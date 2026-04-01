@@ -12,6 +12,20 @@ type AdminOnlyContentProps = {
 export function AdminOnlyContent({ children }: AdminOnlyContentProps) {
   const { isAdmin, isLoading, isLoggedIn, canAccess } = useAdminAuth()
 
+  const handleGoogleLogin = async () => {
+    const redirectTo =
+      typeof window === 'undefined'
+        ? undefined
+        : `${window.location.origin}/auth/callback`
+
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo,
+      },
+    })
+  }
+
   if (isLoading) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white px-4 py-4 text-sm text-slate-600 shadow-sm">
@@ -27,7 +41,7 @@ export function AdminOnlyContent({ children }: AdminOnlyContentProps) {
         <p className="mt-1 text-xs">{t('adminGuard.loginDescription')}</p>
         <button
           type="button"
-          onClick={() => void supabase.auth.signInWithOAuth({ provider: 'google' })}
+          onClick={() => void handleGoogleLogin()}
           className="mt-3 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-slate-950 transition-colors hover:bg-emerald-400"
         >
           {t('auth.loginGoogle')}

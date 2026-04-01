@@ -22,6 +22,14 @@ type PlayerImportRow = {
 type PlayerImportPayload = {
   players: PlayerImportRow[]
 }
+type TierChangeTarget = {
+  playerId: number
+  nickname: string
+  baseTier: PlayerTierStatus
+  currentTier: PlayerTierStatus
+  baseMmr: number
+  currentMmr: number
+}
 const PLAYER_RACE_OPTIONS: PlayerRace[] = ['P', 'T', 'Z', 'PT', 'PZ', 'TZ', 'R']
 const TIER_DOWNLOAD_ORDER: Record<PlayerTierStatus, number> = {
   S: 0,
@@ -387,6 +395,44 @@ export default function PlayersPage() {
 
   const showMmrColumn = isAdmin
   const showActionsColumn = isAdmin
+  const tierChangeTargets = useMemo<TierChangeTarget[]>(
+    () =>
+      rows
+        .flatMap((row) => {
+          if (row.baseTier === undefined || row.baseMmr === undefined) {
+            return []
+          }
+          if (row.baseTier === row.tier) {
+            return []
+          }
+
+          return [{
+            playerId: row.id,
+            nickname: row.nickname,
+            baseTier: row.baseTier,
+            currentTier: row.tier,
+            baseMmr: row.baseMmr,
+            currentMmr: row.currentMmr,
+          }]
+        })
+        .sort((a, b) => {
+          const currentTierDiff = toTierOrder(a.currentTier) - toTierOrder(b.currentTier)
+          if (currentTierDiff !== 0) {
+            return currentTierDiff
+          }
+
+          if (b.currentMmr !== a.currentMmr) {
+            return b.currentMmr - a.currentMmr
+          }
+
+          return a.nickname.localeCompare(b.nickname, 'ko-KR')
+        }),
+    [rows]
+  )
+  const tierChangeTargetById = useMemo(
+    () => new Map(tierChangeTargets.map((target) => [target.playerId, target])),
+    [tierChangeTargets]
+  )
   const downloadableRows = useMemo(
     () => [...rows].sort(comparePlayersByTierThenNickname),
     [rows]
@@ -517,6 +563,52 @@ export default function PlayersPage() {
         </div>
       )}
 
+      {isAdmin && (
+        <article className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-amber-950">{t('players.tierChange.title')}</h3>
+            <span className="rounded-md border border-amber-300 bg-white px-2 py-0.5 text-xs font-medium text-amber-800">
+              {t('players.tierChange.count', { count: tierChangeTargets.length })}
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-amber-900">{t('players.tierChange.description')}</p>
+          {tierChangeTargets.length === 0 ? (
+            <p className="mt-3 rounded-md border border-amber-200 bg-white/70 px-3 py-2 text-xs text-amber-800">
+              {t('players.tierChange.empty')}
+            </p>
+          ) : (
+            <ul className="mt-3 space-y-2">
+              {tierChangeTargets.map((target) => {
+                const fromTierLabel =
+                  target.baseTier === 'UNASSIGNED' ? t('players.table.unassigned') : target.baseTier
+                const toTierLabel =
+                  target.currentTier === 'UNASSIGNED'
+                    ? t('players.table.unassigned')
+                    : target.currentTier
+
+                return (
+                  <li
+                    key={`tier-change-${target.playerId}`}
+                    className="rounded-md border border-amber-200 bg-white/80 px-3 py-2 text-sm text-slate-800"
+                  >
+                    <div className="font-medium text-slate-900">{target.nickname}</div>
+                    <div className="mt-0.5 text-xs text-slate-700">
+                      {t('players.tierChange.fromTo', { from: fromTierLabel, to: toTierLabel })}
+                    </div>
+                    <div className="mt-0.5 text-xs text-slate-600">
+                      {t('players.tierChange.mmrFlow', {
+                        from: formatMmrValue(target.baseMmr),
+                        to: formatMmrValue(target.currentMmr),
+                      })}
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </article>
+      )}
+
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="grid gap-3 md:grid-cols-3">
           <label className="space-y-1 text-xs font-medium text-slate-500 md:col-span-2">
@@ -603,6 +695,7 @@ export default function PlayersPage() {
                 const isSaving = savingPlayerId === row.id
                 const isDeleting = deletingPlayerId === row.id
                 const busy = isSaving || isDeleting
+                const tierChangeTarget = tierChangeTargetById.get(row.id)
 
                 return (
                   <tr key={row.id} className="border-t border-slate-100 transition-colors hover:bg-slate-50/70">
@@ -615,7 +708,14 @@ export default function PlayersPage() {
                           className="w-full rounded-md border border-slate-200 px-2 py-1 text-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
                         />
                       ) : (
-                        row.nickname
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span>{row.nickname}</span>
+                          {isAdmin && tierChangeTarget && (
+                            <span className="rounded-md border border-amber-300 bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
+                              {t('players.tierChange.badge')}
+                            </span>
+                          )}
+                        </div>
                       )}
                     </td>
                     <td className="px-4 py-3 text-slate-700">

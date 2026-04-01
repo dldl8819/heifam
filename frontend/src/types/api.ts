@@ -161,6 +161,8 @@ export type PlayerRosterItem = {
   nickname: string
   race: PlayerRace
   tier: PlayerTierStatus
+  baseMmr?: number
+  baseTier?: PlayerTierStatus
   currentMmr: number
   wins: number
   losses: number

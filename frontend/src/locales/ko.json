@@ -326,6 +326,15 @@
         "games": "경기수"
       }
     },
+    "tierChange": {
+      "title": "티어 변경 안내 대상",
+      "description": "초기 MMR 기준 티어와 현재 MMR 기준 티어가 달라진 선수입니다. 단톡 안내용으로 확인해 주세요.",
+      "count": "총 {count}명",
+      "empty": "현재 티어 변경 안내 대상이 없습니다.",
+      "fromTo": "{from} -> {to}",
+      "mmrFlow": "MMR {from} -> {to}",
+      "badge": "변경 안내"
+    },
     "actions": {
       "edit": "수정",
       "save": "저장",

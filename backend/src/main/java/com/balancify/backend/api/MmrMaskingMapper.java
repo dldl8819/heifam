@@ -30,6 +30,8 @@ public final class MmrMaskingMapper {
                     response.race(),
                     response.tier(),
                     0,
+                    response.tier(),
+                    0,
                     response.wins(),
                     response.losses(),
                     response.games()

@@ -5,10 +5,11 @@ public record GroupPlayerResponse(
     String nickname,
     String race,
     String tier,
+    Integer baseMmr,
+    String baseTier,
     int currentMmr,
     int wins,
     int losses,
     int games
 ) {
 }
-

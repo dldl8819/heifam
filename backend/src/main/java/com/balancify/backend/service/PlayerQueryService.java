@@ -62,12 +62,16 @@ public class PlayerQueryService {
             StatsAccumulator stats =
                 statsByPlayerId.getOrDefault(player.getId(), new StatsAccumulator());
             int games = stats.wins + stats.losses;
+            Integer baseMmr = player.getBaseMmr();
+            String baseTier = baseMmr == null ? null : PlayerTierPolicy.resolveTier(baseMmr);
 
             responses.add(new GroupPlayerResponse(
                 player.getId(),
                 player.getNickname(),
                 normalizeRace(player.getRace()),
                 PlayerTierPolicy.resolveTier(player.getMmr()),
+                baseMmr,
+                baseTier,
                 safeInt(player.getMmr()),
                 stats.wins,
                 stats.losses,

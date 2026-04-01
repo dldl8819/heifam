@@ -396,6 +396,8 @@ function normalizePlayerRosterItem(value: unknown): PlayerRosterItem | null {
         ? source.name
         : null
   const currentMmr = toNumber(source.currentMmr ?? source.mmr)
+  const baseMmr = toNumber(source.baseMmr)
+  const baseTier = normalizeTier(source.baseTier)
   const wins = toNumber(source.wins) ?? 0
   const losses = toNumber(source.losses) ?? 0
   const games = toNumber(source.games) ?? wins + losses
@@ -409,6 +411,8 @@ function normalizePlayerRosterItem(value: unknown): PlayerRosterItem | null {
     nickname,
     race: normalizeRace(source.race),
     tier: normalizeTier(source.tier) ?? 'UNASSIGNED',
+    baseMmr: baseMmr ?? undefined,
+    baseTier: baseTier ?? undefined,
     currentMmr,
     wins,
     losses,
