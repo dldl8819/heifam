@@ -26,12 +26,13 @@ import { getStoredAdminApiKey } from '@/lib/admin-key'
 import { supabase } from '@/lib/supabase'
 
 const DEFAULT_DEV_API_BASE_URL = 'http://localhost:8080'
+const DEFAULT_PROD_API_BASE_URL = '/api/proxy'
 const RAW_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ?? ''
 const API_BASE_URL =
-  RAW_API_BASE_URL.length > 0
-    ? RAW_API_BASE_URL
-    : process.env.NODE_ENV === 'production'
-      ? ''
+  process.env.NODE_ENV === 'production'
+    ? DEFAULT_PROD_API_BASE_URL
+    : RAW_API_BASE_URL.length > 0
+      ? RAW_API_BASE_URL
       : DEFAULT_DEV_API_BASE_URL
 const DEFAULT_API_REQUEST_TIMEOUT_MS = 10000
 const IMPORT_API_REQUEST_TIMEOUT_MS = 120000
@@ -40,9 +41,7 @@ const USER_NICKNAME_HEADER = 'X-USER-NICKNAME'
 
 function createUrl(path: string): string {
   if (API_BASE_URL.length === 0) {
-    throw new Error(
-      'NEXT_PUBLIC_API_BASE_URL is required in production environment',
-    )
+    throw new Error('API base URL is not configured')
   }
 
   const normalizedBase = API_BASE_URL.replace(/\/+$/, '')

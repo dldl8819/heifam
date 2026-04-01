@@ -26,4 +26,4 @@ services:
       - key: ADMIN_EMAILS
         sync: false
       - key: CORS_ALLOWED_ORIGINS
-        value: https://hei.heifam.com
+        value: https://heifam.co.kr,https://www.heifam.co.kr

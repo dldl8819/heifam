@@ -57,23 +57,23 @@ export function getRouteAccessDecision(
 ): RouteAccessDecision {
   const requirement = resolveRouteRequirement(pathname)
 
-  if (pathname === '/' && context.isLoggedIn && context.canAccess) {
+  if (requirement === 'public') {
+    if (pathname === '/' && context.isLoggedIn && context.canAccess) {
+      return {
+        allowed: false,
+        redirectTo: '/dashboard',
+        blocked: false,
+      }
+    }
+
     return {
-      allowed: false,
-      redirectTo: '/dashboard',
+      allowed: true,
+      redirectTo: null,
       blocked: false,
     }
   }
 
   if (!context.isLoggedIn) {
-    if (requirement === 'public') {
-      return {
-        allowed: true,
-        redirectTo: null,
-        blocked: false,
-      }
-    }
-
     return {
       allowed: false,
       redirectTo: '/',
@@ -89,7 +89,7 @@ export function getRouteAccessDecision(
     }
   }
 
-  if (requirement === 'public' || requirement === 'member') {
+  if (requirement === 'member') {
     return {
       allowed: true,
       redirectTo: null,
