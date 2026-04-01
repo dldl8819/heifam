@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply text-slate-900 antialiased;
+    background:
+      radial-gradient(circle at 10% 10%, rgba(251, 191, 36, 0.1), transparent 28%),
+      radial-gradient(circle at 85% 15%, rgba(14, 116, 144, 0.08), transparent 26%),
+      #f1f5f9;
+  }
+}
+
+.pl {
+  position: relative;
+  width: 5.25rem;
+  height: 5.25rem;
+}
+
+.pl__dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 9999px;
+  background: #0f172a;
+  transform: rotate(calc(var(--i) * 30deg)) translateY(-2rem);
+  transform-origin: 0 0;
+  animation: pl-fade 1.2s linear infinite;
+  animation-delay: calc(var(--i) * -0.1s);
+}
+
+.pl__text {
+  position: absolute;
+  left: 50%;
+  bottom: -0.9rem;
+  transform: translateX(-50%);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+@keyframes pl-fade {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.2;
+  }
+}

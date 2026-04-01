@@ -1,0 +1,709 @@
+'use client'
+
+import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAdminAuth } from '@/lib/admin-auth'
+import { apiClient, isApiForbiddenError, isApiUnauthorizedError } from '@/lib/api'
+import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
+import { LoadingIndicator } from '@/components/ui/loading-indicator'
+import { t } from '@/lib/i18n'
+import type { BalancePlayerOption, BalanceResponse, MatchResultResponse, TeamSide } from '@/types/api'
+
+const TEMP_GROUP_ID = 1
+const MAX_SLOT_COUNT = 6
+const BALANCE_STATE_STORAGE_KEY = 'balancify.balance.state.v2'
+const winnerTeamOptions: TeamSide[] = ['HOME', 'AWAY']
+const teamSizeOptions = [
+  { value: 3 as const, labelKey: 'balance.mode.threeVsThree' },
+  { value: 2 as const, labelKey: 'balance.mode.twoVsTwo' },
+]
+
+type SupportedTeamSize = 2 | 3
+
+type PersistedBalanceState = {
+  teamSize: SupportedTeamSize
+  slots: Array<number | null>
+  slotInputs: string[]
+  result: BalanceResponse | null
+  resultMatchId: string
+  winnerTeam: TeamSide
+}
+
+function formatPercent(value: number): string {
+  const percent = value <= 1 ? value * 100 : value
+  return `${percent.toFixed(2)}%`
+}
+
+function formatTeamLabel(team: TeamSide | string): string {
+  return team === 'HOME'
+    ? t('results.team.home')
+    : team === 'AWAY'
+      ? t('results.team.away')
+      : team
+}
+
+function createEmptySlots(): Array<number | null> {
+  return Array.from({ length: MAX_SLOT_COUNT }, () => null)
+}
+
+function createEmptySlotInputs(): string[] {
+  return Array.from({ length: MAX_SLOT_COUNT }, () => '')
+}
+
+function toPlayerLabel(player: BalancePlayerOption, showMmr: boolean): string {
+  const mmrText = showMmr ? ` - ${player.currentMmr} MMR` : ''
+  return `${player.nickname} (${player.race})${mmrText}${player.tier ? ` [${player.tier}]` : ''}`
+}
+
+function sanitizePersistedTeamSize(teamSize: unknown): SupportedTeamSize {
+  return teamSize === 2 ? 2 : 3
+}
+
+function sanitizePersistedSlots(slots: unknown): Array<number | null> {
+  if (!Array.isArray(slots)) {
+    return createEmptySlots()
+  }
+
+  const normalized = slots
+    .slice(0, MAX_SLOT_COUNT)
+    .map((value) => (typeof value === 'number' && Number.isFinite(value) ? value : null))
+
+  while (normalized.length < MAX_SLOT_COUNT) {
+    normalized.push(null)
+  }
+
+  return normalized
+}
+
+function sanitizePersistedSlotInputs(slotInputs: unknown): string[] {
+  if (!Array.isArray(slotInputs)) {
+    return createEmptySlotInputs()
+  }
+
+  const normalized = slotInputs
+    .slice(0, MAX_SLOT_COUNT)
+    .map((value) => (typeof value === 'string' ? value : ''))
+
+  while (normalized.length < MAX_SLOT_COUNT) {
+    normalized.push('')
+  }
+
+  return normalized
+}
+
+function readPersistedBalanceState(): PersistedBalanceState | null {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  try {
+    const raw = window.localStorage.getItem(BALANCE_STATE_STORAGE_KEY)
+    if (!raw) {
+      return null
+    }
+
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    return {
+      teamSize: sanitizePersistedTeamSize(parsed.teamSize),
+      slots: sanitizePersistedSlots(parsed.slots),
+      slotInputs: sanitizePersistedSlotInputs(parsed.slotInputs),
+      result:
+        parsed.result !== null &&
+        typeof parsed.result === 'object' &&
+        parsed.result !== undefined
+          ? (parsed.result as BalanceResponse)
+          : null,
+      resultMatchId: typeof parsed.resultMatchId === 'string' ? parsed.resultMatchId : '',
+      winnerTeam:
+        parsed.winnerTeam === 'HOME' || parsed.winnerTeam === 'AWAY'
+          ? parsed.winnerTeam
+          : 'HOME',
+    }
+  } catch {
+    return null
+  }
+}
+
+export default function BalancePage() {
+  const router = useRouter()
+  const { isAdmin } = useAdminAuth()
+  const [players, setPlayers] = useState<BalancePlayerOption[]>([])
+  const [teamSize, setTeamSize] = useState<SupportedTeamSize>(3)
+  const [slots, setSlots] = useState<Array<number | null>>(createEmptySlots)
+  const [slotInputs, setSlotInputs] = useState<string[]>(createEmptySlotInputs)
+  const [playersLoading, setPlayersLoading] = useState<boolean>(true)
+  const [playersError, setPlayersError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState<boolean>(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [result, setResult] = useState<BalanceResponse | null>(null)
+  const [resultMatchId, setResultMatchId] = useState<string>('')
+  const [resultWinnerTeam, setResultWinnerTeam] = useState<TeamSide>('HOME')
+  const [resultSubmitting, setResultSubmitting] = useState<boolean>(false)
+  const [resultSubmitError, setResultSubmitError] = useState<string | null>(null)
+  const [resultSubmitSuccess, setResultSubmitSuccess] = useState<MatchResultResponse | null>(null)
+  const [matchCreateMessage, setMatchCreateMessage] = useState<string | null>(null)
+  const [persistedReady, setPersistedReady] = useState<boolean>(false)
+
+  const requiredPlayerCount = teamSize * 2
+
+  useEffect(() => {
+    let active = true
+
+    const loadPlayers = async () => {
+      setPlayersLoading(true)
+      setPlayersError(null)
+
+      try {
+        const apiPlayers = await apiClient.getGroupPlayers(TEMP_GROUP_ID)
+
+        if (!active) {
+          return
+        }
+
+        const nextPlayers = apiPlayers
+          .map((player) => ({
+            id: player.id,
+            nickname: player.nickname,
+            race: player.race,
+            currentMmr: player.currentMmr,
+            tier: player.tier,
+          }))
+          .sort((a, b) =>
+            isAdmin
+              ? b.currentMmr - a.currentMmr
+              : a.nickname.localeCompare(b.nickname, 'ko-KR')
+          )
+
+        setPlayers(nextPlayers)
+      } catch {
+        if (!active) {
+          return
+        }
+
+        setPlayersError(t('balance.loadError'))
+        setPlayers([])
+      } finally {
+        if (active) {
+          setPlayersLoading(false)
+        }
+      }
+    }
+
+    void loadPlayers()
+
+    return () => {
+      active = false
+    }
+  }, [isAdmin])
+
+  useEffect(() => {
+    if (playersLoading || players.length === 0) {
+      return
+    }
+
+    const validPlayerIds = new Set(players.map((player) => player.id))
+    setSlots((prev) => prev.map((id) => (id !== null && validPlayerIds.has(id) ? id : null)))
+  }, [players, playersLoading])
+
+  useEffect(() => {
+    const persisted = readPersistedBalanceState()
+    if (persisted) {
+      setSlots(persisted.slots)
+      setSlotInputs(persisted.slotInputs)
+      setResult(persisted.result)
+      setResultMatchId(persisted.resultMatchId)
+      setResultWinnerTeam(persisted.winnerTeam)
+    }
+    setPersistedReady(true)
+  }, [])
+
+  useEffect(() => {
+    if (!persistedReady || typeof window === 'undefined') {
+      return
+    }
+
+    const payload: PersistedBalanceState = {
+      teamSize,
+      slots,
+      slotInputs,
+      result,
+      resultMatchId,
+      winnerTeam: resultWinnerTeam,
+    }
+
+    try {
+      window.localStorage.setItem(BALANCE_STATE_STORAGE_KEY, JSON.stringify(payload))
+    } catch {
+      return
+    }
+  }, [teamSize, slots, slotInputs, result, resultMatchId, resultWinnerTeam, persistedReady])
+
+  const activeSlotIndexes = useMemo(
+    () => Array.from({ length: requiredPlayerCount }, (_, index) => index),
+    [requiredPlayerCount]
+  )
+
+  const selectedPlayers = useMemo(
+    () =>
+      slots
+        .slice(0, requiredPlayerCount)
+        .map((selectedId) => players.find((player) => player.id === selectedId))
+        .filter((player): player is BalancePlayerOption => player !== undefined),
+    [players, requiredPlayerCount, slots]
+  )
+
+  const selectedIds = useMemo(
+    () => new Set(slots.slice(0, requiredPlayerCount).filter((value): value is number => value !== null)),
+    [requiredPlayerCount, slots]
+  )
+
+  const allSelected = selectedPlayers.length === requiredPlayerCount
+  const hasDuplicates = selectedIds.size !== selectedPlayers.length
+  const canSubmit =
+    !playersLoading &&
+    !submitting &&
+    players.length > 0 &&
+    allSelected &&
+    !hasDuplicates
+
+  const totalSelectedMmr = selectedPlayers.reduce((sum, player) => sum + player.currentMmr, 0)
+  const clearSelectionAndResult = (nextTeamSize: SupportedTeamSize | null = null) => {
+    if (nextTeamSize !== null) {
+      setTeamSize(nextTeamSize)
+    }
+    setSlots(createEmptySlots())
+    setSlotInputs(createEmptySlotInputs())
+    setSubmitError(null)
+    setResult(null)
+    setResultMatchId('')
+    setMatchCreateMessage(null)
+    setResultSubmitError(null)
+    setResultSubmitSuccess(null)
+  }
+
+  const handleTeamSizeChange = (nextTeamSize: SupportedTeamSize) => {
+    if (nextTeamSize === teamSize) {
+      return
+    }
+    clearSelectionAndResult(nextTeamSize)
+  }
+
+  const handleSlotInputChange = (index: number, value: string) => {
+    const input = value.trim()
+    const normalizedInput = input.toLowerCase()
+
+    const matchedPlayer =
+      input.length === 0
+        ? null
+        : players.find((player) => player.nickname.toLowerCase() === normalizedInput) ??
+          players.find((player) => toPlayerLabel(player, isAdmin).toLowerCase() === normalizedInput) ??
+          players.find((player) => toPlayerLabel(player, true).toLowerCase() === normalizedInput) ??
+          null
+
+    setSlots((prev) => {
+      const next = [...prev]
+      next[index] = matchedPlayer?.id ?? null
+      return next
+    })
+    setSlotInputs((prev) => {
+      const next = [...prev]
+      next[index] = value
+      return next
+    })
+    setSubmitError(null)
+  }
+
+  const handleGenerate = async () => {
+    setSubmitError(null)
+    setResult(null)
+    setResultMatchId('')
+    setMatchCreateMessage(null)
+    setResultSubmitError(null)
+    setResultSubmitSuccess(null)
+
+    if (!allSelected || hasDuplicates) {
+      setSubmitError(t('balance.validation.needExact', { count: requiredPlayerCount }))
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const selectedPlayerIds = selectedPlayers.map((player) => player.id)
+      const response = await apiClient.balanceMatch({
+        groupId: TEMP_GROUP_ID,
+        playerIds: selectedPlayerIds,
+        teamSize,
+      })
+      setResult(response)
+
+      const homePlayerIds = response.homeTeam
+        .map((player) => player.playerId)
+        .filter((playerId): playerId is number => typeof playerId === 'number' && Number.isFinite(playerId))
+      const awayPlayerIds = response.awayTeam
+        .map((player) => player.playerId)
+        .filter((playerId): playerId is number => typeof playerId === 'number' && Number.isFinite(playerId))
+
+      if (response.teamSize === 3 && homePlayerIds.length === 3 && awayPlayerIds.length === 3) {
+        if (!isAdmin) {
+          setMatchCreateMessage(t('balance.quickResult.matchCreateAdminOnly'))
+        } else {
+          try {
+            const created = await apiClient.createGroupMatch(TEMP_GROUP_ID, {
+              homePlayerIds,
+              awayPlayerIds,
+            })
+            setResultMatchId(String(created.matchId))
+            setMatchCreateMessage(t('balance.quickResult.matchCreated', { matchId: created.matchId }))
+          } catch (createError) {
+            if (isApiForbiddenError(createError)) {
+              setMatchCreateMessage(t('balance.quickResult.matchCreateForbidden'))
+            } else {
+              setMatchCreateMessage(t('balance.quickResult.matchCreateFailed'))
+            }
+          }
+        }
+      } else if (response.teamSize === 2) {
+        setMatchCreateMessage(t('balance.quickResult.matchCreateOnlyThreeVsThree'))
+      } else {
+        setMatchCreateMessage(t('balance.quickResult.matchCreateMissingPlayers'))
+      }
+    } catch {
+      setSubmitError(t('balance.validation.generateFailed'))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleSubmitResult = async () => {
+    setResultSubmitError(null)
+    setResultSubmitSuccess(null)
+
+    if (!isAdmin) {
+      setResultSubmitError(t('common.adminOnlyAction'))
+      return
+    }
+
+    const parsedMatchId = Number(resultMatchId)
+    if (!Number.isFinite(parsedMatchId) || parsedMatchId <= 0) {
+      setResultSubmitError(t('results.form.invalidMatchId'))
+      return
+    }
+
+    setResultSubmitting(true)
+    try {
+      const response = await apiClient.submitMatchResult(parsedMatchId, {
+        winnerTeam: resultWinnerTeam,
+      })
+      setResultSubmitSuccess(response)
+      router.push(
+        `/results?matchId=${response.matchId}&winnerTeam=${response.winnerTeam}&from=balance`
+      )
+    } catch (error) {
+      if (isApiUnauthorizedError(error)) {
+        setResultSubmitError(t('common.adminLoginRequired'))
+      } else if (isApiForbiddenError(error)) {
+        setResultSubmitError(t('common.permissionDenied'))
+      } else {
+        setResultSubmitError(t('results.form.submitFailure'))
+      }
+    } finally {
+      setResultSubmitting(false)
+    }
+  }
+
+  return (
+    <section className="space-y-6">
+      <header className="space-y-2 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+        <h2 className="text-2xl font-semibold tracking-tight">{t('balance.title')}</h2>
+        <p className="text-sm text-slate-600">{t('balance.description')}</p>
+        <p className="text-xs text-slate-500">
+          {teamSize === 2 ? t('balance.mode.helperTwoVsTwo') : t('balance.mode.helperThreeVsThree')}
+        </p>
+      </header>
+
+      {playersError && (
+        <Alert variant="destructive" appearance="light">
+          <AlertIcon icon="destructive">!</AlertIcon>
+          <AlertContent>
+            <AlertTitle>{t('common.errorPrefix')}</AlertTitle>
+            <AlertDescription>{playersError}</AlertDescription>
+          </AlertContent>
+        </Alert>
+      )}
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm xl:col-span-2">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900">
+                {t('balance.selection.title', { count: requiredPlayerCount })}
+              </h3>
+              <button
+                type="button"
+                onClick={() => clearSelectionAndResult()}
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
+              >
+                {t('balance.selection.reset')}
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-slate-700">{t('balance.mode.title')}</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {teamSizeOptions.map((option) => {
+                  const selected = teamSize === option.value
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => handleTeamSizeChange(option.value)}
+                      className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                        selected
+                          ? 'border-indigo-500 bg-indigo-50 text-indigo-900'
+                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className="text-sm font-semibold">{t(option.labelKey)}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          {playersLoading ? (
+            <LoadingIndicator className="mt-4" label={t('common.loading')} />
+          ) : (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {activeSlotIndexes.map((index) => {
+                const activeSlots = slots.slice(0, requiredPlayerCount)
+                const unavailableIds = new Set(
+                  activeSlots.filter(
+                    (slotId, slotIndex): slotId is number => slotId !== null && slotIndex !== index
+                  )
+                )
+                const selectedId = slots[index]
+                const inputMatchedPlayer =
+                  selectedId === null
+                    ? null
+                    : players.find((player) => player.id === selectedId) ?? null
+                const isDuplicateSelection =
+                  inputMatchedPlayer !== null && unavailableIds.has(inputMatchedPlayer.id)
+
+                return (
+                  <label
+                    key={`slot-${index}`}
+                    className="space-y-1 text-xs font-medium text-slate-500"
+                  >
+                    {t('balance.selection.slot', { index: index + 1 })}
+                    <input
+                      value={slotInputs[index]}
+                      onChange={(event) => handleSlotInputChange(index, event.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                      placeholder={t('balance.selection.placeholder')}
+                    />
+                    {inputMatchedPlayer && (
+                      <p className="text-[11px] text-slate-500">{toPlayerLabel(inputMatchedPlayer, isAdmin)}</p>
+                    )}
+                    {isDuplicateSelection && (
+                      <p className="text-[11px] text-rose-700">{t('balance.validation.duplicate')}</p>
+                    )}
+                  </label>
+                )
+              })}
+            </div>
+          )}
+        </article>
+
+        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <h3 className="text-sm font-semibold text-slate-900">{t('balance.summary.title')}</h3>
+          <p className="mt-1 text-xs text-slate-500">
+            {t('balance.summary.selectedCount', {
+              count: selectedPlayers.length,
+              required: requiredPlayerCount,
+            })}
+          </p>
+
+          <ul className="mt-3 space-y-2">
+            {selectedPlayers.map((player) => (
+              <li
+                key={`summary-${player.id}`}
+                className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              >
+                <span className="font-medium text-slate-800">
+                  {player.nickname} ({player.race})
+                </span>
+                <span className="text-slate-600">{isAdmin ? player.currentMmr : '-'}</span>
+              </li>
+            ))}
+            {selectedPlayers.length === 0 && (
+              <li className="rounded-lg border border-dashed border-slate-200 px-3 py-6 text-center text-sm text-slate-500">
+                {t('balance.summary.empty')}
+              </li>
+            )}
+          </ul>
+
+          <div className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            {t('balance.summary.totalMmr')}:{' '}
+            <span className="font-semibold">{isAdmin ? totalSelectedMmr : '-'}</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleGenerate}
+            disabled={!canSubmit}
+            className="mt-4 w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+          >
+            {submitting ? t('balance.summary.submitting') : t('balance.summary.submit')}
+          </button>
+
+          {!allSelected && !playersLoading && (
+            <p className="mt-2 text-xs text-amber-700">
+              {t('balance.validation.needExact', { count: requiredPlayerCount })}
+            </p>
+          )}
+          {!playersLoading && players.length === 0 && (
+            <p className="mt-2 text-xs text-rose-700">{t('balance.validation.noPlayers')}</p>
+          )}
+          {hasDuplicates && (
+            <p className="mt-2 text-xs text-rose-700">{t('balance.validation.duplicate')}</p>
+          )}
+          {submitError && (
+            <Alert variant="destructive" appearance="light" size="sm" className="mt-2">
+              <AlertIcon icon="destructive">!</AlertIcon>
+              <AlertContent>
+                <AlertDescription>{submitError}</AlertDescription>
+              </AlertContent>
+            </Alert>
+          )}
+        </article>
+      </div>
+
+      {result && (
+        <section className="grid gap-4 lg:grid-cols-2">
+          <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <h3 className="text-sm font-semibold text-slate-900">{t('balance.result.homeTeam')}</h3>
+            <ul className="mt-3 space-y-2">
+              {result.homeTeam.map((player) => (
+                <li
+                  key={`home-${player.name}`}
+                  className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                >
+                  <span className="font-medium text-slate-800">{player.name}</span>
+                  <span className="text-slate-600">{isAdmin ? `${player.mmr} MMR` : '-'}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-sm text-slate-700">
+              {t('balance.result.homeMmr')}: <span className="font-semibold">{isAdmin ? result.homeMmr : '-'}</span>
+            </p>
+          </article>
+
+          <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <h3 className="text-sm font-semibold text-slate-900">{t('balance.result.awayTeam')}</h3>
+            <ul className="mt-3 space-y-2">
+              {result.awayTeam.map((player) => (
+                <li
+                  key={`away-${player.name}`}
+                  className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                >
+                  <span className="font-medium text-slate-800">{player.name}</span>
+                  <span className="text-slate-600">{isAdmin ? `${player.mmr} MMR` : '-'}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-sm text-slate-700">
+              {t('balance.result.awayMmr')}: <span className="font-semibold">{isAdmin ? result.awayMmr : '-'}</span>
+            </p>
+          </article>
+
+          <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-2">
+            <h3 className="text-sm font-semibold text-slate-900">{t('balance.result.metricsTitle')}</h3>
+            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                {t('balance.result.mmrDiff')}: <span className="font-semibold">{isAdmin ? result.mmrDiff : '-'}</span>
+              </div>
+              <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                {t('balance.result.expectedHomeWinRate')}:{' '}
+                <span className="font-semibold">
+                  {isAdmin ? formatPercent(result.expectedHomeWinRate) : '-'}
+                </span>
+              </div>
+              <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                {t('balance.result.averageTeamMmr')}:{' '}
+                <span className="font-semibold">
+                  {isAdmin ? Math.round((result.homeMmr + result.awayMmr) / 2) : '-'}
+                </span>
+              </div>
+            </div>
+          </article>
+        </section>
+      )}
+
+      <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h3 className="text-sm font-semibold text-slate-900">{t('balance.quickResult.title')}</h3>
+        <p className="mt-1 text-xs text-slate-500">{t('balance.quickResult.description')}</p>
+        <div className="mt-3 grid gap-3 md:grid-cols-3">
+          <label className="space-y-1 text-xs font-medium text-slate-500 md:col-span-2">
+            {t('results.form.matchId')}
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              value={resultMatchId}
+              onChange={(event) => setResultMatchId(event.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              placeholder={t('results.form.matchIdPlaceholder')}
+            />
+          </label>
+
+          <label className="space-y-1 text-xs font-medium text-slate-500">
+            {t('results.form.winnerTeam')}
+            <select
+              value={resultWinnerTeam}
+              onChange={(event) => setResultWinnerTeam(event.target.value as TeamSide)}
+              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+            >
+              {winnerTeamOptions.map((team) => (
+                <option key={team} value={team}>
+                  {formatTeamLabel(team)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleSubmitResult}
+            disabled={resultSubmitting}
+            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+          >
+            {resultSubmitting ? t('balance.quickResult.submitting') : t('balance.quickResult.submit')}
+          </button>
+        </div>
+
+        {matchCreateMessage && (
+          <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+            {matchCreateMessage}
+          </p>
+        )}
+
+        {resultSubmitError && (
+          <Alert variant="destructive" appearance="light" size="sm" className="mt-3">
+            <AlertIcon icon="destructive">!</AlertIcon>
+            <AlertContent>
+              <AlertDescription>{resultSubmitError}</AlertDescription>
+            </AlertContent>
+          </Alert>
+        )}
+        {resultSubmitSuccess && (
+          <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+            {t('balance.quickResult.success', { matchId: resultSubmitSuccess.matchId })}
+          </div>
+        )}
+      </article>
+    </section>
+  )
+}

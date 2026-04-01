@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: hei-backend
+    runtime: java
+    rootDir: backend
+    plan: free
+    buildCommand: ./gradlew clean bootJar
+    startCommand: java -jar build/libs/heifam-backend.jar
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: JAVA_VERSION
+        value: "21"
+      - key: SPRING_DATASOURCE_URL
+        sync: false
+      - key: SPRING_DATASOURCE_USERNAME
+        sync: false
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+      - key: SPRING_DATASOURCE_SSLMODE
+        value: require
+      - key: SERVER_PORT
+        sync: false
+      - key: ADMIN_API_KEY
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://hei.heifam.com

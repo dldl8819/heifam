@@ -1,0 +1,178 @@
+package com.balancify.backend.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.when;
+
+import com.balancify.backend.api.match.dto.BalancePlayerDto;
+import com.balancify.backend.api.match.dto.BalanceRequest;
+import com.balancify.backend.api.match.dto.BalanceResponse;
+import com.balancify.backend.domain.Group;
+import com.balancify.backend.domain.Player;
+import com.balancify.backend.repository.PlayerRepository;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+@ExtendWith(MockitoExtension.class)
+class TeamBalancingServiceTest {
+
+    @Mock
+    private PlayerRepository playerRepository;
+
+    private TeamBalancingService service;
+
+    @BeforeEach
+    void setUp() {
+        service = new TeamBalancingService(playerRepository);
+    }
+
+    @Test
+    void generatesBalancedTwoVsTwoFromPlayerIds() {
+        List<Player> players = createPlayers(1L, List.of(
+            new PlayerSeed(1L, "A", 1600),
+            new PlayerSeed(2L, "B", 1520),
+            new PlayerSeed(3L, "C", 1490),
+            new PlayerSeed(4L, "D", 1440)
+        ));
+        when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L)))
+            .thenReturn(players);
+
+        BalanceResponse response = service.balance(
+            new BalanceRequest(1L, List.of(1L, 2L, 3L, 4L), 2)
+        );
+
+        assertThat(response.teamSize()).isEqualTo(2);
+        assertThat(response.homeTeam()).hasSize(2);
+        assertThat(response.awayTeam()).hasSize(2);
+        assertThat(response.homeMmr() + response.awayMmr()).isEqualTo(6050);
+        assertThat(response.mmrDiff()).isEqualTo(findMinimumDiff(allPlayers(response), 2));
+        assertThat(response.expectedHomeWinRate()).isBetween(0.0, 1.0);
+    }
+
+    @Test
+    void generatesBalancedThreeVsThreeFromPlayersPayload() {
+        BalanceRequest request = new BalanceRequest(List.of(
+            new BalancePlayerDto("A", 1400),
+            new BalancePlayerDto("B", 1300),
+            new BalancePlayerDto("C", 1200),
+            new BalancePlayerDto("D", 1100),
+            new BalancePlayerDto("E", 1000),
+            new BalancePlayerDto("F", 900)
+        ));
+
+        BalanceResponse response = service.balance(request);
+
+        assertThat(response.teamSize()).isEqualTo(3);
+        assertThat(response.homeTeam()).hasSize(3);
+        assertThat(response.awayTeam()).hasSize(3);
+        assertThat(response.homeMmr() + response.awayMmr()).isEqualTo(6900);
+        assertThat(response.mmrDiff()).isEqualTo(findMinimumDiff(allPlayers(response), 3));
+        assertThat(response.expectedHomeWinRate()).isBetween(0.0, 1.0);
+
+        Set<String> allPlayerNames = new HashSet<>();
+        response.homeTeam().forEach(player -> allPlayerNames.add(player.name()));
+        response.awayTeam().forEach(player -> allPlayerNames.add(player.name()));
+        assertThat(allPlayerNames).containsExactlyInAnyOrder("A", "B", "C", "D", "E", "F");
+    }
+
+    @Test
+    void rejectsInvalidTwoVsTwoPlayerCount() {
+        assertThatThrownBy(() ->
+            service.balance(new BalanceRequest(1L, List.of(1L, 2L, 3L), 2))
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("teamSize=2 requires exactly 4 players");
+    }
+
+    @Test
+    void rejectsInvalidThreeVsThreePlayerCount() {
+        assertThatThrownBy(() ->
+            service.balance(new BalanceRequest(1L, List.of(1L, 2L, 3L, 4L), 3))
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("teamSize=3 requires exactly 6 players");
+    }
+
+    @Test
+    void rejectsDuplicatePlayerIds() {
+        assertThatThrownBy(() ->
+            service.balance(new BalanceRequest(1L, List.of(1L, 2L, 2L, 3L), 2))
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("playerIds must not contain duplicates");
+    }
+
+    @Test
+    void defaultsTeamSizeToThreeWhenOmitted() {
+        BalanceRequest request = new BalanceRequest(List.of(
+            new BalancePlayerDto("A", 1000),
+            new BalancePlayerDto("B", 1000),
+            new BalancePlayerDto("C", 1000),
+            new BalancePlayerDto("D", 1000),
+            new BalancePlayerDto("E", 1000),
+            new BalancePlayerDto("F", 1000)
+        ));
+
+        BalanceResponse response = service.balance(request);
+        assertThat(response.teamSize()).isEqualTo(3);
+        assertThat(response.mmrDiff()).isZero();
+        assertThat(response.expectedHomeWinRate()).isEqualTo(0.5);
+    }
+
+    private List<Player> createPlayers(Long groupId, List<PlayerSeed> seeds) {
+        Group group = new Group();
+        group.setId(groupId);
+
+        List<Player> players = new ArrayList<>();
+        for (PlayerSeed seed : seeds) {
+            Player player = new Player();
+            player.setId(seed.id());
+            player.setGroup(group);
+            player.setNickname(seed.nickname());
+            player.setMmr(seed.mmr());
+            players.add(player);
+        }
+        return players;
+    }
+
+    private List<BalancePlayerDto> allPlayers(BalanceResponse response) {
+        List<BalancePlayerDto> merged = new ArrayList<>();
+        merged.addAll(response.homeTeam());
+        merged.addAll(response.awayTeam());
+        return merged;
+    }
+
+    private int findMinimumDiff(List<BalancePlayerDto> players, int teamSize) {
+        int minDiff = Integer.MAX_VALUE;
+        int totalMasks = 1 << players.size();
+        for (int mask = 0; mask < totalMasks; mask++) {
+            if (Integer.bitCount(mask) != teamSize || (mask & 1) == 0) {
+                continue;
+            }
+
+            int homeMmr = 0;
+            int awayMmr = 0;
+            for (int index = 0; index < players.size(); index++) {
+                if ((mask & (1 << index)) != 0) {
+                    homeMmr += players.get(index).mmr();
+                } else {
+                    awayMmr += players.get(index).mmr();
+                }
+            }
+
+            int diff = Math.abs(homeMmr - awayMmr);
+            minDiff = Math.min(minDiff, diff);
+        }
+        return minDiff;
+    }
+
+    private record PlayerSeed(Long id, String nickname, int mmr) {
+    }
+}

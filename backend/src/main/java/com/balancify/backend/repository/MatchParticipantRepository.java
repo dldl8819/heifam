@@ -1,0 +1,32 @@
+package com.balancify.backend.repository;
+
+import com.balancify.backend.domain.MatchParticipant;
+import java.util.List;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+public interface MatchParticipantRepository extends JpaRepository<MatchParticipant, Long> {
+
+    @Query("""
+        select mp
+        from MatchParticipant mp
+        join fetch mp.match m
+        join fetch mp.player p
+        where p.group.id = :groupId
+        order by m.playedAt desc, m.id desc, mp.id desc
+        """)
+    List<MatchParticipant> findByGroupIdOrderByPlayedAtDesc(@Param("groupId") Long groupId);
+
+    @Query("""
+        select mp
+        from MatchParticipant mp
+        join fetch mp.match m
+        join fetch mp.player p
+        where m.id = :matchId
+        order by mp.id asc
+        """)
+    List<MatchParticipant> findByMatchIdWithPlayerAndMatch(@Param("matchId") Long matchId);
+
+    void deleteByMatch_Id(Long matchId);
+}

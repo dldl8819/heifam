@@ -1,0 +1,675 @@
+﻿{
+  "meta": {
+    "title": "Hei",
+    "description": "Hei`Fam 스타크래프트 내전 운영을 위한 밸런스 매치 및 랭킹 도구"
+  },
+  "brand": {
+    "name": "Hei",
+    "tagline": "Hei`Fam 스타크래프트 내전 운영툴"
+  },
+  "nav": {
+    "home": "홈",
+    "dashboard": "대시보드",
+    "players": "선수 관리",
+    "balance": "밸런스 매치",
+    "captainDraft": "정기 감전",
+    "multiBalance": "다중 밸런스",
+    "accessControl": "권한 관리",
+    "results": "경기 결과",
+    "ranking": "랭킹"
+  },
+  "landing": {
+    "title": "Hei`Fam 내전 운영 플랫폼",
+    "description": "밸런스 매치 생성부터 결과 반영, 랭킹 확인까지 한 곳에서 관리하세요.",
+    "actions": {
+      "toResults": "경기 결과 보기",
+      "toLogin": "Google 로그인"
+    }
+  },
+  "footer": {
+    "copyright": "© {year} Hei`Fam. All rights reserved.",
+    "privacy": "개인정보처리방침",
+    "terms": "이용약관",
+    "supportLabel": "후원:",
+    "supportAccount": "카카오뱅크 79422998398",
+    "youtubeLabel": "YouTube:",
+    "youtubeLinkText": "https://www.youtube.com/@hei1749",
+    "contactLabel": "문의:",
+    "contactName": "민식"
+  },
+  "legal": {
+    "common": {
+      "updatedAt": "최종 업데이트: {date}",
+      "goHome": "홈으로 이동"
+    },
+    "privacy": {
+      "title": "개인정보처리방침",
+      "description": "Hei`Fam 운영 서비스에서 개인정보를 어떤 방식으로 수집·이용·보호하는지 안내합니다.",
+      "links": {
+        "terms": "이용약관 보기"
+      },
+      "sections": {
+        "collect": {
+          "title": "1. 수집하는 정보",
+          "items": {
+            "one": "Google 로그인 시 계정 식별을 위한 이메일 주소를 수집합니다.",
+            "two": "운영 권한 관리 및 경기 기록 표기를 위해 닉네임을 수집합니다.",
+            "three": "서비스 이용 과정에서 경기 결과, 팀 배정, MMR 변동 기록이 저장됩니다."
+          }
+        },
+        "purpose": {
+          "title": "2. 정보 이용 목적",
+          "items": {
+            "one": "Hei`Fam 내전 운영(권한 확인, 매치 생성, 결과 반영, 랭킹 산정)을 위해 사용합니다.",
+            "two": "운영진 접근 제어와 관리자 기능 보호를 위해 사용합니다.",
+            "three": "경기 기록의 정확성 유지 및 분쟁 확인을 위해 사용합니다."
+          }
+        },
+        "retention": {
+          "title": "3. 보관 및 보호",
+          "items": {
+            "one": "개인정보는 서비스 운영에 필요한 범위 내에서만 보관합니다.",
+            "two": "관리자 권한이 필요한 기능은 서버 측 권한 검증으로 보호됩니다.",
+            "three": "비밀번호나 OAuth Secret 등 민감 정보는 서버 환경변수로만 관리합니다."
+          }
+        },
+        "thirdParty": {
+          "title": "4. 제3자 제공",
+          "items": {
+            "one": "원칙적으로 제3자에게 개인정보를 판매하거나 임의 제공하지 않습니다.",
+            "two": "Google OAuth 등 인증 제공자와의 연동에 필요한 범위 내에서만 정보가 처리됩니다."
+          }
+        },
+        "changes": {
+          "title": "5. 문의 및 변경",
+          "items": {
+            "one": "정책 변경 시 본 페이지를 통해 공지합니다.",
+            "two": "개인정보 처리 관련 문의는 Hei`Fam 운영진에게 전달해 주세요."
+          }
+        }
+      }
+    },
+    "terms": {
+      "title": "이용약관",
+      "description": "Hei`Fam 운영 서비스 이용 시 적용되는 기본 약관입니다.",
+      "links": {
+        "privacy": "개인정보처리방침 보기"
+      },
+      "sections": {
+        "purpose": {
+          "title": "1. 서비스 목적",
+          "items": {
+            "one": "Hei`Fam 내전 운영을 위한 매치 생성, 결과 입력, 랭킹 조회 기능을 제공합니다.",
+            "two": "본 서비스는 커뮤니티 운영 목적의 도구이며, 상업적 플랫폼 서비스가 아닙니다."
+          }
+        },
+        "account": {
+          "title": "2. 계정 및 권한",
+          "items": {
+            "one": "Google 로그인 계정 기반으로 이용 권한이 부여됩니다.",
+            "two": "운영진/최상위 관리자 권한은 서버에 등록된 이메일 정책을 따릅니다.",
+            "three": "권한 없는 계정은 관리자 기능 접근이 제한될 수 있습니다."
+          }
+        },
+        "userRules": {
+          "title": "3. 이용자 준수사항",
+          "items": {
+            "one": "허위 경기 결과 등록, 타인 사칭, 운영 방해 행위를 금지합니다.",
+            "two": "다른 이용자의 개인정보를 무단 수집·공유해서는 안 됩니다.",
+            "three": "서비스 취약점 악용 등 비정상 접근 시 이용이 제한될 수 있습니다."
+          }
+        },
+        "dataAccuracy": {
+          "title": "4. 데이터 정확성",
+          "items": {
+            "one": "운영진은 경기 입력 시 팀/승패/매치 정보를 정확히 확인해야 합니다.",
+            "two": "잘못 입력된 결과는 운영 권한 보유자가 정정 또는 삭제할 수 있습니다.",
+            "three": "시스템 오류 또는 외부 장애로 일부 기록이 지연 반영될 수 있습니다."
+          }
+        },
+        "liability": {
+          "title": "5. 책임 제한",
+          "items": {
+            "one": "서비스는 커뮤니티 운영 편의를 위해 제공되며, 무중단을 보장하지 않습니다.",
+            "two": "불가항력 또는 외부 서비스 장애로 인한 손해에 대해 책임이 제한될 수 있습니다."
+          }
+        },
+        "changes": {
+          "title": "6. 약관 변경",
+          "items": {
+            "one": "운영 정책 변경 시 본 페이지를 통해 공지합니다.",
+            "two": "변경 이후 계속 이용하는 경우 개정 약관에 동의한 것으로 봅니다."
+          }
+        }
+      }
+    }
+  },
+  "common": {
+    "all": "전체",
+    "loading": "불러오는 중...",
+    "errorPrefix": "오류:",
+    "readOnly": "읽기 전용",
+    "mmrHidden": "MMR 정보는 관리자만 확인할 수 있습니다.",
+    "save": "저장",
+    "clear": "초기화",
+    "notSet": "설정되지 않음",
+    "savedInBrowser": "브라우저에 저장됨",
+    "invalidJson": "JSON 형식이 올바르지 않습니다.",
+    "adminKeyInvalid": "관리자 키가 올바르지 않습니다. 상단에서 키를 확인해 주세요.",
+    "adminLoginRequired": "관리자 기능은 Google 로그인 후 사용할 수 있습니다.",
+    "permissionDenied": "권한이 없습니다. 관리자 계정으로 로그인해 주세요.",
+    "adminReadOnly": "이 계정은 관리자 권한이 없어 읽기 전용입니다.",
+    "adminReadOnlyWithEmail": "403 권한 없음: {email} 계정은 읽기 전용입니다.",
+    "adminOnlyAction": "관리자 전용 기능입니다. 권한이 있는 계정으로 로그인해 주세요."
+  },
+  "access": {
+    "blockedTitle": "접속 권한이 없습니다",
+    "blockedDescription": "운영진이 등록한 허용 이메일이 아니면 Hei`Fam 서비스에 접근할 수 없습니다.",
+    "blockedEmail": "현재 로그인: {email}",
+    "title": "권한 관리",
+    "description": "최상위 관리자/운영진/접속 허용 이메일을 관리합니다.",
+    "loadError": "권한 목록을 불러오지 못했습니다.",
+    "superOnly": "최상위 관리자만 운영진을 등록/삭제할 수 있습니다.",
+    "sections": {
+      "me": "내 권한 상태",
+      "superAdmins": "최상위 관리자",
+      "admins": "운영진 관리자",
+      "allowlist": "접속 허용 이메일"
+    },
+    "me": {
+      "email": "이메일",
+      "nickname": "닉네임",
+      "role": "권한",
+      "access": "접속 가능 여부",
+      "yes": "허용",
+      "no": "차단"
+    },
+    "labels": {
+      "nicknameNotSet": "닉네임 미설정"
+    },
+    "form": {
+      "emailPlaceholder": "example@gmail.com",
+      "nicknamePlaceholder": "닉네임",
+      "addAdmin": "운영진 추가",
+      "addAllowed": "허용 이메일 추가"
+    },
+    "actions": {
+      "remove": "삭제",
+      "fixed": "고정",
+      "saving": "처리 중..."
+    },
+    "messages": {
+      "adminSaved": "운영진 관리자 목록이 업데이트되었습니다.",
+      "allowedSaved": "접속 허용 이메일 목록이 업데이트되었습니다.",
+      "removeSaved": "삭제가 완료되었습니다.",
+      "invalidEmail": "올바른 이메일 형식을 입력해 주세요.",
+      "invalidNickname": "닉네임을 입력해 주세요. (최대 100자)"
+    }
+  },
+  "adminGuard": {
+    "loginTitle": "Google 로그인이 필요합니다",
+    "loginDescription": "관리자 기능을 사용하려면 Google 계정으로 로그인해 주세요.",
+    "forbiddenTitle": "403 권한 없음",
+    "forbiddenDescription": "이 계정은 관리자 목록에 없어 해당 기능을 사용할 수 없습니다.",
+    "importCenterTitle": "일괄 등록 센터",
+    "importCenterDescription": "선수/경기 일괄 등록은 관리자 계정에서만 사용할 수 있습니다.",
+    "playersImportGuide": "선수 일괄 등록은 선수 관리 화면의 등록 영역에서 진행합니다.",
+    "matchesImportGuide": "경기 일괄 등록은 경기 결과 화면의 등록 영역에서 진행합니다.",
+    "goPlayersImport": "선수 일괄 등록으로 이동",
+    "goMatchesImport": "경기 일괄 등록으로 이동"
+  },
+  "adminKey": {
+    "label": "관리자 키"
+  },
+  "auth": {
+    "loginGoogle": "Google 로그인",
+    "logout": "로그아웃",
+    "loading": "로그인 상태 확인 중...",
+    "noProfile": "사용자",
+    "loggedIn": "로그인됨",
+    "loggedInAs": "로그인됨: {identity}",
+    "notLoggedIn": "로그인되지 않음",
+    "googleNotConfiguredTitle": "Google 로그인 설정이 필요합니다",
+    "googleNotConfiguredDescription": "환경 변수(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)를 확인해 주세요.",
+    "error": {
+      "title": "로그인 오류",
+      "default": "Google 로그인 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+      "configuration": "Google 로그인 설정이 올바르지 않습니다. 환경 변수를 확인해 주세요.",
+      "accessDenied": "로그인 권한이 거부되었습니다. 허용된 팸원 이메일 계정인지 확인해 주세요.",
+      "help": "문제가 계속되면 관리자에게 Google OAuth 설정(리디렉션 URI, 클라이언트 키)을 확인해 달라고 요청해 주세요.",
+      "goHome": "홈으로 돌아가기"
+    }
+  },
+  "profileRace": {
+    "title": "주종 선택",
+    "description": "처음 로그인 시 본인의 주종을 선택해 주세요. (P/T/Z, 복수 종족 가능)",
+    "fieldLabel": "주종",
+    "save": "저장",
+    "saving": "저장 중...",
+    "errorTitle": "저장 실패",
+    "errors": {
+      "saveFailed": "주종 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+      "forbidden": "주종 저장 권한이 없습니다. 운영진에게 문의해 주세요."
+    }
+  },
+  "dashboard": {
+    "title": "대시보드",
+    "description": "Hei`Fam 내전 운영을 빠르게 확인하는 한 화면 요약입니다.",
+    "loadError": "대시보드 데이터를 불러오지 못했습니다. 백엔드 상태를 확인해 주세요.",
+    "kpi": {
+      "totalPlayers": "등록 선수 수",
+      "topMmr": "최고 MMR",
+      "averageMmr": "평균 MMR",
+      "totalGames": "누적 랭크 경기"
+    },
+    "topPreview": {
+      "title": "상위 5명 미리보기",
+      "openFull": "랭킹 전체 보기",
+      "headers": {
+        "rank": "순위",
+        "nickname": "닉네임",
+        "race": "종족",
+        "mmr": "MMR",
+        "winRate": "승률"
+      },
+      "empty": "랭킹 데이터가 아직 없습니다."
+    },
+    "quickActions": {
+      "title": "빠른 작업",
+      "toBalance": "밸런스 매치 열기",
+      "toResults": "경기 결과 열기",
+      "toRanking": "랭킹 확인"
+    },
+    "recentBalance": {
+      "title": "최근 밸런스 결과",
+      "none": "최근 생성 기록 없음",
+      "empty": "최근 밸런스 매치 기록이 없습니다.",
+      "homeTeam": "홈 팀",
+      "awayTeam": "어웨이 팀",
+      "homeMmr": "홈 MMR",
+      "awayMmr": "어웨이 MMR",
+      "matchId": "매치 ID",
+      "mmrDiff": "MMR 차이",
+      "createdAt": "생성 시각"
+    },
+    "notes": {
+      "title": "운영 메모",
+      "items": {
+        "one": "이 화면은 내전 운영에 필요한 핵심 정보만 모아둔 간단한 요약판입니다.",
+        "two": "선수 정보와 밸런스 결과는 새로고침하면 최신 내용으로 반영됩니다."
+      }
+    }
+  },
+  "players": {
+    "title": "선수 관리",
+    "description": "Hei`Fam 로스터를 검색하고 종족/티어 상태를 빠르게 점검합니다.",
+    "loadError": "선수 목록을 불러오지 못했습니다. 백엔드 상태를 확인해 주세요.",
+    "import": {
+      "title": "관리자 전용: 선수 일괄 등록",
+      "description": "`닉네임 티어 주종` 형식으로 예) 민식 B+ P 입력하면 티어 기본 MMR이 자동 적용됩니다.",
+      "button": "선수 일괄 등록",
+      "loading": "등록 중...",
+      "success": "선수 일괄 등록이 완료되었습니다.",
+      "failure": "선수 일괄 등록에 실패했습니다. 요청 형식과 서버 상태를 확인해 주세요.",
+      "invalidFormat": "형식을 확인해 주세요. 예: `민식 B+ P` 또는 JSON.",
+      "placeholder": "민식 B+ P\n테란고수 A+ T\n유니버 재배정대상 R"
+    },
+    "actions": {
+      "edit": "수정",
+      "save": "저장",
+      "saving": "저장 중...",
+      "cancel": "취소",
+      "delete": "삭제",
+      "deleting": "삭제 중...",
+      "nicknameRequired": "닉네임을 입력해 주세요.",
+      "updateSuccess": "선수 이름이 수정되었습니다.",
+      "updateFailure": "이름 수정에 실패했습니다. 닉네임 중복 또는 서버 상태를 확인해 주세요.",
+      "updateNotFound": "선수 수정 API를 찾지 못했습니다. 백엔드를 재시작하고 최신 코드인지 확인해 주세요.",
+      "deleteSuccess": "선수가 삭제되었습니다.",
+      "deleteFailure": "선수 삭제에 실패했습니다. 서버 상태를 확인해 주세요.",
+      "deleteNotFound": "선수 삭제 API를 찾지 못했습니다. 백엔드를 재시작하고 최신 코드인지 확인해 주세요.",
+      "deleteConfirm": "{nickname} 선수를 삭제하시겠습니까?"
+    },
+    "filters": {
+      "searchLabel": "닉네임 검색",
+      "searchPlaceholder": "닉네임 입력...",
+      "raceLabel": "종족 필터"
+    },
+    "table": {
+      "nickname": "닉네임",
+      "race": "종족",
+      "tier": "티어",
+      "currentMmr": "현재 MMR",
+      "wins": "승",
+      "losses": "패",
+      "games": "경기수",
+      "actions": "관리",
+      "empty": "조건에 맞는 선수가 없습니다.",
+      "unassigned": "배정 필요"
+    }
+  },
+  "balance": {
+    "title": "밸런스",
+    "description": "선택한 인원으로 가장 차이가 적은 팀 조합을 자동 계산합니다.",
+    "loadError": "선수 목록을 불러오지 못했습니다. 백엔드 상태를 확인해 주세요.",
+    "mode": {
+      "title": "밸런스 방식 선택",
+      "twoVsTwo": "2:2 밸런스",
+      "threeVsThree": "3:3 밸런스",
+      "helperTwoVsTwo": "2:2 모드는 4명을 정확히 선택해 팀 밸런스를 계산합니다.",
+      "helperThreeVsThree": "3:3 모드는 6명을 정확히 선택해 팀 밸런스를 계산합니다."
+    },
+    "selection": {
+      "title": "선수 선택 ({count}명)",
+      "slot": "슬롯 {index}",
+      "placeholder": "닉네임 입력...",
+      "reset": "초기화"
+    },
+    "summary": {
+      "title": "선택 요약",
+      "selectedCount": "{count}/{required} 선택됨",
+      "empty": "아직 선택된 선수가 없습니다.",
+      "totalMmr": "선택된 총 MMR",
+      "submit": "밸런스 매치 생성",
+      "submitting": "생성 중..."
+    },
+    "validation": {
+      "needSix": "6명을 정확히 선택해야 생성할 수 있습니다.",
+      "needExact": "{count}명을 정확히 선택해야 생성할 수 있습니다.",
+      "noPlayers": "선택 가능한 선수가 없습니다.",
+      "duplicate": "중복 선택은 불가합니다.",
+      "generateFailed": "밸런스 계산에 실패했습니다. 백엔드 상태를 확인해 주세요."
+    },
+    "result": {
+      "homeTeam": "홈 팀",
+      "awayTeam": "어웨이 팀",
+      "homeMmr": "홈 MMR",
+      "awayMmr": "어웨이 MMR",
+      "metricsTitle": "밸런스 지표",
+      "mmrDiff": "MMR 차이",
+      "expectedHomeWinRate": "홈 예상 승률",
+      "averageTeamMmr": "팀 평균 MMR"
+    },
+    "quickResult": {
+      "title": "밸런스에서 바로 결과 입력",
+      "description": "매치 ID와 승리 팀만 입력하면 이 화면에서 바로 반영할 수 있습니다.",
+      "submit": "결과 바로 반영",
+      "submitting": "반영 중...",
+      "success": "매치 {matchId} 결과 반영이 완료되었습니다.",
+        "matchCreated": "밸런스 결과로 매치가 생성되었습니다. 매치 ID: {matchId}",
+        "matchCreateForbidden": "밸런스는 생성되었지만 매치 저장 권한이 없습니다. 관리자 키를 확인해 주세요.",
+        "matchCreateAdminOnly": "밸런스 결과는 계산되었지만 매치 저장은 관리자만 가능합니다.",
+        "matchCreateFailed": "밸런스는 생성되었지만 매치 ID 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+        "matchCreateMissingPlayers": "밸런스는 생성되었지만 매치 저장용 선수 ID를 확인하지 못했습니다.",
+        "matchCreateOnlyThreeVsThree": "2:2 결과는 아직 자동 매치 저장을 지원하지 않습니다."
+      }
+    },
+  "multiBalance": {
+    "title": "다중 밸런스",
+    "description": "참가자를 자동 배정해 3:3 우선, 필요 시 2:2까지 함께 생성합니다.",
+    "helper": {
+      "defaultPriority": "기본적으로 3:3을 우선으로 생성합니다.",
+      "addTwoVsTwo": "남는 인원이 4명일 경우 2:2 경기를 추가 생성합니다.",
+      "waiting": "매치를 만들 수 없는 남는 인원은 대기 인원으로 표시됩니다."
+    },
+    "loadError": "선수 목록을 불러오지 못했습니다. 백엔드 상태를 확인해 주세요.",
+    "generateError": "다중 밸런스 생성에 실패했습니다.",
+    "selection": {
+      "title": "참가자 선택",
+      "reset": "초기화",
+      "searchLabel": "닉네임 검색",
+      "searchPlaceholder": "닉네임 입력...",
+      "empty": "선택 가능한 선수가 없습니다."
+    },
+    "summary": {
+      "title": "선택 요약",
+      "selectedCount": "{count}명 선택됨",
+      "totalMmr": "선택된 총 MMR",
+      "submit": "다중 밸런스 생성",
+      "submitting": "생성 중..."
+    },
+    "mode": {
+      "title": "운영 우선순위",
+      "options": {
+        "MMR_FIRST": {
+          "label": "MMR 우선",
+          "helper": "팀 MMR 차이를 가장 우선해서 맞춥니다."
+        },
+        "DIVERSITY_FIRST": {
+          "label": "다양성 우선",
+          "helper": "같은 조합 반복을 줄이고 새로운 조합을 우선합니다."
+        },
+        "RACE_DISTRIBUTION_FIRST": {
+          "label": "종족 분산 우선",
+          "helper": "종족 쏠림을 줄이고 조합 균형을 우선합니다."
+        }
+      }
+    },
+    "validation": {
+      "selectPlayers": "참가 선수를 선택해 주세요.",
+      "minimumFour": "최소 4명 이상 선택해야 합니다."
+    },
+    "result": {
+      "title": "생성 결과",
+      "summary": "총 {totalPlayers}명으로 {matchCount}경기를 생성했습니다.",
+      "selectedMode": "적용 모드",
+      "totalSelected": "총 참가자",
+      "assignedPlayers": "배정 인원",
+      "waitingPlayers": "대기 인원",
+      "waitingTitle": "대기 인원",
+      "noWaiting": "대기 인원이 없습니다.",
+      "matchNumber": "경기 {number}",
+      "matchType": "경기 유형",
+      "matchType3v3": "3:3",
+      "matchType2v2": "2:2",
+      "homeTeam": "홈팀",
+      "awayTeam": "어웨이팀",
+      "homeMmr": "홈팀 총 MMR",
+      "awayMmr": "어웨이팀 총 MMR",
+      "mmrDiff": "MMR 차이",
+      "expectedHomeWinRate": "홈팀 예상 승률",
+      "raceHome": "홈 종족 요약",
+      "raceAway": "어웨이 종족 요약",
+      "repeatTeammatePenalty": "반복 팀 패널티",
+      "repeatMatchupPenalty": "반복 매치업 패널티",
+      "racePenalty": "종족 분포 패널티"
+    }
+  },
+  "captainDraft": {
+    "title": "정기 감전 드래프트",
+    "description": "참석자와 감독 2명을 설정하고 실시간 팀 드래프트 및 라운드 엔트리를 운영합니다.",
+    "emptyDraft": "아직 생성된 정기 감전 드래프트가 없습니다. 참석자와 감독을 설정해 시작해 주세요.",
+    "attendance": {
+      "title": "참석 인원 설정",
+      "helper": "참석자 8명 이상(짝수)이어야 드래프트를 시작할 수 있습니다.",
+      "searchLabel": "참석자 검색",
+      "searchPlaceholder": "닉네임 입력...",
+      "selectedCount": "선택 {count}명",
+      "empty": "조건에 맞는 선수가 없습니다.",
+      "inCurrentDraft": "현재 드래프트 참여중"
+    },
+    "captain": {
+      "title": "감독 2명 설정",
+      "home": "홈 감독",
+      "away": "어웨이 감독",
+      "acting": "내 감독 선택",
+      "actingHelper": "내 감독을 선택하면 해당 팀 픽/엔트리를 저장할 수 있습니다."
+    },
+    "settings": {
+      "title": "라운드 설정",
+      "setsPerRound": "라운드당 세트 수",
+      "helper": "기본은 4세트이며 참석 인원에 맞게 조정할 수 있습니다."
+    },
+    "actions": {
+      "create": "드래프트 시작",
+      "creating": "생성 중...",
+      "refresh": "새로고침",
+      "pick": "팀원 선택",
+      "picking": "선택 중...",
+      "saveEntries": "내 엔트리 저장",
+      "savingEntries": "저장 중..."
+    },
+    "status": {
+      "label": "진행 상태",
+      "drafting": "드래프트 진행 중",
+      "ready": "팀 구성 완료",
+      "turn": "현재 선택 턴",
+      "none": "없음"
+    },
+    "teams": {
+      "home": "홈 팀",
+      "away": "어웨이 팀",
+      "unassigned": "미선택 참석자",
+      "captainBadge": "감독",
+      "emptyHome": "아직 홈 팀 선수가 없습니다.",
+      "emptyAway": "아직 어웨이 팀 선수가 없습니다.",
+      "emptyUnassigned": "미선택 참석자가 없습니다.",
+      "emptyOpponent": "상대 팀 정보가 없습니다."
+    },
+    "pick": {
+      "title": "감독 픽 진행",
+      "helper": "현재 턴인 감독만 팀원을 선택할 수 있습니다.",
+      "turnTeam": "현재 선택 팀",
+      "selectPlayer": "선택할 팀원"
+    },
+    "pickLog": {
+      "title": "드래프트 진행 기록",
+      "empty": "아직 선택된 팀원이 없습니다."
+    },
+    "entry": {
+      "title": "라운드 엔트리 설정",
+      "helper": "감독은 자기 팀 엔트리만 수정할 수 있고 상대 팀 엔트리는 실시간으로 확인할 수 있습니다.",
+      "round": "{round} Round {code}",
+      "set": "{set}세트",
+      "setLabel": "세트",
+      "homePlayer": "홈 엔트리",
+      "awayPlayer": "어웨이 엔트리",
+      "notSet": "미설정",
+      "opponentVisibleTitle": "상대 팀 확인",
+      "opponentVisibleHelper": "상대 팀 구성은 항상 확인할 수 있습니다."
+    },
+    "messages": {
+      "createSuccess": "정기 감전 드래프트가 생성되었습니다.",
+      "entriesSaved": "엔트리가 저장되었습니다."
+    },
+    "validation": {
+      "needMinimumEight": "참석자는 최소 8명 이상이어야 합니다.",
+      "needEvenCount": "참석 인원은 짝수여야 합니다.",
+      "needTwoCaptains": "감독은 2명을 선택해야 합니다.",
+      "captainMustBeParticipant": "감독은 참석자 명단에서 선택해야 합니다.",
+      "selectDraftFirst": "드래프트 세션을 먼저 생성해 주세요.",
+      "selectActingCaptain": "내 감독을 먼저 선택해 주세요.",
+      "selectPlayerToPick": "선택할 팀원을 지정해 주세요.",
+      "notYourTurn": "현재 내 팀 턴이 아닙니다.",
+      "loadFailed": "드래프트 정보를 불러오지 못했습니다.",
+      "createFailed": "드래프트 생성에 실패했습니다.",
+      "pickFailed": "팀원 선택에 실패했습니다.",
+      "saveEntryFailed": "엔트리 저장에 실패했습니다."
+    }
+  },
+  "results": {
+    "title": "경기 결과",
+    "description": "최근 경기 결과를 조회합니다.",
+    "descriptionAdmin": "관리자는 최근 경기 결과를 조회하고 승리 팀 수정/삭제를 관리합니다.",
+    "descriptionViewer": "최근 경기 결과를 조회합니다.",
+    "form": {
+      "title": "경기 결과 등록",
+      "matchId": "매치 ID",
+      "matchIdPlaceholder": "예: 1024",
+      "winnerTeam": "승리 팀",
+      "submit": "결과 입력",
+      "submitting": "처리 중...",
+      "invalidMatchId": "유효한 매치 ID를 입력해 주세요.",
+      "submitSuccess": "결과 입력이 완료되었습니다.",
+      "submitFailure": "결과 입력에 실패했습니다. 매치 ID와 서버 상태를 확인해 주세요."
+    },
+    "summary": {
+      "title": "처리 결과 요약",
+      "empty": "결과를 입력하면 처리 내용이 표시됩니다.",
+      "matchId": "매치 ID",
+      "winnerTeam": "승리 팀",
+      "kFactor": "K-팩터",
+      "homeExpectedWinRate": "홈 예상 승률"
+    },
+    "recent": {
+      "title": "최근 경기 결과 조회",
+      "description": "최근 경기 결과부터 조회 가능합니다.",
+      "loadError": "최근 경기 데이터를 불러오지 못했습니다. 백엔드 상태를 확인해 주세요.",
+      "empty": "조회 가능한 최근 경기가 없습니다.",
+      "pick": "이 매치 선택",
+      "save": "저장",
+      "saving": "저장 중...",
+      "delete": "삭제",
+      "deleting": "삭제 중...",
+      "updated": "매치 {matchId} 승리 팀을 {winner}(으)로 수정했습니다.",
+      "submittedFromBalance": "매치 {matchId} 결과가 입력되었습니다.",
+      "deleted": "매치 {matchId}를 삭제했습니다.",
+      "updateFailure": "승리 팀 수정에 실패했습니다. 관리자 키와 서버 상태를 확인해 주세요.",
+      "deleteNotFound": "삭제 API를 찾지 못했습니다. 백엔드를 재시작하고 다시 시도해 주세요.",
+      "deleteFailure": "매치 삭제에 실패했습니다. 관리자 키와 서버 상태를 확인해 주세요.",
+      "deleteConfirm": "매치 {matchId}를 삭제하시겠습니까? MMR이 롤백됩니다.",
+      "selectedHint": "매치 {matchId}를 선택했습니다. 승리 팀을 확인하고 저장하세요.",
+      "noWinner": "미입력",
+      "table": {
+        "matchId": "매치 ID",
+        "playedAt": "경기 시각",
+        "recordedAt": "입력 시각",
+        "recordedBy": "입력자",
+        "winner": "승리 팀",
+        "homeTeam": "홈 팀",
+        "awayTeam": "어웨이 팀",
+        "mmrDiff": "MMR 차이",
+        "action": "선택"
+      }
+    },
+    "participants": {
+      "title": "참가자 MMR 변동",
+      "nickname": "닉네임",
+      "team": "팀",
+      "beforeMmr": "이전 MMR",
+      "afterMmr": "변경 후 MMR",
+      "delta": "MMR 증감"
+    },
+    "import": {
+      "title": "최상위 관리자 전용: 매치 일괄 등록",
+      "description": "백엔드 포맷(JSON)으로 데이터를 붙여넣은 뒤 실행하세요.",
+      "button": "매치 일괄 등록",
+      "loading": "등록 중...",
+      "success": "매치 일괄 등록이 완료되었습니다.",
+      "failure": "매치 일괄 등록에 실패했습니다. 요청 형식과 서버 상태를 확인해 주세요.",
+      "placeholder": "[{\"groupId\":1,\"homeTeam\":[],\"awayTeam\":[]}]"
+    },
+    "team": {
+      "home": "홈",
+      "away": "어웨이"
+    }
+  },
+  "ranking": {
+    "title": "랭킹",
+    "description": "현재 그룹 상위권을 MMR 기준으로 확인합니다.",
+    "loadError": "랭킹 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    "empty": "랭킹 데이터가 아직 없습니다.",
+    "table": {
+      "rank": "순위",
+      "nickname": "닉네임",
+      "race": "종족",
+      "currentMmr": "현재 MMR",
+      "wins": "승",
+      "losses": "패",
+      "games": "경기수",
+      "winRate": "승률",
+      "streak": "연속 기록",
+      "last10": "최근 10경기",
+      "mmrDelta": "MMR 변동"
+    },
+    "streak": {
+      "win": "{count}연승",
+      "loss": "{count}연패"
+    },
+    "last10": {
+      "win": "승",
+      "loss": "패"
+    }
+  }
+}
+

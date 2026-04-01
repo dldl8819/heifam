@@ -1,0 +1,164 @@
+package com.balancify.backend.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.balancify.backend.domain.AllowedUserEmail;
+import com.balancify.backend.domain.ManagedAdminEmail;
+import com.balancify.backend.domain.UserRacePreference;
+import com.balancify.backend.repository.AllowedUserEmailRepository;
+import com.balancify.backend.repository.ManagedAdminEmailRepository;
+import com.balancify.backend.repository.UserRacePreferenceRepository;
+import com.balancify.backend.security.AdminKeyProperties;
+import java.util.List;
+import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
+class AccessControlServiceTest {
+
+    @Mock
+    private ManagedAdminEmailRepository managedAdminEmailRepository;
+
+    @Mock
+    private AllowedUserEmailRepository allowedUserEmailRepository;
+
+    @Mock
+    private UserRacePreferenceRepository userRacePreferenceRepository;
+
+    private AccessControlService accessControlService;
+
+    @BeforeEach
+    void setUp() {
+        AdminKeyProperties adminKeyProperties = new AdminKeyProperties();
+        adminKeyProperties.setEmails("ops@hei.gg");
+        adminKeyProperties.setSuperEmails("minsiklee2@gmail.com");
+        adminKeyProperties.setAllowedEmails("member@hei.gg");
+
+        when(managedAdminEmailRepository.findAllByOrderByNormalizedEmailAsc())
+            .thenReturn(List.of());
+        when(allowedUserEmailRepository.findAllByOrderByNormalizedEmailAsc())
+            .thenReturn(List.of());
+        when(managedAdminEmailRepository.findByNormalizedEmail(anyString()))
+            .thenReturn(Optional.empty());
+        when(allowedUserEmailRepository.findByNormalizedEmail(anyString()))
+            .thenReturn(Optional.empty());
+        when(userRacePreferenceRepository.findByNormalizedEmail(anyString()))
+            .thenReturn(Optional.empty());
+
+        accessControlService = new AccessControlService(
+            adminKeyProperties,
+            managedAdminEmailRepository,
+            allowedUserEmailRepository,
+            userRacePreferenceRepository
+        );
+    }
+
+    @Test
+    void resolvesSuperAdminProfile() {
+        AccessControlService.AccessProfile profile = accessControlService.resolveAccessProfile(
+            "minsiklee2@gmail.com"
+        );
+
+        assertThat(profile.superAdmin()).isTrue();
+        assertThat(profile.admin()).isTrue();
+        assertThat(profile.allowed()).isTrue();
+        assertThat(profile.role()).isEqualTo("SUPER_ADMIN");
+    }
+
+    @Test
+    void addsManagedAdminOnlyWhenActorIsSuperAdmin() {
+        when(managedAdminEmailRepository.existsByNormalizedEmail("newops@hei.gg")).thenReturn(false);
+
+        accessControlService.addManagedAdminEmail("minsiklee2@gmail.com", "newops@hei.gg", "운영진");
+
+        verify(managedAdminEmailRepository).save(any(ManagedAdminEmail.class));
+    }
+
+    @Test
+    void rejectsManagedAdminAddWhenActorIsNotSuperAdmin() {
+        assertThatThrownBy(() ->
+            accessControlService.addManagedAdminEmail("ops@hei.gg", "newops@hei.gg", "운영진")
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Only super admins can register operators");
+
+        verify(managedAdminEmailRepository, never()).save(any(ManagedAdminEmail.class));
+    }
+
+    @Test
+    void allowsAdminToAddAllowedMemberEmail() {
+        when(allowedUserEmailRepository.existsByNormalizedEmail("fan@hei.gg")).thenReturn(false);
+
+        accessControlService.addAllowedUserEmail("ops@hei.gg", "fan@hei.gg", "팬");
+
+        verify(allowedUserEmailRepository).save(any(AllowedUserEmail.class));
+    }
+
+    @Test
+    void canRemoveDynamicAllowedEmail() {
+        AllowedUserEmail allowedUserEmail = new AllowedUserEmail();
+        allowedUserEmail.setEmail("fan@hei.gg");
+        when(allowedUserEmailRepository.findByNormalizedEmail("fan@hei.gg"))
+            .thenReturn(Optional.of(allowedUserEmail));
+
+        accessControlService.removeAllowedUserEmail("ops@hei.gg", "fan@hei.gg");
+
+        verify(allowedUserEmailRepository).delete(allowedUserEmail);
+    }
+
+    @Test
+    void resolvesPreferredRaceWhenStored() {
+        UserRacePreference preference = new UserRacePreference();
+        preference.setEmail("member@hei.gg");
+        preference.setPreferredRace("PT");
+        when(userRacePreferenceRepository.findByNormalizedEmail("member@hei.gg"))
+            .thenReturn(Optional.of(preference));
+
+        AccessControlService.AccessProfile profile = accessControlService.resolveAccessProfile("member@hei.gg");
+
+        assertThat(profile.preferredRace()).isEqualTo("PT");
+    }
+
+    @Test
+    void resolvesNicknameFromAllowlistWhenStored() {
+        AllowedUserEmail allowedUserEmail = new AllowedUserEmail();
+        allowedUserEmail.setEmail("member@hei.gg");
+        allowedUserEmail.setNickname("민식");
+        when(allowedUserEmailRepository.findByNormalizedEmail("member@hei.gg"))
+            .thenReturn(Optional.of(allowedUserEmail));
+
+        AccessControlService.AccessProfile profile = accessControlService.resolveAccessProfile("member@hei.gg");
+
+        assertThat(profile.nickname()).isEqualTo("민식");
+    }
+
+    @Test
+    void savesPreferredRaceForCurrentUser() {
+        when(userRacePreferenceRepository.findByNormalizedEmail("member@hei.gg"))
+            .thenReturn(Optional.empty());
+
+        accessControlService.upsertPreferredRace("member@hei.gg", "tz");
+
+        verify(userRacePreferenceRepository).save(any(UserRacePreference.class));
+    }
+
+    @Test
+    void rejectsUnsupportedPreferredRaceValue() {
+        assertThatThrownBy(() -> accessControlService.upsertPreferredRace("member@hei.gg", "PTZ"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Invalid race");
+    }
+}
