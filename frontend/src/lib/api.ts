@@ -27,13 +27,17 @@ import { supabase } from '@/lib/supabase'
 
 const DEFAULT_DEV_API_BASE_URL = 'http://localhost:8080'
 const DEFAULT_PROD_API_BASE_URL = '/api/proxy'
+const DEFAULT_ACCESS_API_BASE_URL = 'https://heifam.onrender.com'
 const RAW_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ?? ''
+const RAW_ACCESS_API_BASE_URL = process.env.NEXT_PUBLIC_ACCESS_API_BASE_URL?.trim() ?? ''
 const API_BASE_URL =
   process.env.NODE_ENV === 'production'
     ? DEFAULT_PROD_API_BASE_URL
     : RAW_API_BASE_URL.length > 0
       ? RAW_API_BASE_URL
       : DEFAULT_DEV_API_BASE_URL
+const ACCESS_API_BASE_URL =
+  RAW_ACCESS_API_BASE_URL.length > 0 ? RAW_ACCESS_API_BASE_URL : DEFAULT_ACCESS_API_BASE_URL
 const DEFAULT_API_REQUEST_TIMEOUT_MS = 10000
 const IMPORT_API_REQUEST_TIMEOUT_MS = 120000
 const SESSION_IDENTITY_CACHE_TTL_MS = 5000
@@ -48,12 +52,16 @@ type SessionIdentity = {
 let cachedSessionIdentity: (SessionIdentity & { resolvedAt: number }) | null = null
 let sessionIdentityPromise: Promise<SessionIdentity> | null = null
 
-function createUrl(path: string): string {
-  if (API_BASE_URL.length === 0) {
+function createUrl(path: string, baseUrlOverride?: string): string {
+  const baseUrl = baseUrlOverride && baseUrlOverride.trim().length > 0
+    ? baseUrlOverride.trim()
+    : API_BASE_URL
+
+  if (baseUrl.length === 0) {
     throw new Error('API base URL is not configured')
   }
 
-  const normalizedBase = API_BASE_URL.replace(/\/+$/, '')
+  const normalizedBase = baseUrl.replace(/\/+$/, '')
   const normalizedPath = path.startsWith('/') ? path : `/${path}`
   return `${normalizedBase}${normalizedPath}`
 }
@@ -66,6 +74,7 @@ type ApiRequestOptions = {
   userEmail?: string
   userNickname?: string
   timeoutMs?: number
+  baseUrlOverride?: string
 }
 
 export class ApiRequestError extends Error {
@@ -212,7 +221,7 @@ async function apiRequest<T>(
 
   let response: Response
   try {
-    response = await fetch(createUrl(path), {
+    response = await fetch(createUrl(path, options?.baseUrlOverride), {
       ...init,
       headers: buildHeaders(init, options, userEmail, userNickname),
       signal: controller.signal,
@@ -605,11 +614,13 @@ export const apiClient = {
       includeUserEmail: true,
       userEmail: identity?.email,
       userNickname: identity?.nickname,
+      baseUrlOverride: ACCESS_API_BASE_URL,
     }),
   getAdminEmailList: () =>
     apiRequest<AccessAdminListResponse>('/api/access/admins', undefined, {
       requireUserEmail: true,
       includeUserEmail: true,
+      baseUrlOverride: ACCESS_API_BASE_URL,
     }),
   addAdminEmail: (email: string, nickname: string) =>
     apiRequest<AccessAdminListResponse>(
@@ -621,6 +632,7 @@ export const apiClient = {
       {
         requireUserEmail: true,
         includeUserEmail: true,
+        baseUrlOverride: ACCESS_API_BASE_URL,
       }
     ),
   removeAdminEmail: (email: string) =>
@@ -632,12 +644,14 @@ export const apiClient = {
       {
         requireUserEmail: true,
         includeUserEmail: true,
+        baseUrlOverride: ACCESS_API_BASE_URL,
       }
     ),
   getAllowedEmailList: () =>
     apiRequest<AccessAllowedEmailListResponse>('/api/access/allowed-users', undefined, {
       requireUserEmail: true,
       includeUserEmail: true,
+      baseUrlOverride: ACCESS_API_BASE_URL,
     }),
   addAllowedEmail: (email: string, nickname: string) =>
     apiRequest<AccessAllowedEmailListResponse>(
@@ -649,6 +663,7 @@ export const apiClient = {
       {
         requireUserEmail: true,
         includeUserEmail: true,
+        baseUrlOverride: ACCESS_API_BASE_URL,
       }
     ),
   removeAllowedEmail: (email: string) =>
@@ -660,6 +675,7 @@ export const apiClient = {
       {
         requireUserEmail: true,
         includeUserEmail: true,
+        baseUrlOverride: ACCESS_API_BASE_URL,
       }
     ),
   updateMyPreferredRace: (race: PlayerRace) =>
@@ -672,6 +688,7 @@ export const apiClient = {
       {
         requireUserEmail: true,
         includeUserEmail: true,
+        baseUrlOverride: ACCESS_API_BASE_URL,
       }
     ),
 }
