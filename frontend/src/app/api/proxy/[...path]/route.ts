@@ -6,6 +6,7 @@ const FALLBACK_BACKEND_BASE_URLS = [
 ]
 
 const RETRYABLE_UPSTREAM_STATUSES = new Set([404, 502, 503, 504])
+const DEFAULT_UPSTREAM_TIMEOUT_MS = 5000
 
 const HOP_BY_HOP_HEADERS = new Set([
   'connection',
@@ -52,6 +53,20 @@ function resolveBackendBaseUrls(): string[] {
   }
 
   return Array.from(deduped)
+}
+
+function resolveUpstreamTimeoutMs(): number {
+  const raw = process.env.BACKEND_PROXY_UPSTREAM_TIMEOUT_MS?.trim()
+  if (!raw) {
+    return DEFAULT_UPSTREAM_TIMEOUT_MS
+  }
+
+  const parsed = Number(raw)
+  if (!Number.isFinite(parsed) || parsed < 1000 || parsed > 60000) {
+    return DEFAULT_UPSTREAM_TIMEOUT_MS
+  }
+
+  return Math.floor(parsed)
 }
 
 function buildTargetUrl(baseUrl: string, path: string[], search: string): string {
@@ -103,6 +118,7 @@ async function proxyRequest(
 
   const search = request.nextUrl.search ?? ''
   const headers = buildForwardHeaders(request)
+  const upstreamTimeoutMs = resolveUpstreamTimeoutMs()
   const body =
     request.method === 'GET' || request.method === 'HEAD'
       ? undefined
@@ -112,6 +128,9 @@ async function proxyRequest(
 
   for (const [index, baseUrl] of baseUrls.entries()) {
     const targetUrl = buildTargetUrl(baseUrl, path, search)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), upstreamTimeoutMs)
+
     try {
       const upstream = await fetch(targetUrl, {
         method: request.method,
@@ -119,6 +138,7 @@ async function proxyRequest(
         body,
         redirect: 'manual',
         cache: 'no-store',
+        signal: controller.signal,
       })
 
       const hasNextCandidate = index < baseUrls.length - 1
@@ -130,6 +150,8 @@ async function proxyRequest(
       return buildProxyResponse(upstream, baseUrl)
     } catch (error) {
       lastError = error
+    } finally {
+      clearTimeout(timeoutId)
     }
   }
 
