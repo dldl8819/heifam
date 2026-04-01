@@ -19,6 +19,12 @@ const HOP_BY_HOP_HEADERS = new Set([
   'x-forwarded-port',
   'x-forwarded-proto',
 ])
+const UPSTREAM_RESPONSE_HEADER_ALLOWLIST = new Set([
+  'cache-control',
+  'content-type',
+  'etag',
+  'last-modified',
+])
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -34,7 +40,7 @@ function parseCsv(value: string | undefined): string[] {
 }
 
 function normalizeBaseUrl(value: string): string {
-    return value.trim().replace(/\/+$/, '')
+  return value.trim().replace(/\/+$/, '')
 }
 
 function sanitizeBackendBaseUrl(value: string): string | null {
@@ -125,18 +131,33 @@ function buildForwardHeaders(request: NextRequest): Headers {
     if (normalizedKey === 'cookie') {
       return
     }
+    if (normalizedKey === 'accept-encoding') {
+      return
+    }
     headers.set(key, value)
   })
   return headers
 }
 
-function buildProxyResponse(upstream: Response, baseUrl: string): NextResponse {
-  const responseHeaders = new Headers(upstream.headers)
+async function buildProxyResponse(upstream: Response, baseUrl: string): Promise<NextResponse> {
+  const responseHeaders = new Headers()
+  upstream.headers.forEach((value, key) => {
+    const normalizedKey = key.toLowerCase()
+    if (!UPSTREAM_RESPONSE_HEADER_ALLOWLIST.has(normalizedKey)) {
+      return
+    }
+    responseHeaders.set(key, value)
+  })
+
+  // Always let platform/runtime set transport encoding headers.
+  responseHeaders.delete('content-encoding')
+  responseHeaders.delete('content-length')
   responseHeaders.delete('transfer-encoding')
   responseHeaders.set('x-proxy-upstream', baseUrl)
   responseHeaders.set('x-proxy-upstream-status', String(upstream.status))
 
-  return new NextResponse(upstream.body, {
+  const upstreamBody = upstream.status === 204 ? null : await upstream.arrayBuffer()
+  return new NextResponse(upstreamBody, {
     status: upstream.status,
     headers: responseHeaders,
   })
@@ -199,7 +220,7 @@ async function proxyRequest(
         continue
       }
 
-      return buildProxyResponse(upstream, baseUrl)
+      return await buildProxyResponse(upstream, baseUrl)
     } catch (error) {
       lastError = error
     } finally {
