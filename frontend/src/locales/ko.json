@@ -314,6 +314,18 @@
       "invalidFormat": "형식을 확인해 주세요. 예: `민식 B+ P` 또는 JSON.",
       "placeholder": "민식 B+ P\n테란고수 A+ T\n유니버 재배정대상 R"
     },
+    "download": {
+      "button": "티어/이름 정렬 명단 다운로드",
+      "success": "티어/이름 정렬 명단 다운로드를 시작했습니다. (총 {count}명)",
+      "empty": "다운로드할 선수 데이터가 없습니다.",
+      "headers": {
+        "tier": "티어",
+        "nickname": "닉네임",
+        "race": "종족",
+        "currentMmr": "현재 MMR",
+        "games": "경기수"
+      }
+    },
     "actions": {
       "edit": "수정",
       "save": "저장",

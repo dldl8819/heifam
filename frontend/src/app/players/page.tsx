@@ -23,6 +23,40 @@ type PlayerImportPayload = {
   players: PlayerImportRow[]
 }
 const PLAYER_RACE_OPTIONS: PlayerRace[] = ['P', 'T', 'Z', 'PT', 'PZ', 'TZ', 'R']
+const TIER_DOWNLOAD_ORDER: Record<PlayerTierStatus, number> = {
+  S: 0,
+  'A+': 1,
+  A: 2,
+  'A-': 3,
+  'B+': 4,
+  B: 5,
+  'B-': 6,
+  'C+': 7,
+  C: 8,
+  'C-': 9,
+  UNASSIGNED: 10,
+}
+
+function toTierOrder(tier: PlayerTierStatus): number {
+  return TIER_DOWNLOAD_ORDER[tier] ?? Number.MAX_SAFE_INTEGER
+}
+
+function comparePlayersByTierThenNickname(a: PlayerRosterItem, b: PlayerRosterItem): number {
+  const tierDiff = toTierOrder(a.tier) - toTierOrder(b.tier)
+  if (tierDiff !== 0) {
+    return tierDiff
+  }
+
+  return a.nickname.localeCompare(b.nickname, 'ko-KR')
+}
+
+function escapeCsvCell(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`
+}
+
+function formatMmrValue(value: number): string {
+  return value === 0 ? 'None' : String(value)
+}
 
 function normalizeImportPayload(payload: unknown): PlayerImportPayload | null {
   if (Array.isArray(payload)) {
@@ -353,6 +387,63 @@ export default function PlayersPage() {
 
   const showMmrColumn = isAdmin
   const showActionsColumn = isAdmin
+  const downloadableRows = useMemo(
+    () => [...rows].sort(comparePlayersByTierThenNickname),
+    [rows]
+  )
+
+  const handleDownloadTierSortedRoster = useCallback(() => {
+    if (!isSuperAdmin) {
+      setPlayerActionError(t('common.adminOnlyAction'))
+      return
+    }
+
+    if (downloadableRows.length === 0) {
+      setPlayerActionError(t('players.download.empty'))
+      return
+    }
+
+    const header = [
+      t('players.download.headers.tier'),
+      t('players.download.headers.nickname'),
+      t('players.download.headers.race'),
+      t('players.download.headers.currentMmr'),
+      t('players.download.headers.games'),
+    ]
+
+    const lines = [
+      header.map(escapeCsvCell).join(','),
+      ...downloadableRows.map((row) =>
+        [
+          row.tier === 'UNASSIGNED' ? t('players.table.unassigned') : row.tier,
+          row.nickname,
+          row.race,
+          formatMmrValue(row.currentMmr),
+          String(row.games),
+        ]
+          .map(escapeCsvCell)
+          .join(',')
+      ),
+    ]
+
+    const now = new Date()
+    const fileDate = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(
+      now.getDate()
+    ).padStart(2, '0')}`
+    const fileName = `players-tier-name-${fileDate}.csv`
+    const blob = new Blob([`\uFEFF${lines.join('\n')}`], { type: 'text/csv;charset=utf-8;' })
+    const downloadUrl = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = downloadUrl
+    anchor.download = fileName
+    document.body.append(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(downloadUrl)
+
+    setPlayerActionError(null)
+    setPlayerActionSuccess(t('players.download.success', { count: downloadableRows.length }))
+  }, [downloadableRows, isSuperAdmin])
 
   return (
     <section className="space-y-6">
@@ -455,6 +546,17 @@ export default function PlayersPage() {
             </select>
           </label>
         </div>
+        {isSuperAdmin && (
+          <div className="mt-3 flex justify-end">
+            <button
+              type="button"
+              onClick={handleDownloadTierSortedRoster}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:border-slate-900 hover:bg-slate-900 hover:text-white"
+            >
+              {t('players.download.button')}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -542,7 +644,9 @@ export default function PlayersPage() {
                         {row.tier === 'UNASSIGNED' ? t('players.table.unassigned') : row.tier}
                       </span>
                     </td>
-                    {showMmrColumn && <td className="px-4 py-3 text-slate-700">{row.currentMmr}</td>}
+                    {showMmrColumn && (
+                      <td className="px-4 py-3 text-slate-700">{formatMmrValue(row.currentMmr)}</td>
+                    )}
                     <td className="px-4 py-3 text-slate-700">{row.wins}</td>
                     <td className="px-4 py-3 text-slate-700">{row.losses}</td>
                     <td className="px-4 py-3 text-slate-700">{row.games}</td>
