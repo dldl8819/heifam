@@ -3,6 +3,7 @@ package com.balancify.backend.api.group;
 import com.balancify.backend.api.MmrMaskingMapper;
 import com.balancify.backend.api.group.dto.GroupDashboardResponse;
 import com.balancify.backend.security.AdminRequestResolver;
+import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.DashboardQueryService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,15 +15,21 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/groups")
 public class GroupDashboardController {
 
+    private static final String USER_EMAIL_HEADER = "X-USER-EMAIL";
+    private static final String USER_NICKNAME_HEADER = "X-USER-NICKNAME";
+
     private final DashboardQueryService dashboardQueryService;
     private final AdminRequestResolver adminRequestResolver;
+    private final AccessControlService accessControlService;
 
     public GroupDashboardController(
         DashboardQueryService dashboardQueryService,
-        AdminRequestResolver adminRequestResolver
+        AdminRequestResolver adminRequestResolver,
+        AccessControlService accessControlService
     ) {
         this.dashboardQueryService = dashboardQueryService;
         this.adminRequestResolver = adminRequestResolver;
+        this.accessControlService = accessControlService;
     }
 
     @GetMapping("/{groupId}/dashboard")
@@ -30,11 +37,19 @@ public class GroupDashboardController {
         @PathVariable Long groupId,
         HttpServletRequest request
     ) {
-        GroupDashboardResponse response = dashboardQueryService.getGroupDashboard(groupId);
+        String requestEmail = safeTrim(request == null ? null : request.getHeader(USER_EMAIL_HEADER));
+        String requestNickname = safeTrim(request == null ? null : request.getHeader(USER_NICKNAME_HEADER));
+        String resolvedNickname = safeTrim(accessControlService.resolveAccessProfile(requestEmail).nickname());
+        String effectiveNickname = resolvedNickname.isEmpty() ? requestNickname : resolvedNickname;
+        GroupDashboardResponse response = dashboardQueryService.getGroupDashboard(groupId, effectiveNickname);
         if (adminRequestResolver.isAdminRequest(request)) {
             return response;
         }
 
         return MmrMaskingMapper.maskDashboard(response);
+    }
+
+    private String safeTrim(String value) {
+        return value == null ? "" : value.trim();
     }
 }

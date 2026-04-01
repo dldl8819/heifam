@@ -199,10 +199,48 @@ export type GroupDashboardRecentBalancePreview = {
   createdAt: string
 }
 
+export type GroupDashboardMyRaceStat = {
+  race: PlayerRace
+  wins: number
+  losses: number
+  games: number
+  winRate: number
+}
+
+export type GroupDashboardMyRaceSummary = {
+  linked: boolean
+  nickname: string | null
+  wins: number
+  losses: number
+  games: number
+  winRate: number
+  byRace: GroupDashboardMyRaceStat[]
+}
+
+export type GroupDashboardMyGameTypeStat = {
+  gameType: string
+  wins: number
+  losses: number
+  games: number
+  winRate: number
+}
+
+export type GroupDashboardMyGameTypeSummary = {
+  linked: boolean
+  nickname: string | null
+  wins: number
+  losses: number
+  games: number
+  winRate: number
+  byGameType: GroupDashboardMyGameTypeStat[]
+}
+
 export type GroupDashboardResponse = {
   kpiSummary: GroupDashboardKpiSummary
   topRankingPreview: GroupDashboardTopRankingPreviewItem[]
   recentBalancePreview: GroupDashboardRecentBalancePreview | null
+  myRaceSummary: GroupDashboardMyRaceSummary
+  myGameTypeSummary: GroupDashboardMyGameTypeSummary
 }
 
 export type CaptainDraftTeam = 'HOME' | 'AWAY' | 'UNASSIGNED'

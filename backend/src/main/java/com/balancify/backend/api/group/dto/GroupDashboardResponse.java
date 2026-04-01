@@ -5,7 +5,8 @@ import java.util.List;
 public record GroupDashboardResponse(
     DashboardKpiSummaryResponse kpiSummary,
     List<DashboardTopRankingPreviewItemResponse> topRankingPreview,
-    DashboardRecentBalancePreviewResponse recentBalancePreview
+    DashboardRecentBalancePreviewResponse recentBalancePreview,
+    DashboardMyRaceSummaryResponse myRaceSummary,
+    DashboardMyGameTypeSummaryResponse myGameTypeSummary
 ) {
 }
-

@@ -292,6 +292,34 @@
       "mmrDiff": "MMR 차이",
       "createdAt": "생성 시각"
     },
+    "myRace": {
+      "title": "내 종족별 전적",
+      "description": "권한 프로필 닉네임과 로스터가 연결되면 종족별 전적/승률을 확인할 수 있습니다.",
+      "notLinked": "내 닉네임이 로스터와 연결되지 않아 종족별 전적을 표시할 수 없습니다. 권한 관리에서 닉네임을 확인해 주세요.",
+      "empty": "아직 집계할 경기 전적이 없습니다.",
+      "total": "전체 전적",
+      "headers": {
+        "race": "종족",
+        "wins": "승",
+        "losses": "패",
+        "games": "경기수",
+        "winRate": "승률"
+      }
+    },
+    "myGameType": {
+      "title": "내 조합별 전적",
+      "description": "내가 속한 팀의 종족 조합(PPP, PPT, PPZ, PTZ 등)별 전적과 승률입니다.",
+      "notLinked": "내 닉네임이 로스터와 연결되지 않아 조합별 전적을 표시할 수 없습니다. 권한 관리에서 닉네임을 확인해 주세요.",
+      "empty": "아직 집계할 조합별 전적이 없습니다.",
+      "total": "전체 전적",
+      "headers": {
+        "gameType": "조합",
+        "wins": "승",
+        "losses": "패",
+        "games": "경기수",
+        "winRate": "승률"
+      }
+    },
     "notes": {
       "title": "운영 메모",
       "items": {

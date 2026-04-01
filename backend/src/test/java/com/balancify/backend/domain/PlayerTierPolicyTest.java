@@ -79,4 +79,16 @@ class PlayerTierPolicyTest {
         assertThat(PlayerTierPolicy.resolveTierForSnapshot("재배정대상", 830))
             .isEqualTo("A");
     }
+
+    @Test
+    void demotesTierByRequestedSteps() {
+        assertThat(PlayerTierPolicy.demoteTier("A+", 1)).isEqualTo("A");
+        assertThat(PlayerTierPolicy.demoteTier("A+", 2)).isEqualTo("A-");
+        assertThat(PlayerTierPolicy.demoteTier("C-", 1)).isEqualTo("NONE");
+    }
+
+    @Test
+    void demoteTierNormalizesUnknownTierToNone() {
+        assertThat(PlayerTierPolicy.demoteTier("재배정대상", 1)).isEqualTo("NONE");
+    }
 }

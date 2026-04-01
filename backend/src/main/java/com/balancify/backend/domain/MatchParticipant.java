@@ -8,7 +8,10 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import java.util.Locale;
 
 @Entity
 @Table(name = "match_participants")
@@ -28,6 +31,9 @@ public class MatchParticipant {
 
     @Column(nullable = false, length = 20)
     private String team;
+
+    @Column(nullable = false, length = 2)
+    private String race = "P";
 
     @Column
     private Integer mmrBefore;
@@ -70,6 +76,14 @@ public class MatchParticipant {
         this.team = team;
     }
 
+    public String getRace() {
+        return race;
+    }
+
+    public void setRace(String race) {
+        this.race = normalizeRace(race);
+    }
+
     public Integer getMmrBefore() {
         return mmrBefore;
     }
@@ -92,5 +106,23 @@ public class MatchParticipant {
 
     public void setMmrDelta(Integer mmrDelta) {
         this.mmrDelta = mmrDelta;
+    }
+
+    @PrePersist
+    @PreUpdate
+    private void normalizeParticipantRace() {
+        this.race = normalizeRace(this.race);
+    }
+
+    private String normalizeRace(String value) {
+        if (value == null || value.isBlank()) {
+            return "P";
+        }
+
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        return switch (normalized) {
+            case "P", "T", "Z", "PT", "PZ", "TZ", "R" -> normalized;
+            default -> "P";
+        };
     }
 }

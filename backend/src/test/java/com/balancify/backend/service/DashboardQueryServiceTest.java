@@ -104,6 +104,8 @@ class DashboardQueryServiceTest {
         assertThat(response.recentBalancePreview().mmrDiff()).isEqualTo(300);
         assertThat(response.recentBalancePreview().createdAt())
             .isEqualTo(OffsetDateTime.parse("2026-03-22T10:00:00+09:00"));
+        assertThat(response.myRaceSummary().linked()).isFalse();
+        assertThat(response.myGameTypeSummary().linked()).isFalse();
     }
 
     @Test
@@ -120,6 +122,78 @@ class DashboardQueryServiceTest {
         assertThat(response.kpiSummary().totalGames()).isZero();
         assertThat(response.topRankingPreview()).isEmpty();
         assertThat(response.recentBalancePreview()).isNull();
+        assertThat(response.myRaceSummary().linked()).isFalse();
+        assertThat(response.myGameTypeSummary().linked()).isFalse();
+    }
+
+    @Test
+    void returnsMyRaceSummaryWhenRequesterNicknameMatchesRosterPlayer() {
+        Group group = new Group();
+        group.setId(1L);
+
+        Player alpha = player(1L, group, "Alpha", "P", 2000);
+        Player bravo = player(2L, group, "Bravo", "T", 1800);
+        Player charlie = player(3L, group, "Charlie", "P", 1700);
+        Player delta = player(4L, group, "Delta", "Z", 1600);
+        Player echo = player(5L, group, "Echo", "P", 1500);
+
+        Match m1 = match(201L, group, "HOME", OffsetDateTime.parse("2026-03-20T10:00:00+09:00"));
+        Match m2 = match(202L, group, "AWAY", OffsetDateTime.parse("2026-03-21T10:00:00+09:00"));
+        Match m3 = match(203L, group, "HOME", OffsetDateTime.parse("2026-03-22T10:00:00+09:00"));
+
+        List<MatchParticipant> groupParticipants = List.of(
+            participant(3001L, m3, alpha, "HOME", null, "P"),
+            participant(3002L, m3, delta, "HOME", null, "Z"),
+            participant(3003L, m3, echo, "HOME", null, "P"),
+            participant(3004L, m3, bravo, "AWAY", null, "T"),
+
+            participant(3012L, m2, alpha, "HOME", null, "T"),
+            participant(3005L, m2, bravo, "HOME", null, "T"),
+            participant(3006L, m2, charlie, "HOME", null, "P"),
+            participant(3007L, m2, delta, "AWAY", null, "Z"),
+
+            participant(3013L, m1, alpha, "HOME", null, "P"),
+            participant(3008L, m1, charlie, "HOME", null, "P"),
+            participant(3009L, m1, echo, "HOME", null, "P"),
+            participant(3010L, m1, bravo, "AWAY", null, "T"),
+            participant(3011L, m1, delta, "AWAY", null, "Z")
+        );
+
+        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
+            .thenReturn(List.of(alpha, bravo, charlie, delta, echo));
+        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L))
+            .thenReturn(groupParticipants);
+        when(matchRepository.findTopByGroup_IdOrderByPlayedAtDescIdDesc(1L))
+            .thenReturn(Optional.empty());
+
+        GroupDashboardResponse response = dashboardQueryService.getGroupDashboard(1L, "Alpha");
+
+        assertThat(response.myRaceSummary().linked()).isTrue();
+        assertThat(response.myRaceSummary().nickname()).isEqualTo("Alpha");
+        assertThat(response.myRaceSummary().wins()).isEqualTo(2);
+        assertThat(response.myRaceSummary().losses()).isEqualTo(1);
+        assertThat(response.myRaceSummary().games()).isEqualTo(3);
+        assertThat(response.myRaceSummary().winRate()).isEqualTo(66.67);
+        assertThat(response.myRaceSummary().byRace()).hasSize(2);
+        assertThat(response.myRaceSummary().byRace().get(0).race()).isEqualTo("P");
+        assertThat(response.myRaceSummary().byRace().get(0).wins()).isEqualTo(2);
+        assertThat(response.myRaceSummary().byRace().get(0).games()).isEqualTo(2);
+        assertThat(response.myRaceSummary().byRace().get(1).race()).isEqualTo("T");
+        assertThat(response.myRaceSummary().byRace().get(1).losses()).isEqualTo(1);
+
+        assertThat(response.myGameTypeSummary().linked()).isTrue();
+        assertThat(response.myGameTypeSummary().nickname()).isEqualTo("Alpha");
+        assertThat(response.myGameTypeSummary().wins()).isEqualTo(2);
+        assertThat(response.myGameTypeSummary().losses()).isEqualTo(1);
+        assertThat(response.myGameTypeSummary().games()).isEqualTo(3);
+        assertThat(response.myGameTypeSummary().winRate()).isEqualTo(66.67);
+        assertThat(response.myGameTypeSummary().byGameType()).hasSize(3);
+        assertThat(response.myGameTypeSummary().byGameType().get(0).gameType()).isEqualTo("PPP");
+        assertThat(response.myGameTypeSummary().byGameType().get(0).wins()).isEqualTo(1);
+        assertThat(response.myGameTypeSummary().byGameType().get(1).gameType()).isEqualTo("PPZ");
+        assertThat(response.myGameTypeSummary().byGameType().get(1).wins()).isEqualTo(1);
+        assertThat(response.myGameTypeSummary().byGameType().get(2).gameType()).isEqualTo("PTT");
+        assertThat(response.myGameTypeSummary().byGameType().get(2).losses()).isEqualTo(1);
     }
 
     private Player player(Long id, Group group, String nickname, String race, int mmr) {
@@ -156,5 +230,17 @@ class DashboardQueryServiceTest {
         participant.setMmrBefore(mmrBefore);
         return participant;
     }
-}
 
+    private MatchParticipant participant(
+        Long id,
+        Match match,
+        Player player,
+        String team,
+        Integer mmrBefore,
+        String race
+    ) {
+        MatchParticipant participant = participant(id, match, player, team, mmrBefore);
+        participant.setRace(race);
+        return participant;
+    }
+}

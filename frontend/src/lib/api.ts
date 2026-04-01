@@ -550,6 +550,7 @@ export const apiClient = {
   getGroupDashboard: (groupId: number) =>
     apiRequest<GroupDashboardResponse>(`/api/groups/${groupId}/dashboard`, undefined, {
       includeUserEmail: true,
+      includeUserNickname: true,
     }),
   getRanking: (groupId: number) =>
     apiRequest<RankingResponse>(`/api/groups/${groupId}/ranking`, undefined, {

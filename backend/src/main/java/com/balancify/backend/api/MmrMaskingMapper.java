@@ -109,7 +109,13 @@ public final class MmrMaskingMapper {
             );
         }
 
-        return new GroupDashboardResponse(maskedKpi, maskedTopPreview, maskedRecentPreview);
+        return new GroupDashboardResponse(
+            maskedKpi,
+            maskedTopPreview,
+            maskedRecentPreview,
+            response.myRaceSummary(),
+            response.myGameTypeSummary()
+        );
     }
 
     public static List<GroupRecentMatchResponse> maskRecentMatches(List<GroupRecentMatchResponse> responses) {

@@ -45,3 +45,9 @@ balancify:
     allowed-emails: ${ALLOWED_USER_EMAILS:}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
+  rank:
+    dormancy:
+      enabled: ${RANK_DORMANCY_ENABLED:true}
+      inactive-days: ${RANK_DORMANCY_INACTIVE_DAYS:3}
+      max-games: ${RANK_DORMANCY_MAX_GAMES:3}
+      demote-steps: ${RANK_DORMANCY_DEMOTE_STEPS:1}

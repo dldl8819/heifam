@@ -333,6 +333,7 @@ public class MatchImportService {
         participant.setMatch(match);
         participant.setPlayer(player);
         participant.setTeam(team);
+        participant.setRace(player.getRace());
 
         int mmr = player.getMmr() == null ? 0 : player.getMmr();
         participant.setMmrBefore(mmr);

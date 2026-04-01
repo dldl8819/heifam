@@ -10,6 +10,9 @@ import com.balancify.backend.domain.MatchParticipant;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.MatchParticipantRepository;
 import com.balancify.backend.repository.PlayerRepository;
+import java.time.Clock;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,6 +22,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class PlayerQueryServiceTest {
+
+    private static final OffsetDateTime FIXED_NOW = OffsetDateTime.parse("2026-04-02T00:00:00Z");
 
     @Mock
     private PlayerRepository playerRepository;
@@ -30,7 +35,15 @@ class PlayerQueryServiceTest {
 
     @BeforeEach
     void setUp() {
-        playerQueryService = new PlayerQueryService(playerRepository, matchParticipantRepository);
+        playerQueryService = new PlayerQueryService(
+            playerRepository,
+            matchParticipantRepository,
+            true,
+            3,
+            3,
+            1,
+            Clock.fixed(FIXED_NOW.toInstant(), ZoneOffset.UTC)
+        );
     }
 
     @Test
@@ -95,6 +108,59 @@ class PlayerQueryServiceTest {
         assertThat(response).isEmpty();
     }
 
+    @Test
+    void demotesTierOneStepWhenPlayerIsDormantWithLowParticipation() {
+        Group group = new Group();
+        group.setId(1L);
+
+        Player robo = player(9L, group, "로보", "P", "A+", 930);
+        robo.setCreatedAt(OffsetDateTime.parse("2026-03-30T00:00:00Z"));
+
+        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
+            .thenReturn(List.of(robo));
+        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L))
+            .thenReturn(List.of());
+
+        List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L);
+
+        assertThat(response).hasSize(1);
+        assertThat(response.get(0).tier()).isEqualTo("A");
+        assertThat(response.get(0).currentMmr()).isEqualTo(930);
+        assertThat(response.get(0).games()).isZero();
+    }
+
+    @Test
+    void doesNotDemoteDormantTierWhenParticipationIsAboveThreshold() {
+        Group group = new Group();
+        group.setId(1L);
+
+        Player robo = player(9L, group, "로보", "P", "A+", 930);
+        robo.setCreatedAt(OffsetDateTime.parse("2026-03-20T00:00:00Z"));
+
+        Match m1 = match(21L, group, "HOME", "2026-03-20T00:00:00Z");
+        Match m2 = match(22L, group, "HOME", "2026-03-21T00:00:00Z");
+        Match m3 = match(23L, group, "HOME", "2026-03-22T00:00:00Z");
+        Match m4 = match(24L, group, "HOME", "2026-03-23T00:00:00Z");
+
+        List<MatchParticipant> participants = List.of(
+            participant(201L, m4, robo, "HOME"),
+            participant(202L, m3, robo, "HOME"),
+            participant(203L, m2, robo, "HOME"),
+            participant(204L, m1, robo, "HOME")
+        );
+
+        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
+            .thenReturn(List.of(robo));
+        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L))
+            .thenReturn(participants);
+
+        List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L);
+
+        assertThat(response).hasSize(1);
+        assertThat(response.get(0).tier()).isEqualTo("A+");
+        assertThat(response.get(0).games()).isEqualTo(4);
+    }
+
     private Player player(
         Long id,
         Group group,
@@ -110,6 +176,7 @@ class PlayerQueryServiceTest {
         player.setRace(race);
         player.setTier(tier);
         player.setMmr(mmr);
+        player.setCreatedAt(FIXED_NOW);
         return player;
     }
 
@@ -118,6 +185,12 @@ class PlayerQueryServiceTest {
         match.setId(id);
         match.setGroup(group);
         match.setWinningTeam(winningTeam);
+        return match;
+    }
+
+    private Match match(Long id, Group group, String winningTeam, String playedAtIso) {
+        Match match = match(id, group, winningTeam);
+        match.setPlayedAt(OffsetDateTime.parse(playedAtIso));
         return match;
     }
 

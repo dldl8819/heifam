@@ -104,6 +104,7 @@ public class GroupMatchAdminService {
         participant.setMatch(match);
         participant.setPlayer(player);
         participant.setTeam(team);
+        participant.setRace(player.getRace());
         participant.setMmrBefore(player.getMmr());
         participant.setMmrAfter(player.getMmr());
         participant.setMmrDelta(0);

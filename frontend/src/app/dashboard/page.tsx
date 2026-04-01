@@ -30,6 +30,8 @@ export default function DashboardPage() {
   const [dashboard, setDashboard] = useState<GroupDashboardResponse | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+  const myRaceSummary = dashboard?.myRaceSummary
+  const myGameTypeSummary = dashboard?.myGameTypeSummary
 
   useEffect(() => {
     let active = true
@@ -298,11 +300,133 @@ export default function DashboardPage() {
         </article>
 
         <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-900">{t('dashboard.notes.title')}</h3>
-          <ul className="mt-3 space-y-2 text-sm text-slate-600">
-            <li>{t('dashboard.notes.items.one')}</li>
-            <li>{t('dashboard.notes.items.two')}</li>
-          </ul>
+          <h3 className="text-sm font-semibold text-slate-900">{t('dashboard.myRace.title')}</h3>
+          <p className="mt-1 text-xs text-slate-500">{t('dashboard.myRace.description')}</p>
+
+          {loading && (
+            <div className="mt-3">
+              <LoadingIndicator label={t('common.loading')} />
+            </div>
+          )}
+
+          {!loading && dashboard && !myRaceSummary?.linked && (
+            <div className="mt-3 rounded-lg border border-dashed border-slate-200 px-3 py-3 text-sm text-slate-500">
+              {t('dashboard.myRace.notLinked')}
+            </div>
+          )}
+
+          {!loading && myRaceSummary && myRaceSummary.linked && (
+            <>
+              <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                {t('dashboard.myRace.total')}:&nbsp;
+                <span className="font-semibold text-slate-900">
+                  {myRaceSummary.wins}W {myRaceSummary.losses}L ({myRaceSummary.games})
+                </span>
+                &nbsp;·&nbsp;
+                <span className="font-semibold text-slate-900">
+                  {formatWinRate(myRaceSummary.winRate)}
+                </span>
+              </div>
+
+              <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-xs tracking-wide text-slate-500">
+                    <tr>
+                      <th className="px-3 py-2">{t('dashboard.myRace.headers.race')}</th>
+                      <th className="px-3 py-2">{t('dashboard.myRace.headers.wins')}</th>
+                      <th className="px-3 py-2">{t('dashboard.myRace.headers.losses')}</th>
+                      <th className="px-3 py-2">{t('dashboard.myRace.headers.games')}</th>
+                      <th className="px-3 py-2">{t('dashboard.myRace.headers.winRate')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {myRaceSummary.byRace.map((item) => (
+                      <tr key={`my-race-${item.race}`} className="border-t border-slate-100">
+                        <td className="px-3 py-2 font-medium text-slate-900">{item.race}</td>
+                        <td className="px-3 py-2 text-slate-700">{item.wins}</td>
+                        <td className="px-3 py-2 text-slate-700">{item.losses}</td>
+                        <td className="px-3 py-2 text-slate-700">{item.games}</td>
+                        <td className="px-3 py-2 text-slate-700">{formatWinRate(item.winRate)}</td>
+                      </tr>
+                    ))}
+                    {myRaceSummary.byRace.length === 0 && (
+                      <tr className="border-t border-slate-100">
+                        <td className="px-3 py-4 text-center text-sm text-slate-500" colSpan={5}>
+                          {t('dashboard.myRace.empty')}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          <div className="mt-4 border-t border-slate-200 pt-4">
+            <h4 className="text-sm font-semibold text-slate-900">{t('dashboard.myGameType.title')}</h4>
+            <p className="mt-1 text-xs text-slate-500">{t('dashboard.myGameType.description')}</p>
+
+            {!loading && dashboard && !myGameTypeSummary?.linked && (
+              <div className="mt-3 rounded-lg border border-dashed border-slate-200 px-3 py-3 text-sm text-slate-500">
+                {t('dashboard.myGameType.notLinked')}
+              </div>
+            )}
+
+            {!loading && myGameTypeSummary && myGameTypeSummary.linked && (
+              <>
+                <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  {t('dashboard.myGameType.total')}:&nbsp;
+                  <span className="font-semibold text-slate-900">
+                    {myGameTypeSummary.wins}W {myGameTypeSummary.losses}L ({myGameTypeSummary.games})
+                  </span>
+                  &nbsp;·&nbsp;
+                  <span className="font-semibold text-slate-900">
+                    {formatWinRate(myGameTypeSummary.winRate)}
+                  </span>
+                </div>
+
+                <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200">
+                  <table className="min-w-full text-left text-sm">
+                    <thead className="bg-slate-50 text-xs tracking-wide text-slate-500">
+                      <tr>
+                        <th className="px-3 py-2">{t('dashboard.myGameType.headers.gameType')}</th>
+                        <th className="px-3 py-2">{t('dashboard.myGameType.headers.wins')}</th>
+                        <th className="px-3 py-2">{t('dashboard.myGameType.headers.losses')}</th>
+                        <th className="px-3 py-2">{t('dashboard.myGameType.headers.games')}</th>
+                        <th className="px-3 py-2">{t('dashboard.myGameType.headers.winRate')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {myGameTypeSummary.byGameType.map((item) => (
+                        <tr key={`my-game-type-${item.gameType}`} className="border-t border-slate-100">
+                          <td className="px-3 py-2 font-medium text-slate-900">{item.gameType}</td>
+                          <td className="px-3 py-2 text-slate-700">{item.wins}</td>
+                          <td className="px-3 py-2 text-slate-700">{item.losses}</td>
+                          <td className="px-3 py-2 text-slate-700">{item.games}</td>
+                          <td className="px-3 py-2 text-slate-700">{formatWinRate(item.winRate)}</td>
+                        </tr>
+                      ))}
+                      {myGameTypeSummary.byGameType.length === 0 && (
+                        <tr className="border-t border-slate-100">
+                          <td className="px-3 py-4 text-center text-sm text-slate-500" colSpan={5}>
+                            {t('dashboard.myGameType.empty')}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="mt-4 border-t border-slate-200 pt-4">
+            <h4 className="text-sm font-semibold text-slate-900">{t('dashboard.notes.title')}</h4>
+            <ul className="mt-3 space-y-2 text-sm text-slate-600">
+              <li>{t('dashboard.notes.items.one')}</li>
+              <li>{t('dashboard.notes.items.two')}</li>
+            </ul>
+          </div>
         </article>
       </section>
     </section>

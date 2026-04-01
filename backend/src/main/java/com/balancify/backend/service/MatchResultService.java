@@ -138,6 +138,9 @@ public class MatchResultService {
                 ? currentPlayerMmr - previousDelta + mmrDelta
                 : currentPlayerMmr + mmrDelta;
 
+            if (participant.getRace() == null || participant.getRace().isBlank()) {
+                participant.setRace(player.getRace());
+            }
             participant.setMmrBefore(baseMmrBefore);
             participant.setMmrAfter(mmrAfter);
             participant.setMmrDelta(mmrDelta);

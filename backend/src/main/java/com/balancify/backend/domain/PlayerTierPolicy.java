@@ -113,6 +113,15 @@ public final class PlayerTierPolicy {
         return canonicalTier(tier, resolveTier(mmr));
     }
 
+    public static String demoteTier(String tier, int steps) {
+        if (steps <= 0) {
+            return canonicalTier(tier, TIER_NONE);
+        }
+
+        String normalizedTier = canonicalTier(tier, TIER_NONE);
+        return stepTier(normalizedTier, -steps);
+    }
+
     public static boolean isLowTier(Integer mmr) {
         String tier = resolveTier(mmr);
         return TIER_NONE.equals(tier) || "C+".equals(tier) || "C".equals(tier) || "C-".equals(tier);
