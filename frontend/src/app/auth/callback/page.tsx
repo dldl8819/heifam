@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
-import { apiClient } from '@/lib/api'
+import { ApiRequestError, apiClient } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 
 function resolveSessionNickname(metadata: unknown): string {
@@ -81,9 +81,17 @@ export default function AuthCallbackPage() {
 
         router.replace('/dashboard')
       } catch (callbackError) {
+        if (
+          callbackError instanceof ApiRequestError &&
+          (callbackError.status === 401 || callbackError.status === 403)
+        ) {
+          await supabase.auth.signOut()
+          router.replace('/')
+          return
+        }
+
         console.error('Error verifying access during auth callback:', callbackError)
-        await supabase.auth.signOut()
-        router.replace('/')
+        router.replace('/dashboard')
       }
     }
 

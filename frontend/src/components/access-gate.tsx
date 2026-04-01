@@ -14,7 +14,17 @@ type AccessGateProps = {
 }
 
 export function AccessGate({ children }: AccessGateProps) {
-  const { isLoggedIn, canAccess, isLoading, email, isAdmin, isSuperAdmin } = useAdminAuth()
+  const {
+    isLoggedIn,
+    canAccess,
+    isLoading,
+    email,
+    isAdmin,
+    isSuperAdmin,
+    role,
+    accessError,
+    refreshAccess,
+  } = useAdminAuth()
   const { signOut } = useAuth()
   const [signingOutBlockedUser, setSigningOutBlockedUser] = useState(false)
   const pathname = usePathname()
@@ -36,7 +46,15 @@ export function AccessGate({ children }: AccessGateProps) {
 
   useEffect(() => {
     const isAuthRoute = pathname === '/auth' || pathname.startsWith('/auth/')
-    if (isAuthRoute || isLoading || !isLoggedIn || canAccess || signingOutBlockedUser) {
+    if (
+      isAuthRoute ||
+      isLoading ||
+      !isLoggedIn ||
+      canAccess ||
+      signingOutBlockedUser ||
+      accessError ||
+      role !== 'BLOCKED'
+    ) {
       return
     }
 
@@ -45,7 +63,29 @@ export function AccessGate({ children }: AccessGateProps) {
       router.replace('/')
       setSigningOutBlockedUser(false)
     })
-  }, [canAccess, isLoading, isLoggedIn, pathname, router, signOut, signingOutBlockedUser])
+  }, [
+    accessError,
+    canAccess,
+    isLoading,
+    isLoggedIn,
+    pathname,
+    role,
+    router,
+    signOut,
+    signingOutBlockedUser,
+  ])
+
+  useEffect(() => {
+    if (!accessError || !isLoggedIn || isLoading) {
+      return
+    }
+
+    const retryTimer = window.setTimeout(() => {
+      void refreshAccess()
+    }, 1500)
+
+    return () => window.clearTimeout(retryTimer)
+  }, [accessError, isLoading, isLoggedIn, refreshAccess])
 
   if (signingOutBlockedUser) {
     return <LoadingIndicator label={t('auth.loading')} />
@@ -53,6 +93,10 @@ export function AccessGate({ children }: AccessGateProps) {
 
   if (isLoading) {
     return <LoadingIndicator label={t('auth.loading')} />
+  }
+
+  if (accessError && !canAccess) {
+    return <LoadingIndicator label="권한 확인 재시도 중..." />
   }
 
   if (decision.redirectTo) {

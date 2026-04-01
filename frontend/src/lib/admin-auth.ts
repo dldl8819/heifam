@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '@/components/auth-session-provider'
-import { apiClient } from '@/lib/api'
+import { ApiRequestError, apiClient } from '@/lib/api'
 import type { AccessMeResponse, AccessRole, PlayerRace } from '@/types/api'
 
 let cachedAccessEmail: string | null = null
 let cachedAccessProfile: AccessMeResponse | null = null
+const ACCESS_FETCH_RETRY_DELAYS_MS = [400, 900]
 
 export type AdminAuthState = {
   status: 'loading' | 'authenticated' | 'unauthenticated'
@@ -16,6 +17,7 @@ export type AdminAuthState = {
   isSuperAdmin: boolean
   canAccess: boolean
   role: AccessRole
+  accessError: boolean
   email: string | null
   nickname: string | null
   preferredRace: PlayerRace | null
@@ -34,6 +36,7 @@ export function useAdminAuth(): AdminAuthState {
   const email = user?.email?.trim().toLowerCase() ?? null
   const [accessProfile, setAccessProfile] = useState<AccessMeResponse | null>(null)
   const [accessLoading, setAccessLoading] = useState<boolean>(false)
+  const [accessError, setAccessError] = useState<boolean>(false)
 
   const refreshAccess = useCallback(async () => {
     if (!email) {
@@ -41,28 +44,69 @@ export function useAdminAuth(): AdminAuthState {
       cachedAccessProfile = null
       setAccessProfile(null)
       setAccessLoading(false)
+      setAccessError(false)
       return
     }
 
     setAccessLoading(true)
+    setAccessError(false)
+    let lastError: unknown = null
+
     try {
-      const profile = await apiClient.getMyAccess({ email })
-      cachedAccessEmail = email
-      cachedAccessProfile = profile
-      setAccessProfile(profile)
-    } catch {
-      const blockedProfile: AccessMeResponse = {
-        email,
-        nickname: null,
-        role: 'BLOCKED',
-        admin: false,
-        superAdmin: false,
-        allowed: false,
-        preferredRace: null,
+      for (let attempt = 0; attempt <= ACCESS_FETCH_RETRY_DELAYS_MS.length; attempt += 1) {
+        try {
+          const profile = await apiClient.getMyAccess({ email })
+          cachedAccessEmail = email
+          cachedAccessProfile = profile
+          setAccessProfile(profile)
+          setAccessError(false)
+          return
+        } catch (error) {
+          if (
+            error instanceof ApiRequestError &&
+            (error.status === 401 || error.status === 403)
+          ) {
+            const blockedProfile: AccessMeResponse = {
+              email,
+              nickname: null,
+              role: 'BLOCKED',
+              admin: false,
+              superAdmin: false,
+              allowed: false,
+              preferredRace: null,
+            }
+            cachedAccessEmail = email
+            cachedAccessProfile = blockedProfile
+            setAccessProfile(blockedProfile)
+            setAccessError(false)
+            return
+          }
+
+          lastError = error
+          if (attempt < ACCESS_FETCH_RETRY_DELAYS_MS.length) {
+            const delayMs = ACCESS_FETCH_RETRY_DELAYS_MS[attempt]
+            await new Promise((resolve) => setTimeout(resolve, delayMs))
+            continue
+          }
+          break
+        }
       }
-      cachedAccessEmail = email
-      cachedAccessProfile = blockedProfile
-      setAccessProfile(blockedProfile)
+
+      if (cachedAccessEmail === email && cachedAccessProfile) {
+        setAccessProfile(cachedAccessProfile)
+      } else {
+        setAccessProfile({
+          email,
+          nickname: null,
+          role: 'MEMBER',
+          admin: false,
+          superAdmin: false,
+          allowed: false,
+          preferredRace: null,
+        })
+      }
+      setAccessError(true)
+      console.error('Failed to load access profile after retries:', lastError)
     } finally {
       setAccessLoading(false)
     }
@@ -78,12 +122,14 @@ export function useAdminAuth(): AdminAuthState {
       cachedAccessProfile = null
       setAccessProfile(null)
       setAccessLoading(false)
+      setAccessError(false)
       return
     }
 
     if (cachedAccessEmail === email && cachedAccessProfile !== null) {
       setAccessProfile(cachedAccessProfile)
       setAccessLoading(false)
+      setAccessError(false)
       return
     }
 
@@ -107,6 +153,7 @@ export function useAdminAuth(): AdminAuthState {
     isSuperAdmin: Boolean(accessProfile?.superAdmin),
     canAccess: Boolean(accessProfile?.allowed),
     role: resolveRole(accessProfile),
+    accessError,
     email,
     nickname: accessProfile?.nickname ?? null,
     preferredRace: accessProfile?.preferredRace ?? null,
