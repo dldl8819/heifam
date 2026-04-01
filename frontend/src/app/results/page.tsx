@@ -299,6 +299,8 @@ export default function ResultsPage() {
         setImportError(t('common.adminLoginRequired'))
       } else if (isApiForbiddenError(matchImportError)) {
         setImportError(t('common.permissionDenied'))
+      } else if (matchImportError instanceof Error && matchImportError.message.trim().length > 0) {
+        setImportError(matchImportError.message)
       } else {
         setImportError(t('results.import.failure'))
       }

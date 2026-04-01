@@ -83,7 +83,7 @@ export default function DashboardPage() {
         </Alert>
       )}
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className={`grid gap-4 sm:grid-cols-2 ${isAdmin ? 'xl:grid-cols-4' : 'xl:grid-cols-2'}`}>
         <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-xs tracking-wide text-slate-500">{t('dashboard.kpi.totalPlayers')}</p>
           <p className="mt-2 text-2xl font-semibold text-slate-900">
@@ -91,19 +91,23 @@ export default function DashboardPage() {
           </p>
         </article>
 
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs tracking-wide text-slate-500">{t('dashboard.kpi.topMmr')}</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900">
-            {loading ? '...' : isAdmin ? dashboard?.kpiSummary.topMmr ?? 0 : '-'}
-          </p>
-        </article>
+        {isAdmin && (
+          <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs tracking-wide text-slate-500">{t('dashboard.kpi.topMmr')}</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-900">
+              {loading ? '...' : dashboard?.kpiSummary.topMmr ?? 0}
+            </p>
+          </article>
+        )}
 
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs tracking-wide text-slate-500">{t('dashboard.kpi.averageMmr')}</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900">
-            {loading ? '...' : isAdmin ? dashboard?.kpiSummary.averageMmr ?? 0 : '-'}
-          </p>
-        </article>
+        {isAdmin && (
+          <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs tracking-wide text-slate-500">{t('dashboard.kpi.averageMmr')}</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-900">
+              {loading ? '...' : dashboard?.kpiSummary.averageMmr ?? 0}
+            </p>
+          </article>
+        )}
 
         <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-xs tracking-wide text-slate-500">{t('dashboard.kpi.totalGames')}</p>

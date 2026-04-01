@@ -13,6 +13,7 @@ const TEMP_GROUP_ID = 1
 const MAX_SLOT_COUNT = 6
 const BALANCE_STATE_STORAGE_KEY = 'balancify.balance.state.v2'
 const winnerTeamOptions: TeamSide[] = ['HOME', 'AWAY']
+type WinnerTeamSelection = '' | TeamSide
 const teamSizeOptions = [
   { value: 3 as const, labelKey: 'balance.mode.threeVsThree' },
   { value: 2 as const, labelKey: 'balance.mode.twoVsTwo' },
@@ -26,7 +27,7 @@ type PersistedBalanceState = {
   slotInputs: string[]
   result: BalanceResponse | null
   resultMatchId: string
-  winnerTeam: TeamSide
+  winnerTeam: WinnerTeamSelection
 }
 
 function formatPercent(value: number): string {
@@ -117,7 +118,7 @@ function readPersistedBalanceState(): PersistedBalanceState | null {
       winnerTeam:
         parsed.winnerTeam === 'HOME' || parsed.winnerTeam === 'AWAY'
           ? parsed.winnerTeam
-          : 'HOME',
+          : '',
     }
   } catch {
     return null
@@ -126,7 +127,8 @@ function readPersistedBalanceState(): PersistedBalanceState | null {
 
 export default function BalancePage() {
   const router = useRouter()
-  const { isAdmin } = useAdminAuth()
+  const { isAdmin, canAccess } = useAdminAuth()
+  const showMmr = isAdmin
   const [players, setPlayers] = useState<BalancePlayerOption[]>([])
   const [teamSize, setTeamSize] = useState<SupportedTeamSize>(3)
   const [slots, setSlots] = useState<Array<number | null>>(createEmptySlots)
@@ -137,7 +139,7 @@ export default function BalancePage() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [result, setResult] = useState<BalanceResponse | null>(null)
   const [resultMatchId, setResultMatchId] = useState<string>('')
-  const [resultWinnerTeam, setResultWinnerTeam] = useState<TeamSide>('HOME')
+  const [resultWinnerTeam, setResultWinnerTeam] = useState<WinnerTeamSelection>('')
   const [resultSubmitting, setResultSubmitting] = useState<boolean>(false)
   const [resultSubmitError, setResultSubmitError] = useState<string | null>(null)
   const [resultSubmitSuccess, setResultSubmitSuccess] = useState<MatchResultResponse | null>(null)
@@ -169,7 +171,7 @@ export default function BalancePage() {
             tier: player.tier,
           }))
           .sort((a, b) =>
-            isAdmin
+            showMmr
               ? b.currentMmr - a.currentMmr
               : a.nickname.localeCompare(b.nickname, 'ko-KR')
           )
@@ -194,7 +196,7 @@ export default function BalancePage() {
     return () => {
       active = false
     }
-  }, [isAdmin])
+  }, [showMmr])
 
   useEffect(() => {
     if (playersLoading || players.length === 0) {
@@ -265,6 +267,12 @@ export default function BalancePage() {
     players.length > 0 &&
     allSelected &&
     !hasDuplicates
+  const hasGeneratedMatchId = Number.isFinite(Number(resultMatchId)) && Number(resultMatchId) > 0
+  const canSubmitQuickResult =
+    canAccess &&
+    hasGeneratedMatchId &&
+    (resultWinnerTeam === 'HOME' || resultWinnerTeam === 'AWAY') &&
+    !resultSubmitting
 
   const totalSelectedMmr = selectedPlayers.reduce((sum, player) => sum + player.currentMmr, 0)
   const clearSelectionAndResult = (nextTeamSize: SupportedTeamSize | null = null) => {
@@ -276,6 +284,7 @@ export default function BalancePage() {
     setSubmitError(null)
     setResult(null)
     setResultMatchId('')
+    setResultWinnerTeam('')
     setMatchCreateMessage(null)
     setResultSubmitError(null)
     setResultSubmitSuccess(null)
@@ -296,7 +305,7 @@ export default function BalancePage() {
       input.length === 0
         ? null
         : players.find((player) => player.nickname.toLowerCase() === normalizedInput) ??
-          players.find((player) => toPlayerLabel(player, isAdmin).toLowerCase() === normalizedInput) ??
+          players.find((player) => toPlayerLabel(player, showMmr).toLowerCase() === normalizedInput) ??
           players.find((player) => toPlayerLabel(player, true).toLowerCase() === normalizedInput) ??
           null
 
@@ -317,6 +326,7 @@ export default function BalancePage() {
     setSubmitError(null)
     setResult(null)
     setResultMatchId('')
+    setResultWinnerTeam('')
     setMatchCreateMessage(null)
     setResultSubmitError(null)
     setResultSubmitSuccess(null)
@@ -344,22 +354,18 @@ export default function BalancePage() {
         .filter((playerId): playerId is number => typeof playerId === 'number' && Number.isFinite(playerId))
 
       if (response.teamSize === 3 && homePlayerIds.length === 3 && awayPlayerIds.length === 3) {
-        if (!isAdmin) {
-          setMatchCreateMessage(t('balance.quickResult.matchCreateAdminOnly'))
-        } else {
-          try {
-            const created = await apiClient.createGroupMatch(TEMP_GROUP_ID, {
-              homePlayerIds,
-              awayPlayerIds,
-            })
-            setResultMatchId(String(created.matchId))
-            setMatchCreateMessage(t('balance.quickResult.matchCreated', { matchId: created.matchId }))
-          } catch (createError) {
-            if (isApiForbiddenError(createError)) {
-              setMatchCreateMessage(t('balance.quickResult.matchCreateForbidden'))
-            } else {
-              setMatchCreateMessage(t('balance.quickResult.matchCreateFailed'))
-            }
+        try {
+          const created = await apiClient.createGroupMatch(TEMP_GROUP_ID, {
+            homePlayerIds,
+            awayPlayerIds,
+          })
+          setResultMatchId(String(created.matchId))
+          setMatchCreateMessage(t('balance.quickResult.matchCreated', { matchId: created.matchId }))
+        } catch (createError) {
+          if (isApiForbiddenError(createError)) {
+            setMatchCreateMessage(t('balance.quickResult.matchCreateForbidden'))
+          } else {
+            setMatchCreateMessage(t('balance.quickResult.matchCreateFailed'))
           }
         }
       } else if (response.teamSize === 2) {
@@ -378,14 +384,19 @@ export default function BalancePage() {
     setResultSubmitError(null)
     setResultSubmitSuccess(null)
 
-    if (!isAdmin) {
-      setResultSubmitError(t('common.adminOnlyAction'))
+    if (!canAccess) {
+      setResultSubmitError(t('common.permissionDenied'))
       return
     }
 
     const parsedMatchId = Number(resultMatchId)
     if (!Number.isFinite(parsedMatchId) || parsedMatchId <= 0) {
-      setResultSubmitError(t('results.form.invalidMatchId'))
+      setResultSubmitError(t('balance.quickResult.matchNotReady'))
+      return
+    }
+
+    if (resultWinnerTeam !== 'HOME' && resultWinnerTeam !== 'AWAY') {
+      setResultSubmitError(t('balance.quickResult.winnerRequired'))
       return
     }
 
@@ -503,7 +514,7 @@ export default function BalancePage() {
                       placeholder={t('balance.selection.placeholder')}
                     />
                     {inputMatchedPlayer && (
-                      <p className="text-[11px] text-slate-500">{toPlayerLabel(inputMatchedPlayer, isAdmin)}</p>
+                      <p className="text-[11px] text-slate-500">{toPlayerLabel(inputMatchedPlayer, showMmr)}</p>
                     )}
                     {isDuplicateSelection && (
                       <p className="text-[11px] text-rose-700">{t('balance.validation.duplicate')}</p>
@@ -533,7 +544,7 @@ export default function BalancePage() {
                 <span className="font-medium text-slate-800">
                   {player.nickname} ({player.race})
                 </span>
-                <span className="text-slate-600">{isAdmin ? player.currentMmr : '-'}</span>
+                {showMmr && <span className="text-slate-600">{player.currentMmr}</span>}
               </li>
             ))}
             {selectedPlayers.length === 0 && (
@@ -543,10 +554,11 @@ export default function BalancePage() {
             )}
           </ul>
 
-          <div className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-            {t('balance.summary.totalMmr')}:{' '}
-            <span className="font-semibold">{isAdmin ? totalSelectedMmr : '-'}</span>
-          </div>
+          {showMmr && (
+            <div className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              {t('balance.summary.totalMmr')}: <span className="font-semibold">{totalSelectedMmr}</span>
+            </div>
+          )}
 
           <button
             type="button"
@@ -590,13 +602,15 @@ export default function BalancePage() {
                   className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm"
                 >
                   <span className="font-medium text-slate-800">{player.name}</span>
-                  <span className="text-slate-600">{isAdmin ? `${player.mmr} MMR` : '-'}</span>
+                  {showMmr && <span className="text-slate-600">{player.mmr} MMR</span>}
                 </li>
               ))}
             </ul>
-            <p className="mt-3 text-sm text-slate-700">
-              {t('balance.result.homeMmr')}: <span className="font-semibold">{isAdmin ? result.homeMmr : '-'}</span>
-            </p>
+            {showMmr && (
+              <p className="mt-3 text-sm text-slate-700">
+                {t('balance.result.homeMmr')}: <span className="font-semibold">{result.homeMmr}</span>
+              </p>
+            )}
           </article>
 
           <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -608,33 +622,39 @@ export default function BalancePage() {
                   className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm"
                 >
                   <span className="font-medium text-slate-800">{player.name}</span>
-                  <span className="text-slate-600">{isAdmin ? `${player.mmr} MMR` : '-'}</span>
+                  {showMmr && <span className="text-slate-600">{player.mmr} MMR</span>}
                 </li>
               ))}
             </ul>
-            <p className="mt-3 text-sm text-slate-700">
-              {t('balance.result.awayMmr')}: <span className="font-semibold">{isAdmin ? result.awayMmr : '-'}</span>
-            </p>
+            {showMmr && (
+              <p className="mt-3 text-sm text-slate-700">
+                {t('balance.result.awayMmr')}: <span className="font-semibold">{result.awayMmr}</span>
+              </p>
+            )}
           </article>
 
           <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-2">
             <h3 className="text-sm font-semibold text-slate-900">{t('balance.result.metricsTitle')}</h3>
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                {t('balance.result.mmrDiff')}: <span className="font-semibold">{isAdmin ? result.mmrDiff : '-'}</span>
-              </div>
+            <div className={`mt-3 grid gap-3 ${showMmr ? 'sm:grid-cols-3' : 'sm:grid-cols-1'}`}>
+              {showMmr && (
+                <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  {t('balance.result.mmrDiff')}: <span className="font-semibold">{result.mmrDiff}</span>
+                </div>
+              )}
               <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
                 {t('balance.result.expectedHomeWinRate')}:{' '}
                 <span className="font-semibold">
-                  {isAdmin ? formatPercent(result.expectedHomeWinRate) : '-'}
+                  {formatPercent(result.expectedHomeWinRate)}
                 </span>
               </div>
-              <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                {t('balance.result.averageTeamMmr')}:{' '}
-                <span className="font-semibold">
-                  {isAdmin ? Math.round((result.homeMmr + result.awayMmr) / 2) : '-'}
-                </span>
-              </div>
+              {showMmr && (
+                <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  {t('balance.result.averageTeamMmr')}:{' '}
+                  <span className="font-semibold">
+                    {Math.round((result.homeMmr + result.awayMmr) / 2)}
+                  </span>
+                </div>
+              )}
             </div>
           </article>
         </section>
@@ -643,27 +663,20 @@ export default function BalancePage() {
       <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <h3 className="text-sm font-semibold text-slate-900">{t('balance.quickResult.title')}</h3>
         <p className="mt-1 text-xs text-slate-500">{t('balance.quickResult.description')}</p>
-        <div className="mt-3 grid gap-3 md:grid-cols-3">
-          <label className="space-y-1 text-xs font-medium text-slate-500 md:col-span-2">
-            {t('results.form.matchId')}
-            <input
-              type="number"
-              inputMode="numeric"
-              min={1}
-              value={resultMatchId}
-              onChange={(event) => setResultMatchId(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-              placeholder={t('results.form.matchIdPlaceholder')}
-            />
-          </label>
-
+        <p className="mt-3 text-xs text-slate-600">
+          {hasGeneratedMatchId
+            ? t('balance.quickResult.autoMatchId', { matchId: resultMatchId })
+            : t('balance.quickResult.matchNotReady')}
+        </p>
+        <div className="mt-3 grid gap-3 md:grid-cols-1">
           <label className="space-y-1 text-xs font-medium text-slate-500">
             {t('results.form.winnerTeam')}
             <select
               value={resultWinnerTeam}
-              onChange={(event) => setResultWinnerTeam(event.target.value as TeamSide)}
+              onChange={(event) => setResultWinnerTeam(event.target.value as WinnerTeamSelection)}
               className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
             >
+              <option value="">{t('balance.quickResult.winnerPlaceholder')}</option>
               {winnerTeamOptions.map((team) => (
                 <option key={team} value={team}>
                   {formatTeamLabel(team)}
@@ -677,7 +690,7 @@ export default function BalancePage() {
           <button
             type="button"
             onClick={handleSubmitResult}
-            disabled={resultSubmitting}
+            disabled={!canSubmitQuickResult}
             className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
           >
             {resultSubmitting ? t('balance.quickResult.submitting') : t('balance.quickResult.submit')}

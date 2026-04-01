@@ -89,7 +89,7 @@ class AdminKeyFilterTest {
     void setUp() {
         Set<String> admins = Set.of("admin@hei.gg", "ops@hei.gg");
         Set<String> superAdmins = Set.of("minsiklee2@gmail.com");
-        Set<String> allowed = Set.of("admin@hei.gg", "ops@hei.gg", "minsiklee2@gmail.com");
+        Set<String> allowed = Set.of("admin@hei.gg", "ops@hei.gg", "minsiklee2@gmail.com", "member@hei.gg");
 
         when(accessControlService.isAdminEmail(any())).thenAnswer(invocation -> {
             Object argument = invocation.getArgument(0);
@@ -120,7 +120,7 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void returnsForbiddenWhenUserEmailIsNotAdminForMatchResult() throws Exception {
+    void returnsForbiddenWhenUserEmailIsNotAllowedForMatchResult() throws Exception {
         mockMvc
             .perform(
                 post("/api/matches/1/result")
@@ -132,7 +132,7 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void allowsMatchResultWhenUserEmailIsAdmin() throws Exception {
+    void allowsMatchResultWhenUserEmailIsAllowedMember() throws Exception {
         when(matchResultService.processMatchResult(eq(1L), any(MatchResultRequest.class), any(), any()))
             .thenReturn(
                 new MatchResultResponse(
@@ -148,7 +148,7 @@ class AdminKeyFilterTest {
         mockMvc
             .perform(
                 post("/api/matches/1/result")
-                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .header("X-USER-EMAIL", "member@hei.gg")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"winnerTeam\":\"HOME\"}")
             )
@@ -282,7 +282,7 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void returnsForbiddenForGroupMatchCreateWithoutAdminKey() throws Exception {
+    void returnsForbiddenForGroupMatchCreateWithoutAllowedEmail() throws Exception {
         mockMvc
             .perform(
                 post("/api/groups/1/matches")
@@ -293,19 +293,30 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void allowsGroupMatchCreateWithValidAdminKey() throws Exception {
+    void allowsGroupMatchCreateWithAllowedEmail() throws Exception {
         when(groupMatchAdminService.createMatch(eq(1L), any()))
             .thenReturn(new CreateGroupMatchResponse(100L));
 
         mockMvc
             .perform(
                 post("/api/groups/1/matches")
-                    .header("X-ADMIN-KEY", "test-admin-key")
-                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .header("X-USER-EMAIL", "member@hei.gg")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"homePlayerIds\":[1,2,3],\"awayPlayerIds\":[4,5,6]}")
             )
             .andExpect(status().isOk());
+    }
+
+    @Test
+    void returnsForbiddenForGroupMatchCreateWhenEmailIsNotAllowed() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/groups/1/matches")
+                    .header("X-USER-EMAIL", "guest@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"homePlayerIds\":[1,2,3],\"awayPlayerIds\":[4,5,6]}")
+            )
+            .andExpect(status().isForbidden());
     }
 
     @Test

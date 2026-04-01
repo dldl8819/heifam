@@ -30,7 +30,7 @@ public class AdminKeyFilter extends OncePerRequestFilter {
         new ProtectedRoute(
             "POST",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/matches"),
-            AuthType.ADMIN_KEY
+            AuthType.SERVICE_ACCESS
         ),
         new ProtectedRoute(
             "PATCH",
@@ -50,7 +50,7 @@ public class AdminKeyFilter extends OncePerRequestFilter {
         new ProtectedRoute(
             "POST",
             PathPatternParser.defaultInstance.parse("/api/matches/{id}/result"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SERVICE_ACCESS
         ),
         new ProtectedRoute(
             "PATCH",
@@ -154,6 +154,10 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             return accessControlService.isSuperAdminEmail(requestEmail);
         }
 
+        if (authType == AuthType.SERVICE_ACCESS) {
+            return accessControlService.isServiceAccessAllowed(requestEmail);
+        }
+
         String configuredKey = safeTrim(adminKeyProperties.getApiKey());
         String requestKey = safeTrim(request.getHeader(ADMIN_HEADER));
         return isValidKey(configuredKey, requestKey);
@@ -187,6 +191,7 @@ public class AdminKeyFilter extends OncePerRequestFilter {
     private enum AuthType {
         ADMIN_KEY,
         ADMIN_EMAIL,
-        SUPER_ADMIN_EMAIL
+        SUPER_ADMIN_EMAIL,
+        SERVICE_ACCESS
     }
 }

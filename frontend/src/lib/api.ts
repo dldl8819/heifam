@@ -33,7 +33,8 @@ const API_BASE_URL =
     : process.env.NODE_ENV === 'production'
       ? ''
       : DEFAULT_DEV_API_BASE_URL
-const API_REQUEST_TIMEOUT_MS = 10000
+const DEFAULT_API_REQUEST_TIMEOUT_MS = 10000
+const IMPORT_API_REQUEST_TIMEOUT_MS = 120000
 const USER_EMAIL_HEADER = 'X-USER-EMAIL'
 const USER_NICKNAME_HEADER = 'X-USER-NICKNAME'
 
@@ -53,8 +54,10 @@ type ApiRequestOptions = {
   adminOnly?: boolean
   requireUserEmail?: boolean
   includeUserEmail?: boolean
+  includeUserNickname?: boolean
   userEmail?: string
   userNickname?: string
+  timeoutMs?: number
 }
 
 export class ApiRequestError extends Error {
@@ -130,7 +133,7 @@ function buildHeaders(
     headers.set(USER_EMAIL_HEADER, userEmail)
   }
 
-  if (options?.adminOnly && userNickname.length > 0) {
+  if ((options?.adminOnly || options?.includeUserNickname) && userNickname.length > 0) {
     headers.set(USER_NICKNAME_HEADER, userNickname)
   }
 
@@ -162,7 +165,10 @@ async function apiRequest<T>(
   }
 
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), API_REQUEST_TIMEOUT_MS)
+  const timeoutMs = Number.isFinite(options?.timeoutMs) && (options?.timeoutMs ?? 0) > 0
+    ? (options?.timeoutMs as number)
+    : DEFAULT_API_REQUEST_TIMEOUT_MS
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
   if (init?.signal) {
     if (init.signal.aborted) {
@@ -187,7 +193,7 @@ async function apiRequest<T>(
     if (error instanceof DOMException && error.name === 'AbortError') {
       throw new ApiRequestError(
         408,
-        `API request timed out (${API_REQUEST_TIMEOUT_MS}ms)`
+        `API request timed out (${timeoutMs}ms)`
       )
     }
     throw error
@@ -426,7 +432,7 @@ export const apiClient = {
     apiRequest<MatchResultResponse>(`/api/matches/${matchId}/result`, {
       method: 'POST',
       body: JSON.stringify(payload),
-    }, { adminOnly: true }),
+    }, { requireUserEmail: true, includeUserEmail: true, includeUserNickname: true }),
   updateMatchResult: (matchId: number, payload: MatchResultRequest) =>
     apiRequest<MatchResultResponse>(`/api/matches/${matchId}/result`, {
       method: 'PATCH',
@@ -446,7 +452,7 @@ export const apiClient = {
         method: 'POST',
         body: JSON.stringify(payload),
       },
-      { adminOnly: true }
+      { requireUserEmail: true, includeUserEmail: true }
     ),
   importGroupPlayers: (groupId: number, payload: unknown) =>
     apiRequest<unknown>(
@@ -455,7 +461,7 @@ export const apiClient = {
         method: 'POST',
         body: JSON.stringify(payload),
       },
-      { adminOnly: true }
+      { adminOnly: true, timeoutMs: IMPORT_API_REQUEST_TIMEOUT_MS }
     ),
   updateGroupPlayer: (
     groupId: number,
@@ -485,7 +491,7 @@ export const apiClient = {
         method: 'POST',
         body: JSON.stringify(payload),
       },
-      { adminOnly: true }
+      { adminOnly: true, timeoutMs: IMPORT_API_REQUEST_TIMEOUT_MS }
     ),
   getGroupPlayers: async (groupId: number): Promise<PlayerRosterItem[]> => {
     const payload = await apiRequest<unknown>(`/api/groups/${groupId}/players`, undefined, {

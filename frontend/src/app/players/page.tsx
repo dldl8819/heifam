@@ -191,11 +191,15 @@ export default function PlayersPage() {
     try {
       const response = await apiClient.getGroupPlayers(TEMP_GROUP_ID)
       setRows(
-        [...response].sort((a, b) =>
-          isAdmin
-            ? b.currentMmr - a.currentMmr
-            : a.nickname.localeCompare(b.nickname, 'ko-KR')
-        )
+        [...response].sort((a, b) => {
+          if (b.games !== a.games) {
+            return b.games - a.games
+          }
+          if (b.currentMmr !== a.currentMmr) {
+            return b.currentMmr - a.currentMmr
+          }
+          return a.nickname.localeCompare(b.nickname, 'ko-KR')
+        })
       )
     } catch {
       setRows([])
@@ -203,7 +207,7 @@ export default function PlayersPage() {
     } finally {
       setLoading(false)
     }
-  }, [isAdmin])
+  }, [])
 
   useEffect(() => {
     void fetchRoster()

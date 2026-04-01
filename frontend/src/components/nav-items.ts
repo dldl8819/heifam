@@ -40,6 +40,8 @@ export function getVisibleNavItems(context: NavVisibilityContext): NavItem[] {
 
   return [
     { label: t('nav.dashboard'), href: '/dashboard' },
+    { label: t('nav.players'), href: '/players' },
+    { label: t('nav.balance'), href: '/balance' },
     { label: t('nav.results'), href: '/results' },
     { label: t('nav.ranking'), href: '/ranking' },
   ]
