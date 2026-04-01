@@ -5,6 +5,8 @@ const FALLBACK_BACKEND_BASE_URLS = [
   'https://heifam-backend.onrender.com',
 ]
 
+const RETRYABLE_UPSTREAM_STATUSES = new Set([404, 502, 503, 504])
+
 const HOP_BY_HOP_HEADERS = new Set([
   'connection',
   'content-length',
@@ -73,6 +75,18 @@ function buildForwardHeaders(request: NextRequest): Headers {
   return headers
 }
 
+function buildProxyResponse(upstream: Response, baseUrl: string): NextResponse {
+  const responseHeaders = new Headers(upstream.headers)
+  responseHeaders.delete('transfer-encoding')
+  responseHeaders.set('x-proxy-upstream', baseUrl)
+  responseHeaders.set('x-proxy-upstream-status', String(upstream.status))
+
+  return new NextResponse(upstream.body, {
+    status: upstream.status,
+    headers: responseHeaders,
+  })
+}
+
 async function proxyRequest(
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> }
@@ -96,7 +110,7 @@ async function proxyRequest(
 
   let lastError: unknown = null
 
-  for (const baseUrl of baseUrls) {
+  for (const [index, baseUrl] of baseUrls.entries()) {
     const targetUrl = buildTargetUrl(baseUrl, path, search)
     try {
       const upstream = await fetch(targetUrl, {
@@ -107,13 +121,13 @@ async function proxyRequest(
         cache: 'no-store',
       })
 
-      const responseHeaders = new Headers(upstream.headers)
-      responseHeaders.delete('transfer-encoding')
+      const hasNextCandidate = index < baseUrls.length - 1
+      if (RETRYABLE_UPSTREAM_STATUSES.has(upstream.status) && hasNextCandidate) {
+        await upstream.body?.cancel()
+        continue
+      }
 
-      return new NextResponse(upstream.body, {
-        status: upstream.status,
-        headers: responseHeaders,
-      })
+      return buildProxyResponse(upstream, baseUrl)
     } catch (error) {
       lastError = error
     }
@@ -164,4 +178,3 @@ export async function DELETE(
 ): Promise<NextResponse> {
   return proxyRequest(request, context)
 }
-
