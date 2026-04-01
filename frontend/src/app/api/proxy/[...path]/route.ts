@@ -153,11 +153,12 @@ async function buildProxyResponse(upstream: Response, baseUrl: string): Promise<
   responseHeaders.delete('content-encoding')
   responseHeaders.delete('content-length')
   responseHeaders.delete('transfer-encoding')
+  responseHeaders.set('content-encoding', 'identity')
   responseHeaders.set('x-proxy-upstream', baseUrl)
   responseHeaders.set('x-proxy-upstream-status', String(upstream.status))
 
-  const upstreamBody = upstream.status === 204 ? null : await upstream.arrayBuffer()
-  return new NextResponse(upstreamBody, {
+  const upstreamBodyText = upstream.status === 204 ? null : await upstream.text()
+  return new NextResponse(upstreamBodyText, {
     status: upstream.status,
     headers: responseHeaders,
   })
