@@ -64,12 +64,13 @@ public class PlayerQueryService {
             int games = stats.wins + stats.losses;
             Integer baseMmr = player.getBaseMmr();
             String baseTier = baseMmr == null ? null : PlayerTierPolicy.resolveTier(baseMmr);
+            String currentTier = PlayerTierPolicy.resolveTierForSnapshot(player.getTier(), player.getMmr());
 
             responses.add(new GroupPlayerResponse(
                 player.getId(),
                 player.getNickname(),
                 normalizeRace(player.getRace()),
-                PlayerTierPolicy.resolveTier(player.getMmr()),
+                currentTier,
                 baseMmr,
                 baseTier,
                 safeInt(player.getMmr()),

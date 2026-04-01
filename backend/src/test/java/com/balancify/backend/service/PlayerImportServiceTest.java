@@ -121,7 +121,7 @@ class PlayerImportServiceTest {
             .filter(player -> "Echo".equals(player.getNickname()))
             .findFirst()
             .orElseThrow();
-        assertThat(echo.getTier()).isEqualTo("C-");
+        assertThat(echo.getTier()).isEqualTo("NONE");
         assertThat(echo.getBaseMmr()).isZero();
         assertThat(echo.getMmr()).isZero();
         assertThat(echo.getNote()).isEqualTo("재배정 대상");

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const FALLBACK_BACKEND_BASE_URLS = [
+  'https://heifam.onrender.com',
   'https://hei-backend.onrender.com',
   'https://heifam-backend.onrender.com',
 ]
@@ -33,7 +34,30 @@ function parseCsv(value: string | undefined): string[] {
 }
 
 function normalizeBaseUrl(value: string): string {
-  return value.trim().replace(/\/+$/, '')
+    return value.trim().replace(/\/+$/, '')
+}
+
+function sanitizeBackendBaseUrl(value: string): string | null {
+  try {
+    const parsed = new URL(value)
+    const normalizedPath = parsed.pathname.replace(/\/+$/, '')
+
+    // Prevent proxy loops when a proxy URL is accidentally configured as upstream.
+    if (normalizedPath.startsWith('/api/proxy')) {
+      return null
+    }
+
+    // Common misconfiguration: setting upstream to `/api` or `/api/health`.
+    if (normalizedPath === '/api' || normalizedPath === '/api/health') {
+      parsed.pathname = '/'
+    }
+
+    parsed.search = ''
+    parsed.hash = ''
+    return parsed.toString().replace(/\/+$/, '')
+  } catch {
+    return null
+  }
 }
 
 function resolveBackendBaseUrls(): string[] {
@@ -49,7 +73,12 @@ function resolveBackendBaseUrls(): string[] {
     if (!normalized.startsWith('http://') && !normalized.startsWith('https://')) {
       continue
     }
-    deduped.add(normalized)
+
+    const sanitized = sanitizeBackendBaseUrl(normalized)
+    if (!sanitized) {
+      continue
+    }
+    deduped.add(sanitized)
   }
 
   return Array.from(deduped)
@@ -100,6 +129,18 @@ function buildProxyResponse(upstream: Response, baseUrl: string): NextResponse {
     status: upstream.status,
     headers: responseHeaders,
   })
+}
+
+function buildUnavailableResponse(baseUrls: string[], reason: string): NextResponse {
+  return NextResponse.json(
+    {
+      message:
+        'Failed to connect to all configured backend endpoints. Check backend DNS and deployment status.',
+      reason,
+      attemptedBaseUrls: baseUrls,
+    },
+    { status: 502 }
+  )
 }
 
 async function proxyRequest(
@@ -156,14 +197,7 @@ async function proxyRequest(
   }
 
   const reason = lastError instanceof Error ? lastError.message : 'Unknown network error'
-  return NextResponse.json(
-    {
-      message:
-        'Failed to connect to all configured backend endpoints. Check backend DNS and deployment status.',
-      reason,
-    },
-    { status: 502 }
-  )
+  return buildUnavailableResponse(baseUrls, reason)
 }
 
 export async function GET(

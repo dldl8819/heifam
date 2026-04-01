@@ -28,5 +28,7 @@ public interface MatchParticipantRepository extends JpaRepository<MatchParticipa
         """)
     List<MatchParticipant> findByMatchIdWithPlayerAndMatch(@Param("matchId") Long matchId);
 
+    long countByPlayer_IdAndMatch_WinningTeamIsNotNull(Long playerId);
+
     void deleteByMatch_Id(Long matchId);
 }

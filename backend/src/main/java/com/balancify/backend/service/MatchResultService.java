@@ -119,6 +119,7 @@ public class MatchResultService {
         List<MmrHistory> mmrHistories = new ArrayList<>();
         Map<Long, Player> updatedPlayers = new LinkedHashMap<>();
         List<MatchResultParticipantResponse> responseParticipants = new ArrayList<>();
+        Map<Long, Integer> completedRankedGamesByPlayerId = new HashMap<>();
 
         for (MatchParticipant participant : participants) {
             Player player = participant.getPlayer();
@@ -141,7 +142,12 @@ public class MatchResultService {
             participant.setMmrAfter(mmrAfter);
             participant.setMmrDelta(mmrDelta);
 
-            player.setMmr(updatedPlayerMmr);
+            int completedRankedGames = resolveCompletedRankedGamesAfterResult(
+                player.getId(),
+                alreadyProcessed,
+                completedRankedGamesByPlayerId
+            );
+            player.applyRankedMmr(updatedPlayerMmr, completedRankedGames);
             updatedPlayers.put(player.getId(), player);
 
             MmrHistory mmrHistory = existingHistoriesByPlayerId.get(player.getId());
@@ -203,6 +209,22 @@ public class MatchResultService {
 
     private int safeMmr(Integer mmr) {
         return mmr == null ? 0 : mmr;
+    }
+
+    private int resolveCompletedRankedGamesAfterResult(
+        Long playerId,
+        boolean alreadyProcessed,
+        Map<Long, Integer> cache
+    ) {
+        if (playerId == null) {
+            return 0;
+        }
+
+        return cache.computeIfAbsent(playerId, id -> {
+            long completedGames = matchParticipantRepository.countByPlayer_IdAndMatch_WinningTeamIsNotNull(id);
+            long adjustedCompletedGames = alreadyProcessed ? completedGames : completedGames + 1;
+            return (int) Math.max(0, Math.min(Integer.MAX_VALUE, adjustedCompletedGames));
+        });
     }
 
     private boolean hasProcessedResult(String winningTeam) {
@@ -294,6 +316,8 @@ public class MatchResultService {
             matchParticipantRepository.findByMatchIdWithPlayerAndMatch(matchId);
 
         Map<Long, Player> playersToUpdate = new LinkedHashMap<>();
+        boolean matchHadResult = hasProcessedResult(match.getWinningTeam());
+        Map<Long, Integer> completedRankedGamesByPlayerId = new HashMap<>();
         for (MatchParticipant participant : participants) {
             Player player = participant.getPlayer();
             if (player == null || player.getId() == null) {
@@ -302,7 +326,12 @@ public class MatchResultService {
 
             int currentMmr = safeMmr(player.getMmr());
             int rollbackDelta = safeMmr(participant.getMmrDelta());
-            player.setMmr(currentMmr - rollbackDelta);
+            int completedRankedGames = resolveCompletedRankedGamesAfterDelete(
+                player.getId(),
+                matchHadResult,
+                completedRankedGamesByPlayerId
+            );
+            player.applyRankedMmr(currentMmr - rollbackDelta, completedRankedGames);
             playersToUpdate.put(player.getId(), player);
         }
 
@@ -313,5 +342,23 @@ public class MatchResultService {
         mmrHistoryRepository.deleteByMatch_Id(matchId);
         matchParticipantRepository.deleteByMatch_Id(matchId);
         matchRepository.delete(match);
+    }
+
+    private int resolveCompletedRankedGamesAfterDelete(
+        Long playerId,
+        boolean matchHadResult,
+        Map<Long, Integer> cache
+    ) {
+        if (playerId == null) {
+            return 0;
+        }
+
+        return cache.computeIfAbsent(playerId, id -> {
+            long completedGames = matchParticipantRepository.countByPlayer_IdAndMatch_WinningTeamIsNotNull(id);
+            long adjustedCompletedGames = matchHadResult
+                ? Math.max(0, completedGames - 1)
+                : completedGames;
+            return (int) Math.max(0, Math.min(Integer.MAX_VALUE, adjustedCompletedGames));
+        });
     }
 }

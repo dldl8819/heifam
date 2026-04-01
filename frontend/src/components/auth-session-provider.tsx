@@ -12,6 +12,15 @@ type AuthContextType = {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
+const ENABLE_SUPABASE_PROFILE_SYNC =
+  process.env.NEXT_PUBLIC_ENABLE_SUPABASE_PROFILE_SYNC === 'true'
+
+function isSupabaseLockContentionError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false
+  }
+  return /lock .* was released because another request stole it/i.test(error.message)
+}
 
 export function useAuth() {
   const context = useContext(AuthContext)
@@ -32,14 +41,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     // Get initial session
-    supabase.auth
+    void supabase.auth
       .getSession()
       .then(({ data: { session } }) => {
         setSession(session)
         setUser(session?.user ?? null)
       })
       .catch((error) => {
-        console.error('Failed to load auth session:', error)
+        if (!isSupabaseLockContentionError(error)) {
+          console.error('Failed to load auth session:', error)
+        }
         setSession(null)
         setUser(null)
       })
@@ -50,14 +61,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
 
       // If user signed in, save to users table
-      if (event === 'SIGNED_IN' && session?.user) {
-        await saveUserToDatabase(session.user)
+      if (event === 'SIGNED_IN' && session?.user && ENABLE_SUPABASE_PROFILE_SYNC) {
+        void saveUserToDatabase(session.user)
       }
     })
 

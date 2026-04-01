@@ -36,8 +36,17 @@ const API_BASE_URL =
       : DEFAULT_DEV_API_BASE_URL
 const DEFAULT_API_REQUEST_TIMEOUT_MS = 10000
 const IMPORT_API_REQUEST_TIMEOUT_MS = 120000
+const SESSION_IDENTITY_CACHE_TTL_MS = 5000
 const USER_EMAIL_HEADER = 'X-USER-EMAIL'
 const USER_NICKNAME_HEADER = 'X-USER-NICKNAME'
+
+type SessionIdentity = {
+  email: string
+  nickname: string
+}
+
+let cachedSessionIdentity: (SessionIdentity & { resolvedAt: number }) | null = null
+let sessionIdentityPromise: Promise<SessionIdentity> | null = null
 
 function createUrl(path: string): string {
   if (API_BASE_URL.length === 0) {
@@ -93,23 +102,43 @@ function resolveSessionNickname(metadata: Record<string, unknown> | undefined): 
 }
 
 async function resolveSessionUserIdentity(): Promise<{ email: string; nickname: string }> {
-  try {
-    const { data } = await supabase.auth.getSession()
-    const user = data.session?.user
-    const email = user?.email?.trim() ?? ''
-    const nickname = resolveSessionNickname(
-      user?.user_metadata && typeof user.user_metadata === 'object'
-        ? (user.user_metadata as Record<string, unknown>)
-        : undefined
-    )
-
+  const now = Date.now()
+  if (cachedSessionIdentity && now - cachedSessionIdentity.resolvedAt < SESSION_IDENTITY_CACHE_TTL_MS) {
     return {
-      email,
-      nickname: nickname || '운영진',
+      email: cachedSessionIdentity.email,
+      nickname: cachedSessionIdentity.nickname,
     }
-  } catch {
-    return { email: '', nickname: '' }
   }
+
+  if (sessionIdentityPromise) {
+    return sessionIdentityPromise
+  }
+
+  sessionIdentityPromise = (async () => {
+    try {
+      const { data } = await supabase.auth.getSession()
+      const user = data.session?.user
+      const email = user?.email?.trim() ?? ''
+      const nickname = resolveSessionNickname(
+        user?.user_metadata && typeof user.user_metadata === 'object'
+          ? (user.user_metadata as Record<string, unknown>)
+          : undefined
+      )
+
+      const identity = {
+        email,
+        nickname: nickname || '운영진',
+      }
+      cachedSessionIdentity = { ...identity, resolvedAt: Date.now() }
+      return identity
+    } catch {
+      return { email: '', nickname: '' }
+    } finally {
+      sessionIdentityPromise = null
+    }
+  })()
+
+  return sessionIdentityPromise
 }
 
 function buildHeaders(
@@ -281,6 +310,7 @@ function normalizeTier(value: unknown): PlayerTierStatus | undefined {
     case 'UNASSIGNED':
     case 'PENDING':
     case 'TBD':
+    case 'NONE':
       return 'UNASSIGNED'
     default:
       return undefined

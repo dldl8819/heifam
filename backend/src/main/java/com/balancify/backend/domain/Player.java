@@ -95,6 +95,11 @@ public class Player {
         this.tier = PlayerTierPolicy.resolveTier(mmr);
     }
 
+    public void applyRankedMmr(Integer mmr, int completedRankedGames) {
+        this.mmr = mmr;
+        this.tier = PlayerTierPolicy.resolveTierForRankedMatch(this.tier, mmr, completedRankedGames);
+    }
+
     public Integer getBaseMmr() {
         return baseMmr;
     }
@@ -122,6 +127,8 @@ public class Player {
     @PrePersist
     @PreUpdate
     private void syncTierWithMmr() {
-        this.tier = PlayerTierPolicy.resolveTier(this.mmr);
+        if (this.tier == null || this.tier.isBlank()) {
+            this.tier = PlayerTierPolicy.resolveTier(this.mmr);
+        }
     }
 }

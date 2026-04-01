@@ -8,8 +8,9 @@ class PlayerTierPolicyTest {
 
     @Test
     void resolvesTierByMmrBoundaries() {
-        assertThat(PlayerTierPolicy.resolveTier(-10)).isEqualTo("C-");
-        assertThat(PlayerTierPolicy.resolveTier(0)).isEqualTo("C-");
+        assertThat(PlayerTierPolicy.resolveTier(-10)).isEqualTo("NONE");
+        assertThat(PlayerTierPolicy.resolveTier(0)).isEqualTo("NONE");
+        assertThat(PlayerTierPolicy.resolveTier(1)).isEqualTo("C-");
         assertThat(PlayerTierPolicy.resolveTier(199)).isEqualTo("C-");
         assertThat(PlayerTierPolicy.resolveTier(200)).isEqualTo("C");
         assertThat(PlayerTierPolicy.resolveTier(299)).isEqualTo("C");
@@ -32,11 +33,50 @@ class PlayerTierPolicyTest {
     }
 
     @Test
-    void detectsLowTierFromMmr() {
+    void detectsLowTierFromMmrIncludingNone() {
         assertThat(PlayerTierPolicy.isLowTier(0)).isTrue();
+        assertThat(PlayerTierPolicy.isLowTier(1)).isTrue();
         assertThat(PlayerTierPolicy.isLowTier(250)).isTrue();
         assertThat(PlayerTierPolicy.isLowTier(399)).isTrue();
         assertThat(PlayerTierPolicy.isLowTier(400)).isFalse();
         assertThat(PlayerTierPolicy.isLowTier(1000)).isFalse();
+    }
+
+    @Test
+    void protectsDemotionDuringPlacement() {
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("A", 730, 2))
+            .isEqualTo("A");
+    }
+
+    @Test
+    void demotesAfterPlacementWhenMmrFallsBelowShield() {
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("A", 740, 6))
+            .isEqualTo("A-");
+    }
+
+    @Test
+    void doesNotDemoteInsideDemotionShieldRange() {
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("A", 760, 6))
+            .isEqualTo("A");
+    }
+
+    @Test
+    void requiresPromotionBufferBeforeTierUp() {
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("B", 620, 6))
+            .isEqualTo("B");
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("B", 630, 6))
+            .isEqualTo("B+");
+    }
+
+    @Test
+    void promotesOnlyOneStepPerMatchResult() {
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("B", 980, 10))
+            .isEqualTo("B+");
+    }
+
+    @Test
+    void snapshotTierFallsBackToMmrWhenTierIsUnknown() {
+        assertThat(PlayerTierPolicy.resolveTierForSnapshot("재배정대상", 830))
+            .isEqualTo("A");
     }
 }

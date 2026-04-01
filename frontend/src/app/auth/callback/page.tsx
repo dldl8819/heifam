@@ -37,9 +37,10 @@ export default function AuthCallbackPage() {
       const hasAuthCode =
         typeof window !== 'undefined' &&
         new URL(window.location.href).searchParams.has('code')
+      let session = null
 
       if (hasAuthCode) {
-        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(
+        const { data: exchangeData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(
           currentUrl
         )
         if (exchangeError) {
@@ -48,14 +49,11 @@ export default function AuthCallbackPage() {
           router.replace('/')
           return
         }
+        session = exchangeData.session
       }
 
-      let session = (await supabase.auth.getSession()).data.session
       if (!session) {
-        for (let attempt = 0; attempt < 10 && !session; attempt += 1) {
-          await new Promise((resolve) => setTimeout(resolve, 120))
-          session = (await supabase.auth.getSession()).data.session
-        }
+        session = (await supabase.auth.getSession()).data.session
       }
 
       if (!session) {
