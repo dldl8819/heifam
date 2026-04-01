@@ -7,7 +7,7 @@ const FALLBACK_BACKEND_BASE_URLS = [
 ]
 
 const RETRYABLE_UPSTREAM_STATUSES = new Set([404, 502, 503, 504])
-const DEFAULT_UPSTREAM_TIMEOUT_MS = 5000
+const DEFAULT_UPSTREAM_TIMEOUT_MS = 25000
 
 const HOP_BY_HOP_HEADERS = new Set([
   'connection',
@@ -61,14 +61,13 @@ function sanitizeBackendBaseUrl(value: string): string | null {
 }
 
 function resolveBackendBaseUrls(): string[] {
-  const candidates = [
+  const explicitCandidates = [
     ...parseCsv(process.env.BACKEND_API_BASE_URLS),
     ...parseCsv(process.env.NEXT_PUBLIC_API_BASE_URL),
-    ...FALLBACK_BACKEND_BASE_URLS,
   ]
 
   const deduped = new Set<string>()
-  for (const candidate of candidates) {
+  for (const candidate of explicitCandidates) {
     const normalized = normalizeBaseUrl(candidate)
     if (!normalized.startsWith('http://') && !normalized.startsWith('https://')) {
       continue
@@ -81,7 +80,19 @@ function resolveBackendBaseUrls(): string[] {
     deduped.add(sanitized)
   }
 
-  return Array.from(deduped)
+  if (deduped.size > 0) {
+    return Array.from(deduped)
+  }
+
+  const fallbackDeduped = new Set<string>()
+  for (const fallback of FALLBACK_BACKEND_BASE_URLS) {
+    const sanitized = sanitizeBackendBaseUrl(normalizeBaseUrl(fallback))
+    if (sanitized) {
+      fallbackDeduped.add(sanitized)
+    }
+  }
+
+  return Array.from(fallbackDeduped)
 }
 
 function resolveUpstreamTimeoutMs(): number {
