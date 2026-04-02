@@ -1,6 +1,7 @@
 package com.balancify.backend.service;
 
 import com.balancify.backend.api.group.dto.GroupPlayerUpdateRequest;
+import com.balancify.backend.api.group.dto.GroupPlayerMmrUpdateRequest;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.PlayerRepository;
 import java.util.List;
@@ -58,6 +59,27 @@ public class PlayerAdminService {
             player.setRace(normalizedRace);
         }
 
+        playerRepository.save(player);
+    }
+
+    @Transactional
+    public void updatePlayerMmr(
+        Long groupId,
+        Long playerId,
+        GroupPlayerMmrUpdateRequest request
+    ) {
+        Player player = playerRepository.findByIdAndGroup_Id(playerId, groupId)
+            .orElseThrow(() -> new NoSuchElementException("Player not found"));
+
+        Integer nextMmr = request == null ? null : request.mmr();
+        if (nextMmr == null) {
+            throw new IllegalArgumentException("MMR is required");
+        }
+        if (nextMmr < 0 || nextMmr > 5000) {
+            throw new IllegalArgumentException("MMR must be between 0 and 5000");
+        }
+
+        player.setMmr(nextMmr);
         playerRepository.save(player);
     }
 

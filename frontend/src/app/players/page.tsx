@@ -221,7 +221,11 @@ export default function PlayersPage() {
   const [editingPlayerId, setEditingPlayerId] = useState<number | null>(null)
   const [editingNickname, setEditingNickname] = useState<string>('')
   const [editingRace, setEditingRace] = useState<PlayerRace>('P')
+  const [editingInlineMmrValue, setEditingInlineMmrValue] = useState<string>('')
   const [savingPlayerId, setSavingPlayerId] = useState<number | null>(null)
+  const [editingMmrPlayerId, setEditingMmrPlayerId] = useState<number | null>(null)
+  const [editingMmrValue, setEditingMmrValue] = useState<string>('')
+  const [savingMmrPlayerId, setSavingMmrPlayerId] = useState<number | null>(null)
   const [deletingPlayerId, setDeletingPlayerId] = useState<number | null>(null)
   const [playerActionError, setPlayerActionError] = useState<string | null>(null)
   const [playerActionSuccess, setPlayerActionSuccess] = useState<string | null>(null)
@@ -297,9 +301,12 @@ export default function PlayersPage() {
       return
     }
 
+    setEditingMmrPlayerId(null)
+    setEditingMmrValue('')
     setEditingPlayerId(player.id)
     setEditingNickname(player.nickname)
     setEditingRace(player.race)
+    setEditingInlineMmrValue(String(player.currentMmr))
     setPlayerActionError(null)
     setPlayerActionSuccess(null)
   }
@@ -308,6 +315,7 @@ export default function PlayersPage() {
     setEditingPlayerId(null)
     setEditingNickname('')
     setEditingRace('P')
+    setEditingInlineMmrValue('')
   }
 
   const handleSaveEdit = async (playerId: number) => {
@@ -322,6 +330,28 @@ export default function PlayersPage() {
       return
     }
 
+    const targetRow = rows.find((row) => row.id === playerId)
+    if (!targetRow) {
+      setPlayerActionError(t('players.actions.updateNotFound'))
+      return
+    }
+
+    let nextMmr: number | null = null
+    if (isSuperAdmin) {
+      const rawMmr = editingInlineMmrValue.trim()
+      if (rawMmr.length === 0) {
+        setPlayerActionError(t('players.actions.mmrRequired'))
+        return
+      }
+
+      const parsedMmr = Number(rawMmr)
+      if (!Number.isInteger(parsedMmr) || parsedMmr < 0 || parsedMmr > 5000) {
+        setPlayerActionError(t('players.actions.mmrInvalid'))
+        return
+      }
+      nextMmr = parsedMmr
+    }
+
     setSavingPlayerId(playerId)
     setPlayerActionError(null)
     setPlayerActionSuccess(null)
@@ -330,10 +360,20 @@ export default function PlayersPage() {
         nickname: nextNickname,
         race: editingRace,
       })
+
+      if (isSuperAdmin && nextMmr !== null && nextMmr !== targetRow.currentMmr) {
+        await apiClient.updateGroupPlayerMmr(TEMP_GROUP_ID, playerId, {
+          mmr: nextMmr,
+        })
+      }
+
       setEditingPlayerId(null)
       setEditingNickname('')
       setEditingRace('P')
-      setPlayerActionSuccess(t('players.actions.updateSuccess'))
+      setEditingInlineMmrValue('')
+      setPlayerActionSuccess(
+        isSuperAdmin ? t('players.actions.updateAndMmrSuccess') : t('players.actions.updateSuccess')
+      )
       await fetchRoster()
     } catch (actionError) {
       if (isApiForbiddenError(actionError)) {
@@ -345,6 +385,67 @@ export default function PlayersPage() {
       }
     } finally {
       setSavingPlayerId(null)
+    }
+  }
+
+  const handleStartMmrEdit = (player: PlayerRosterItem) => {
+    if (!isSuperAdmin) {
+      return
+    }
+
+    setEditingPlayerId(null)
+    setEditingNickname('')
+    setEditingRace('P')
+    setEditingMmrPlayerId(player.id)
+    setEditingMmrValue(String(player.currentMmr))
+    setPlayerActionError(null)
+    setPlayerActionSuccess(null)
+  }
+
+  const handleCancelMmrEdit = () => {
+    setEditingMmrPlayerId(null)
+    setEditingMmrValue('')
+  }
+
+  const handleSaveMmr = async (playerId: number) => {
+    if (!isSuperAdmin) {
+      setPlayerActionError(t('common.adminOnlyAction'))
+      return
+    }
+
+    const raw = editingMmrValue.trim()
+    if (raw.length === 0) {
+      setPlayerActionError(t('players.actions.mmrRequired'))
+      return
+    }
+
+    const parsed = Number(raw)
+    const isInteger = Number.isInteger(parsed)
+    if (!isInteger || parsed < 0 || parsed > 5000) {
+      setPlayerActionError(t('players.actions.mmrInvalid'))
+      return
+    }
+
+    setSavingMmrPlayerId(playerId)
+    setPlayerActionError(null)
+    setPlayerActionSuccess(null)
+
+    try {
+      await apiClient.updateGroupPlayerMmr(TEMP_GROUP_ID, playerId, { mmr: parsed })
+      setEditingMmrPlayerId(null)
+      setEditingMmrValue('')
+      setPlayerActionSuccess(t('players.actions.mmrUpdateSuccess'))
+      await fetchRoster()
+    } catch (actionError) {
+      if (isApiForbiddenError(actionError)) {
+        setPlayerActionError(t('common.permissionDenied'))
+      } else if (isApiNotFoundError(actionError)) {
+        setPlayerActionError(t('players.actions.mmrUpdateNotFound'))
+      } else {
+        setPlayerActionError(t('players.actions.mmrUpdateFailure'))
+      }
+    } finally {
+      setSavingMmrPlayerId(null)
     }
   }
 
@@ -367,6 +468,11 @@ export default function PlayersPage() {
         setEditingPlayerId(null)
         setEditingNickname('')
         setEditingRace('P')
+        setEditingInlineMmrValue('')
+      }
+      if (editingMmrPlayerId === player.id) {
+        setEditingMmrPlayerId(null)
+        setEditingMmrValue('')
       }
       setPlayerActionSuccess(t('players.actions.deleteSuccess'))
       await fetchRoster()
@@ -692,9 +798,11 @@ export default function PlayersPage() {
             {!loading &&
               filteredRows.map((row) => {
                 const isEditing = editingPlayerId === row.id
+                const isMmrEditing = editingMmrPlayerId === row.id
                 const isSaving = savingPlayerId === row.id
+                const isSavingMmr = savingMmrPlayerId === row.id
                 const isDeleting = deletingPlayerId === row.id
-                const busy = isSaving || isDeleting
+                const busy = isSaving || isSavingMmr || isDeleting
                 const tierChangeTarget = tierChangeTargetById.get(row.id)
 
                 return (
@@ -745,7 +853,21 @@ export default function PlayersPage() {
                       </span>
                     </td>
                     {showMmrColumn && (
-                      <td className="px-4 py-3 text-slate-700">{formatMmrValue(row.currentMmr)}</td>
+                      <td className="px-4 py-3 text-slate-700">
+                        {isEditing && isSuperAdmin ? (
+                          <input
+                            type="number"
+                            min={0}
+                            max={5000}
+                            step={1}
+                            value={editingInlineMmrValue}
+                            onChange={(event) => setEditingInlineMmrValue(event.target.value)}
+                            className="w-24 rounded-md border border-slate-200 px-2 py-1 text-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                          />
+                        ) : (
+                          formatMmrValue(row.currentMmr)
+                        )}
+                      </td>
                     )}
                     <td className="px-4 py-3 text-slate-700">{row.wins}</td>
                     <td className="px-4 py-3 text-slate-700">{row.losses}</td>
@@ -775,7 +897,7 @@ export default function PlayersPage() {
                           ) : (
                             <button
                               type="button"
-                              disabled={editingPlayerId !== null || deletingPlayerId !== null}
+                              disabled={editingPlayerId !== null || editingMmrPlayerId !== null || deletingPlayerId !== null}
                               onClick={() => handleStartEdit(row)}
                               className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-indigo-600 hover:bg-indigo-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
                             >
@@ -783,9 +905,50 @@ export default function PlayersPage() {
                             </button>
                           )}
 
+                          {isSuperAdmin &&
+                            !isEditing &&
+                            (isMmrEditing ? (
+                              <>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={5000}
+                                  step={1}
+                                  value={editingMmrValue}
+                                  onChange={(event) => setEditingMmrValue(event.target.value)}
+                                  className="w-24 rounded-md border border-slate-200 px-2 py-1 text-xs outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                                />
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => handleSaveMmr(row.id)}
+                                  className="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+                                >
+                                  {isSavingMmr ? t('players.actions.mmrSaving') : t('players.actions.mmrSave')}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={handleCancelMmrEdit}
+                                  className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  {t('players.actions.mmrCancel')}
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={editingPlayerId !== null || editingMmrPlayerId !== null || deletingPlayerId !== null}
+                                onClick={() => handleStartMmrEdit(row)}
+                                className="rounded-md border border-indigo-300 px-2.5 py-1 text-xs font-medium text-indigo-700 transition-colors hover:border-indigo-600 hover:bg-indigo-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {t('players.actions.mmrEdit')}
+                              </button>
+                            ))}
+
                           <button
                             type="button"
-                            disabled={busy || editingPlayerId !== null}
+                            disabled={busy || editingPlayerId !== null || editingMmrPlayerId !== null}
                             onClick={() => handleDeletePlayer(row)}
                             className="rounded-md border border-rose-300 px-2.5 py-1 text-xs font-medium text-rose-700 transition-colors hover:border-rose-600 hover:bg-rose-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
                           >

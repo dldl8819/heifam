@@ -343,6 +343,41 @@ class AdminKeyFilterTest {
     }
 
     @Test
+    void returnsForbiddenForPlayerMmrUpdateWithoutSuperAdminEmail() throws Exception {
+        mockMvc
+            .perform(
+                patch("/api/groups/1/players/10/mmr")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"mmr\":1200}")
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void returnsForbiddenForPlayerMmrUpdateWithAdminEmail() throws Exception {
+        mockMvc
+            .perform(
+                patch("/api/groups/1/players/10/mmr")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"mmr\":1200}")
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void allowsPlayerMmrUpdateWithSuperAdminEmail() throws Exception {
+        mockMvc
+            .perform(
+                patch("/api/groups/1/players/10/mmr")
+                    .header("X-USER-EMAIL", "minsiklee2@gmail.com")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"mmr\":1200}")
+            )
+            .andExpect(status().isOk());
+    }
+
+    @Test
     void returnsForbiddenForPlayerDeleteWithoutAdminEmail() throws Exception {
         mockMvc
             .perform(delete("/api/groups/1/players/10"))

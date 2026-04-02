@@ -1,6 +1,7 @@
 package com.balancify.backend.api.group;
 
 import com.balancify.backend.api.group.dto.GroupPlayerUpdateRequest;
+import com.balancify.backend.api.group.dto.GroupPlayerMmrUpdateRequest;
 import com.balancify.backend.service.PlayerAdminService;
 import java.util.NoSuchElementException;
 import org.springframework.http.HttpStatus;
@@ -30,6 +31,29 @@ public class GroupPlayerAdminController {
     ) {
         try {
             playerAdminService.updatePlayer(groupId, playerId, request);
+        } catch (IllegalArgumentException illegalArgumentException) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                illegalArgumentException.getMessage(),
+                illegalArgumentException
+            );
+        } catch (NoSuchElementException noSuchElementException) {
+            throw new ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                noSuchElementException.getMessage(),
+                noSuchElementException
+            );
+        }
+    }
+
+    @PatchMapping("/{groupId}/players/{playerId}/mmr")
+    public void updatePlayerMmr(
+        @PathVariable Long groupId,
+        @PathVariable Long playerId,
+        @RequestBody GroupPlayerMmrUpdateRequest request
+    ) {
+        try {
+            playerAdminService.updatePlayerMmr(groupId, playerId, request);
         } catch (IllegalArgumentException illegalArgumentException) {
             throw new ResponseStatusException(
                 HttpStatus.BAD_REQUEST,

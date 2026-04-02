@@ -169,6 +169,10 @@ export type PlayerRosterItem = {
   games: number
 }
 
+export type GroupPlayerMmrUpdateRequest = {
+  mmr: number
+}
+
 export type GroupDashboardKpiSummary = {
   totalPlayers: number
   topMmr: number

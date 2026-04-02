@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.balancify.backend.api.group.dto.GroupPlayerUpdateRequest;
+import com.balancify.backend.api.group.dto.GroupPlayerMmrUpdateRequest;
 import com.balancify.backend.domain.Group;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.PlayerRepository;
@@ -119,6 +120,45 @@ class PlayerAdminServiceTest {
         )
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Race must be one of P,T,Z,PT,PZ,TZ,R");
+    }
+
+    @Test
+    void updatesPlayerMmrWhenValid() {
+        Player player = player(10L, 1L, "기존닉");
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+        when(playerRepository.save(any(Player.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        playerAdminService.updatePlayerMmr(1L, 10L, new GroupPlayerMmrUpdateRequest(1420));
+
+        verify(playerRepository).save(player);
+    }
+
+    @Test
+    void throwsWhenMmrIsMissing() {
+        Player player = player(10L, 1L, "기존닉");
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+
+        assertThatThrownBy(() ->
+            playerAdminService.updatePlayerMmr(1L, 10L, new GroupPlayerMmrUpdateRequest(null))
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("MMR is required");
+
+        verify(playerRepository, never()).save(any(Player.class));
+    }
+
+    @Test
+    void throwsWhenMmrIsOutOfRange() {
+        Player player = player(10L, 1L, "기존닉");
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+
+        assertThatThrownBy(() ->
+            playerAdminService.updatePlayerMmr(1L, 10L, new GroupPlayerMmrUpdateRequest(-1))
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("MMR must be between 0 and 5000");
+
+        verify(playerRepository, never()).save(any(Player.class));
     }
 
     @Test

@@ -9,6 +9,7 @@ import type {
   CaptainDraftPickRequest,
   CaptainDraftResponse,
   GroupDashboardResponse,
+  GroupPlayerMmrUpdateRequest,
   HealthResponse,
   MatchTeamSide,
   MultiBalanceRequest,
@@ -27,7 +28,6 @@ import { supabase } from '@/lib/supabase'
 
 const DEFAULT_DEV_API_BASE_URL = 'http://localhost:8080'
 const DEFAULT_PROD_API_BASE_URL = '/api/proxy'
-const DEFAULT_ACCESS_API_BASE_URL = 'https://heifam.onrender.com'
 const RAW_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ?? ''
 const RAW_ACCESS_API_BASE_URL = process.env.NEXT_PUBLIC_ACCESS_API_BASE_URL?.trim() ?? ''
 const API_BASE_URL =
@@ -37,7 +37,7 @@ const API_BASE_URL =
       ? RAW_API_BASE_URL
       : DEFAULT_DEV_API_BASE_URL
 const ACCESS_API_BASE_URL =
-  RAW_ACCESS_API_BASE_URL.length > 0 ? RAW_ACCESS_API_BASE_URL : DEFAULT_ACCESS_API_BASE_URL
+  RAW_ACCESS_API_BASE_URL.length > 0 ? RAW_ACCESS_API_BASE_URL : API_BASE_URL
 const DEFAULT_API_REQUEST_TIMEOUT_MS = 10000
 const IMPORT_API_REQUEST_TIMEOUT_MS = 120000
 const SESSION_IDENTITY_CACHE_TTL_MS = 5000
@@ -520,6 +520,19 @@ export const apiClient = {
         body: JSON.stringify(payload),
       },
       { adminOnly: true }
+    ),
+  updateGroupPlayerMmr: (
+    groupId: number,
+    playerId: number,
+    payload: GroupPlayerMmrUpdateRequest
+  ) =>
+    apiRequest<void>(
+      `/api/groups/${groupId}/players/${playerId}/mmr`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      },
+      { requireUserEmail: true, includeUserEmail: true }
     ),
   deleteGroupPlayer: (groupId: number, playerId: number) =>
     apiRequest<void>(

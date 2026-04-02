@@ -34,6 +34,11 @@ public class AdminKeyFilter extends OncePerRequestFilter {
         ),
         new ProtectedRoute(
             "PATCH",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/players/{playerId}/mmr"),
+            AuthType.SUPER_ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "PATCH",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/players/{playerId}"),
             AuthType.ADMIN_EMAIL
         ),
