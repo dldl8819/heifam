@@ -45,7 +45,7 @@ export function useAdminAuth(): AdminAuthState {
   const { user, session, loading } = useAuth()
   const email = user?.email?.trim().toLowerCase() ?? null
   const [accessProfile, setAccessProfile] = useState<AccessMeResponse | null>(null)
-  const [accessLoading, setAccessLoading] = useState<boolean>(false)
+  const [, setAccessLoading] = useState<boolean>(false)
   const [accessError, setAccessError] = useState<boolean>(false)
 
   const refreshAccess = useCallback(async () => {
@@ -151,7 +151,7 @@ export function useAdminAuth(): AdminAuthState {
 
   const isLoggedIn = Boolean(user)
   const needsAccessResolution = isLoggedIn && accessProfile === null
-  const isLoading = loading || needsAccessResolution || (isLoggedIn && accessLoading)
+  const isLoading = loading || needsAccessResolution
   const status: AdminAuthState['status'] = isLoading
     ? 'loading'
     : isLoggedIn
