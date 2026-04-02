@@ -14,6 +14,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -28,6 +29,7 @@ public class PlayerQueryService {
     private final int dormancyDemoteSteps;
     private final Clock clock;
 
+    @Autowired
     public PlayerQueryService(
         PlayerRepository playerRepository,
         MatchParticipantRepository matchParticipantRepository,
