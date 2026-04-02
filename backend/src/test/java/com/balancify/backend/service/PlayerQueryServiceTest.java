@@ -39,8 +39,7 @@ class PlayerQueryServiceTest {
             playerRepository,
             matchParticipantRepository,
             true,
-            3,
-            3,
+            30,
             1,
             Clock.fixed(FIXED_NOW.toInstant(), ZoneOffset.UTC)
         );
@@ -114,7 +113,7 @@ class PlayerQueryServiceTest {
         group.setId(1L);
 
         Player robo = player(9L, group, "로보", "P", "A+", 930);
-        robo.setCreatedAt(OffsetDateTime.parse("2026-03-30T00:00:00Z"));
+        robo.setCreatedAt(OffsetDateTime.parse("2026-02-20T00:00:00Z"));
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
             .thenReturn(List.of(robo));
@@ -125,7 +124,7 @@ class PlayerQueryServiceTest {
 
         assertThat(response).hasSize(1);
         assertThat(response.get(0).tier()).isEqualTo("A");
-        assertThat(response.get(0).currentMmr()).isEqualTo(930);
+        assertThat(response.get(0).currentMmr()).isEqualTo(890);
         assertThat(response.get(0).games()).isZero();
     }
 

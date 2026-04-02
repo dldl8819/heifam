@@ -3,13 +3,19 @@ package com.balancify.backend.service;
 import com.balancify.backend.api.group.dto.RankingItemResponse;
 import com.balancify.backend.domain.MatchParticipant;
 import com.balancify.backend.domain.Player;
+import com.balancify.backend.domain.PlayerTierPolicy;
 import com.balancify.backend.repository.MatchParticipantRepository;
 import com.balancify.backend.repository.PlayerRepository;
+import java.time.Clock;
+import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -17,13 +23,24 @@ public class RankingService {
 
     private final PlayerRepository playerRepository;
     private final MatchParticipantRepository matchParticipantRepository;
+    private final boolean dormancyEnabled;
+    private final int dormancyInactiveDays;
+    private final int dormancyDemoteSteps;
+    private final Clock clock;
 
     public RankingService(
         PlayerRepository playerRepository,
-        MatchParticipantRepository matchParticipantRepository
+        MatchParticipantRepository matchParticipantRepository,
+        @Value("${balancify.rank.dormancy.enabled:true}") boolean dormancyEnabled,
+        @Value("${balancify.rank.dormancy.inactive-days:30}") int dormancyInactiveDays,
+        @Value("${balancify.rank.dormancy.demote-steps:1}") int dormancyDemoteSteps
     ) {
         this.playerRepository = playerRepository;
         this.matchParticipantRepository = matchParticipantRepository;
+        this.dormancyEnabled = dormancyEnabled;
+        this.dormancyInactiveDays = Math.max(0, dormancyInactiveDays);
+        this.dormancyDemoteSteps = Math.max(0, dormancyDemoteSteps);
+        this.clock = Clock.systemUTC();
     }
 
     public List<RankingItemResponse> getGroupRanking(Long groupId) {
@@ -37,18 +54,41 @@ public class RankingService {
             historyByPlayerId.computeIfAbsent(playerId, key -> new ArrayList<>()).add(matchParticipant);
         }
 
-        List<RankingItemResponse> ranking = new ArrayList<>();
-        int rank = 1;
+        OffsetDateTime now = OffsetDateTime.now(clock);
+        List<RankingCandidate> candidates = new ArrayList<>();
         for (Player player : players) {
             List<MatchParticipant> history =
                 historyByPlayerId.getOrDefault(player.getId(), Collections.emptyList());
             RankingStats stats = calculateStats(history);
+            int currentMmr = safeInt(player.getMmr());
+            String currentTier = PlayerTierPolicy.resolveTierForSnapshot(player.getTier(), currentMmr);
+            int effectiveMmr = applyDormancyMmr(currentTier, currentMmr, resolveLastPlayedAt(history), player.getCreatedAt(), now);
 
-            ranking.add(new RankingItemResponse(
-                rank++,
+            candidates.add(new RankingCandidate(
+                player.getId(),
                 player.getNickname(),
                 normalizeRace(player.getRace()),
-                safeInt(player.getMmr()),
+                effectiveMmr,
+                stats
+            ));
+        }
+
+        candidates.sort(
+            Comparator
+                .comparingInt(RankingCandidate::mmr)
+                .reversed()
+                .thenComparing(RankingCandidate::playerId, Comparator.nullsLast(Long::compareTo))
+        );
+
+        List<RankingItemResponse> ranking = new ArrayList<>();
+        int rank = 1;
+        for (RankingCandidate candidate : candidates) {
+            RankingStats stats = candidate.stats();
+            ranking.add(new RankingItemResponse(
+                rank++,
+                candidate.nickname(),
+                candidate.race(),
+                candidate.mmr(),
                 stats.wins(),
                 stats.losses(),
                 stats.games(),
@@ -60,6 +100,43 @@ public class RankingService {
         }
 
         return ranking;
+    }
+
+    private OffsetDateTime resolveLastPlayedAt(List<MatchParticipant> history) {
+        for (MatchParticipant participant : history) {
+            if (participant.getMatch() != null && participant.getMatch().getPlayedAt() != null) {
+                return participant.getMatch().getPlayedAt();
+            }
+        }
+        return null;
+    }
+
+    private int applyDormancyMmr(
+        String currentTier,
+        int currentMmr,
+        OffsetDateTime lastPlayedAt,
+        OffsetDateTime createdAt,
+        OffsetDateTime now
+    ) {
+        if (!dormancyEnabled || dormancyDemoteSteps <= 0) {
+            return currentMmr;
+        }
+
+        OffsetDateTime activityReference = lastPlayedAt != null ? lastPlayedAt : createdAt;
+        if (activityReference == null) {
+            return currentMmr;
+        }
+
+        long inactiveDays = ChronoUnit.DAYS.between(activityReference.toInstant(), now.toInstant());
+        if (inactiveDays < dormancyInactiveDays) {
+            return currentMmr;
+        }
+
+        return PlayerTierPolicy.resolveDormancyAdjustedMmr(
+            currentTier,
+            currentMmr,
+            dormancyDemoteSteps
+        );
     }
 
     private RankingStats calculateStats(List<MatchParticipant> history) {
@@ -153,6 +230,15 @@ public class RankingService {
         String streak,
         String last10,
         int mmrDelta
+    ) {
+    }
+
+    private record RankingCandidate(
+        Long playerId,
+        String nickname,
+        String race,
+        int mmr,
+        RankingStats stats
     ) {
     }
 

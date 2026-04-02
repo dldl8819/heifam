@@ -91,4 +91,16 @@ class PlayerTierPolicyTest {
     void demoteTierNormalizesUnknownTierToNone() {
         assertThat(PlayerTierPolicy.demoteTier("재배정대상", 1)).isEqualTo("NONE");
     }
+
+    @Test
+    void resolvesDormancyAdjustedMmrToNearTopOfDemotedTier() {
+        assertThat(PlayerTierPolicy.resolveDormancyAdjustedMmr("A+", 930, 1)).isEqualTo(890);
+        assertThat(PlayerTierPolicy.resolveDormancyAdjustedMmr("A", 880, 1)).isEqualTo(790);
+    }
+
+    @Test
+    void doesNotIncreaseMmrWhenDormancyTargetIsHigherThanCurrent() {
+        assertThat(PlayerTierPolicy.resolveDormancyAdjustedMmr("A+", 850, 1)).isEqualTo(850);
+        assertThat(PlayerTierPolicy.resolveDormancyAdjustedMmr("NONE", 0, 1)).isEqualTo(0);
+    }
 }

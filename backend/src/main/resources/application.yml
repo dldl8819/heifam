@@ -48,6 +48,5 @@ balancify:
   rank:
     dormancy:
       enabled: ${RANK_DORMANCY_ENABLED:true}
-      inactive-days: ${RANK_DORMANCY_INACTIVE_DAYS:3}
-      max-games: ${RANK_DORMANCY_MAX_GAMES:3}
+      inactive-days: ${RANK_DORMANCY_INACTIVE_DAYS:30}
       demote-steps: ${RANK_DORMANCY_DEMOTE_STEPS:1}

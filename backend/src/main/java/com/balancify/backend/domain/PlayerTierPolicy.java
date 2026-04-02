@@ -122,6 +122,22 @@ public final class PlayerTierPolicy {
         return stepTier(normalizedTier, -steps);
     }
 
+    public static int resolveDormancyAdjustedMmr(String currentTier, Integer mmr, int demoteSteps) {
+        int normalizedMmr = Math.max(0, mmr == null ? 0 : mmr);
+        if (normalizedMmr <= 0 || demoteSteps <= 0) {
+            return normalizedMmr;
+        }
+
+        String normalizedCurrentTier = canonicalTier(currentTier, resolveTier(normalizedMmr));
+        String demotedTier = demoteTier(normalizedCurrentTier, demoteSteps);
+        if (demotedTier.equals(normalizedCurrentTier)) {
+            return normalizedMmr;
+        }
+
+        int upperMmrNearTop = nearTopMmrForTier(demotedTier);
+        return Math.min(normalizedMmr, upperMmrNearTop);
+    }
+
     public static boolean isLowTier(Integer mmr) {
         String tier = resolveTier(mmr);
         return TIER_NONE.equals(tier) || "C+".equals(tier) || "C".equals(tier) || "C-".equals(tier);
@@ -171,5 +187,22 @@ public final class PlayerTierPolicy {
 
         int currentTierFloor = TIER_FLOOR_MMR.getOrDefault(currentTier, 0);
         return mmr < (currentTierFloor - DEMOTION_MMR_BUFFER);
+    }
+
+    private static int nearTopMmrForTier(String tier) {
+        String normalizedTier = canonicalTier(tier, TIER_NONE);
+        if (TIER_NONE.equals(normalizedTier)) {
+            return 0;
+        }
+
+        int currentFloor = TIER_FLOOR_MMR.getOrDefault(normalizedTier, 0);
+        String nextTier = stepTier(normalizedTier, 1);
+        if (nextTier.equals(normalizedTier)) {
+            return currentFloor + 90;
+        }
+
+        int nextFloor = TIER_FLOOR_MMR.getOrDefault(nextTier, currentFloor + 100);
+        int upperBound = Math.max(currentFloor, nextFloor - 1);
+        return Math.max(currentFloor, upperBound - 9);
     }
 }
