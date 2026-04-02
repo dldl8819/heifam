@@ -437,7 +437,7 @@ export default function MultiBalancePage() {
                   <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
                     {t('multiBalance.result.expectedHomeWinRate')}:{' '}
                     <span className="font-semibold">
-                      {showMmr && typeof match.expectedHomeWinRate === 'number'
+                      {typeof match.expectedHomeWinRate === 'number'
                         ? formatPercent(match.expectedHomeWinRate)
                         : '-'}
                     </span>

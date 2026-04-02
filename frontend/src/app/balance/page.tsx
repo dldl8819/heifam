@@ -697,16 +697,14 @@ export default function BalancePage() {
                   <span className="font-semibold">{result.mmrDiff ?? '-'}</span>
                 </div>
               )}
-              {showMmr && (
-                <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  {t('balance.result.expectedHomeWinRate')}:{' '}
-                  <span className="font-semibold">
-                    {typeof result.expectedHomeWinRate === 'number'
-                      ? formatPercent(result.expectedHomeWinRate)
-                      : '-'}
-                  </span>
-                </div>
-              )}
+              <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                {t('balance.result.expectedHomeWinRate')}:{' '}
+                <span className="font-semibold">
+                  {typeof result.expectedHomeWinRate === 'number'
+                    ? formatPercent(result.expectedHomeWinRate)
+                    : '-'}
+                </span>
+              </div>
               {showMmr && (
                 <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
                   {t('balance.result.averageTeamMmr')}:{' '}
@@ -715,11 +713,6 @@ export default function BalancePage() {
                       ? Math.round((result.homeMmr + result.awayMmr) / 2)
                       : '-'}
                   </span>
-                </div>
-              )}
-              {!showMmr && (
-                <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  {t('balance.result.expectedHomeWinRate')}: <span className="font-semibold">-</span>
                 </div>
               )}
             </div>
