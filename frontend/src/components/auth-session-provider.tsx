@@ -14,6 +14,7 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 const ENABLE_SUPABASE_PROFILE_SYNC =
   process.env.NEXT_PUBLIC_ENABLE_SUPABASE_PROFILE_SYNC === 'true'
+const INITIAL_SESSION_TIMEOUT_MS = 7000
 
 function isSupabaseLockContentionError(error: unknown): boolean {
   if (!(error instanceof Error)) {
@@ -40,14 +41,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
+    const initialSessionTimeout = window.setTimeout(() => {
+      if (!cancelled) {
+        setLoading(false)
+      }
+    }, INITIAL_SESSION_TIMEOUT_MS)
+
     // Get initial session
     void supabase.auth
       .getSession()
       .then(({ data: { session } }) => {
+        if (cancelled) {
+          return
+        }
         setSession(session)
         setUser(session?.user ?? null)
       })
       .catch((error) => {
+        if (cancelled) {
+          return
+        }
         if (!isSupabaseLockContentionError(error)) {
           console.error('Failed to load auth session:', error)
         }
@@ -55,13 +69,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setUser(null)
       })
       .finally(() => {
-        setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+        }
+        window.clearTimeout(initialSessionTimeout)
       })
 
     // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
+      if (cancelled) {
+        return
+      }
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
@@ -72,7 +92,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      cancelled = true
+      window.clearTimeout(initialSessionTimeout)
+      subscription.unsubscribe()
+    }
   }, [])
 
   const signOut = async () => {
