@@ -6,6 +6,8 @@ import com.balancify.backend.security.AdminRequestResolver;
 import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.DashboardQueryService;
 import jakarta.servlet.http.HttpServletRequest;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -57,6 +59,20 @@ public class GroupDashboardController {
     }
 
     private String safeTrim(String value) {
-        return value == null ? "" : value.trim();
+        if (value == null) {
+            return "";
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return "";
+        }
+        if (!trimmed.contains("%")) {
+            return trimmed;
+        }
+        try {
+            return URLDecoder.decode(trimmed, StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException ignored) {
+            return trimmed;
+        }
     }
 }

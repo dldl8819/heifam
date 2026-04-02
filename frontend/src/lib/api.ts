@@ -171,7 +171,10 @@ function buildHeaders(
   }
 
   if ((options?.adminOnly || options?.includeUserNickname) && userNickname.length > 0) {
-    headers.set(USER_NICKNAME_HEADER, userNickname)
+    const encodedNickname = encodeURIComponent(userNickname)
+    if (encodedNickname.length > 0) {
+      headers.set(USER_NICKNAME_HEADER, encodedNickname)
+    }
   }
 
   return headers

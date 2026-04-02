@@ -4,6 +4,8 @@ import com.balancify.backend.api.match.dto.MatchResultRequest;
 import com.balancify.backend.api.match.dto.MatchResultResponse;
 import com.balancify.backend.service.MatchResultService;
 import jakarta.servlet.http.HttpServletRequest;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.NoSuchElementException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -96,6 +98,17 @@ public class MatchResultController {
         if (value == null || value.isBlank()) {
             return null;
         }
-        return value.trim();
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        if (!trimmed.contains("%")) {
+            return trimmed;
+        }
+        try {
+            return URLDecoder.decode(trimmed, StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException ignored) {
+            return trimmed;
+        }
     }
 }
