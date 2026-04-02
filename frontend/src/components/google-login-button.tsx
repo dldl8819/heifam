@@ -13,13 +13,19 @@ type GoogleLoginButtonProps = {
 
 export function GoogleLoginButton({ className, children }: GoogleLoginButtonProps) {
   const [warningMessage, setWarningMessage] = useState<string | null>(null)
+  const [oauthInProgress, setOauthInProgress] = useState<boolean>(false)
 
   const handleLogin = async () => {
+    if (oauthInProgress) {
+      return
+    }
+
     if (isInAppBrowser()) {
       setWarningMessage(t('auth.inAppBrowser.alert'))
       return
     }
 
+    setOauthInProgress(true)
     setWarningMessage(null)
     const redirectTo = buildSupabaseAuthRedirectTo()
 
@@ -32,12 +38,18 @@ export function GoogleLoginButton({ className, children }: GoogleLoginButtonProp
 
     if (error) {
       setWarningMessage(t('auth.error.default'))
+      setOauthInProgress(false)
     }
   }
 
   return (
     <div className="space-y-2">
-      <button type="button" onClick={() => void handleLogin()} className={className}>
+      <button
+        type="button"
+        onClick={() => void handleLogin()}
+        disabled={oauthInProgress}
+        className={className}
+      >
         {children}
       </button>
       {warningMessage && (

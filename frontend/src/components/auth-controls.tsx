@@ -22,13 +22,19 @@ export function AuthControls() {
   const { nickname, isAdmin } = useAdminAuth()
   const { mmrVisible, setMmrVisible } = useMmrVisibility()
   const [warningMessage, setWarningMessage] = useState<string | null>(null)
+  const [oauthInProgress, setOauthInProgress] = useState<boolean>(false)
 
   const handleGoogleLogin = async () => {
+    if (oauthInProgress) {
+      return
+    }
+
     if (isInAppBrowser()) {
       setWarningMessage(t('auth.inAppBrowser.alert'))
       return
     }
 
+    setOauthInProgress(true)
     setWarningMessage(null)
     const redirectTo = buildSupabaseAuthRedirectTo()
 
@@ -41,6 +47,7 @@ export function AuthControls() {
 
     if (error) {
       setWarningMessage(t('auth.error.default'))
+      setOauthInProgress(false)
     }
   }
 
@@ -57,9 +64,10 @@ export function AuthControls() {
       <div className="space-y-2">
         <button
           onClick={() => void handleGoogleLogin()}
+          disabled={oauthInProgress}
           className="rounded-lg border border-slate-700 bg-slate-800/70 px-3 py-2 text-xs text-slate-300 hover:bg-slate-700 transition-colors"
         >
-          {t('auth.loginGoogle')}
+          {oauthInProgress ? t('auth.loginGooglePending') : t('auth.loginGoogle')}
         </button>
         {warningMessage && (
           <p className="max-w-xs text-xs text-amber-300">

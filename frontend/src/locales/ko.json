@@ -223,6 +223,7 @@
   },
   "auth": {
     "loginGoogle": "Google 로그인",
+    "loginGooglePending": "로그인 이동 중...",
     "logout": "로그아웃",
     "mmrToggle": "MMR 표시",
     "loading": "로그인 상태 확인 중...",

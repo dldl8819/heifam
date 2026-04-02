@@ -14,13 +14,19 @@ type AdminOnlyContentProps = {
 export function AdminOnlyContent({ children }: AdminOnlyContentProps) {
   const { isAdmin, isLoading, isLoggedIn, canAccess } = useAdminAuth()
   const [warningMessage, setWarningMessage] = useState<string | null>(null)
+  const [oauthInProgress, setOauthInProgress] = useState<boolean>(false)
 
   const handleGoogleLogin = async () => {
+    if (oauthInProgress) {
+      return
+    }
+
     if (isInAppBrowser()) {
       setWarningMessage(t('auth.inAppBrowser.alert'))
       return
     }
 
+    setOauthInProgress(true)
     setWarningMessage(null)
     const redirectTo = buildSupabaseAuthRedirectTo()
 
@@ -33,6 +39,7 @@ export function AdminOnlyContent({ children }: AdminOnlyContentProps) {
 
     if (error) {
       setWarningMessage(t('auth.error.default'))
+      setOauthInProgress(false)
     }
   }
 
@@ -52,9 +59,10 @@ export function AdminOnlyContent({ children }: AdminOnlyContentProps) {
         <button
           type="button"
           onClick={() => void handleGoogleLogin()}
+          disabled={oauthInProgress}
           className="mt-3 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-slate-950 transition-colors hover:bg-emerald-400"
         >
-          {t('auth.loginGoogle')}
+          {oauthInProgress ? t('auth.loginGooglePending') : t('auth.loginGoogle')}
         </button>
         {warningMessage && (
           <p className="mt-2 text-xs text-amber-800">

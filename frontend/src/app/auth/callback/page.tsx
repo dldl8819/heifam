@@ -32,6 +32,33 @@ function isPkceVerifierMissingError(error: unknown): boolean {
   )
 }
 
+function isFlowStateNotFoundError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false
+  }
+
+  return (
+    /flow_state_not_found/i.test(error.message) ||
+    /invalid flow state/i.test(error.message) ||
+    /no valid flow state found/i.test(error.message)
+  )
+}
+
+async function waitForSessionWithRetry(maxAttempts: number = 8, delayMs: number = 250) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const { data } = await supabase.auth.getSession()
+    if (data.session) {
+      return data.session
+    }
+
+    if (attempt < maxAttempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
+    }
+  }
+
+  return null
+}
+
 export default function AuthCallbackPage() {
   const router = useRouter()
   const handledRef = useRef(false)
@@ -55,15 +82,23 @@ export default function AuthCallbackPage() {
           currentUrl
         )
         if (exchangeError) {
-          if (!isPkceVerifierMissingError(exchangeError)) {
+          const recoverableFlowError =
+            isPkceVerifierMissingError(exchangeError) || isFlowStateNotFoundError(exchangeError)
+
+          if (!recoverableFlowError) {
             console.error('Error exchanging auth code:', exchangeError)
             await supabase.auth.signOut()
             router.replace('/')
             return
           }
 
-          const { data: fallbackData } = await supabase.auth.getSession()
-          session = fallbackData.session
+          session = await waitForSessionWithRetry()
+
+          if (!session) {
+            console.error('Error exchanging auth code:', exchangeError)
+            router.replace('/auth?retry=1')
+            return
+          }
         } else {
           session = exchangeData.session
         }
