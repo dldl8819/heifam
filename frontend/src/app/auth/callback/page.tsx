@@ -70,16 +70,15 @@ export default function AuthCallbackPage() {
     handledRef.current = true
 
     const handleAuthCallback = async () => {
-      const currentUrl =
-        typeof window === 'undefined' ? '' : window.location.href
-      const hasAuthCode =
-        typeof window !== 'undefined' &&
-        new URL(window.location.href).searchParams.has('code')
+      const authCode =
+        typeof window === 'undefined'
+          ? null
+          : new URL(window.location.href).searchParams.get('code')
       let session = null
 
-      if (hasAuthCode) {
+      if (authCode) {
         const { data: exchangeData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(
-          currentUrl
+          authCode
         )
         if (exchangeError) {
           const recoverableFlowError =
