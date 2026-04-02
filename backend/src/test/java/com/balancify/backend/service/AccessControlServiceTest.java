@@ -18,6 +18,7 @@ import com.balancify.backend.repository.UserRacePreferenceRepository;
 import com.balancify.backend.security.AdminKeyProperties;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -63,7 +64,8 @@ class AccessControlServiceTest {
             adminKeyProperties,
             managedAdminEmailRepository,
             allowedUserEmailRepository,
-            userRacePreferenceRepository
+            userRacePreferenceRepository,
+            60_000L
         );
     }
 
@@ -154,6 +156,60 @@ class AccessControlServiceTest {
         verify(managedAdminEmailRepository, times(1)).findByNormalizedEmail("member@hei.gg");
         verify(allowedUserEmailRepository, times(1)).findByNormalizedEmail("member@hei.gg");
         verify(userRacePreferenceRepository, times(1)).findByNormalizedEmail("member@hei.gg");
+    }
+
+    @Test
+    void refreshesAccessProfileAfterCacheExpiry() throws InterruptedException {
+        AdminKeyProperties adminKeyProperties = new AdminKeyProperties();
+        adminKeyProperties.setAllowedEmails("");
+        AtomicInteger lookupCount = new AtomicInteger();
+
+        when(managedAdminEmailRepository.findByNormalizedEmail("fan@hei.gg")).thenReturn(Optional.empty());
+        when(userRacePreferenceRepository.findByNormalizedEmail("fan@hei.gg")).thenReturn(Optional.empty());
+        when(allowedUserEmailRepository.findByNormalizedEmail("fan@hei.gg")).thenAnswer(invocation -> {
+            if (lookupCount.incrementAndGet() == 1) {
+                return Optional.empty();
+            }
+            AllowedUserEmail allowedUserEmail = new AllowedUserEmail();
+            allowedUserEmail.setEmail("fan@hei.gg");
+            allowedUserEmail.setNickname("팬");
+            return Optional.of(allowedUserEmail);
+        });
+
+        AccessControlService serviceWithShortCache = new AccessControlService(
+            adminKeyProperties,
+            managedAdminEmailRepository,
+            allowedUserEmailRepository,
+            userRacePreferenceRepository,
+            5L
+        );
+
+        AccessControlService.AccessProfile first = serviceWithShortCache.resolveAccessProfile("fan@hei.gg");
+        Thread.sleep(20L);
+        AccessControlService.AccessProfile second = serviceWithShortCache.resolveAccessProfile("fan@hei.gg");
+
+        assertThat(first.allowed()).isFalse();
+        assertThat(second.allowed()).isTrue();
+        verify(allowedUserEmailRepository, times(2)).findByNormalizedEmail("fan@hei.gg");
+    }
+
+    @Test
+    void invalidatesCachedAccessProfileWhenPreferredRaceChanges() {
+        AccessControlService.AccessProfile initialProfile = accessControlService.resolveAccessProfile("member@hei.gg");
+
+        UserRacePreference preference = new UserRacePreference();
+        preference.setEmail("member@hei.gg");
+        preference.setPreferredRace("TZ");
+        when(userRacePreferenceRepository.findByNormalizedEmail("member@hei.gg"))
+            .thenReturn(Optional.of(preference));
+
+        AccessControlService.AccessProfile updatedProfile = accessControlService.upsertPreferredRace("member@hei.gg", "TZ");
+        AccessControlService.AccessProfile reloadedProfile = accessControlService.resolveAccessProfile("member@hei.gg");
+
+        assertThat(initialProfile.preferredRace()).isNull();
+        assertThat(updatedProfile.preferredRace()).isEqualTo("TZ");
+        assertThat(reloadedProfile.preferredRace()).isEqualTo("TZ");
+        verify(userRacePreferenceRepository, times(3)).findByNormalizedEmail("member@hei.gg");
     }
 
     @Test

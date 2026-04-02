@@ -10,7 +10,6 @@ public class SupabaseAuthProperties {
     private boolean requireJwt = true;
     private boolean allowEmailHeaderFallback = false;
     private String supabaseUrl;
-    private String supabaseApiKey;
     private int verifyTimeoutMs = 3000;
     private int verificationCacheTtlSeconds = 15;
 
@@ -38,14 +37,6 @@ public class SupabaseAuthProperties {
         this.supabaseUrl = safeTrim(supabaseUrl);
     }
 
-    public String getSupabaseApiKey() {
-        return supabaseApiKey;
-    }
-
-    public void setSupabaseApiKey(String supabaseApiKey) {
-        this.supabaseApiKey = safeTrim(supabaseApiKey);
-    }
-
     public int getVerifyTimeoutMs() {
         return verifyTimeoutMs;
     }
@@ -66,4 +57,3 @@ public class SupabaseAuthProperties {
         return value == null ? "" : value.trim();
     }
 }
-

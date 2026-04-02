@@ -46,7 +46,6 @@ balancify:
     require-jwt: ${AUTH_REQUIRE_JWT:true}
     allow-email-header-fallback: ${AUTH_ALLOW_EMAIL_HEADER_FALLBACK:false}
     supabase-url: ${SUPABASE_URL:}
-    supabase-api-key: ${SUPABASE_ANON_KEY:${SUPABASE_SERVICE_ROLE_KEY:}}
     verify-timeout-ms: ${SUPABASE_VERIFY_TIMEOUT_MS:3000}
     verification-cache-ttl-seconds: ${SUPABASE_VERIFICATION_CACHE_TTL_SECONDS:15}
   cors:

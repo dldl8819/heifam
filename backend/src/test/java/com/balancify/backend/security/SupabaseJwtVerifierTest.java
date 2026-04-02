@@ -23,12 +23,14 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 class SupabaseJwtVerifierTest {
 
     private HttpServer jwksServer;
+    private final AtomicInteger jwksRequestCount = new AtomicInteger();
 
     @AfterEach
     void tearDown() {
@@ -63,6 +65,7 @@ class SupabaseJwtVerifierTest {
         assertThat(verifiedUser).isPresent();
         assertThat(verifiedUser.orElseThrow().email()).isEqualTo("member@hei.gg");
         assertThat(verifiedUser.orElseThrow().nickname()).isEqualTo("민식");
+        assertThat(jwksRequestCount.get()).isEqualTo(1);
     }
 
     @Test
@@ -89,7 +92,87 @@ class SupabaseJwtVerifierTest {
         assertThat(verifier.verify(token)).isEmpty();
     }
 
+    @Test
+    void rejectsExpiredToken() throws Exception {
+        ECKey signingKey = new ECKeyGenerator(Curve.P_256)
+            .keyID("hei-test-key")
+            .generate();
+        String baseUrl = startJwksServer(new JWKSet(signingKey.toPublicJWK()).toString());
+
+        SupabaseAuthProperties properties = new SupabaseAuthProperties();
+        properties.setSupabaseUrl(baseUrl);
+        properties.setVerifyTimeoutMs(1000);
+        properties.setVerificationCacheTtlSeconds(60);
+
+        SupabaseJwtVerifier verifier = new SupabaseJwtVerifier(properties);
+
+        String token = createToken(
+            signingKey,
+            baseUrl + "/auth/v1",
+            "member@hei.gg",
+            Map.of("full_name", "민식"),
+            Instant.now().minusSeconds(120)
+        );
+
+        assertThat(verifier.verify(token)).isEmpty();
+    }
+
+    @Test
+    void rejectsTokenWithInvalidSignature() throws Exception {
+        ECKey trustedKey = new ECKeyGenerator(Curve.P_256)
+            .keyID("hei-trusted-key")
+            .generate();
+        ECKey attackerKey = new ECKeyGenerator(Curve.P_256)
+            .keyID("hei-attacker-key")
+            .generate();
+        String baseUrl = startJwksServer(new JWKSet(trustedKey.toPublicJWK()).toString());
+
+        SupabaseAuthProperties properties = new SupabaseAuthProperties();
+        properties.setSupabaseUrl(baseUrl);
+        properties.setVerifyTimeoutMs(1000);
+        properties.setVerificationCacheTtlSeconds(60);
+
+        SupabaseJwtVerifier verifier = new SupabaseJwtVerifier(properties);
+
+        String token = createToken(
+            attackerKey,
+            baseUrl + "/auth/v1",
+            "member@hei.gg",
+            Map.of("full_name", "민식")
+        );
+
+        assertThat(verifier.verify(token)).isEmpty();
+        assertThat(jwksRequestCount.get()).isBetween(1, 2);
+    }
+
+    @Test
+    void cachesVerifiedTokenToAvoidRepeatedJwksLookups() throws Exception {
+        ECKey signingKey = new ECKeyGenerator(Curve.P_256)
+            .keyID("hei-test-key")
+            .generate();
+        String baseUrl = startJwksServer(new JWKSet(signingKey.toPublicJWK()).toString());
+
+        SupabaseAuthProperties properties = new SupabaseAuthProperties();
+        properties.setSupabaseUrl(baseUrl);
+        properties.setVerifyTimeoutMs(1000);
+        properties.setVerificationCacheTtlSeconds(60);
+
+        SupabaseJwtVerifier verifier = new SupabaseJwtVerifier(properties);
+
+        String token = createToken(
+            signingKey,
+            baseUrl + "/auth/v1",
+            "member@hei.gg",
+            Map.of("full_name", "민식")
+        );
+
+        assertThat(verifier.verify(token)).isPresent();
+        assertThat(verifier.verify(token)).isPresent();
+        assertThat(jwksRequestCount.get()).isEqualTo(1);
+    }
+
     private String startJwksServer(String responseBody) throws IOException {
+        jwksRequestCount.set(0);
         jwksServer = HttpServer.create(new InetSocketAddress(0), 0);
         jwksServer.createContext("/auth/v1/.well-known/jwks.json", new StaticBodyHandler(responseBody));
         jwksServer.start();
@@ -103,6 +186,16 @@ class SupabaseJwtVerifierTest {
         String email,
         Map<String, Object> userMetadata
     ) throws Exception {
+        return createToken(signingKey, issuer, email, userMetadata, Instant.now().plusSeconds(600));
+    }
+
+    private String createToken(
+        ECKey signingKey,
+        String issuer,
+        String email,
+        Map<String, Object> userMetadata,
+        Instant expirationTime
+    ) throws Exception {
         SignedJWT jwt = new SignedJWT(
             new JWSHeader.Builder(JWSAlgorithm.ES256)
                 .keyID(signingKey.getKeyID())
@@ -113,7 +206,7 @@ class SupabaseJwtVerifierTest {
                 .subject("test-user-id")
                 .audience("authenticated")
                 .issueTime(Date.from(Instant.now()))
-                .expirationTime(Date.from(Instant.now().plusSeconds(600)))
+                .expirationTime(Date.from(expirationTime))
                 .claim("email", email)
                 .claim("user_metadata", userMetadata)
                 .build()
@@ -122,7 +215,7 @@ class SupabaseJwtVerifierTest {
         return jwt.serialize();
     }
 
-    private static class StaticBodyHandler implements HttpHandler {
+    private class StaticBodyHandler implements HttpHandler {
 
         private final byte[] responseBody;
 
@@ -132,6 +225,7 @@ class SupabaseJwtVerifierTest {
 
         @Override
         public void handle(HttpExchange exchange) throws IOException {
+            jwksRequestCount.incrementAndGet();
             exchange.getResponseHeaders().add("Content-Type", "application/json");
             exchange.sendResponseHeaders(200, responseBody.length);
             try (OutputStream outputStream = exchange.getResponseBody()) {

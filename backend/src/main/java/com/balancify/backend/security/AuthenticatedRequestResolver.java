@@ -12,6 +12,7 @@ public class AuthenticatedRequestResolver {
 
     public static final String AUTHENTICATED_EMAIL_ATTRIBUTE = "balancify.auth.email";
     public static final String AUTHENTICATED_NICKNAME_ATTRIBUTE = "balancify.auth.nickname";
+    public static final String AUTHENTICATED_JWT_VERIFIED_ATTRIBUTE = "balancify.auth.jwtVerified";
 
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String USER_EMAIL_HEADER = "X-USER-EMAIL";
@@ -35,8 +36,9 @@ public class AuthenticatedRequestResolver {
 
         String cachedEmail = normalizeEmail(asString(request.getAttribute(AUTHENTICATED_EMAIL_ATTRIBUTE)));
         String cachedNickname = safeTrim(asString(request.getAttribute(AUTHENTICATED_NICKNAME_ATTRIBUTE)));
+        boolean cachedJwtVerified = asBoolean(request.getAttribute(AUTHENTICATED_JWT_VERIFIED_ATTRIBUTE));
         if (!cachedEmail.isEmpty()) {
-            return new ResolvedRequestIdentity(cachedEmail, cachedNickname, true);
+            return new ResolvedRequestIdentity(cachedEmail, cachedNickname, cachedJwtVerified);
         }
 
         String bearerToken = extractBearerToken(request.getHeader(AUTHORIZATION_HEADER));
@@ -48,6 +50,7 @@ public class AuthenticatedRequestResolver {
                 if (!email.isEmpty()) {
                     request.setAttribute(AUTHENTICATED_EMAIL_ATTRIBUTE, email);
                     request.setAttribute(AUTHENTICATED_NICKNAME_ATTRIBUTE, nickname);
+                    request.setAttribute(AUTHENTICATED_JWT_VERIFIED_ATTRIBUTE, true);
                     return new ResolvedRequestIdentity(email, nickname, true);
                 }
             }
@@ -71,6 +74,7 @@ public class AuthenticatedRequestResolver {
         String headerNickname = decodeNickname(request.getHeader(USER_NICKNAME_HEADER));
         request.setAttribute(AUTHENTICATED_EMAIL_ATTRIBUTE, headerEmail);
         request.setAttribute(AUTHENTICATED_NICKNAME_ATTRIBUTE, headerNickname);
+        request.setAttribute(AUTHENTICATED_JWT_VERIFIED_ATTRIBUTE, false);
         return new ResolvedRequestIdentity(headerEmail, headerNickname, false);
     }
 
@@ -108,6 +112,16 @@ public class AuthenticatedRequestResolver {
         return value == null ? "" : value.toString();
     }
 
+    private boolean asBoolean(Object value) {
+        if (value instanceof Boolean booleanValue) {
+            return booleanValue;
+        }
+        if (value instanceof String stringValue) {
+            return Boolean.parseBoolean(stringValue.trim());
+        }
+        return false;
+    }
+
     private String safeTrim(String value) {
         return value == null ? "" : value.trim();
     }
@@ -126,4 +140,3 @@ public class AuthenticatedRequestResolver {
         }
     }
 }
-

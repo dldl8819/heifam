@@ -14,9 +14,7 @@ ADMIN_EMAILS=admin1@example.com,admin2@example.com
 SUPER_ADMIN_EMAILS=super-admin@example.com
 ALLOWED_USER_EMAILS=member1@example.com,member2@example.com
 SUPABASE_URL=https://your-project-ref.supabase.co
-SUPABASE_ANON_KEY=replace-with-supabase-anon-key
 CORS_ALLOWED_ORIGINS=https://heifam.co.kr,https://www.heifam.co.kr
-SUPABASE_SERVICE_ROLE_KEY=replace-with-supabase-service-role-key
 SERVER_PORT=10000
 ```
 

@@ -20,15 +20,17 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AccessControlService {
 
+    private static final long DEFAULT_ACCESS_STATE_CACHE_TTL_MS = 60_000L;
+
     private final AdminKeyProperties adminKeyProperties;
     private final ManagedAdminEmailRepository managedAdminEmailRepository;
     private final AllowedUserEmailRepository allowedUserEmailRepository;
     private final UserRacePreferenceRepository userRacePreferenceRepository;
     private final ConcurrentMap<String, CachedAccessState> accessStateCache = new ConcurrentHashMap<>();
+    private final long accessStateCacheTtlMs;
 
     private static final Set<String> ALLOWED_RACES = Set.of("P", "T", "Z", "PT", "PZ", "TZ", "R");
     private static final int MAX_NICKNAME_LENGTH = 100;
-    private static final long ACCESS_STATE_CACHE_TTL_MS = 60_000L;
 
     public AccessControlService(
         AdminKeyProperties adminKeyProperties,
@@ -36,10 +38,27 @@ public class AccessControlService {
         AllowedUserEmailRepository allowedUserEmailRepository,
         UserRacePreferenceRepository userRacePreferenceRepository
     ) {
+        this(
+            adminKeyProperties,
+            managedAdminEmailRepository,
+            allowedUserEmailRepository,
+            userRacePreferenceRepository,
+            DEFAULT_ACCESS_STATE_CACHE_TTL_MS
+        );
+    }
+
+    AccessControlService(
+        AdminKeyProperties adminKeyProperties,
+        ManagedAdminEmailRepository managedAdminEmailRepository,
+        AllowedUserEmailRepository allowedUserEmailRepository,
+        UserRacePreferenceRepository userRacePreferenceRepository,
+        long accessStateCacheTtlMs
+    ) {
         this.adminKeyProperties = adminKeyProperties;
         this.managedAdminEmailRepository = managedAdminEmailRepository;
         this.allowedUserEmailRepository = allowedUserEmailRepository;
         this.userRacePreferenceRepository = userRacePreferenceRepository;
+        this.accessStateCacheTtlMs = Math.max(0L, accessStateCacheTtlMs);
     }
 
     @Transactional(readOnly = true)
@@ -253,7 +272,7 @@ public class AccessControlService {
         AccessState computed = loadAccessState(normalizedEmail);
         accessStateCache.put(
             normalizedEmail,
-            new CachedAccessState(computed, now + ACCESS_STATE_CACHE_TTL_MS)
+            new CachedAccessState(computed, now + accessStateCacheTtlMs)
         );
         return computed;
     }
