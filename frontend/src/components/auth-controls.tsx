@@ -1,7 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import { useAuth } from '@/components/auth-session-provider'
 import { useAdminAuth } from '@/lib/admin-auth'
+import { buildSupabaseAuthRedirectTo, isInAppBrowser } from '@/lib/auth-browser'
 import { supabase } from '@/lib/supabase'
 import { t } from '@/lib/i18n'
 
@@ -17,19 +19,27 @@ function buildDisplayName(name?: string | null): string {
 export function AuthControls() {
   const { user, loading, signOut } = useAuth()
   const { nickname } = useAdminAuth()
+  const [warningMessage, setWarningMessage] = useState<string | null>(null)
 
   const handleGoogleLogin = async () => {
-    const redirectTo =
-      typeof window === 'undefined'
-        ? undefined
-        : `${window.location.origin}/auth/callback`
+    if (isInAppBrowser()) {
+      setWarningMessage(t('auth.inAppBrowser.alert'))
+      return
+    }
 
-    await supabase.auth.signInWithOAuth({
+    setWarningMessage(null)
+    const redirectTo = buildSupabaseAuthRedirectTo()
+
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo,
       },
     })
+
+    if (error) {
+      setWarningMessage(t('auth.error.default'))
+    }
   }
 
   if (loading) {
@@ -42,12 +52,19 @@ export function AuthControls() {
 
   if (!user) {
     return (
-      <button
-        onClick={() => void handleGoogleLogin()}
-        className="rounded-lg border border-slate-700 bg-slate-800/70 px-3 py-2 text-xs text-slate-300 hover:bg-slate-700 transition-colors"
-      >
-        {t('auth.loginGoogle')}
-      </button>
+      <div className="space-y-2">
+        <button
+          onClick={() => void handleGoogleLogin()}
+          className="rounded-lg border border-slate-700 bg-slate-800/70 px-3 py-2 text-xs text-slate-300 hover:bg-slate-700 transition-colors"
+        >
+          {t('auth.loginGoogle')}
+        </button>
+        {warningMessage && (
+          <p className="max-w-xs text-xs text-amber-300">
+            {warningMessage}
+          </p>
+        )}
+      </div>
     )
   }
 

@@ -1,6 +1,9 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import { useState } from 'react'
+import { t } from '@/lib/i18n'
+import { buildSupabaseAuthRedirectTo, isInAppBrowser } from '@/lib/auth-browser'
 import { supabase } from '@/lib/supabase'
 
 type GoogleLoginButtonProps = {
@@ -9,23 +12,39 @@ type GoogleLoginButtonProps = {
 }
 
 export function GoogleLoginButton({ className, children }: GoogleLoginButtonProps) {
-  const handleLogin = async () => {
-    const redirectTo =
-      typeof window === 'undefined'
-        ? undefined
-        : `${window.location.origin}/auth/callback`
+  const [warningMessage, setWarningMessage] = useState<string | null>(null)
 
-    await supabase.auth.signInWithOAuth({
+  const handleLogin = async () => {
+    if (isInAppBrowser()) {
+      setWarningMessage(t('auth.inAppBrowser.alert'))
+      return
+    }
+
+    setWarningMessage(null)
+    const redirectTo = buildSupabaseAuthRedirectTo()
+
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo,
       },
     })
+
+    if (error) {
+      setWarningMessage(t('auth.error.default'))
+    }
   }
 
   return (
-    <button type="button" onClick={() => void handleLogin()} className={className}>
-      {children}
-    </button>
+    <div className="space-y-2">
+      <button type="button" onClick={() => void handleLogin()} className={className}>
+        {children}
+      </button>
+      {warningMessage && (
+        <p className="max-w-md text-xs text-amber-200">
+          {warningMessage}
+        </p>
+      )}
+    </div>
   )
 }

@@ -1,7 +1,9 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import { useState } from 'react'
 import { useAdminAuth } from '@/lib/admin-auth'
+import { buildSupabaseAuthRedirectTo, isInAppBrowser } from '@/lib/auth-browser'
 import { supabase } from '@/lib/supabase'
 import { t } from '@/lib/i18n'
 
@@ -11,19 +13,27 @@ type AdminOnlyContentProps = {
 
 export function AdminOnlyContent({ children }: AdminOnlyContentProps) {
   const { isAdmin, isLoading, isLoggedIn, canAccess } = useAdminAuth()
+  const [warningMessage, setWarningMessage] = useState<string | null>(null)
 
   const handleGoogleLogin = async () => {
-    const redirectTo =
-      typeof window === 'undefined'
-        ? undefined
-        : `${window.location.origin}/auth/callback`
+    if (isInAppBrowser()) {
+      setWarningMessage(t('auth.inAppBrowser.alert'))
+      return
+    }
 
-    await supabase.auth.signInWithOAuth({
+    setWarningMessage(null)
+    const redirectTo = buildSupabaseAuthRedirectTo()
+
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo,
       },
     })
+
+    if (error) {
+      setWarningMessage(t('auth.error.default'))
+    }
   }
 
   if (isLoading) {
@@ -46,6 +56,11 @@ export function AdminOnlyContent({ children }: AdminOnlyContentProps) {
         >
           {t('auth.loginGoogle')}
         </button>
+        {warningMessage && (
+          <p className="mt-2 text-xs text-amber-800">
+            {warningMessage}
+          </p>
+        )}
       </div>
     )
   }
