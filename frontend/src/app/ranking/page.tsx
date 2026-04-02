@@ -6,6 +6,7 @@ import { apiClient } from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
+import { useMmrVisibility } from '@/lib/mmr-visibility'
 import type { RankingItem } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
@@ -59,6 +60,8 @@ function formatLast10(value: string): string {
 
 export default function RankingPage() {
   const { isAdmin } = useAdminAuth()
+  const { mmrVisible } = useMmrVisibility()
+  const showMmr = isAdmin && mmrVisible
   const [rows, setRows] = useState<RankingItem[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
@@ -148,14 +151,14 @@ export default function RankingPage() {
               <th className="px-4 py-3">{t('ranking.table.rank')}</th>
               <th className="px-4 py-3">{t('ranking.table.nickname')}</th>
               <th className="px-4 py-3">{t('ranking.table.race')}</th>
-              {isAdmin && <th className="px-4 py-3">{t('ranking.table.currentMmr')}</th>}
+              {showMmr && <th className="px-4 py-3">{t('ranking.table.currentMmr')}</th>}
               <th className="px-4 py-3">{t('ranking.table.wins')}</th>
               <th className="px-4 py-3">{t('ranking.table.losses')}</th>
               <th className="px-4 py-3">{t('ranking.table.games')}</th>
               <th className="px-4 py-3">{t('ranking.table.winRate')}</th>
               <th className="px-4 py-3">{t('ranking.table.streak')}</th>
               <th className="px-4 py-3">{t('ranking.table.last10')}</th>
-              {isAdmin && <th className="px-4 py-3">{t('ranking.table.mmrDelta')}</th>}
+              {showMmr && <th className="px-4 py-3">{t('ranking.table.mmrDelta')}</th>}
             </tr>
           </thead>
 
@@ -163,7 +166,7 @@ export default function RankingPage() {
             {loading &&
               (
                 <tr className="border-t border-slate-100">
-                  <td className="px-4 py-3" colSpan={isAdmin ? 11 : 9}>
+                  <td className="px-4 py-3" colSpan={showMmr ? 11 : 9}>
                     <LoadingIndicator label={t('common.loading')} />
                   </td>
                 </tr>
@@ -171,7 +174,7 @@ export default function RankingPage() {
 
             {!loading && error && (
               <tr className="border-t border-slate-100">
-                <td className="px-4 py-8 text-center text-sm text-slate-500" colSpan={isAdmin ? 11 : 9}>
+                <td className="px-4 py-8 text-center text-sm text-slate-500" colSpan={showMmr ? 11 : 9}>
                   <Alert variant="destructive" appearance="light">
                     <AlertIcon icon="destructive">!</AlertIcon>
                     <AlertContent>
@@ -185,7 +188,7 @@ export default function RankingPage() {
 
             {!loading && !error && sortedRows.length === 0 && (
               <tr className="border-t border-slate-100">
-                <td className="px-4 py-8 text-center text-sm text-slate-500" colSpan={isAdmin ? 11 : 9}>
+                <td className="px-4 py-8 text-center text-sm text-slate-500" colSpan={showMmr ? 11 : 9}>
                   {t('ranking.empty')}
                 </td>
               </tr>
@@ -193,32 +196,43 @@ export default function RankingPage() {
 
             {!loading &&
               !error &&
-              sortedRows.map((row) => (
-                <tr
-                  key={`${row.rank}-${row.nickname}`}
-                  className={`border-t border-slate-100 ${getRankClass(row.rank)}`}
-                >
-                  <td className="px-4 py-3 font-semibold text-slate-900">{row.rank}</td>
-                  <td className="px-4 py-3 font-medium text-slate-900">{row.nickname}</td>
-                  <td className="px-4 py-3 text-slate-700">{row.race}</td>
-                  {isAdmin && <td className="px-4 py-3 text-slate-700">{row.currentMmr}</td>}
-                  <td className="px-4 py-3 text-slate-700">{row.wins}</td>
-                  <td className="px-4 py-3 text-slate-700">{row.losses}</td>
-                  <td className="px-4 py-3 text-slate-700">{row.games}</td>
-                  <td className="px-4 py-3 text-slate-700">{formatWinRate(row.winRate)}</td>
-                  <td className="px-4 py-3 text-slate-700">{formatStreak(row.streak)}</td>
-                  <td className="px-4 py-3 text-xs text-slate-700">{formatLast10(row.last10)}</td>
-                  {isAdmin && (
-                    <td
-                      className={`px-4 py-3 font-medium ${
-                        row.mmrDelta >= 0 ? 'text-emerald-600' : 'text-rose-600'
-                      }`}
-                    >
-                      {row.mmrDelta >= 0 ? `+${row.mmrDelta}` : row.mmrDelta}
-                    </td>
-                  )}
-                </tr>
-              ))}
+              sortedRows.map((row) => {
+                const rowMmrDelta =
+                  typeof row.mmrDelta === 'number' ? row.mmrDelta : null
+
+                return (
+                  <tr
+                    key={`${row.rank}-${row.nickname}`}
+                    className={`border-t border-slate-100 ${getRankClass(row.rank)}`}
+                  >
+                    <td className="px-4 py-3 font-semibold text-slate-900">{row.rank}</td>
+                    <td className="px-4 py-3 font-medium text-slate-900">{row.nickname}</td>
+                    <td className="px-4 py-3 text-slate-700">{row.race}</td>
+                    {showMmr && (
+                      <td className="px-4 py-3 text-slate-700">
+                        {typeof row.currentMmr === 'number' ? row.currentMmr : '-'}
+                      </td>
+                    )}
+                    <td className="px-4 py-3 text-slate-700">{row.wins}</td>
+                    <td className="px-4 py-3 text-slate-700">{row.losses}</td>
+                    <td className="px-4 py-3 text-slate-700">{row.games}</td>
+                    <td className="px-4 py-3 text-slate-700">{formatWinRate(row.winRate)}</td>
+                    <td className="px-4 py-3 text-slate-700">{formatStreak(row.streak)}</td>
+                    <td className="px-4 py-3 text-xs text-slate-700">{formatLast10(row.last10)}</td>
+                    {showMmr && rowMmrDelta !== null ? (
+                      <td
+                        className={`px-4 py-3 font-medium ${
+                          rowMmrDelta >= 0 ? 'text-emerald-600' : 'text-rose-600'
+                        }`}
+                      >
+                        {rowMmrDelta >= 0 ? `+${rowMmrDelta}` : rowMmrDelta}
+                      </td>
+                    ) : showMmr ? (
+                      <td className="px-4 py-3 text-slate-700">-</td>
+                    ) : null}
+                  </tr>
+                )
+              })}
           </tbody>
         </table>
       </div>

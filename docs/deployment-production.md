@@ -1,4 +1,6 @@
-﻿# Hei (Balancify) Production Deployment Guide
+# Hei (Balancify) Production Deployment Guide
+
+> 참고: 현재 Hei`Fam 운영 배포(Frontend=Vercel, Backend=Render)는 `docs/deployment-vercel-render-supabase.md`를 우선 기준으로 사용하세요.
 
 ## A. Server and Domain Preparation
 - Target deployment: single Linux server
@@ -32,7 +34,8 @@ GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 NEXTAUTH_SECRET=replace-with-32-char-random-string
 NEXTAUTH_URL=https://hei.heifam.com
-NEXT_PUBLIC_ADMIN_EMAILS=admin1@example.com,admin2@example.com
+ALLOWED_SIGNIN_EMAILS=member1@example.com,member2@example.com
+ALLOWED_SIGNIN_DOMAINS=
 ```
 
 ## C. Database Startup
@@ -146,4 +149,5 @@ journalctl -u balancify-frontend -f
 - [ ] Admin email accounts can use protected actions
 - [ ] Non-admin users are blocked (403) for admin-only APIs
 - [ ] Ranking/balance/import/result flows all respond normally
+
 

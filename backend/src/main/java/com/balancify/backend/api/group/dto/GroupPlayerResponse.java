@@ -1,5 +1,8 @@
 package com.balancify.backend.api.group.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record GroupPlayerResponse(
     Long id,
     String nickname,
@@ -7,7 +10,7 @@ public record GroupPlayerResponse(
     String tier,
     Integer baseMmr,
     String baseTier,
-    int currentMmr,
+    Integer currentMmr,
     int wins,
     int losses,
     int games

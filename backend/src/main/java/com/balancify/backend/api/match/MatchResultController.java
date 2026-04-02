@@ -1,13 +1,17 @@
 package com.balancify.backend.api.match;
 
+import com.balancify.backend.api.MmrMaskingMapper;
 import com.balancify.backend.api.match.dto.MatchResultRequest;
 import com.balancify.backend.api.match.dto.MatchResultResponse;
+import com.balancify.backend.security.AdminRequestResolver;
 import com.balancify.backend.service.MatchResultService;
+import com.balancify.backend.service.exception.MatchConflictException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.NoSuchElementException;
 import org.springframework.http.HttpStatus;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,9 +29,14 @@ public class MatchResultController {
     private static final String USER_NICKNAME_HEADER = "X-USER-NICKNAME";
 
     private final MatchResultService matchResultService;
+    private final AdminRequestResolver adminRequestResolver;
 
-    public MatchResultController(MatchResultService matchResultService) {
+    public MatchResultController(
+        MatchResultService matchResultService,
+        AdminRequestResolver adminRequestResolver
+    ) {
         this.matchResultService = matchResultService;
+        this.adminRequestResolver = adminRequestResolver;
     }
 
     @PostMapping("/{id}/result")
@@ -37,12 +46,20 @@ public class MatchResultController {
         HttpServletRequest httpRequest
     ) {
         try {
-            return matchResultService.processMatchResult(
+            MatchResultResponse response = matchResultService.processMatchResult(
                 matchId,
                 request,
                 extractRequestEmail(httpRequest),
-                extractRequestNickname(httpRequest)
+                extractRequestNickname(httpRequest),
+                false
             );
+            if (adminRequestResolver.isAdminRequest(httpRequest)) {
+                return response;
+            }
+
+            return MmrMaskingMapper.maskMatchResult(response);
+        } catch (MatchConflictException | ObjectOptimisticLockingFailureException exception) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, exception.getMessage());
         } catch (NoSuchElementException exception) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, exception.getMessage());
         } catch (IllegalArgumentException exception) {
@@ -57,12 +74,20 @@ public class MatchResultController {
         HttpServletRequest httpRequest
     ) {
         try {
-            return matchResultService.processMatchResult(
+            MatchResultResponse response = matchResultService.processMatchResult(
                 matchId,
                 request,
                 extractRequestEmail(httpRequest),
-                extractRequestNickname(httpRequest)
+                extractRequestNickname(httpRequest),
+                true
             );
+            if (adminRequestResolver.isAdminRequest(httpRequest)) {
+                return response;
+            }
+
+            return MmrMaskingMapper.maskMatchResult(response);
+        } catch (MatchConflictException | ObjectOptimisticLockingFailureException exception) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, exception.getMessage());
         } catch (NoSuchElementException exception) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, exception.getMessage());
         } catch (IllegalArgumentException exception) {

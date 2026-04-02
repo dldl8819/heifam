@@ -7,6 +7,7 @@ import { apiClient } from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
+import { useMmrVisibility } from '@/lib/mmr-visibility'
 import type { GroupDashboardResponse } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
@@ -27,6 +28,8 @@ function formatDateTime(value: string): string {
 
 export default function DashboardPage() {
   const { isAdmin } = useAdminAuth()
+  const { mmrVisible } = useMmrVisibility()
+  const showMmr = isAdmin && mmrVisible
   const [dashboard, setDashboard] = useState<GroupDashboardResponse | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
@@ -85,7 +88,7 @@ export default function DashboardPage() {
         </Alert>
       )}
 
-      <section className={`grid gap-4 sm:grid-cols-2 ${isAdmin ? 'xl:grid-cols-4' : 'xl:grid-cols-2'}`}>
+      <section className={`grid gap-4 sm:grid-cols-2 ${showMmr ? 'xl:grid-cols-4' : 'xl:grid-cols-2'}`}>
         <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-xs tracking-wide text-slate-500">{t('dashboard.kpi.totalPlayers')}</p>
           <p className="mt-2 text-2xl font-semibold text-slate-900">
@@ -93,7 +96,7 @@ export default function DashboardPage() {
           </p>
         </article>
 
-        {isAdmin && (
+        {showMmr && (
           <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-xs tracking-wide text-slate-500">{t('dashboard.kpi.topMmr')}</p>
             <p className="mt-2 text-2xl font-semibold text-slate-900">
@@ -102,7 +105,7 @@ export default function DashboardPage() {
           </article>
         )}
 
-        {isAdmin && (
+        {showMmr && (
           <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-xs tracking-wide text-slate-500">{t('dashboard.kpi.averageMmr')}</p>
             <p className="mt-2 text-2xl font-semibold text-slate-900">
@@ -138,7 +141,7 @@ export default function DashboardPage() {
                   <th className="px-3 py-2">{t('dashboard.topPreview.headers.rank')}</th>
                   <th className="px-3 py-2">{t('dashboard.topPreview.headers.nickname')}</th>
                   <th className="px-3 py-2">{t('dashboard.topPreview.headers.race')}</th>
-                  {isAdmin && <th className="px-3 py-2">{t('dashboard.topPreview.headers.mmr')}</th>}
+                  {showMmr && <th className="px-3 py-2">{t('dashboard.topPreview.headers.mmr')}</th>}
                   <th className="px-3 py-2">{t('dashboard.topPreview.headers.winRate')}</th>
                 </tr>
               </thead>
@@ -146,7 +149,7 @@ export default function DashboardPage() {
                 {loading &&
                   (
                     <tr className="border-t border-slate-100">
-                      <td className="px-3 py-3" colSpan={isAdmin ? 5 : 4}>
+                      <td className="px-3 py-3" colSpan={showMmr ? 5 : 4}>
                         <LoadingIndicator label={t('common.loading')} />
                       </td>
                     </tr>
@@ -158,14 +161,14 @@ export default function DashboardPage() {
                       <td className="px-3 py-2 font-semibold text-slate-900">{row.rank}</td>
                       <td className="px-3 py-2 text-slate-800">{row.nickname}</td>
                       <td className="px-3 py-2 text-slate-700">{row.race}</td>
-                      {isAdmin && <td className="px-3 py-2 text-slate-700">{row.currentMmr}</td>}
+                      {showMmr && <td className="px-3 py-2 text-slate-700">{row.currentMmr}</td>}
                       <td className="px-3 py-2 text-slate-700">{formatWinRate(row.winRate)}</td>
                     </tr>
                   ))}
 
                 {!loading && (dashboard?.topRankingPreview.length ?? 0) === 0 && (
                   <tr className="border-t border-slate-100">
-                    <td className="px-3 py-8 text-center text-sm text-slate-500" colSpan={isAdmin ? 5 : 4}>
+                    <td className="px-3 py-8 text-center text-sm text-slate-500" colSpan={showMmr ? 5 : 4}>
                       {t('dashboard.topPreview.empty')}
                     </td>
                   </tr>
@@ -230,14 +233,14 @@ export default function DashboardPage() {
                     {dashboard.recentBalancePreview.homeTeam.map((player) => (
                       <li
                         key={`dashboard-home-${player.nickname}`}
-                        className={`text-sm text-slate-700 ${isAdmin ? 'flex items-center justify-between' : ''}`}
+                        className={`text-sm text-slate-700 ${showMmr ? 'flex items-center justify-between' : ''}`}
                       >
                         <span>{player.nickname}</span>
-                        {isAdmin && <span>{player.mmr}</span>}
+                        {showMmr && <span>{player.mmr}</span>}
                       </li>
                     ))}
                   </ul>
-                  {isAdmin && (
+                  {showMmr && (
                     <p className="mt-2 text-xs text-slate-500">
                       {t('dashboard.recentBalance.homeMmr')}:{' '}
                       <span className="font-semibold text-slate-700">
@@ -255,14 +258,14 @@ export default function DashboardPage() {
                     {dashboard.recentBalancePreview.awayTeam.map((player) => (
                       <li
                         key={`dashboard-away-${player.nickname}`}
-                        className={`text-sm text-slate-700 ${isAdmin ? 'flex items-center justify-between' : ''}`}
+                        className={`text-sm text-slate-700 ${showMmr ? 'flex items-center justify-between' : ''}`}
                       >
                         <span>{player.nickname}</span>
-                        {isAdmin && <span>{player.mmr}</span>}
+                        {showMmr && <span>{player.mmr}</span>}
                       </li>
                     ))}
                   </ul>
-                  {isAdmin && (
+                  {showMmr && (
                     <p className="mt-2 text-xs text-slate-500">
                       {t('dashboard.recentBalance.awayMmr')}:{' '}
                       <span className="font-semibold text-slate-700">
@@ -273,14 +276,14 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className={`mt-3 grid gap-2 ${isAdmin ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+              <div className={`mt-3 grid gap-2 ${showMmr ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
                 <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
                   {t('dashboard.recentBalance.matchId')}:{' '}
                   <span className="font-semibold">
                     {dashboard.recentBalancePreview.matchId}
                   </span>
                 </div>
-                {isAdmin && (
+                {showMmr && (
                   <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
                     {t('dashboard.recentBalance.mmrDiff')}:{' '}
                     <span className="font-semibold">

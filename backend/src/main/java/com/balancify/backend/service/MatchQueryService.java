@@ -79,6 +79,7 @@ public class MatchQueryService {
             responses.add(new GroupRecentMatchResponse(
                 match.getId(),
                 match.getPlayedAt(),
+                normalizeStatus(match.getStatus()),
                 normalizeWinningTeam(match.getWinningTeam()),
                 match.getResultRecordedAt(),
                 match.getResultRecordedByNickname(),
@@ -122,6 +123,13 @@ public class MatchQueryService {
             case "HOME", "AWAY" -> normalized;
             default -> null;
         };
+    }
+
+    private String normalizeStatus(Enum<?> status) {
+        if (status == null) {
+            return "UNKNOWN";
+        }
+        return status.name();
     }
 
     private int safeInt(Integer value) {

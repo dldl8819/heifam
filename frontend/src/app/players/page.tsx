@@ -6,6 +6,7 @@ import { apiClient, isApiForbiddenError, isApiNotFoundError, isApiUnauthorizedEr
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
+import { useMmrVisibility } from '@/lib/mmr-visibility'
 import type { PlayerRace, PlayerRosterItem, PlayerTierStatus } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
@@ -62,7 +63,10 @@ function escapeCsvCell(value: string): string {
   return `"${value.replace(/"/g, '""')}"`
 }
 
-function formatMmrValue(value: number): string {
+function formatMmrValue(value: number | undefined): string {
+  if (typeof value !== 'number') {
+    return '-'
+  }
   return value === 0 ? 'None' : String(value)
 }
 
@@ -209,6 +213,8 @@ function getTierBadgeClass(tier: PlayerTierStatus): string {
 
 export default function PlayersPage() {
   const { isAdmin, isSuperAdmin } = useAdminAuth()
+  const { mmrVisible } = useMmrVisibility()
+  const showMmrColumn = isAdmin && mmrVisible
   const [rows, setRows] = useState<PlayerRosterItem[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
@@ -241,8 +247,12 @@ export default function PlayersPage() {
           if (b.games !== a.games) {
             return b.games - a.games
           }
-          if (b.currentMmr !== a.currentMmr) {
-            return b.currentMmr - a.currentMmr
+          if (showMmrColumn) {
+            const aMmr = typeof a.currentMmr === 'number' ? a.currentMmr : -1
+            const bMmr = typeof b.currentMmr === 'number' ? b.currentMmr : -1
+            if (bMmr !== aMmr) {
+              return bMmr - aMmr
+            }
           }
           return a.nickname.localeCompare(b.nickname, 'ko-KR')
         })
@@ -253,7 +263,7 @@ export default function PlayersPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [showMmrColumn])
 
   useEffect(() => {
     void fetchRoster()
@@ -306,7 +316,9 @@ export default function PlayersPage() {
     setEditingPlayerId(player.id)
     setEditingNickname(player.nickname)
     setEditingRace(player.race)
-    setEditingInlineMmrValue(String(player.currentMmr))
+    setEditingInlineMmrValue(
+      typeof player.currentMmr === 'number' ? String(player.currentMmr) : ''
+    )
     setPlayerActionError(null)
     setPlayerActionSuccess(null)
   }
@@ -361,7 +373,8 @@ export default function PlayersPage() {
         race: editingRace,
       })
 
-      if (isSuperAdmin && nextMmr !== null && nextMmr !== targetRow.currentMmr) {
+      const targetMmr = typeof targetRow.currentMmr === 'number' ? targetRow.currentMmr : null
+      if (isSuperAdmin && nextMmr !== null && nextMmr !== targetMmr) {
         await apiClient.updateGroupPlayerMmr(TEMP_GROUP_ID, playerId, {
           mmr: nextMmr,
         })
@@ -397,7 +410,7 @@ export default function PlayersPage() {
     setEditingNickname('')
     setEditingRace('P')
     setEditingMmrPlayerId(player.id)
-    setEditingMmrValue(String(player.currentMmr))
+    setEditingMmrValue(typeof player.currentMmr === 'number' ? String(player.currentMmr) : '')
     setPlayerActionError(null)
     setPlayerActionSuccess(null)
   }
@@ -499,7 +512,6 @@ export default function PlayersPage() {
     })
   }, [raceFilter, rows, search])
 
-  const showMmrColumn = isAdmin
   const showActionsColumn = isAdmin
   const tierChangeTargets = useMemo<TierChangeTarget[]>(
     () =>
@@ -518,7 +530,7 @@ export default function PlayersPage() {
             baseTier: row.baseTier,
             currentTier: row.tier,
             baseMmr: row.baseMmr,
-            currentMmr: row.currentMmr,
+            currentMmr: row.currentMmr ?? 0,
           }]
         })
         .sort((a, b) => {
@@ -701,12 +713,14 @@ export default function PlayersPage() {
                     <div className="mt-0.5 text-xs text-slate-700">
                       {t('players.tierChange.fromTo', { from: fromTierLabel, to: toTierLabel })}
                     </div>
-                    <div className="mt-0.5 text-xs text-slate-600">
-                      {t('players.tierChange.mmrFlow', {
-                        from: formatMmrValue(target.baseMmr),
-                        to: formatMmrValue(target.currentMmr),
-                      })}
-                    </div>
+                    {showMmrColumn && (
+                      <div className="mt-0.5 text-xs text-slate-600">
+                        {t('players.tierChange.mmrFlow', {
+                          from: formatMmrValue(target.baseMmr),
+                          to: formatMmrValue(target.currentMmr),
+                        })}
+                      </div>
+                    )}
                   </li>
                 )
               })}
@@ -906,6 +920,7 @@ export default function PlayersPage() {
                           )}
 
                           {isSuperAdmin &&
+                            showMmrColumn &&
                             !isEditing &&
                             (isMmrEditing ? (
                               <>

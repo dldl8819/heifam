@@ -12,12 +12,14 @@ import com.balancify.backend.api.match.dto.MatchResultResponse;
 import com.balancify.backend.domain.Group;
 import com.balancify.backend.domain.Match;
 import com.balancify.backend.domain.MatchParticipant;
+import com.balancify.backend.domain.MatchStatus;
 import com.balancify.backend.domain.MmrHistory;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.MatchParticipantRepository;
 import com.balancify.backend.repository.MatchRepository;
 import com.balancify.backend.repository.MmrHistoryRepository;
 import com.balancify.backend.repository.PlayerRepository;
+import com.balancify.backend.service.exception.MatchConflictException;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,10 +65,11 @@ class MatchResultServiceTest {
     void processesResultAndUpdatesMmrForAllParticipants() {
         Match match = new Match();
         match.setId(1L);
+        match.setStatus(MatchStatus.CONFIRMED);
 
         List<MatchParticipant> participants = buildParticipants(match);
 
-        when(matchRepository.findById(1L)).thenReturn(Optional.of(match));
+        when(matchRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(match));
         when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(1L)).thenReturn(participants);
         when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(playerRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -117,6 +120,7 @@ class MatchResultServiceTest {
             assertThat(history.getPlayer()).isNotNull();
             assertThat(history.getBeforeMmr()).isNotNull();
             assertThat(history.getAfterMmr()).isNotNull();
+            assertThat(history.getDelta()).isNotNull();
         });
     }
 
@@ -124,8 +128,9 @@ class MatchResultServiceTest {
     void throwsWhenWinnerTeamIsInvalid() {
         Match match = new Match();
         match.setId(1L);
+        match.setStatus(MatchStatus.CONFIRMED);
 
-        when(matchRepository.findById(1L)).thenReturn(Optional.of(match));
+        when(matchRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(match));
 
         assertThatThrownBy(() -> matchResultService.processMatchResult(1L, new MatchResultRequest("BLUE")))
             .isInstanceOf(IllegalArgumentException.class)
@@ -136,70 +141,25 @@ class MatchResultServiceTest {
     }
 
     @Test
-    void allowsReprocessingWhenMatchAlreadyHasResult() {
+    void rejectsSecondSubmissionWhenMatchAlreadyCompleted() {
         Match match = new Match();
         match.setId(1L);
+        match.setStatus(MatchStatus.COMPLETED);
         match.setWinningTeam("HOME");
+        when(matchRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(match));
 
-        Group group = new Group();
-        group.setId(1L);
-
-        List<MatchParticipant> participants = List.of(
-            participant(11L, match, player(1L, group, "H1", 1013), "HOME"),
-            participant(12L, match, player(2L, group, "H2", 1013), "HOME"),
-            participant(13L, match, player(3L, group, "H3", 1013), "HOME"),
-            participant(14L, match, player(4L, group, "A1", 987), "AWAY"),
-            participant(15L, match, player(5L, group, "A2", 987), "AWAY"),
-            participant(16L, match, player(6L, group, "A3", 987), "AWAY")
-        );
-        participants.stream()
-            .filter(participant -> "HOME".equals(participant.getTeam()))
-            .forEach(participant -> {
-                participant.setMmrBefore(1000);
-                participant.setMmrAfter(1013);
-                participant.setMmrDelta(13);
-            });
-        participants.stream()
-            .filter(participant -> "AWAY".equals(participant.getTeam()))
-            .forEach(participant -> {
-                participant.setMmrBefore(1000);
-                participant.setMmrAfter(987);
-                participant.setMmrDelta(-13);
-            });
-
-        List<MmrHistory> histories = participants.stream().map(participant -> {
-            MmrHistory history = new MmrHistory();
-            history.setMatch(match);
-            history.setPlayer(participant.getPlayer());
-            history.setBeforeMmr(1000);
-            history.setAfterMmr(participant.getMmrAfter());
-            return history;
-        }).toList();
-
-        when(matchRepository.findById(1L)).thenReturn(Optional.of(match));
-        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(1L)).thenReturn(participants);
-        when(mmrHistoryRepository.findByMatch_Id(1L)).thenReturn(histories);
-        when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(playerRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(mmrHistoryRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        MatchResultResponse response = matchResultService.processMatchResult(1L, new MatchResultRequest("AWAY"));
-
-        assertThat(response.winnerTeam()).isEqualTo("AWAY");
-        assertThat(match.getWinningTeam()).isEqualTo("AWAY");
-        participants.stream()
-            .filter(participant -> "HOME".equals(participant.getTeam()))
-            .forEach(participant -> assertThat(participant.getPlayer().getMmr()).isEqualTo(984));
-        participants.stream()
-            .filter(participant -> "AWAY".equals(participant.getTeam()))
-            .forEach(participant -> assertThat(participant.getPlayer().getMmr()).isEqualTo(1016));
+        assertThatThrownBy(() ->
+            matchResultService.processMatchResult(1L, new MatchResultRequest("AWAY"))
+        )
+            .isInstanceOf(MatchConflictException.class)
+            .hasMessage("이미 결과가 확정된 경기입니다.");
     }
 
     @Test
     void reducesKFactorWhenLowTierPlayerIsIncluded() {
         Match match = new Match();
         match.setId(2L);
+        match.setStatus(MatchStatus.CONFIRMED);
 
         Group group = new Group();
         group.setId(1L);
@@ -213,7 +173,7 @@ class MatchResultServiceTest {
             participant(26L, match, player(16L, group, "A3", 1000, "A"), "AWAY")
         );
 
-        when(matchRepository.findById(2L)).thenReturn(Optional.of(match));
+        when(matchRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(match));
         when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(2L)).thenReturn(participants);
         when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(playerRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -270,6 +230,7 @@ class MatchResultServiceTest {
     void reducesKFactorWhenMmrGapIsVeryLarge() {
         Match match = new Match();
         match.setId(3L);
+        match.setStatus(MatchStatus.CONFIRMED);
 
         Group group = new Group();
         group.setId(1L);
@@ -283,7 +244,7 @@ class MatchResultServiceTest {
             participant(36L, match, player(26L, group, "A3", 700, "B"), "AWAY")
         );
 
-        when(matchRepository.findById(3L)).thenReturn(Optional.of(match));
+        when(matchRepository.findByIdForUpdate(3L)).thenReturn(Optional.of(match));
         when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(3L)).thenReturn(participants);
         when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(playerRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));

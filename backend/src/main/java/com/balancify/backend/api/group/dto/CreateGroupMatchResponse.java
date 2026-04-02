@@ -1,6 +1,8 @@
 package com.balancify.backend.api.group.dto;
 
 public record CreateGroupMatchResponse(
-    Long matchId
+    Long matchId,
+    String confirmationStatus,
+    String message
 ) {
 }

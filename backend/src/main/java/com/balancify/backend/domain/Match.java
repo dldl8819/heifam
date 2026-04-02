@@ -2,13 +2,18 @@ package com.balancify.backend.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.OffsetDateTime;
 
 @Entity
@@ -28,6 +33,29 @@ public class Match {
 
     @Column(length = 20)
     private String winningTeam;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private MatchStatus status = MatchStatus.DRAFT;
+
+    @Column(name = "team_size", nullable = false)
+    private Integer teamSize = 3;
+
+    @Version
+    @Column(nullable = false)
+    private Long version = 0L;
+
+    @Column(name = "participant_signature", length = 255)
+    private String participantSignature;
+
+    @Column(name = "team_signature", length = 255)
+    private String teamSignature;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private OffsetDateTime createdAt = OffsetDateTime.now();
+
+    @Column(name = "updated_at", nullable = false)
+    private OffsetDateTime updatedAt = OffsetDateTime.now();
 
     @Column
     private OffsetDateTime resultRecordedAt;
@@ -70,6 +98,62 @@ public class Match {
         this.winningTeam = winningTeam;
     }
 
+    public MatchStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(MatchStatus status) {
+        this.status = status;
+    }
+
+    public Integer getTeamSize() {
+        return teamSize;
+    }
+
+    public void setTeamSize(Integer teamSize) {
+        this.teamSize = teamSize;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
+    }
+
+    public String getParticipantSignature() {
+        return participantSignature;
+    }
+
+    public void setParticipantSignature(String participantSignature) {
+        this.participantSignature = participantSignature;
+    }
+
+    public String getTeamSignature() {
+        return teamSignature;
+    }
+
+    public void setTeamSignature(String teamSignature) {
+        this.teamSignature = teamSignature;
+    }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(OffsetDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public OffsetDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(OffsetDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
     public OffsetDateTime getResultRecordedAt() {
         return resultRecordedAt;
     }
@@ -92,5 +176,31 @@ public class Match {
 
     public void setResultRecordedByNickname(String resultRecordedByNickname) {
         this.resultRecordedByNickname = resultRecordedByNickname;
+    }
+
+    @PrePersist
+    private void prePersist() {
+        OffsetDateTime now = OffsetDateTime.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        updatedAt = now;
+        if (status == null) {
+            status = MatchStatus.DRAFT;
+        }
+        if (teamSize == null || teamSize <= 0) {
+            teamSize = 3;
+        }
+    }
+
+    @PreUpdate
+    private void preUpdate() {
+        updatedAt = OffsetDateTime.now();
+        if (status == null) {
+            status = MatchStatus.DRAFT;
+        }
+        if (teamSize == null || teamSize <= 0) {
+            teamSize = 3;
+        }
     }
 }

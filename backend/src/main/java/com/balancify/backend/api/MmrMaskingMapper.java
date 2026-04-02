@@ -11,6 +11,8 @@ import com.balancify.backend.api.group.dto.GroupRecentMatchResponse;
 import com.balancify.backend.api.group.dto.RankingItemResponse;
 import com.balancify.backend.api.match.dto.BalancePlayerDto;
 import com.balancify.backend.api.match.dto.BalanceResponse;
+import com.balancify.backend.api.match.dto.MatchResultParticipantResponse;
+import com.balancify.backend.api.match.dto.MatchResultResponse;
 import com.balancify.backend.api.match.dto.MultiBalanceMatchResponse;
 import com.balancify.backend.api.match.dto.MultiBalanceResponse;
 import java.util.List;
@@ -29,9 +31,9 @@ public final class MmrMaskingMapper {
                     response.nickname(),
                     response.race(),
                     response.tier(),
-                    0,
+                    null,
                     response.tier(),
-                    0,
+                    null,
                     response.wins(),
                     response.losses(),
                     response.games()
@@ -48,14 +50,14 @@ public final class MmrMaskingMapper {
                     response.rank(),
                     response.nickname(),
                     response.race(),
-                    0,
+                    null,
                     response.wins(),
                     response.losses(),
                     response.games(),
                     response.winRate(),
                     response.streak(),
                     response.last10(),
-                    0
+                    null
                 )
             )
             .toList();
@@ -125,14 +127,15 @@ public final class MmrMaskingMapper {
                 new GroupRecentMatchResponse(
                     response.matchId(),
                     response.playedAt(),
+                    response.status(),
                     response.winningTeam(),
                     response.resultRecordedAt(),
                     response.resultRecordedByNickname(),
                     maskRecentMatchPlayers(response.homeTeam()),
                     maskRecentMatchPlayers(response.awayTeam()),
-                    0,
-                    0,
-                    0
+                    null,
+                    null,
+                    null
                 )
             )
             .toList();
@@ -143,10 +146,10 @@ public final class MmrMaskingMapper {
             response.teamSize(),
             maskBalancePlayers(response.homeTeam()),
             maskBalancePlayers(response.awayTeam()),
-            0,
-            0,
-            0,
-            response.expectedHomeWinRate()
+            null,
+            null,
+            null,
+            null
         );
     }
 
@@ -161,10 +164,10 @@ public final class MmrMaskingMapper {
                     match.teamSize(),
                     maskBalancePlayers(match.homeTeam()),
                     maskBalancePlayers(match.awayTeam()),
-                    0,
-                    0,
-                    0,
-                    match.expectedHomeWinRate(),
+                    null,
+                    null,
+                    null,
+                    null,
                     match.raceSummary(),
                     match.penaltySummary()
                 )
@@ -181,6 +184,30 @@ public final class MmrMaskingMapper {
         );
     }
 
+    public static MatchResultResponse maskMatchResult(MatchResultResponse response) {
+        List<MatchResultParticipantResponse> maskedParticipants = response
+            .participants()
+            .stream()
+            .map(participant -> new MatchResultParticipantResponse(
+                participant.playerId(),
+                participant.nickname(),
+                participant.team(),
+                null,
+                null,
+                null
+            ))
+            .toList();
+
+        return new MatchResultResponse(
+            response.matchId(),
+            response.winnerTeam(),
+            response.kFactor(),
+            null,
+            null,
+            maskedParticipants
+        );
+    }
+
     private static List<GroupRecentMatchPlayerResponse> maskRecentMatchPlayers(
         List<GroupRecentMatchPlayerResponse> players
     ) {
@@ -191,7 +218,7 @@ public final class MmrMaskingMapper {
                     player.playerId(),
                     player.nickname(),
                     player.team(),
-                    0
+                    null
                 )
             )
             .toList();
@@ -200,7 +227,7 @@ public final class MmrMaskingMapper {
     private static List<BalancePlayerDto> maskBalancePlayers(List<BalancePlayerDto> players) {
         return players
             .stream()
-            .map(player -> new BalancePlayerDto(player.playerId(), player.name(), 0))
+            .map(player -> new BalancePlayerDto(player.playerId(), player.name(), null))
             .toList();
     }
 }

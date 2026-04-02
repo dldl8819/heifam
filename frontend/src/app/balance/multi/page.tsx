@@ -6,6 +6,7 @@ import { apiClient } from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
+import { useMmrVisibility } from '@/lib/mmr-visibility'
 import {
   buildMultiBalanceRequestPayload,
   DEFAULT_MULTI_BALANCE_MODE,
@@ -28,11 +29,19 @@ function formatPercent(value: number): string {
 }
 
 function buildPlayerLine(player: BalancePlayerInput, showMmr: boolean): string {
-  return showMmr ? `${player.name} (${player.mmr} MMR)` : player.name
+  if (!showMmr) {
+    return player.name
+  }
+
+  return typeof player.mmr === 'number'
+    ? `${player.name} (${player.mmr} MMR)`
+    : player.name
 }
 
 export default function MultiBalancePage() {
   const { isAdmin } = useAdminAuth()
+  const { mmrVisible } = useMmrVisibility()
+  const showMmr = isAdmin && mmrVisible
   const [players, setPlayers] = useState<BalancePlayerOption[]>([])
   const [playersLoading, setPlayersLoading] = useState<boolean>(true)
   const [playersError, setPlayersError] = useState<string | null>(null)
@@ -64,11 +73,19 @@ export default function MultiBalancePage() {
             currentMmr: player.currentMmr,
             tier: player.tier,
           }))
-          .sort((a, b) =>
-            isAdmin
-              ? b.currentMmr - a.currentMmr
-              : a.nickname.localeCompare(b.nickname, 'ko-KR')
-          )
+          .sort((a, b) => {
+            if (!showMmr) {
+              return a.nickname.localeCompare(b.nickname, 'ko-KR')
+            }
+
+            const aMmr = typeof a.currentMmr === 'number' ? a.currentMmr : -1
+            const bMmr = typeof b.currentMmr === 'number' ? b.currentMmr : -1
+            if (bMmr !== aMmr) {
+              return bMmr - aMmr
+            }
+
+            return a.nickname.localeCompare(b.nickname, 'ko-KR')
+          })
 
         setPlayers(mappedPlayers)
       } catch {
@@ -89,7 +106,7 @@ export default function MultiBalancePage() {
     return () => {
       active = false
     }
-  }, [isAdmin])
+  }, [showMmr])
 
   const filteredPlayers = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase()
@@ -107,7 +124,10 @@ export default function MultiBalancePage() {
     [players, selectedIds],
   )
 
-  const selectedTotalMmr = selectedPlayers.reduce((sum, player) => sum + player.currentMmr, 0)
+  const selectedTotalMmr = selectedPlayers.reduce(
+    (sum, player) => sum + (typeof player.currentMmr === 'number' ? player.currentMmr : 0),
+    0
+  )
   const canSubmit = selectedIds.length >= 4 && !submitting && !playersLoading
 
   const validationMessage =
@@ -224,7 +244,9 @@ export default function MultiBalancePage() {
                     <span className="font-medium">
                       {player.nickname} ({player.race})
                     </span>
-                    <span className="text-xs">{isAdmin ? player.currentMmr : '-'}</span>
+                    <span className="text-xs">
+                      {showMmr && typeof player.currentMmr === 'number' ? player.currentMmr : '-'}
+                    </span>
                   </button>
                 )
               })}
@@ -245,7 +267,7 @@ export default function MultiBalancePage() {
 
           <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
             {t('multiBalance.summary.totalMmr')}:{' '}
-            <span className="font-semibold">{isAdmin ? selectedTotalMmr : '-'}</span>
+            <span className="font-semibold">{showMmr ? selectedTotalMmr : '-'}</span>
           </div>
 
           <div className="mt-4 space-y-2">
@@ -372,7 +394,7 @@ export default function MultiBalancePage() {
                           key={`multi-home-${match.matchNumber}-${player.name}`}
                           className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800"
                         >
-                          {buildPlayerLine(player, isAdmin)}
+                          {buildPlayerLine(player, showMmr)}
                         </li>
                       ))}
                     </ul>
@@ -386,7 +408,7 @@ export default function MultiBalancePage() {
                           key={`multi-away-${match.matchNumber}-${player.name}`}
                           className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800"
                         >
-                          {buildPlayerLine(player, isAdmin)}
+                          {buildPlayerLine(player, showMmr)}
                         </li>
                       ))}
                     </ul>
@@ -395,17 +417,30 @@ export default function MultiBalancePage() {
 
                 <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                   <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                    {t('multiBalance.result.homeMmr')}: <span className="font-semibold">{isAdmin ? match.homeMmr : '-'}</span>
+                    {t('multiBalance.result.homeMmr')}:{' '}
+                    <span className="font-semibold">
+                      {showMmr && typeof match.homeMmr === 'number' ? match.homeMmr : '-'}
+                    </span>
                   </div>
                   <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                    {t('multiBalance.result.awayMmr')}: <span className="font-semibold">{isAdmin ? match.awayMmr : '-'}</span>
+                    {t('multiBalance.result.awayMmr')}:{' '}
+                    <span className="font-semibold">
+                      {showMmr && typeof match.awayMmr === 'number' ? match.awayMmr : '-'}
+                    </span>
                   </div>
                   <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                    {t('multiBalance.result.mmrDiff')}: <span className="font-semibold">{isAdmin ? match.mmrDiff : '-'}</span>
+                    {t('multiBalance.result.mmrDiff')}:{' '}
+                    <span className="font-semibold">
+                      {showMmr && typeof match.mmrDiff === 'number' ? match.mmrDiff : '-'}
+                    </span>
                   </div>
                   <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
                     {t('multiBalance.result.expectedHomeWinRate')}:{' '}
-                    <span className="font-semibold">{isAdmin ? formatPercent(match.expectedHomeWinRate) : '-'}</span>
+                    <span className="font-semibold">
+                      {showMmr && typeof match.expectedHomeWinRate === 'number'
+                        ? formatPercent(match.expectedHomeWinRate)
+                        : '-'}
+                    </span>
                   </div>
                 </div>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">

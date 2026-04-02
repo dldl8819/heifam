@@ -4,6 +4,7 @@ import type {
   AccessMeResponse,
   BalanceRequest,
   BalanceResponse,
+  CreateGroupMatchResponse,
   CaptainDraftCreateRequest,
   CaptainDraftEntriesUpdateRequest,
   CaptainDraftPickRequest,
@@ -159,11 +160,9 @@ function buildHeaders(
   const headers = new Headers(init?.headers)
   headers.set('Content-Type', 'application/json')
 
-  if (options?.adminOnly) {
-    const adminKey = getStoredAdminApiKey()
-    if (adminKey.length > 0) {
-      headers.set('X-ADMIN-KEY', adminKey)
-    }
+  const adminKey = getStoredAdminApiKey()
+  if (adminKey.length > 0) {
+    headers.set('X-ADMIN-KEY', adminKey)
   }
 
   if (userEmail.length > 0) {
@@ -362,7 +361,7 @@ function normalizeRecentMatchPlayer(value: unknown) {
   const playerId = toNumber(source.playerId)
   const nickname = typeof source.nickname === 'string' ? source.nickname : null
   const mmr = toNumber(source.mmr)
-  if (playerId === null || nickname === null || mmr === null) {
+  if (playerId === null || nickname === null) {
     return null
   }
 
@@ -370,7 +369,7 @@ function normalizeRecentMatchPlayer(value: unknown) {
     playerId,
     nickname,
     team: normalizeMatchTeam(source.team),
-    mmr,
+    mmr: mmr ?? undefined,
   }
 }
 
@@ -399,27 +398,22 @@ function normalizeRecentMatchItem(value: unknown): RecentMatchItem | null {
         .filter((item): item is NonNullable<ReturnType<typeof normalizeRecentMatchPlayer>> => item !== null)
     : []
 
-  if (
-    matchId === null ||
-    playedAt === null ||
-    homeMmr === null ||
-    awayMmr === null ||
-    mmrDiff === null
-  ) {
+  if (matchId === null || playedAt === null) {
     return null
   }
 
   return {
     matchId,
     playedAt,
+    status: typeof source.status === 'string' ? source.status : null,
     winningTeam: normalizeWinnerTeam(source.winningTeam),
     resultRecordedAt,
     resultRecordedByNickname,
     homeTeam,
     awayTeam,
-    homeMmr,
-    awayMmr,
-    mmrDiff,
+    homeMmr: homeMmr ?? undefined,
+    awayMmr: awayMmr ?? undefined,
+    mmrDiff: mmrDiff ?? undefined,
   }
 }
 
@@ -443,7 +437,7 @@ function normalizePlayerRosterItem(value: unknown): PlayerRosterItem | null {
   const losses = toNumber(source.losses) ?? 0
   const games = toNumber(source.games) ?? wins + losses
 
-  if (id === null || nickname === null || currentMmr === null) {
+  if (id === null || nickname === null) {
     return null
   }
 
@@ -454,7 +448,7 @@ function normalizePlayerRosterItem(value: unknown): PlayerRosterItem | null {
     tier: normalizeTier(source.tier) ?? 'UNASSIGNED',
     baseMmr: baseMmr ?? undefined,
     baseTier: baseTier ?? undefined,
-    currentMmr,
+    currentMmr: currentMmr ?? undefined,
     wins,
     losses,
     games,
@@ -491,7 +485,7 @@ export const apiClient = {
     groupId: number,
     payload: { homePlayerIds: number[]; awayPlayerIds: number[] }
   ) =>
-    apiRequest<{ matchId: number }>(
+    apiRequest<CreateGroupMatchResponse>(
       `/api/groups/${groupId}/matches`,
       {
         method: 'POST',
@@ -720,4 +714,8 @@ export function isApiNotFoundError(error: unknown): boolean {
 
 export function isApiUnauthorizedError(error: unknown): boolean {
   return error instanceof ApiRequestError && error.status === 401
+}
+
+export function isApiConflictError(error: unknown): boolean {
+  return error instanceof ApiRequestError && error.status === 409
 }

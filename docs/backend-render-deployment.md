@@ -12,7 +12,10 @@ SPRING_DATASOURCE_USERNAME=postgres.<project-ref>
 SPRING_DATASOURCE_PASSWORD=replace-with-supabase-db-password
 ADMIN_API_KEY=replace-with-strong-admin-key
 ADMIN_EMAILS=admin1@example.com,admin2@example.com
-CORS_ALLOWED_ORIGINS=https://hei.heifam.com
+SUPER_ADMIN_EMAILS=super-admin@example.com
+ALLOWED_USER_EMAILS=member1@example.com,member2@example.com
+CORS_ALLOWED_ORIGINS=https://heifam.co.kr,https://www.heifam.co.kr
+SUPABASE_SERVICE_ROLE_KEY=replace-with-supabase-service-role-key
 SERVER_PORT=10000
 ```
 

@@ -1,12 +1,14 @@
 package com.balancify.backend.api.match.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record MatchResultParticipantResponse(
     Long playerId,
     String nickname,
     String team,
-    int mmrBefore,
-    int mmrAfter,
-    int mmrDelta
+    Integer mmrBefore,
+    Integer mmrAfter,
+    Integer mmrDelta
 ) {
 }
-

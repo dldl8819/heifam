@@ -5,6 +5,7 @@ import com.balancify.backend.api.group.dto.CreateGroupMatchResponse;
 import com.balancify.backend.domain.Group;
 import com.balancify.backend.domain.Match;
 import com.balancify.backend.domain.MatchParticipant;
+import com.balancify.backend.domain.MatchStatus;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.GroupRepository;
 import com.balancify.backend.repository.MatchParticipantRepository;
@@ -19,6 +20,7 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,22 +29,28 @@ public class GroupMatchAdminService {
 
     private static final String TEAM_HOME = "HOME";
     private static final String TEAM_AWAY = "AWAY";
+    private static final int TEAM_SIZE_3V3 = 3;
+    private static final List<MatchStatus> DUPLICATE_BLOCKING_STATUSES =
+        List.of(MatchStatus.DRAFT, MatchStatus.CONFIRMED);
 
     private final GroupRepository groupRepository;
     private final PlayerRepository playerRepository;
     private final MatchRepository matchRepository;
     private final MatchParticipantRepository matchParticipantRepository;
+    private final long duplicateWindowMinutes;
 
     public GroupMatchAdminService(
         GroupRepository groupRepository,
         PlayerRepository playerRepository,
         MatchRepository matchRepository,
-        MatchParticipantRepository matchParticipantRepository
+        MatchParticipantRepository matchParticipantRepository,
+        @Value("${balancify.match.confirm.duplicate-window-minutes:5}") long duplicateWindowMinutes
     ) {
         this.groupRepository = groupRepository;
         this.playerRepository = playerRepository;
         this.matchRepository = matchRepository;
         this.matchParticipantRepository = matchParticipantRepository;
+        this.duplicateWindowMinutes = Math.max(1, duplicateWindowMinutes);
     }
 
     @Transactional
@@ -65,7 +73,7 @@ public class GroupMatchAdminService {
             throw new IllegalArgumentException("Players must be unique across both teams");
         }
 
-        Group group = groupRepository.findById(groupId)
+        Group group = groupRepository.findByIdForUpdate(groupId)
             .orElseThrow(() -> new NoSuchElementException("Group not found: " + groupId));
 
         List<Player> players = playerRepository.findByGroup_IdAndIdIn(groupId, new ArrayList<>(allIds));
@@ -77,9 +85,54 @@ public class GroupMatchAdminService {
             .stream()
             .collect(Collectors.toMap(Player::getId, Function.identity()));
 
+        Signature requestedSignature = buildRequestedSignature(homePlayerIds, awayPlayerIds);
+        OffsetDateTime duplicateCheckStartAt = OffsetDateTime.now().minusMinutes(duplicateWindowMinutes);
+        List<Match> activeMatches = matchRepository.findRecentDuplicateCandidates(
+            groupId,
+            TEAM_SIZE_3V3,
+            requestedSignature.participantSignature(),
+            DUPLICATE_BLOCKING_STATUSES,
+            duplicateCheckStartAt
+        );
+
+        for (Match activeMatch : activeMatches) {
+            if (activeMatch.getId() == null) {
+                continue;
+            }
+            MatchStatus activeStatus = activeMatch.getStatus();
+            if (activeStatus == null || !DUPLICATE_BLOCKING_STATUSES.contains(activeStatus)) {
+                continue;
+            }
+            if (resolveTeamSize(activeMatch) != TEAM_SIZE_3V3) {
+                continue;
+            }
+
+            Signature existingSignature = readSignature(activeMatch);
+            if (existingSignature == null) {
+                existingSignature = buildSignatureFromParticipants(activeMatch.getId());
+            }
+            if (existingSignature == null) {
+                continue;
+            }
+
+            if (!requestedSignature.participantSignature().equals(existingSignature.participantSignature())) {
+                continue;
+            }
+
+            return new CreateGroupMatchResponse(
+                activeMatch.getId(),
+                "REUSED_EXISTING",
+                "동일 참가자 조합의 활성 매치를 재사용했습니다."
+            );
+        }
+
         Match match = new Match();
         match.setGroup(group);
         match.setPlayedAt(OffsetDateTime.now());
+        match.setStatus(MatchStatus.CONFIRMED);
+        match.setTeamSize(TEAM_SIZE_3V3);
+        match.setParticipantSignature(requestedSignature.participantSignature());
+        match.setTeamSignature(requestedSignature.teamSignature());
         Match savedMatch = matchRepository.save(match);
 
         List<MatchParticipant> participants = new ArrayList<>();
@@ -92,7 +145,11 @@ public class GroupMatchAdminService {
 
         matchParticipantRepository.saveAll(participants);
 
-        return new CreateGroupMatchResponse(savedMatch.getId());
+        return new CreateGroupMatchResponse(
+            savedMatch.getId(),
+            "CREATED",
+            "매치를 확정했습니다."
+        );
     }
 
     private MatchParticipant createParticipant(Match match, Player player, String team) {
@@ -124,5 +181,93 @@ public class GroupMatchAdminService {
             normalized.add(playerId);
         }
         return normalized;
+    }
+
+    private Signature buildRequestedSignature(List<Long> homePlayerIds, List<Long> awayPlayerIds) {
+        List<Long> participantIds = new ArrayList<>(homePlayerIds.size() + awayPlayerIds.size());
+        participantIds.addAll(homePlayerIds);
+        participantIds.addAll(awayPlayerIds);
+        return new Signature(
+            buildParticipantSignature(participantIds),
+            buildTeamSignature(homePlayerIds, awayPlayerIds)
+        );
+    }
+
+    private Signature readSignature(Match match) {
+        if (match.getParticipantSignature() == null || match.getTeamSignature() == null) {
+            return null;
+        }
+        String participantSignature = match.getParticipantSignature().trim();
+        String teamSignature = match.getTeamSignature().trim();
+        if (participantSignature.isEmpty() || teamSignature.isEmpty()) {
+            return null;
+        }
+        return new Signature(participantSignature, teamSignature);
+    }
+
+    private Signature buildSignatureFromParticipants(Long matchId) {
+        List<MatchParticipant> participants =
+            matchParticipantRepository.findByMatchIdWithPlayerAndMatch(matchId);
+        if (participants.isEmpty()) {
+            return null;
+        }
+
+        List<Long> homePlayerIds = new ArrayList<>();
+        List<Long> awayPlayerIds = new ArrayList<>();
+        List<Long> participantIds = new ArrayList<>();
+
+        for (MatchParticipant participant : participants) {
+            if (participant.getPlayer() == null || participant.getPlayer().getId() == null) {
+                continue;
+            }
+            Long playerId = participant.getPlayer().getId();
+            participantIds.add(playerId);
+            if (TEAM_HOME.equals(participant.getTeam())) {
+                homePlayerIds.add(playerId);
+            } else if (TEAM_AWAY.equals(participant.getTeam())) {
+                awayPlayerIds.add(playerId);
+            }
+        }
+
+        if (homePlayerIds.size() != TEAM_SIZE_3V3 || awayPlayerIds.size() != TEAM_SIZE_3V3) {
+            return null;
+        }
+
+        return new Signature(
+            buildParticipantSignature(participantIds),
+            buildTeamSignature(homePlayerIds, awayPlayerIds)
+        );
+    }
+
+    private String buildParticipantSignature(List<Long> playerIds) {
+        return playerIds.stream()
+            .sorted()
+            .map(String::valueOf)
+            .collect(Collectors.joining("-"));
+    }
+
+    private String buildTeamSignature(List<Long> homePlayerIds, List<Long> awayPlayerIds) {
+        String homeSignature = homePlayerIds.stream()
+            .sorted()
+            .map(String::valueOf)
+            .collect(Collectors.joining("-"));
+        String awaySignature = awayPlayerIds.stream()
+            .sorted()
+            .map(String::valueOf)
+            .collect(Collectors.joining("-"));
+        return "HOME:" + homeSignature + "|AWAY:" + awaySignature;
+    }
+
+    private int resolveTeamSize(Match match) {
+        if (match.getTeamSize() == null || match.getTeamSize() <= 0) {
+            return TEAM_SIZE_3V3;
+        }
+        return match.getTeamSize();
+    }
+
+    private record Signature(
+        String participantSignature,
+        String teamSignature
+    ) {
     }
 }

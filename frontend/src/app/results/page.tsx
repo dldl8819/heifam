@@ -7,6 +7,7 @@ import { apiClient, isApiForbiddenError, isApiNotFoundError, isApiUnauthorizedEr
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
+import { useMmrVisibility } from '@/lib/mmr-visibility'
 import type { MatchResultResponse, RecentMatchItem, TeamSide } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
@@ -65,6 +66,8 @@ function formatTeamPlayers(match: RecentMatchItem, team: TeamSide): string {
 export default function ResultsPage() {
   const searchParams = useSearchParams()
   const { isAdmin, isSuperAdmin } = useAdminAuth()
+  const { mmrVisible } = useMmrVisibility()
+  const showMmr = isAdmin && mmrVisible
   const [selectedRecentMatchId, setSelectedRecentMatchId] = useState<number | null>(null)
   const [selectedRecentWinnerTeam, setSelectedRecentWinnerTeam] = useState<TeamSide>('HOME')
   const [isRecentSaving, setIsRecentSaving] = useState<boolean>(false)
@@ -367,7 +370,7 @@ export default function ResultsPage() {
                   <th className="px-3 py-2">{t('results.recent.table.winner')}</th>
                   <th className="px-3 py-2">{t('results.recent.table.homeTeam')}</th>
                   <th className="px-3 py-2">{t('results.recent.table.awayTeam')}</th>
-                  {isAdmin && <th className="px-3 py-2">{t('results.recent.table.mmrDiff')}</th>}
+                  {showMmr && <th className="px-3 py-2">{t('results.recent.table.mmrDiff')}</th>}
                   {isAdmin && <th className="px-3 py-2">{t('results.recent.table.action')}</th>}
                 </tr>
               </thead>
@@ -402,7 +405,11 @@ export default function ResultsPage() {
                     </td>
                     <td className="px-3 py-2 text-slate-700">{formatTeamPlayers(recentMatch, 'HOME')}</td>
                     <td className="px-3 py-2 text-slate-700">{formatTeamPlayers(recentMatch, 'AWAY')}</td>
-                    {isAdmin && <td className="px-3 py-2 text-slate-700">{recentMatch.mmrDiff}</td>}
+                    {showMmr && (
+                      <td className="px-3 py-2 text-slate-700">
+                        {typeof recentMatch.mmrDiff === 'number' ? recentMatch.mmrDiff : '-'}
+                      </td>
+                    )}
                     {isAdmin && (
                       <td className="px-3 py-2">
                         {selectedRecentMatchId === recentMatch.matchId ? (
@@ -453,34 +460,51 @@ export default function ResultsPage() {
               <tr>
                 <th className="px-4 py-3">{t('results.participants.nickname')}</th>
                 <th className="px-4 py-3">{t('results.participants.team')}</th>
-                <th className="px-4 py-3">{t('results.participants.beforeMmr')}</th>
-                <th className="px-4 py-3">{t('results.participants.afterMmr')}</th>
-                <th className="px-4 py-3">{t('results.participants.delta')}</th>
+                {showMmr && <th className="px-4 py-3">{t('results.participants.beforeMmr')}</th>}
+                {showMmr && <th className="px-4 py-3">{t('results.participants.afterMmr')}</th>}
+                {showMmr && <th className="px-4 py-3">{t('results.participants.delta')}</th>}
               </tr>
             </thead>
             <tbody>
-              {result.participants.map((participant) => (
-                <tr
-                  key={`${participant.playerId}-${participant.nickname}`}
-                  className="border-t border-slate-100"
-                >
-                  <td className="px-4 py-3 font-medium text-slate-900">{participant.nickname}</td>
-                  <td className="px-4 py-3 text-slate-700">{formatTeamLabel(participant.team)}</td>
-                  <td className="px-4 py-3 text-slate-700">{isAdmin ? participant.mmrBefore : '-'}</td>
-                  <td className="px-4 py-3 text-slate-700">{isAdmin ? participant.mmrAfter : '-'}</td>
-                  {isAdmin ? (
-                    <td
-                      className={`px-4 py-3 font-medium ${
-                        participant.mmrDelta >= 0 ? 'text-emerald-600' : 'text-rose-600'
-                      }`}
-                    >
-                      {participant.mmrDelta >= 0 ? `+${participant.mmrDelta}` : participant.mmrDelta}
-                    </td>
-                  ) : (
-                    <td className="px-4 py-3 text-slate-700">-</td>
-                  )}
-                </tr>
-              ))}
+              {result.participants.map((participant) => {
+                const participantMmrBefore =
+                  typeof participant.mmrBefore === 'number' ? participant.mmrBefore : null
+                const participantMmrAfter =
+                  typeof participant.mmrAfter === 'number' ? participant.mmrAfter : null
+                const participantMmrDelta =
+                  typeof participant.mmrDelta === 'number' ? participant.mmrDelta : null
+
+                return (
+                  <tr
+                    key={`${participant.playerId}-${participant.nickname}`}
+                    className="border-t border-slate-100"
+                  >
+                    <td className="px-4 py-3 font-medium text-slate-900">{participant.nickname}</td>
+                    <td className="px-4 py-3 text-slate-700">{formatTeamLabel(participant.team)}</td>
+                    {showMmr && (
+                      <td className="px-4 py-3 text-slate-700">
+                        {participantMmrBefore !== null ? participantMmrBefore : '-'}
+                      </td>
+                    )}
+                    {showMmr && (
+                      <td className="px-4 py-3 text-slate-700">
+                        {participantMmrAfter !== null ? participantMmrAfter : '-'}
+                      </td>
+                    )}
+                    {showMmr && participantMmrDelta !== null ? (
+                      <td
+                        className={`px-4 py-3 font-medium ${
+                          participantMmrDelta >= 0 ? 'text-emerald-600' : 'text-rose-600'
+                        }`}
+                      >
+                        {participantMmrDelta >= 0 ? `+${participantMmrDelta}` : participantMmrDelta}
+                      </td>
+                    ) : showMmr ? (
+                      <td className="px-4 py-3 text-slate-700">-</td>
+                    ) : null}
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </article>

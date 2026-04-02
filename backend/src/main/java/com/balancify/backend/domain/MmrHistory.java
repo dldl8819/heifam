@@ -34,6 +34,9 @@ public class MmrHistory {
     private Integer afterMmr;
 
     @Column(nullable = false)
+    private Integer delta = 0;
+
+    @Column(nullable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
     public Long getId() {
@@ -76,6 +79,14 @@ public class MmrHistory {
         this.afterMmr = afterMmr;
     }
 
+    public Integer getDelta() {
+        return delta;
+    }
+
+    public void setDelta(Integer delta) {
+        this.delta = delta;
+    }
+
     public OffsetDateTime getCreatedAt() {
         return createdAt;
     }
@@ -84,4 +95,3 @@ public class MmrHistory {
         this.createdAt = createdAt;
     }
 }
-

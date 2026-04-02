@@ -6,8 +6,8 @@ This guide keeps the current architecture:
 - Database: Supabase Postgres
 
 Expected production URLs:
-- Frontend: `https://hei.heifam.com`
-- Backend API: `https://api.heifam.com`
+- Frontend: `https://www.heifam.co.kr` (or `https://heifam.co.kr`)
+- Backend API: `https://heifam.onrender.com` (custom domain optional)
 
 ## A. Frontend Deploy on Vercel
 
@@ -24,16 +24,22 @@ Expected production URLs:
 Set these in Vercel Project Settings > Environment Variables:
 
 ```env
-NEXT_PUBLIC_API_BASE_URL=https://api.heifam.com
+NEXT_PUBLIC_API_BASE_URL=
+NEXT_PUBLIC_ACCESS_API_BASE_URL=https://heifam.onrender.com
+BACKEND_API_BASE_URLS=https://heifam.onrender.com,https://api.heifam.com
+BACKEND_PROXY_UPSTREAM_TIMEOUT_MS=25000
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
 GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 NEXTAUTH_SECRET=replace-with-32+-char-random-secret
-NEXTAUTH_URL=https://hei.heifam.com
-NEXT_PUBLIC_ADMIN_EMAILS=admin1@example.com,admin2@example.com
+NEXTAUTH_URL=https://www.heifam.co.kr
+ALLOWED_SIGNIN_EMAILS=member1@example.com,member2@example.com
+ALLOWED_SIGNIN_DOMAINS=
 ```
 
 ### 4) Domain
-- Attach custom domain `hei.heifam.com` to the Vercel project.
+- Attach custom domain `www.heifam.co.kr` (and optional apex redirect `heifam.co.kr`) to the Vercel project.
 
 ## B. Backend Deploy on Render
 
@@ -59,7 +65,10 @@ SPRING_DATASOURCE_PASSWORD=replace-with-supabase-db-password
 SPRING_DATASOURCE_SSLMODE=require
 ADMIN_API_KEY=replace-with-strong-admin-key
 ADMIN_EMAILS=admin1@example.com,admin2@example.com
-CORS_ALLOWED_ORIGINS=https://hei.heifam.com
+SUPER_ADMIN_EMAILS=super-admin@example.com
+ALLOWED_USER_EMAILS=member1@example.com,member2@example.com
+CORS_ALLOWED_ORIGINS=https://heifam.co.kr,https://www.heifam.co.kr
+SUPABASE_SERVICE_ROLE_KEY=replace-with-supabase-service-role-key
 ```
 
 Optional:
@@ -71,7 +80,7 @@ SPRING_PROFILES_ACTIVE=prod
 `SERVER_PORT` is optional because the backend also supports Render's `PORT` environment variable.
 
 ### 5) Domain
-- Attach custom domain `api.heifam.com` to the Render service.
+- Optional: attach custom domain `api.heifam.com` to the Render service.
 
 ## C. Supabase Postgres Connection Setup
 
@@ -101,20 +110,22 @@ For persistent servers:
 In Google Cloud Console (OAuth Client):
 
 - Authorized JavaScript origins:
-  - `https://hei.heifam.com`
+  - `https://www.heifam.co.kr`
+  - `https://heifam.co.kr`
 
 - Authorized redirect URIs:
-  - `https://hei.heifam.com/api/auth/callback/google`
+  - `https://www.heifam.co.kr/api/auth/callback/google`
+  - `https://heifam.co.kr/api/auth/callback/google`
 
 Ensure Vercel env vars `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` match the same OAuth client.
 
 ## E. Final Verification Checklist
 
-- [ ] `https://hei.heifam.com` loads (Korean Hei UI visible)
-- [ ] `https://api.heifam.com/api/health` returns healthy response
+- [ ] `https://www.heifam.co.kr` loads (Korean Hei UI visible)
+- [ ] `https://heifam.onrender.com/api/health` returns healthy response
 - [ ] Google login succeeds from frontend
-- [ ] Frontend requests go to `https://api.heifam.com`
-- [ ] CORS accepts only `https://hei.heifam.com`
+- [ ] `https://www.heifam.co.kr/api/proxy/api/health` returns healthy response
+- [ ] CORS allows only `https://heifam.co.kr` and `https://www.heifam.co.kr`
 - [ ] Admin emails can call admin-only actions
 - [ ] Non-admin users are blocked with `403` on admin-only actions
 - [ ] Ranking / balance / import / result flows work without API errors

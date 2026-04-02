@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAdminAuth } from '@/lib/admin-auth'
-import { apiClient, isApiForbiddenError, isApiUnauthorizedError } from '@/lib/api'
+import { apiClient, isApiConflictError, isApiForbiddenError, isApiUnauthorizedError } from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
+import { useMmrVisibility } from '@/lib/mmr-visibility'
 import type { BalancePlayerOption, BalanceResponse, MatchResultResponse, TeamSide } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
@@ -52,7 +53,10 @@ function createEmptySlotInputs(): string[] {
 }
 
 function toPlayerLabel(player: BalancePlayerOption, showMmr: boolean): string {
-  const mmrText = showMmr ? ` - ${player.currentMmr} MMR` : ''
+  const mmrText =
+    showMmr && typeof player.currentMmr === 'number'
+      ? ` - ${player.currentMmr} MMR`
+      : ''
   return `${player.nickname} (${player.race})${mmrText}${player.tier ? ` [${player.tier}]` : ''}`
 }
 
@@ -128,7 +132,8 @@ function readPersistedBalanceState(): PersistedBalanceState | null {
 export default function BalancePage() {
   const router = useRouter()
   const { isAdmin, canAccess } = useAdminAuth()
-  const showMmr = isAdmin
+  const { mmrVisible } = useMmrVisibility()
+  const showMmr = isAdmin && mmrVisible
   const [players, setPlayers] = useState<BalancePlayerOption[]>([])
   const [teamSize, setTeamSize] = useState<SupportedTeamSize>(3)
   const [slots, setSlots] = useState<Array<number | null>>(createEmptySlots)
@@ -170,11 +175,19 @@ export default function BalancePage() {
             currentMmr: player.currentMmr,
             tier: player.tier,
           }))
-          .sort((a, b) =>
-            showMmr
-              ? b.currentMmr - a.currentMmr
-              : a.nickname.localeCompare(b.nickname, 'ko-KR')
-          )
+          .sort((a, b) => {
+            if (!showMmr) {
+              return a.nickname.localeCompare(b.nickname, 'ko-KR')
+            }
+
+            const aMmr = typeof a.currentMmr === 'number' ? a.currentMmr : -1
+            const bMmr = typeof b.currentMmr === 'number' ? b.currentMmr : -1
+            if (bMmr !== aMmr) {
+              return bMmr - aMmr
+            }
+
+            return a.nickname.localeCompare(b.nickname, 'ko-KR')
+          })
 
         setPlayers(nextPlayers)
       } catch {
@@ -274,7 +287,10 @@ export default function BalancePage() {
     (resultWinnerTeam === 'HOME' || resultWinnerTeam === 'AWAY') &&
     !resultSubmitting
 
-  const totalSelectedMmr = selectedPlayers.reduce((sum, player) => sum + player.currentMmr, 0)
+  const totalSelectedMmr = selectedPlayers.reduce(
+    (sum, player) => sum + (typeof player.currentMmr === 'number' ? player.currentMmr : 0),
+    0
+  )
   const clearSelectionAndResult = (nextTeamSize: SupportedTeamSize | null = null) => {
     if (nextTeamSize !== null) {
       setTeamSize(nextTeamSize)
@@ -359,8 +375,31 @@ export default function BalancePage() {
             homePlayerIds,
             awayPlayerIds,
           })
-          setResultMatchId(String(created.matchId))
-          setMatchCreateMessage(t('balance.quickResult.matchCreated', { matchId: created.matchId }))
+
+          const confirmationStatus = created.confirmationStatus
+          if (confirmationStatus === 'DUPLICATE_REJECTED') {
+            setResultMatchId('')
+            setMatchCreateMessage(
+              created.message && created.message.trim().length > 0
+                ? created.message
+                : t('balance.quickResult.matchDuplicateRejected')
+            )
+          } else if (
+            (confirmationStatus === 'CREATED' || confirmationStatus === 'REUSED_EXISTING') &&
+            typeof created.matchId === 'number' &&
+            Number.isFinite(created.matchId) &&
+            created.matchId > 0
+          ) {
+            setResultMatchId(String(created.matchId))
+            setMatchCreateMessage(
+              confirmationStatus === 'REUSED_EXISTING'
+                ? t('balance.quickResult.matchReused', { matchId: created.matchId })
+                : t('balance.quickResult.matchCreated', { matchId: created.matchId })
+            )
+          } else {
+            setResultMatchId('')
+            setMatchCreateMessage(t('balance.quickResult.matchCreateFailed'))
+          }
         } catch (createError) {
           if (isApiForbiddenError(createError)) {
             setMatchCreateMessage(t('balance.quickResult.matchCreateForbidden'))
@@ -410,7 +449,9 @@ export default function BalancePage() {
         `/results?matchId=${response.matchId}&winnerTeam=${response.winnerTeam}&from=balance`
       )
     } catch (error) {
-      if (isApiUnauthorizedError(error)) {
+      if (isApiConflictError(error)) {
+        setResultSubmitError(t('balance.quickResult.submitConflict'))
+      } else if (isApiUnauthorizedError(error)) {
         setResultSubmitError(t('common.adminLoginRequired'))
       } else if (isApiForbiddenError(error)) {
         setResultSubmitError(t('common.permissionDenied'))
@@ -544,7 +585,11 @@ export default function BalancePage() {
                 <span className="font-medium text-slate-800">
                   {player.nickname} ({player.race})
                 </span>
-                {showMmr && <span className="text-slate-600">{player.currentMmr}</span>}
+                {showMmr && (
+                  <span className="text-slate-600">
+                    {typeof player.currentMmr === 'number' ? player.currentMmr : '-'}
+                  </span>
+                )}
               </li>
             ))}
             {selectedPlayers.length === 0 && (
@@ -602,13 +647,18 @@ export default function BalancePage() {
                   className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm"
                 >
                   <span className="font-medium text-slate-800">{player.name}</span>
-                  {showMmr && <span className="text-slate-600">{player.mmr} MMR</span>}
+                  {showMmr && (
+                    <span className="text-slate-600">
+                      {typeof player.mmr === 'number' ? `${player.mmr} MMR` : '-'}
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
             {showMmr && (
               <p className="mt-3 text-sm text-slate-700">
-                {t('balance.result.homeMmr')}: <span className="font-semibold">{result.homeMmr}</span>
+                {t('balance.result.homeMmr')}:{' '}
+                <span className="font-semibold">{result.homeMmr ?? '-'}</span>
               </p>
             )}
           </article>
@@ -622,13 +672,18 @@ export default function BalancePage() {
                   className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm"
                 >
                   <span className="font-medium text-slate-800">{player.name}</span>
-                  {showMmr && <span className="text-slate-600">{player.mmr} MMR</span>}
+                  {showMmr && (
+                    <span className="text-slate-600">
+                      {typeof player.mmr === 'number' ? `${player.mmr} MMR` : '-'}
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
             {showMmr && (
               <p className="mt-3 text-sm text-slate-700">
-                {t('balance.result.awayMmr')}: <span className="font-semibold">{result.awayMmr}</span>
+                {t('balance.result.awayMmr')}:{' '}
+                <span className="font-semibold">{result.awayMmr ?? '-'}</span>
               </p>
             )}
           </article>
@@ -638,21 +693,33 @@ export default function BalancePage() {
             <div className={`mt-3 grid gap-3 ${showMmr ? 'sm:grid-cols-3' : 'sm:grid-cols-1'}`}>
               {showMmr && (
                 <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  {t('balance.result.mmrDiff')}: <span className="font-semibold">{result.mmrDiff}</span>
+                  {t('balance.result.mmrDiff')}:{' '}
+                  <span className="font-semibold">{result.mmrDiff ?? '-'}</span>
                 </div>
               )}
-              <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                {t('balance.result.expectedHomeWinRate')}:{' '}
-                <span className="font-semibold">
-                  {formatPercent(result.expectedHomeWinRate)}
-                </span>
-              </div>
+              {showMmr && (
+                <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  {t('balance.result.expectedHomeWinRate')}:{' '}
+                  <span className="font-semibold">
+                    {typeof result.expectedHomeWinRate === 'number'
+                      ? formatPercent(result.expectedHomeWinRate)
+                      : '-'}
+                  </span>
+                </div>
+              )}
               {showMmr && (
                 <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
                   {t('balance.result.averageTeamMmr')}:{' '}
                   <span className="font-semibold">
-                    {Math.round((result.homeMmr + result.awayMmr) / 2)}
+                    {typeof result.homeMmr === 'number' && typeof result.awayMmr === 'number'
+                      ? Math.round((result.homeMmr + result.awayMmr) / 2)
+                      : '-'}
                   </span>
+                </div>
+              )}
+              {!showMmr && (
+                <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  {t('balance.result.expectedHomeWinRate')}: <span className="font-semibold">-</span>
                 </div>
               )}
             </div>

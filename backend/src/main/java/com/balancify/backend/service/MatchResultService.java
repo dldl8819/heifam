@@ -5,6 +5,7 @@ import com.balancify.backend.api.match.dto.MatchResultRequest;
 import com.balancify.backend.api.match.dto.MatchResultResponse;
 import com.balancify.backend.domain.Match;
 import com.balancify.backend.domain.MatchParticipant;
+import com.balancify.backend.domain.MatchStatus;
 import com.balancify.backend.domain.MmrHistory;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.domain.PlayerTierPolicy;
@@ -12,6 +13,7 @@ import com.balancify.backend.repository.MatchParticipantRepository;
 import com.balancify.backend.repository.MatchRepository;
 import com.balancify.backend.repository.MmrHistoryRepository;
 import com.balancify.backend.repository.PlayerRepository;
+import com.balancify.backend.service.exception.MatchConflictException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -64,7 +66,7 @@ public class MatchResultService {
 
     @Transactional
     public MatchResultResponse processMatchResult(Long matchId, MatchResultRequest request) {
-        return processMatchResult(matchId, request, null, null);
+        return processMatchResult(matchId, request, null, null, false);
     }
 
     @Transactional
@@ -73,7 +75,7 @@ public class MatchResultService {
         MatchResultRequest request,
         String recordedByEmail
     ) {
-        return processMatchResult(matchId, request, recordedByEmail, null);
+        return processMatchResult(matchId, request, recordedByEmail, null, false);
     }
 
     @Transactional
@@ -83,12 +85,37 @@ public class MatchResultService {
         String recordedByEmail,
         String recordedByNickname
     ) {
-        Match match = matchRepository.findById(matchId)
+        return processMatchResult(matchId, request, recordedByEmail, recordedByNickname, false);
+    }
+
+    @Transactional
+    public MatchResultResponse processMatchResult(
+        Long matchId,
+        MatchResultRequest request,
+        String recordedByEmail,
+        String recordedByNickname,
+        boolean allowReprocess
+    ) {
+        Match match = matchRepository.findByIdForUpdate(matchId)
             .orElseThrow(() -> new NoSuchElementException("Match not found: " + matchId));
 
         String winnerTeam = normalizeTeam(request == null ? null : request.winnerTeam());
         String normalizedRecordedByEmail = normalizeRecordedByEmail(recordedByEmail);
         String normalizedRecordedByNickname = normalizeRecordedByNickname(recordedByNickname);
+        MatchStatus currentStatus = normalizeMatchStatus(match);
+        boolean alreadyProcessed = hasProcessedResult(match.getWinningTeam())
+            || currentStatus == MatchStatus.COMPLETED;
+
+        if (!allowReprocess) {
+            if (alreadyProcessed) {
+                throw new MatchConflictException("이미 결과가 확정된 경기입니다.");
+            }
+            if (currentStatus != MatchStatus.CONFIRMED) {
+                throw new MatchConflictException("결과 입력이 가능한 상태의 경기가 아닙니다.");
+            }
+        } else if (currentStatus == MatchStatus.CANCELLED) {
+            throw new MatchConflictException("취소된 경기는 결과를 수정할 수 없습니다.");
+        }
 
         List<MatchParticipant> participants =
             matchParticipantRepository.findByMatchIdWithPlayerAndMatch(matchId);
@@ -113,7 +140,6 @@ public class MatchResultService {
         double awayExpectedWinRate = 1.0 - homeExpectedWinRate;
         int effectiveKFactor = calculateEffectiveKFactor(participants, homeAverageMmr, awayAverageMmr);
 
-        boolean alreadyProcessed = hasProcessedResult(match.getWinningTeam());
         Map<Long, MmrHistory> existingHistoriesByPlayerId = loadHistoryMap(matchId);
 
         List<MmrHistory> mmrHistories = new ArrayList<>();
@@ -161,6 +187,7 @@ public class MatchResultService {
             }
             mmrHistory.setBeforeMmr(baseMmrBefore);
             mmrHistory.setAfterMmr(mmrAfter);
+            mmrHistory.setDelta(mmrDelta);
             mmrHistories.add(mmrHistory);
 
             responseParticipants.add(new MatchResultParticipantResponse(
@@ -174,6 +201,10 @@ public class MatchResultService {
         }
 
         match.setWinningTeam(winnerTeam);
+        match.setStatus(MatchStatus.COMPLETED);
+        if (match.getTeamSize() == null || match.getTeamSize() <= 0) {
+            match.setTeamSize(Math.max(1, participants.size() / 2));
+        }
         match.setResultRecordedAt(OffsetDateTime.now());
         match.setResultRecordedByEmail(normalizedRecordedByEmail);
         match.setResultRecordedByNickname(normalizedRecordedByNickname);
@@ -232,6 +263,16 @@ public class MatchResultService {
 
     private boolean hasProcessedResult(String winningTeam) {
         return winningTeam != null && !winningTeam.isBlank();
+    }
+
+    private MatchStatus normalizeMatchStatus(Match match) {
+        if (match.getStatus() != null) {
+            return match.getStatus();
+        }
+        if (hasProcessedResult(match.getWinningTeam())) {
+            return MatchStatus.COMPLETED;
+        }
+        return MatchStatus.CONFIRMED;
     }
 
     private Map<Long, MmrHistory> loadHistoryMap(Long matchId) {

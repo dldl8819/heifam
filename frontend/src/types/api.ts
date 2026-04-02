@@ -10,14 +10,14 @@ export type HealthResponse = {
 export type BalancePlayerInput = {
   playerId?: number
   name: string
-  mmr: number
+  mmr?: number
 }
 
 export type BalancePlayerOption = {
   id: number
   nickname: string
   race: PlayerRace
-  currentMmr: number
+  currentMmr?: number
   tier?: PlayerTierStatus
 }
 
@@ -32,10 +32,10 @@ export type BalanceResponse = {
   teamSize: number
   homeTeam: BalancePlayerInput[]
   awayTeam: BalancePlayerInput[]
-  homeMmr: number
-  awayMmr: number
-  mmrDiff: number
-  expectedHomeWinRate: number
+  homeMmr?: number
+  awayMmr?: number
+  mmrDiff?: number
+  expectedHomeWinRate?: number
 }
 
 export type MultiBalanceRequest = {
@@ -55,10 +55,10 @@ export type MultiBalanceMatch = {
   teamSize: number
   homeTeam: BalancePlayerInput[]
   awayTeam: BalancePlayerInput[]
-  homeMmr: number
-  awayMmr: number
-  mmrDiff: number
-  expectedHomeWinRate: number
+  homeMmr?: number
+  awayMmr?: number
+  mmrDiff?: number
+  expectedHomeWinRate?: number
   raceSummary: {
     home: string
     away: string
@@ -88,21 +88,33 @@ export type MatchResultRequest = {
   winnerTeam: TeamSide
 }
 
+export type MatchConfirmationStatus =
+  | 'CREATED'
+  | 'REUSED_EXISTING'
+  | 'DUPLICATE_REJECTED'
+  | string
+
+export type CreateGroupMatchResponse = {
+  matchId: number | null
+  confirmationStatus: MatchConfirmationStatus
+  message: string | null
+}
+
 export type MatchResultParticipant = {
   playerId: number
   nickname: string
   team: MatchTeamSide
-  mmrBefore: number
-  mmrAfter: number
-  mmrDelta: number
+  mmrBefore?: number
+  mmrAfter?: number
+  mmrDelta?: number
 }
 
 export type MatchResultResponse = {
   matchId: number
   winnerTeam: TeamSide
   kFactor: number
-  homeExpectedWinRate: number
-  awayExpectedWinRate: number
+  homeExpectedWinRate?: number
+  awayExpectedWinRate?: number
   participants: MatchResultParticipant[]
 }
 
@@ -110,34 +122,35 @@ export type RecentMatchPlayer = {
   playerId: number
   nickname: string
   team: MatchTeamSide
-  mmr: number
+  mmr?: number
 }
 
 export type RecentMatchItem = {
   matchId: number
   playedAt: string
+  status: string | null
   winningTeam: TeamSide | null
   resultRecordedAt: string | null
   resultRecordedByNickname: string | null
   homeTeam: RecentMatchPlayer[]
   awayTeam: RecentMatchPlayer[]
-  homeMmr: number
-  awayMmr: number
-  mmrDiff: number
+  homeMmr?: number
+  awayMmr?: number
+  mmrDiff?: number
 }
 
 export type RankingItem = {
   rank: number
   nickname: string
   race: PlayerRace
-  currentMmr: number
+  currentMmr?: number
   wins: number
   losses: number
   games: number
   winRate: number
   streak: string
   last10: string
-  mmrDelta: number
+  mmrDelta?: number
 }
 
 export type RankingResponse = RankingItem[]
@@ -163,7 +176,7 @@ export type PlayerRosterItem = {
   tier: PlayerTierStatus
   baseMmr?: number
   baseTier?: PlayerTierStatus
-  currentMmr: number
+  currentMmr?: number
   wins: number
   losses: number
   games: number

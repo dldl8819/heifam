@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.balancify.backend.api.match.dto.BalancePlayerDto;
 import com.balancify.backend.api.match.dto.BalanceResponse;
+import com.balancify.backend.api.match.dto.MatchResultParticipantResponse;
+import com.balancify.backend.api.match.dto.MatchResultResponse;
 import com.balancify.backend.api.match.dto.MultiBalanceMatchResponse;
 import com.balancify.backend.api.match.dto.MultiBalancePenaltySummaryResponse;
 import com.balancify.backend.api.match.dto.MultiBalanceRaceSummaryResponse;
@@ -15,7 +17,7 @@ import org.junit.jupiter.api.Test;
 class MmrMaskingMapperTest {
 
     @Test
-    void maskBalanceKeepsExpectedHomeWinRate() {
+    void maskBalanceRemovesMmrFields() {
         BalanceResponse source = new BalanceResponse(
             3,
             List.of(
@@ -36,14 +38,16 @@ class MmrMaskingMapperTest {
 
         BalanceResponse masked = MmrMaskingMapper.maskBalance(source);
 
-        assertThat(masked.homeMmr()).isZero();
-        assertThat(masked.awayMmr()).isZero();
-        assertThat(masked.mmrDiff()).isZero();
-        assertThat(masked.expectedHomeWinRate()).isEqualTo(0.64);
+        assertThat(masked.homeMmr()).isNull();
+        assertThat(masked.awayMmr()).isNull();
+        assertThat(masked.mmrDiff()).isNull();
+        assertThat(masked.expectedHomeWinRate()).isNull();
+        assertThat(masked.homeTeam().getFirst().mmr()).isNull();
+        assertThat(masked.awayTeam().getFirst().mmr()).isNull();
     }
 
     @Test
-    void maskMultiBalanceKeepsExpectedHomeWinRatePerMatch() {
+    void maskMultiBalanceRemovesMmrFields() {
         MultiBalanceResponse source = new MultiBalanceResponse(
             "MMR_FIRST",
             6,
@@ -78,9 +82,35 @@ class MmrMaskingMapperTest {
         MultiBalanceResponse masked = MmrMaskingMapper.maskMultiBalance(source);
         MultiBalanceMatchResponse maskedMatch = masked.matches().getFirst();
 
-        assertThat(maskedMatch.homeMmr()).isZero();
-        assertThat(maskedMatch.awayMmr()).isZero();
-        assertThat(maskedMatch.mmrDiff()).isZero();
-        assertThat(maskedMatch.expectedHomeWinRate()).isEqualTo(0.58);
+        assertThat(maskedMatch.homeMmr()).isNull();
+        assertThat(maskedMatch.awayMmr()).isNull();
+        assertThat(maskedMatch.mmrDiff()).isNull();
+        assertThat(maskedMatch.expectedHomeWinRate()).isNull();
+        assertThat(maskedMatch.homeTeam().getFirst().mmr()).isNull();
+    }
+
+    @Test
+    void maskMatchResultRemovesMmrFields() {
+        MatchResultResponse source = new MatchResultResponse(
+            44L,
+            "HOME",
+            32,
+            0.58,
+            0.42,
+            List.of(
+                new MatchResultParticipantResponse(1L, "A", "HOME", 1200, 1216, 16),
+                new MatchResultParticipantResponse(2L, "B", "AWAY", 1180, 1164, -16)
+            )
+        );
+
+        MatchResultResponse masked = MmrMaskingMapper.maskMatchResult(source);
+
+        assertThat(masked.homeExpectedWinRate()).isNull();
+        assertThat(masked.awayExpectedWinRate()).isNull();
+        assertThat(masked.participants()).allSatisfy(participant -> {
+            assertThat(participant.mmrBefore()).isNull();
+            assertThat(participant.mmrAfter()).isNull();
+            assertThat(participant.mmrDelta()).isNull();
+        });
     }
 }

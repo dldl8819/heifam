@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { apiClient, isApiNotFoundError } from '@/lib/api'
+import { useAdminAuth } from '@/lib/admin-auth'
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
+import { useMmrVisibility } from '@/lib/mmr-visibility'
 import type {
   CaptainDraftResponse,
   CaptainDraftTeam,
@@ -41,6 +43,9 @@ function resolvePlayerMeta(
 }
 
 export default function CaptainDraftPage() {
+  const { isAdmin } = useAdminAuth()
+  const { mmrVisible } = useMmrVisibility()
+  const showMmr = isAdmin && mmrVisible
   const [players, setPlayers] = useState<PlayerRosterItem[]>([])
   const [playersLoading, setPlayersLoading] = useState<boolean>(true)
   const [playersError, setPlayersError] = useState<string | null>(null)
@@ -511,7 +516,11 @@ export default function CaptainDraftPage() {
                     <p className="font-medium">
                       {player.nickname} ({player.race})
                     </p>
-                    <p className="mt-1 text-xs text-slate-500">{player.currentMmr} MMR</p>
+                    {showMmr && (
+                      <p className="mt-1 text-xs text-slate-500">
+                        {typeof player.currentMmr === 'number' ? `${player.currentMmr} MMR` : '-'}
+                      </p>
+                    )}
                     {inCurrentDraft && (
                       <p className="mt-1 text-[11px] text-indigo-700">
                         {t('captainDraft.attendance.inCurrentDraft')}
@@ -671,7 +680,11 @@ export default function CaptainDraftPage() {
                           </span>
                         )}
                       </div>
-                      <p className="mt-1 text-xs text-slate-500">{meta ? `${meta.currentMmr} MMR` : '-'}</p>
+                      {showMmr && (
+                        <p className="mt-1 text-xs text-slate-500">
+                          {meta && typeof meta.currentMmr === 'number' ? `${meta.currentMmr} MMR` : '-'}
+                        </p>
+                      )}
                     </div>
                   )
                 })}
@@ -696,7 +709,11 @@ export default function CaptainDraftPage() {
                       <p className="font-medium">
                         {participant.nickname} ({participant.race})
                       </p>
-                      <p className="mt-1 text-xs text-slate-500">{meta ? `${meta.currentMmr} MMR` : '-'}</p>
+                      {showMmr && (
+                        <p className="mt-1 text-xs text-slate-500">
+                          {meta && typeof meta.currentMmr === 'number' ? `${meta.currentMmr} MMR` : '-'}
+                        </p>
+                      )}
                     </div>
                   )
                 })}
@@ -728,7 +745,11 @@ export default function CaptainDraftPage() {
                           </span>
                         )}
                       </div>
-                      <p className="mt-1 text-xs text-slate-500">{meta ? `${meta.currentMmr} MMR` : '-'}</p>
+                      {showMmr && (
+                        <p className="mt-1 text-xs text-slate-500">
+                          {meta && typeof meta.currentMmr === 'number' ? `${meta.currentMmr} MMR` : '-'}
+                        </p>
+                      )}
                     </div>
                   )
                 })}

@@ -6,6 +6,7 @@ import { useAdminAuth } from '@/lib/admin-auth'
 import { buildSupabaseAuthRedirectTo, isInAppBrowser } from '@/lib/auth-browser'
 import { supabase } from '@/lib/supabase'
 import { t } from '@/lib/i18n'
+import { useMmrVisibility } from '@/lib/mmr-visibility'
 
 function buildDisplayName(name?: string | null): string {
   const normalizedName = name?.trim()
@@ -18,7 +19,8 @@ function buildDisplayName(name?: string | null): string {
 
 export function AuthControls() {
   const { user, loading, signOut } = useAuth()
-  const { nickname } = useAdminAuth()
+  const { nickname, isAdmin } = useAdminAuth()
+  const { mmrVisible, setMmrVisible } = useMmrVisibility()
   const [warningMessage, setWarningMessage] = useState<string | null>(null)
 
   const handleGoogleLogin = async () => {
@@ -69,7 +71,18 @@ export function AuthControls() {
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      {isAdmin && (
+        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-700 bg-slate-800/70 px-3 py-2 text-xs text-slate-300">
+          <span>{t('auth.mmrToggle')}</span>
+          <input
+            type="checkbox"
+            checked={mmrVisible}
+            onChange={(event) => setMmrVisible(event.target.checked)}
+            className="h-3.5 w-3.5 accent-amber-400"
+          />
+        </label>
+      )}
       <div className="rounded-lg border border-slate-700 bg-slate-800/70 px-3 py-2 text-xs text-slate-300">
         {buildDisplayName(
           nickname ||

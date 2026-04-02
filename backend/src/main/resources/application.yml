@@ -50,3 +50,6 @@ balancify:
       enabled: ${RANK_DORMANCY_ENABLED:true}
       inactive-days: ${RANK_DORMANCY_INACTIVE_DAYS:30}
       demote-steps: ${RANK_DORMANCY_DEMOTE_STEPS:1}
+  match:
+    confirm:
+      duplicate-window-minutes: ${MATCH_CONFIRM_DUPLICATE_WINDOW_MINUTES:5}

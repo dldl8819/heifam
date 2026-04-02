@@ -7,6 +7,7 @@ import com.balancify.backend.api.match.dto.MatchResultRequest;
 import com.balancify.backend.domain.Group;
 import com.balancify.backend.domain.Match;
 import com.balancify.backend.domain.MatchParticipant;
+import com.balancify.backend.domain.MatchStatus;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.GroupRepository;
 import com.balancify.backend.repository.MatchParticipantRepository;
@@ -18,12 +19,14 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -105,7 +108,11 @@ public class MatchImportService {
                 Match match = new Match();
                 match.setGroup(group);
                 match.setPlayedAt(validationResult.playedAt());
+                match.setStatus(MatchStatus.CONFIRMED);
+                match.setTeamSize(3);
                 match.setWinningTeam(null);
+                match.setParticipantSignature(buildParticipantSignature(resolutionResult.homePlayers(), resolutionResult.awayPlayers()));
+                match.setTeamSignature(buildTeamSignature(resolutionResult.homePlayers(), resolutionResult.awayPlayers()));
                 Match savedMatch = matchRepository.save(match);
 
                 List<MatchParticipant> participants = new ArrayList<>(6);
@@ -349,6 +356,30 @@ public class MatchImportService {
     private String safeTrimToNull(String value) {
         String trimmed = safeTrim(value);
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String buildParticipantSignature(List<Player> homePlayers, List<Player> awayPlayers) {
+        List<Long> allIds = new ArrayList<>(homePlayers.size() + awayPlayers.size());
+        homePlayers.forEach(player -> allIds.add(player.getId()));
+        awayPlayers.forEach(player -> allIds.add(player.getId()));
+        return allIds.stream()
+            .sorted(Comparator.naturalOrder())
+            .map(String::valueOf)
+            .collect(Collectors.joining("-"));
+    }
+
+    private String buildTeamSignature(List<Player> homePlayers, List<Player> awayPlayers) {
+        String homeSignature = homePlayers.stream()
+            .map(Player::getId)
+            .sorted(Comparator.naturalOrder())
+            .map(String::valueOf)
+            .collect(Collectors.joining("-"));
+        String awaySignature = awayPlayers.stream()
+            .map(Player::getId)
+            .sorted(Comparator.naturalOrder())
+            .map(String::valueOf)
+            .collect(Collectors.joining("-"));
+        return "HOME:" + homeSignature + "|AWAY:" + awaySignature;
     }
 
     private record ValidationResult(
