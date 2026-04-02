@@ -28,5 +28,17 @@ export function buildSupabaseAuthRedirectTo(): string | undefined {
     return undefined
   }
 
+  const configuredOrigin = process.env.NEXT_PUBLIC_APP_ORIGIN?.trim()
+  if (configuredOrigin) {
+    try {
+      const url = new URL(configuredOrigin)
+      if (url.protocol === 'https:' || url.protocol === 'http:') {
+        return `${url.origin}/auth/callback`
+      }
+    } catch {
+      // fallback to runtime origin
+    }
+  }
+
   return `${window.location.origin}/auth/callback`
 }

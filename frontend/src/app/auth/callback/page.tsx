@@ -21,6 +21,17 @@ function resolveSessionNickname(metadata: unknown): string {
   return typeof nickname === 'string' ? nickname.trim() : ''
 }
 
+function isPkceVerifierMissingError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false
+  }
+
+  return (
+    error.name === 'AuthPKCECodeVerifierMissingError' ||
+    /pkce code verifier not found/i.test(error.message)
+  )
+}
+
 export default function AuthCallbackPage() {
   const router = useRouter()
   const handledRef = useRef(false)
@@ -44,12 +55,18 @@ export default function AuthCallbackPage() {
           currentUrl
         )
         if (exchangeError) {
-          console.error('Error exchanging auth code:', exchangeError)
-          await supabase.auth.signOut()
-          router.replace('/')
-          return
+          if (!isPkceVerifierMissingError(exchangeError)) {
+            console.error('Error exchanging auth code:', exchangeError)
+            await supabase.auth.signOut()
+            router.replace('/')
+            return
+          }
+
+          const { data: fallbackData } = await supabase.auth.getSession()
+          session = fallbackData.session
+        } else {
+          session = exchangeData.session
         }
-        session = exchangeData.session
       }
 
       if (!session) {
