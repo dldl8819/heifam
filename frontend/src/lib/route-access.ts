@@ -15,9 +15,9 @@ type RouteRequirement = 'public' | 'member' | 'admin' | 'super_admin'
 
 const AUTH_PATH_PREFIX = '/auth'
 const PUBLIC_PATHS = ['/', '/results', '/privacy', '/terms']
-const MEMBER_PATHS = ['/dashboard', '/ranking', '/balance', '/players']
+const MEMBER_PATHS = ['/ranking', '/balance', '/players']
 const ADMIN_PATHS = ['/balance/multi', '/captain-draft', '/import', '/admin/access']
-const SUPER_ADMIN_PATHS = ['/players/import']
+const SUPER_ADMIN_PATHS = ['/dashboard', '/players/import']
 
 function matchesPath(pathname: string, path: string): boolean {
   if (path === '/') {
@@ -61,7 +61,7 @@ export function getRouteAccessDecision(
     if (pathname === '/' && context.isLoggedIn && context.canAccess) {
       return {
         allowed: false,
-        redirectTo: '/dashboard',
+        redirectTo: context.isSuperAdmin ? '/dashboard' : '/ranking',
         blocked: false,
       }
     }
@@ -100,14 +100,14 @@ export function getRouteAccessDecision(
   if (requirement === 'admin') {
     return {
       allowed: context.isAdmin,
-      redirectTo: context.isAdmin ? null : '/dashboard',
+      redirectTo: context.isAdmin ? null : '/ranking',
       blocked: false,
     }
   }
 
   return {
     allowed: context.isSuperAdmin,
-    redirectTo: context.isSuperAdmin ? null : '/dashboard',
+    redirectTo: context.isSuperAdmin ? null : '/ranking',
     blocked: false,
   }
 }

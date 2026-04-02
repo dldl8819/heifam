@@ -149,11 +149,10 @@ async function buildProxyResponse(upstream: Response, baseUrl: string): Promise<
     responseHeaders.set(key, value)
   })
 
-  // Always let platform/runtime set transport encoding headers.
+  // Let runtime/platform negotiate transport encoding.
   responseHeaders.delete('content-encoding')
   responseHeaders.delete('content-length')
   responseHeaders.delete('transfer-encoding')
-  responseHeaders.set('content-encoding', 'identity')
   responseHeaders.set('x-proxy-upstream', baseUrl)
   responseHeaders.set('x-proxy-upstream-status', String(upstream.status))
 

@@ -6,10 +6,12 @@ import com.balancify.backend.security.AdminRequestResolver;
 import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.DashboardQueryService;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/groups")
@@ -39,7 +41,12 @@ public class GroupDashboardController {
     ) {
         String requestEmail = safeTrim(request == null ? null : request.getHeader(USER_EMAIL_HEADER));
         String requestNickname = safeTrim(request == null ? null : request.getHeader(USER_NICKNAME_HEADER));
-        String resolvedNickname = safeTrim(accessControlService.resolveAccessProfile(requestEmail).nickname());
+        AccessControlService.AccessProfile accessProfile = accessControlService.resolveAccessProfile(requestEmail);
+        if (!accessProfile.superAdmin()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only super admins can access dashboard data");
+        }
+
+        String resolvedNickname = safeTrim(accessProfile.nickname());
         String effectiveNickname = resolvedNickname.isEmpty() ? requestNickname : resolvedNickname;
         GroupDashboardResponse response = dashboardQueryService.getGroupDashboard(groupId, effectiveNickname);
         if (adminRequestResolver.isAdminRequest(request)) {

@@ -79,7 +79,7 @@ export default function AuthCallbackPage() {
           return
         }
 
-        router.replace('/dashboard')
+        router.replace(access.superAdmin ? '/dashboard' : '/ranking')
       } catch (callbackError) {
         if (
           callbackError instanceof ApiRequestError &&
@@ -91,7 +91,7 @@ export default function AuthCallbackPage() {
         }
 
         console.error('Error verifying access during auth callback:', callbackError)
-        router.replace('/dashboard')
+        router.replace('/ranking')
       }
     }
 
