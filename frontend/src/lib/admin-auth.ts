@@ -9,6 +9,16 @@ let cachedAccessEmail: string | null = null
 let cachedAccessProfile: AccessMeResponse | null = null
 const ACCESS_FETCH_RETRY_DELAYS_MS = [400, 900]
 
+export function primeAccessProfile(profile: AccessMeResponse) {
+  const normalizedEmail = profile.email?.trim().toLowerCase() ?? ''
+  if (normalizedEmail.length === 0) {
+    return
+  }
+
+  cachedAccessEmail = normalizedEmail
+  cachedAccessProfile = profile
+}
+
 export type AdminAuthState = {
   status: 'loading' | 'authenticated' | 'unauthenticated'
   isLoading: boolean
@@ -32,7 +42,7 @@ function resolveRole(profile: AccessMeResponse | null): AccessRole {
 }
 
 export function useAdminAuth(): AdminAuthState {
-  const { user, loading } = useAuth()
+  const { user, session, loading } = useAuth()
   const email = user?.email?.trim().toLowerCase() ?? null
   const [accessProfile, setAccessProfile] = useState<AccessMeResponse | null>(null)
   const [accessLoading, setAccessLoading] = useState<boolean>(false)
@@ -55,9 +65,11 @@ export function useAdminAuth(): AdminAuthState {
     try {
       for (let attempt = 0; attempt <= ACCESS_FETCH_RETRY_DELAYS_MS.length; attempt += 1) {
         try {
-          const profile = await apiClient.getMyAccess({ email })
-          cachedAccessEmail = email
-          cachedAccessProfile = profile
+          const profile = await apiClient.getMyAccess({
+            email,
+            accessToken: session?.access_token ?? '',
+          })
+          primeAccessProfile(profile)
           setAccessProfile(profile)
           setAccessError(false)
           return
@@ -110,7 +122,7 @@ export function useAdminAuth(): AdminAuthState {
     } finally {
       setAccessLoading(false)
     }
-  }, [email])
+  }, [email, session?.access_token])
 
   useEffect(() => {
     if (loading) {

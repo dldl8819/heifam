@@ -39,6 +39,7 @@ const API_BASE_URL =
 const ACCESS_API_BASE_URL =
   RAW_ACCESS_API_BASE_URL.length > 0 ? RAW_ACCESS_API_BASE_URL : API_BASE_URL
 const DEFAULT_API_REQUEST_TIMEOUT_MS = 10000
+const ACCESS_API_REQUEST_TIMEOUT_MS = process.env.NODE_ENV === 'production' ? 45000 : 15000
 const IMPORT_API_REQUEST_TIMEOUT_MS = 120000
 const SESSION_IDENTITY_CACHE_TTL_MS = 5000
 const USER_EMAIL_HEADER = 'X-USER-EMAIL'
@@ -629,12 +630,14 @@ export const apiClient = {
       userEmail: identity?.email,
       userNickname: identity?.nickname,
       accessToken: identity?.accessToken,
+      timeoutMs: ACCESS_API_REQUEST_TIMEOUT_MS,
       baseUrlOverride: ACCESS_API_BASE_URL,
     }),
   getAdminEmailList: () =>
     apiRequest<AccessAdminListResponse>('/api/access/admins', undefined, {
       requireUserEmail: true,
       includeUserEmail: true,
+      timeoutMs: ACCESS_API_REQUEST_TIMEOUT_MS,
       baseUrlOverride: ACCESS_API_BASE_URL,
     }),
   addAdminEmail: (email: string, nickname: string) =>
@@ -647,6 +650,7 @@ export const apiClient = {
       {
         requireUserEmail: true,
         includeUserEmail: true,
+        timeoutMs: ACCESS_API_REQUEST_TIMEOUT_MS,
         baseUrlOverride: ACCESS_API_BASE_URL,
       }
     ),
@@ -659,6 +663,7 @@ export const apiClient = {
       {
         requireUserEmail: true,
         includeUserEmail: true,
+        timeoutMs: ACCESS_API_REQUEST_TIMEOUT_MS,
         baseUrlOverride: ACCESS_API_BASE_URL,
       }
     ),
@@ -666,6 +671,7 @@ export const apiClient = {
     apiRequest<AccessAllowedEmailListResponse>('/api/access/allowed-users', undefined, {
       requireUserEmail: true,
       includeUserEmail: true,
+      timeoutMs: ACCESS_API_REQUEST_TIMEOUT_MS,
       baseUrlOverride: ACCESS_API_BASE_URL,
     }),
   addAllowedEmail: (email: string, nickname: string) =>
@@ -678,6 +684,7 @@ export const apiClient = {
       {
         requireUserEmail: true,
         includeUserEmail: true,
+        timeoutMs: ACCESS_API_REQUEST_TIMEOUT_MS,
         baseUrlOverride: ACCESS_API_BASE_URL,
       }
     ),
@@ -690,6 +697,7 @@ export const apiClient = {
       {
         requireUserEmail: true,
         includeUserEmail: true,
+        timeoutMs: ACCESS_API_REQUEST_TIMEOUT_MS,
         baseUrlOverride: ACCESS_API_BASE_URL,
       }
     ),
@@ -703,6 +711,7 @@ export const apiClient = {
       {
         requireUserEmail: true,
         includeUserEmail: true,
+        timeoutMs: ACCESS_API_REQUEST_TIMEOUT_MS,
         baseUrlOverride: ACCESS_API_BASE_URL,
       }
     ),
@@ -722,4 +731,8 @@ export function isApiUnauthorizedError(error: unknown): boolean {
 
 export function isApiConflictError(error: unknown): boolean {
   return error instanceof ApiRequestError && error.status === 409
+}
+
+export function isApiTimeoutError(error: unknown): boolean {
+  return error instanceof ApiRequestError && error.status === 408
 }

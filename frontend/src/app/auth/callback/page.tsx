@@ -3,8 +3,11 @@
 import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
-import { ApiRequestError, apiClient } from '@/lib/api'
+import { ApiRequestError, apiClient, isApiTimeoutError } from '@/lib/api'
+import { primeAccessProfile } from '@/lib/admin-auth'
 import { supabase } from '@/lib/supabase'
+
+const CALLBACK_ACCESS_PREFETCH_GRACE_MS = 1500
 
 function resolveSessionNickname(metadata: unknown): string {
   if (!metadata || typeof metadata !== 'object') {
@@ -120,11 +123,29 @@ export default function AuthCallbackPage() {
           return
         }
 
-        const access = await apiClient.getMyAccess({
-          email: sessionEmail,
-          nickname: resolveSessionNickname(session.user.user_metadata),
-          accessToken: session.access_token ?? '',
-        })
+        const accessPromise = apiClient
+          .getMyAccess({
+            email: sessionEmail,
+            nickname: resolveSessionNickname(session.user.user_metadata),
+            accessToken: session.access_token ?? '',
+          })
+          .then((access) => {
+            primeAccessProfile(access)
+            return access
+          })
+
+        const access = await Promise.race<Awaited<typeof accessPromise> | null>([
+          accessPromise,
+          new Promise<null>((resolve) => {
+            window.setTimeout(() => resolve(null), CALLBACK_ACCESS_PREFETCH_GRACE_MS)
+          }),
+        ])
+
+        if (!access) {
+          router.replace('/ranking')
+          return
+        }
+
         if (!access.allowed) {
           await supabase.auth.signOut()
           router.replace('/')
@@ -139,6 +160,11 @@ export default function AuthCallbackPage() {
         ) {
           await supabase.auth.signOut()
           router.replace('/')
+          return
+        }
+
+        if (isApiTimeoutError(callbackError)) {
+          router.replace('/ranking')
           return
         }
 
