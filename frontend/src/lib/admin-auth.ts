@@ -130,6 +130,7 @@ export function useAdminAuth(): AdminAuthState {
       setAccessProfile(cachedAccessProfile)
       setAccessLoading(false)
       setAccessError(false)
+      void refreshAccess()
       return
     }
 
