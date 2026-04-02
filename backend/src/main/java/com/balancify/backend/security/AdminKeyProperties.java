@@ -11,14 +11,12 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "balancify.admin")
 public class AdminKeyProperties {
 
-    private static final String DEFAULT_SUPER_ADMIN_EMAIL = "minsiklee2@gmail.com";
-
     private String apiKey;
     private String emails;
-    private String superEmails = DEFAULT_SUPER_ADMIN_EMAIL;
+    private String superEmails;
     private String allowedEmails;
     private Set<String> normalizedAdminEmails = Set.of();
-    private Set<String> normalizedSuperAdminEmails = Set.of(DEFAULT_SUPER_ADMIN_EMAIL);
+    private Set<String> normalizedSuperAdminEmails = Set.of();
     private Set<String> normalizedAllowedEmails = Set.of();
 
     public String getApiKey() {
@@ -47,8 +45,7 @@ public class AdminKeyProperties {
     }
 
     public void setSuperEmails(String superEmails) {
-        String normalized = safeValue(superEmails).trim();
-        this.superEmails = normalized.isEmpty() ? DEFAULT_SUPER_ADMIN_EMAIL : normalized;
+        this.superEmails = safeValue(superEmails).trim();
         this.normalizedSuperAdminEmails = Arrays
             .stream(this.superEmails.split(","))
             .map(this::normalizeEmail)

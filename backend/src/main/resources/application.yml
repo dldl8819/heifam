@@ -41,7 +41,7 @@ balancify:
   admin:
     api-key: ${ADMIN_API_KEY:}
     emails: ${ADMIN_EMAILS:}
-    super-emails: ${SUPER_ADMIN_EMAILS:minsiklee2@gmail.com}
+    super-emails: ${SUPER_ADMIN_EMAILS:}
     allowed-emails: ${ALLOWED_USER_EMAILS:}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}

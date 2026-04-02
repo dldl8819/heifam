@@ -44,7 +44,7 @@ class AccessControlServiceTest {
     void setUp() {
         AdminKeyProperties adminKeyProperties = new AdminKeyProperties();
         adminKeyProperties.setEmails("ops@hei.gg");
-        adminKeyProperties.setSuperEmails("minsiklee2@gmail.com");
+        adminKeyProperties.setSuperEmails("superadmin@hei.gg");
         adminKeyProperties.setAllowedEmails("member@hei.gg");
 
         when(managedAdminEmailRepository.findAllByOrderByNormalizedEmailAsc())
@@ -69,7 +69,7 @@ class AccessControlServiceTest {
     @Test
     void resolvesSuperAdminProfile() {
         AccessControlService.AccessProfile profile = accessControlService.resolveAccessProfile(
-            "minsiklee2@gmail.com"
+            "superadmin@hei.gg"
         );
 
         assertThat(profile.superAdmin()).isTrue();
@@ -82,7 +82,7 @@ class AccessControlServiceTest {
     void addsManagedAdminOnlyWhenActorIsSuperAdmin() {
         when(managedAdminEmailRepository.existsByNormalizedEmail("newops@hei.gg")).thenReturn(false);
 
-        accessControlService.addManagedAdminEmail("minsiklee2@gmail.com", "newops@hei.gg", "운영진");
+        accessControlService.addManagedAdminEmail("superadmin@hei.gg", "newops@hei.gg", "운영진");
 
         verify(managedAdminEmailRepository).save(any(ManagedAdminEmail.class));
     }

@@ -54,7 +54,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @TestPropertySource(properties = {
     "balancify.admin.api-key=test-admin-key",
     "balancify.admin.emails=admin@hei.gg,ops@hei.gg",
-    "balancify.admin.super-emails=minsiklee2@gmail.com"
+    "balancify.admin.super-emails=superadmin@hei.gg"
 })
 class AdminKeyFilterTest {
 
@@ -88,8 +88,8 @@ class AdminKeyFilterTest {
     @BeforeEach
     void setUp() {
         Set<String> admins = Set.of("admin@hei.gg", "ops@hei.gg");
-        Set<String> superAdmins = Set.of("minsiklee2@gmail.com");
-        Set<String> allowed = Set.of("admin@hei.gg", "ops@hei.gg", "minsiklee2@gmail.com", "member@hei.gg");
+        Set<String> superAdmins = Set.of("superadmin@hei.gg");
+        Set<String> allowed = Set.of("admin@hei.gg", "ops@hei.gg", "superadmin@hei.gg", "member@hei.gg");
 
         when(accessControlService.isAdminEmail(any())).thenAnswer(invocation -> {
             Object argument = invocation.getArgument(0);
@@ -368,9 +368,9 @@ class AdminKeyFilterTest {
     @Test
     void allowsPlayerMmrUpdateWithSuperAdminEmail() throws Exception {
         mockMvc
-            .perform(
+                    .perform(
                 patch("/api/groups/1/players/10/mmr")
-                    .header("X-USER-EMAIL", "minsiklee2@gmail.com")
+                    .header("X-USER-EMAIL", "superadmin@hei.gg")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"mmr\":1200}")
             )
