@@ -12,6 +12,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,9 +24,11 @@ public class AccessControlService {
     private final ManagedAdminEmailRepository managedAdminEmailRepository;
     private final AllowedUserEmailRepository allowedUserEmailRepository;
     private final UserRacePreferenceRepository userRacePreferenceRepository;
+    private final ConcurrentMap<String, CachedAccessState> accessStateCache = new ConcurrentHashMap<>();
 
     private static final Set<String> ALLOWED_RACES = Set.of("P", "T", "Z", "PT", "PZ", "TZ", "R");
     private static final int MAX_NICKNAME_LENGTH = 100;
+    private static final long ACCESS_STATE_CACHE_TTL_MS = 60_000L;
 
     public AccessControlService(
         AdminKeyProperties adminKeyProperties,
@@ -45,17 +49,21 @@ public class AccessControlService {
             return new AccessProfile("", null, "BLOCKED", false, false, false, null);
         }
 
-        boolean superAdmin = isSuperAdminEmail(normalizedEmail);
-        boolean admin = superAdmin || isAdminEmail(normalizedEmail);
-        boolean allowed = admin || isServiceAccessAllowed(normalizedEmail);
+        AccessState accessState = resolveAccessState(normalizedEmail);
+        boolean superAdmin = accessState.superAdmin();
+        boolean admin = accessState.admin();
+        boolean allowed = accessState.allowed();
         String role = superAdmin ? "SUPER_ADMIN" : admin ? "ADMIN" : allowed ? "MEMBER" : "BLOCKED";
-        String nickname = resolveNickname(normalizedEmail);
-        String preferredRace = userRacePreferenceRepository
-            .findByNormalizedEmail(normalizedEmail)
-            .map(UserRacePreference::getPreferredRace)
-            .orElse(null);
 
-        return new AccessProfile(normalizedEmail, nickname, role, admin, superAdmin, allowed, preferredRace);
+        return new AccessProfile(
+            normalizedEmail,
+            accessState.nickname(),
+            role,
+            admin,
+            superAdmin,
+            allowed,
+            accessState.preferredRace()
+        );
     }
 
     @Transactional
@@ -76,6 +84,7 @@ public class AccessControlService {
         preference.setEmail(normalizedEmail);
         preference.setPreferredRace(normalizedRace);
         userRacePreferenceRepository.save(preference);
+        invalidateAccessState(normalizedEmail);
 
         return resolveAccessProfile(normalizedEmail);
     }
@@ -89,28 +98,13 @@ public class AccessControlService {
     @Transactional(readOnly = true)
     public boolean isAdminEmail(String email) {
         String normalizedEmail = normalizeEmail(email);
-        if (normalizedEmail.isEmpty()) {
-            return false;
-        }
-        if (adminKeyProperties.isAllowedAdminEmail(normalizedEmail)) {
-            return true;
-        }
-        return managedAdminEmailRepository.existsByNormalizedEmail(normalizedEmail);
+        return !normalizedEmail.isEmpty() && resolveAccessState(normalizedEmail).admin();
     }
 
     @Transactional(readOnly = true)
     public boolean isServiceAccessAllowed(String email) {
         String normalizedEmail = normalizeEmail(email);
-        if (normalizedEmail.isEmpty()) {
-            return false;
-        }
-        if (isAdminEmail(normalizedEmail)) {
-            return true;
-        }
-        if (adminKeyProperties.isConfiguredAllowedEmail(normalizedEmail)) {
-            return true;
-        }
-        return allowedUserEmailRepository.existsByNormalizedEmail(normalizedEmail);
+        return !normalizedEmail.isEmpty() && resolveAccessState(normalizedEmail).allowed();
     }
 
     @Transactional(readOnly = true)
@@ -175,6 +169,7 @@ public class AccessControlService {
             throw new IllegalArgumentException("Target email is already a super admin");
         }
         upsertManagedAdminEmail(normalizedActorEmail, normalizedTargetEmail, normalizedTargetNickname);
+        invalidateAccessState(normalizedTargetEmail);
 
         return getAdminEmailSnapshot();
     }
@@ -198,6 +193,7 @@ public class AccessControlService {
         managedAdminEmailRepository
             .findByNormalizedEmail(normalizedTargetEmail)
             .ifPresent(managedAdminEmailRepository::delete);
+        invalidateAccessState(normalizedTargetEmail);
 
         return getAdminEmailSnapshot();
     }
@@ -218,6 +214,7 @@ public class AccessControlService {
             return getAllowedEmailSnapshot();
         }
         upsertAllowedUserEmail(normalizedActorEmail, normalizedTargetEmail, normalizedTargetNickname);
+        invalidateAccessState(normalizedTargetEmail);
 
         return getAllowedEmailSnapshot();
     }
@@ -241,8 +238,61 @@ public class AccessControlService {
         allowedUserEmailRepository
             .findByNormalizedEmail(normalizedTargetEmail)
             .ifPresent(allowedUserEmailRepository::delete);
+        invalidateAccessState(normalizedTargetEmail);
 
         return getAllowedEmailSnapshot();
+    }
+
+    private AccessState resolveAccessState(String normalizedEmail) {
+        long now = System.currentTimeMillis();
+        CachedAccessState cached = accessStateCache.get(normalizedEmail);
+        if (cached != null && cached.expiresAtEpochMs() > now) {
+            return cached.accessState();
+        }
+
+        AccessState computed = loadAccessState(normalizedEmail);
+        accessStateCache.put(
+            normalizedEmail,
+            new CachedAccessState(computed, now + ACCESS_STATE_CACHE_TTL_MS)
+        );
+        return computed;
+    }
+
+    private AccessState loadAccessState(String normalizedEmail) {
+        boolean superAdmin = adminKeyProperties.isConfiguredSuperAdminEmail(normalizedEmail);
+        boolean configuredAdmin = adminKeyProperties.isConfiguredAdminEmail(normalizedEmail);
+        boolean configuredAllowed = adminKeyProperties.isConfiguredAllowedEmail(normalizedEmail);
+
+        ManagedAdminEmail managedAdminEmail = managedAdminEmailRepository
+            .findByNormalizedEmail(normalizedEmail)
+            .orElse(null);
+        AllowedUserEmail allowedUserEmail = allowedUserEmailRepository
+            .findByNormalizedEmail(normalizedEmail)
+            .orElse(null);
+        UserRacePreference userRacePreference = userRacePreferenceRepository
+            .findByNormalizedEmail(normalizedEmail)
+            .orElse(null);
+
+        boolean admin = superAdmin || configuredAdmin || managedAdminEmail != null;
+        boolean allowed = admin || configuredAllowed || allowedUserEmail != null;
+        String nickname = managedAdminEmail != null
+            ? normalizeNickname(managedAdminEmail.getNickname())
+            : allowedUserEmail != null
+                ? normalizeNickname(allowedUserEmail.getNickname())
+                : null;
+        if (nickname != null && nickname.isBlank()) {
+            nickname = null;
+        }
+        String preferredRace = userRacePreference == null ? null : userRacePreference.getPreferredRace();
+
+        return new AccessState(superAdmin, admin, allowed, nickname, preferredRace);
+    }
+
+    private void invalidateAccessState(String normalizedEmail) {
+        if (normalizedEmail == null || normalizedEmail.isBlank()) {
+            return;
+        }
+        accessStateCache.remove(normalizedEmail);
     }
 
     private void validateEmail(String email) {
@@ -311,6 +361,21 @@ public class AccessControlService {
 
     private String normalizeRace(String value) {
         return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private record AccessState(
+        boolean superAdmin,
+        boolean admin,
+        boolean allowed,
+        String nickname,
+        String preferredRace
+    ) {
+    }
+
+    private record CachedAccessState(
+        AccessState accessState,
+        long expiresAtEpochMs
+    ) {
     }
 
     public record AccessProfile(

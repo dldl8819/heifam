@@ -1,33 +1,44 @@
 package com.balancify.backend.security;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import java.net.URI;
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.jwk.source.JWKSource;
+import com.nimbusds.jose.jwk.source.RemoteJWKSet;
+import com.nimbusds.jose.proc.BadJOSEException;
+import com.nimbusds.jose.proc.JWSAlgorithmFamilyJWSKeySelector;
+import com.nimbusds.jose.proc.JWSKeySelector;
+import com.nimbusds.jose.proc.SecurityContext;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.proc.ConfigurableJWTProcessor;
+import com.nimbusds.jwt.proc.DefaultJWTProcessor;
+import com.nimbusds.jose.util.DefaultResourceRetriever;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.text.ParseException;
+import java.time.Instant;
+import java.util.Date;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
 
 @Component
 public class SupabaseJwtVerifier {
 
-    private final RestClient restClient;
+    private static final long CLOCK_SKEW_SECONDS = 30L;
+
     private final SupabaseAuthProperties supabaseAuthProperties;
     private final ConcurrentMap<String, CachedVerification> verificationCache = new ConcurrentHashMap<>();
+    private final ConfigurableJWTProcessor<SecurityContext> jwtProcessor;
+    private final String expectedIssuer;
 
     public SupabaseJwtVerifier(
         SupabaseAuthProperties supabaseAuthProperties
     ) {
         this.supabaseAuthProperties = supabaseAuthProperties;
-
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(this.supabaseAuthProperties.getVerifyTimeoutMs());
-        requestFactory.setReadTimeout(this.supabaseAuthProperties.getVerifyTimeoutMs());
-        this.restClient = RestClient.builder().requestFactory(requestFactory).build();
+        this.expectedIssuer = resolveExpectedIssuer();
+        this.jwtProcessor = createJwtProcessor();
     }
 
     public Optional<VerifiedUser> verify(String bearerToken) {
@@ -42,50 +53,102 @@ public class SupabaseJwtVerifier {
             return Optional.of(cachedVerification.user());
         }
 
-        String userEndpoint = resolveUserEndpoint();
-        if (userEndpoint.isEmpty()) {
+        if (jwtProcessor == null || expectedIssuer.isEmpty()) {
+            verificationCache.remove(normalizedToken);
             return Optional.empty();
         }
 
         try {
-            JsonNode responseBody = restClient
-                .get()
-                .uri(URI.create(userEndpoint))
-                .headers(headers -> {
-                    headers.setBearerAuth(normalizedToken);
-                    String apiKey = safeTrim(supabaseAuthProperties.getSupabaseApiKey());
-                    if (!apiKey.isEmpty()) {
-                        headers.set("apikey", apiKey);
-                    }
-                    headers.set(HttpHeaders.ACCEPT, "application/json");
-                })
-                .retrieve()
-                .body(JsonNode.class);
-
-            if (responseBody == null) {
+            JWTClaimsSet claims = jwtProcessor.process(normalizedToken, null);
+            if (!isValidClaims(claims, now)) {
+                verificationCache.remove(normalizedToken);
                 return Optional.empty();
             }
 
-            String email = normalizeEmail(responseBody.path("email").asText(""));
+            String email = normalizeEmail(claims.getStringClaim("email"));
             if (email.isEmpty()) {
+                verificationCache.remove(normalizedToken);
                 return Optional.empty();
             }
 
-            String nickname = resolveNickname(responseBody.path("user_metadata"));
+            String nickname = resolveNickname(claims.getClaim("user_metadata"));
             VerifiedUser verifiedUser = new VerifiedUser(email, nickname);
+
             long ttlMillis = (long) supabaseAuthProperties.getVerificationCacheTtlSeconds() * 1000L;
             if (ttlMillis > 0) {
-                verificationCache.put(normalizedToken, new CachedVerification(verifiedUser, now + ttlMillis));
+                long expirationBound = resolveExpirationBound(claims, now);
+                long expiresAt = expirationBound > 0
+                    ? Math.min(now + ttlMillis, expirationBound)
+                    : now + ttlMillis;
+                verificationCache.put(normalizedToken, new CachedVerification(verifiedUser, expiresAt));
             }
 
             return Optional.of(verifiedUser);
-        } catch (RestClientException restClientException) {
+        } catch (BadJOSEException | JOSEException | ParseException exception) {
             verificationCache.remove(normalizedToken);
             return Optional.empty();
         }
     }
 
-    private String resolveUserEndpoint() {
+    private ConfigurableJWTProcessor<SecurityContext> createJwtProcessor() {
+        String jwksUrl = resolveJwksEndpoint();
+        if (jwksUrl.isEmpty()) {
+            return null;
+        }
+
+        try {
+            DefaultResourceRetriever resourceRetriever = new DefaultResourceRetriever(
+                supabaseAuthProperties.getVerifyTimeoutMs(),
+                supabaseAuthProperties.getVerifyTimeoutMs()
+            );
+            JWKSource<SecurityContext> jwkSource = new RemoteJWKSet<>(new URL(jwksUrl), resourceRetriever);
+            DefaultJWTProcessor<SecurityContext> processor = new DefaultJWTProcessor<>();
+            JWSKeySelector<SecurityContext> keySelector =
+                JWSAlgorithmFamilyJWSKeySelector.fromJWKSource(jwkSource);
+            processor.setJWSKeySelector(keySelector);
+            return processor;
+        } catch (MalformedURLException malformedURLException) {
+            return null;
+        } catch (JOSEException joseException) {
+            return null;
+        }
+    }
+
+    private boolean isValidClaims(JWTClaimsSet claims, long nowEpochMs) {
+        if (claims == null) {
+            return false;
+        }
+
+        if (!expectedIssuer.equals(safeTrim(claims.getIssuer()))) {
+            return false;
+        }
+
+        Date expirationTime = claims.getExpirationTime();
+        if (expirationTime == null) {
+            return false;
+        }
+        if (expirationTime.toInstant().isBefore(Instant.ofEpochMilli(nowEpochMs).minusSeconds(CLOCK_SKEW_SECONDS))) {
+            return false;
+        }
+
+        Date notBeforeTime = claims.getNotBeforeTime();
+        if (notBeforeTime != null && notBeforeTime.toInstant().isAfter(Instant.ofEpochMilli(nowEpochMs).plusSeconds(CLOCK_SKEW_SECONDS))) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private long resolveExpirationBound(JWTClaimsSet claims, long nowEpochMs) {
+        Date expirationTime = claims.getExpirationTime();
+        if (expirationTime == null) {
+            return 0L;
+        }
+        long expirationEpochMs = expirationTime.getTime();
+        return Math.max(nowEpochMs, expirationEpochMs);
+    }
+
+    private String resolveExpectedIssuer() {
         String configuredUrl = safeTrim(supabaseAuthProperties.getSupabaseUrl());
         if (configuredUrl.isEmpty()) {
             return "";
@@ -96,25 +159,28 @@ public class SupabaseJwtVerifier {
             : configuredUrl;
 
         if (normalizedBase.endsWith("/auth/v1")) {
-            return normalizedBase + "/user";
+            return normalizedBase;
         }
-        return normalizedBase + "/auth/v1/user";
+        return normalizedBase + "/auth/v1";
     }
 
-    private String resolveNickname(JsonNode userMetadataNode) {
-        if (userMetadataNode == null || userMetadataNode.isNull() || !userMetadataNode.isObject()) {
+    private String resolveJwksEndpoint() {
+        String issuer = resolveExpectedIssuer();
+        if (issuer.isEmpty()) {
+            return "";
+        }
+        return issuer + "/.well-known/jwks.json";
+    }
+
+    private String resolveNickname(Object userMetadataClaim) {
+        if (!(userMetadataClaim instanceof Map<?, ?> userMetadata)) {
             return "";
         }
 
-        String[] candidates = new String[] {
-            userMetadataNode.path("nickname").asText(""),
-            userMetadataNode.path("full_name").asText(""),
-            userMetadataNode.path("name").asText(""),
-            userMetadataNode.path("preferred_username").asText("")
-        };
-
-        for (String candidate : candidates) {
-            String normalized = safeTrim(candidate);
+        String[] candidateKeys = new String[] { "nickname", "full_name", "name", "preferred_username" };
+        for (String candidateKey : candidateKeys) {
+            Object value = userMetadata.get(candidateKey);
+            String normalized = safeTrim(value == null ? "" : value.toString());
             if (!normalized.isEmpty()) {
                 return normalized;
             }
