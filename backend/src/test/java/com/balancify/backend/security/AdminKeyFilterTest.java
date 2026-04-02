@@ -58,6 +58,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -83,9 +84,10 @@ import org.springframework.test.web.servlet.MockMvc;
 })
 @Import({ AdminKeyFilter.class, ServiceAccessFilter.class, AdminKeyProperties.class })
 @TestPropertySource(properties = {
-    "balancify.admin.api-key=test-admin-key",
     "balancify.admin.emails=admin@hei.gg,ops@hei.gg",
-    "balancify.admin.super-emails=superadmin@hei.gg"
+    "balancify.admin.super-emails=superadmin@hei.gg",
+    "balancify.auth.allow-email-header-fallback=true",
+    "balancify.auth.require-jwt=false"
 })
 class AdminKeyFilterTest {
 
@@ -131,6 +133,9 @@ class AdminKeyFilterTest {
     @MockBean
     private AccessControlService accessControlService;
 
+    @MockBean
+    private AuthenticatedRequestResolver authenticatedRequestResolver;
+
     @BeforeEach
     void setUp() {
         Set<String> admins = Set.of("admin@hei.gg", "ops@hei.gg");
@@ -151,6 +156,17 @@ class AdminKeyFilterTest {
             Object argument = invocation.getArgument(0);
             String email = argument == null ? "" : argument.toString().trim().toLowerCase(Locale.ROOT);
             return allowed.contains(email);
+        });
+        when(authenticatedRequestResolver.resolve(any(HttpServletRequest.class))).thenAnswer(invocation -> {
+            HttpServletRequest request = invocation.getArgument(0);
+            String email = request.getHeader("X-USER-EMAIL");
+            if (email == null || email.isBlank()) {
+                return AuthenticatedRequestResolver.ResolvedRequestIdentity.empty();
+            }
+            String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
+            String nickname = request.getHeader("X-USER-NICKNAME");
+            String normalizedNickname = nickname == null ? "" : nickname.trim();
+            return new AuthenticatedRequestResolver.ResolvedRequestIdentity(normalizedEmail, normalizedNickname, true);
         });
     }
 
@@ -217,7 +233,7 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void returnsForbiddenWhenAdminKeyHeaderIsMissingForMatchResultPatch() throws Exception {
+    void returnsForbiddenWhenAdminEmailHeaderIsMissingForMatchResultPatch() throws Exception {
         mockMvc
             .perform(
                 patch("/api/matches/1/result")
@@ -228,7 +244,7 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void allowsMatchResultPatchWhenAdminKeyHeaderIsValid() throws Exception {
+    void allowsMatchResultPatchWhenAdminEmailHeaderIsValid() throws Exception {
         when(matchResultService.processMatchResult(eq(1L), any(MatchResultRequest.class), any(), any(), anyBoolean()))
             .thenReturn(
                 new MatchResultResponse(
@@ -245,7 +261,6 @@ class AdminKeyFilterTest {
         mockMvc
             .perform(
                 patch("/api/matches/1/result")
-                    .header("X-ADMIN-KEY", "test-admin-key")
                     .header("X-USER-EMAIL", "admin@hei.gg")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"winnerTeam\":\"AWAY\"}")
@@ -357,7 +372,6 @@ class AdminKeyFilterTest {
         mockMvc
             .perform(
                 post("/api/matches/import")
-                    .header("X-ADMIN-KEY", "test-admin-key")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("[]")
             )
@@ -365,18 +379,17 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void returnsForbiddenForMatchDeleteWithoutAdminKey() throws Exception {
+    void returnsForbiddenForMatchDeleteWithoutAdminEmail() throws Exception {
         mockMvc
             .perform(delete("/api/matches/1"))
             .andExpect(status().isForbidden());
     }
 
     @Test
-    void allowsMatchDeleteWithValidAdminKey() throws Exception {
+    void allowsMatchDeleteWithAdminEmail() throws Exception {
         mockMvc
             .perform(
                 delete("/api/matches/1")
-                    .header("X-ADMIN-KEY", "test-admin-key")
                     .header("X-USER-EMAIL", "admin@hei.gg")
             )
             .andExpect(status().isOk());
@@ -562,32 +575,7 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void rejectsDashboardForSuperAdminWhenAdminKeyIsMissing() throws Exception {
-        when(accessControlService.resolveAccessProfile(eq("superadmin@hei.gg")))
-            .thenReturn(
-                new AccessControlService.AccessProfile(
-                    "superadmin@hei.gg",
-                    "superadmin",
-                    "SUPER_ADMIN",
-                    true,
-                    true,
-                    true,
-                    null
-                )
-            );
-        when(adminRequestResolver.isAdminRequest(any())).thenReturn(false);
-
-        mockMvc
-            .perform(
-                get("/api/groups/1/dashboard")
-                    .header("X-USER-EMAIL", "superadmin@hei.gg")
-                    .header("X-USER-NICKNAME", "superadmin")
-            )
-            .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void allowsDashboardForSuperAdminWhenAdminKeyIsValid() throws Exception {
+    void allowsDashboardForSuperAdminWhenAuthenticated() throws Exception {
         when(accessControlService.resolveAccessProfile(eq("superadmin@hei.gg")))
             .thenReturn(
                 new AccessControlService.AccessProfile(

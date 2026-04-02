@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 import com.balancify.backend.service.AccessControlService;
+import com.balancify.backend.security.AuthenticatedRequestResolver.ResolvedRequestIdentity;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,18 +17,18 @@ import org.springframework.mock.web.MockHttpServletRequest;
 class AdminRequestResolverTest {
 
     private static final String ADMIN_EMAIL = "admin@hei.gg";
-    private static final String ADMIN_KEY = "test-admin-key";
 
     @Mock
     private AccessControlService accessControlService;
+
+    @Mock
+    private AuthenticatedRequestResolver authenticatedRequestResolver;
 
     private AdminRequestResolver adminRequestResolver;
 
     @BeforeEach
     void setUp() {
-        AdminKeyProperties adminKeyProperties = new AdminKeyProperties();
-        adminKeyProperties.setApiKey(ADMIN_KEY);
-        adminRequestResolver = new AdminRequestResolver(accessControlService, adminKeyProperties);
+        adminRequestResolver = new AdminRequestResolver(accessControlService, authenticatedRequestResolver);
     }
 
     @Test
@@ -38,41 +39,30 @@ class AdminRequestResolverTest {
     @Test
     void returnsFalseWhenEmailIsNotAdmin() {
         MockHttpServletRequest request = new MockHttpServletRequest();
-        request.addHeader("X-USER-EMAIL", "member@hei.gg");
-        request.addHeader("X-ADMIN-KEY", ADMIN_KEY);
 
+        when(authenticatedRequestResolver.resolve(request))
+            .thenReturn(new ResolvedRequestIdentity("member@hei.gg", "", true));
         when(accessControlService.isAdminEmail("member@hei.gg")).thenReturn(false);
 
         assertFalse(adminRequestResolver.isAdminRequest(request));
     }
 
     @Test
-    void returnsFalseWhenAdminEmailButMissingAdminKey() {
+    void returnsFalseWhenEmailIsMissing() {
         MockHttpServletRequest request = new MockHttpServletRequest();
-        request.addHeader("X-USER-EMAIL", ADMIN_EMAIL);
 
-        when(accessControlService.isAdminEmail(ADMIN_EMAIL)).thenReturn(true);
+        when(authenticatedRequestResolver.resolve(request))
+            .thenReturn(ResolvedRequestIdentity.empty());
 
         assertFalse(adminRequestResolver.isAdminRequest(request));
     }
 
     @Test
-    void returnsFalseWhenAdminEmailButInvalidAdminKey() {
+    void returnsTrueWhenAdminEmailIsAuthenticated() {
         MockHttpServletRequest request = new MockHttpServletRequest();
-        request.addHeader("X-USER-EMAIL", ADMIN_EMAIL);
-        request.addHeader("X-ADMIN-KEY", "wrong-key");
 
-        when(accessControlService.isAdminEmail(ADMIN_EMAIL)).thenReturn(true);
-
-        assertFalse(adminRequestResolver.isAdminRequest(request));
-    }
-
-    @Test
-    void returnsTrueWhenAdminEmailAndValidAdminKey() {
-        MockHttpServletRequest request = new MockHttpServletRequest();
-        request.addHeader("X-USER-EMAIL", ADMIN_EMAIL);
-        request.addHeader("X-ADMIN-KEY", ADMIN_KEY);
-
+        when(authenticatedRequestResolver.resolve(request))
+            .thenReturn(new ResolvedRequestIdentity(ADMIN_EMAIL, "", true));
         when(accessControlService.isAdminEmail(ADMIN_EMAIL)).thenReturn(true);
 
         assertTrue(adminRequestResolver.isAdminRequest(request));

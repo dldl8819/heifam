@@ -6,8 +6,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import com.balancify.backend.service.AccessControlService;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.List;
 import org.springframework.http.server.PathContainer;
 import org.springframework.stereotype.Component;
@@ -17,9 +15,6 @@ import org.springframework.web.util.pattern.PathPatternParser;
 
 @Component
 public class AdminKeyFilter extends OncePerRequestFilter {
-
-    private static final String ADMIN_HEADER = "X-ADMIN-KEY";
-    private static final String USER_EMAIL_HEADER = "X-USER-EMAIL";
 
     private static final List<ProtectedRoute> PROTECTED_ROUTES = List.of(
         new ProtectedRoute(
@@ -60,12 +55,12 @@ public class AdminKeyFilter extends OncePerRequestFilter {
         new ProtectedRoute(
             "PATCH",
             PathPatternParser.defaultInstance.parse("/api/matches/{id}/result"),
-            AuthType.ADMIN_KEY
+            AuthType.ADMIN_EMAIL
         ),
         new ProtectedRoute(
             "DELETE",
             PathPatternParser.defaultInstance.parse("/api/matches/{id}"),
-            AuthType.ADMIN_KEY
+            AuthType.ADMIN_EMAIL
         ),
         new ProtectedRoute(
             "GET",
@@ -99,15 +94,15 @@ public class AdminKeyFilter extends OncePerRequestFilter {
         )
     );
 
-    private final AdminKeyProperties adminKeyProperties;
     private final AccessControlService accessControlService;
+    private final AuthenticatedRequestResolver authenticatedRequestResolver;
 
     public AdminKeyFilter(
-        AdminKeyProperties adminKeyProperties,
-        AccessControlService accessControlService
+        AccessControlService accessControlService,
+        AuthenticatedRequestResolver authenticatedRequestResolver
     ) {
-        this.adminKeyProperties = adminKeyProperties;
         this.accessControlService = accessControlService;
+        this.authenticatedRequestResolver = authenticatedRequestResolver;
     }
 
     @Override
@@ -150,7 +145,12 @@ public class AdminKeyFilter extends OncePerRequestFilter {
     }
 
     private boolean isAuthorized(HttpServletRequest request, AuthType authType) {
-        String requestEmail = safeTrim(request.getHeader(USER_EMAIL_HEADER));
+        AuthenticatedRequestResolver.ResolvedRequestIdentity identity = authenticatedRequestResolver.resolve(request);
+        if (!identity.isAuthenticated()) {
+            return false;
+        }
+
+        String requestEmail = identity.email();
         if (authType == AuthType.ADMIN_EMAIL) {
             return accessControlService.isAdminEmail(requestEmail);
         }
@@ -163,24 +163,7 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             return accessControlService.isServiceAccessAllowed(requestEmail);
         }
 
-        String configuredKey = safeTrim(adminKeyProperties.getApiKey());
-        String requestKey = safeTrim(request.getHeader(ADMIN_HEADER));
-        return isValidKey(configuredKey, requestKey);
-    }
-
-    private boolean isValidKey(String configuredKey, String requestKey) {
-        if (configuredKey.isEmpty() || requestKey.isEmpty()) {
-            return false;
-        }
-
-        return MessageDigest.isEqual(
-            configuredKey.getBytes(StandardCharsets.UTF_8),
-            requestKey.getBytes(StandardCharsets.UTF_8)
-        );
-    }
-
-    private String safeTrim(String value) {
-        return value == null ? "" : value.trim();
+        return false;
     }
 
     private record ProtectedRoute(
@@ -194,7 +177,6 @@ public class AdminKeyFilter extends OncePerRequestFilter {
     }
 
     private enum AuthType {
-        ADMIN_KEY,
         ADMIN_EMAIL,
         SUPER_ADMIN_EMAIL,
         SERVICE_ACCESS

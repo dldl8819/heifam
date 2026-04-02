@@ -155,7 +155,6 @@
     "notSet": "설정되지 않음",
     "savedInBrowser": "브라우저에 저장됨",
     "invalidJson": "JSON 형식이 올바르지 않습니다.",
-    "adminKeyInvalid": "관리자 키가 올바르지 않습니다. 상단에서 키를 확인해 주세요.",
     "adminLoginRequired": "관리자 기능은 Google 로그인 후 사용할 수 있습니다.",
     "permissionDenied": "권한이 없습니다. 관리자 계정으로 로그인해 주세요.",
     "adminReadOnly": "이 계정은 관리자 권한이 없어 읽기 전용입니다.",
@@ -217,9 +216,6 @@
     "matchesImportGuide": "경기 일괄 등록은 경기 결과 화면의 등록 영역에서 진행합니다.",
     "goPlayersImport": "선수 일괄 등록으로 이동",
     "goMatchesImport": "경기 일괄 등록으로 이동"
-  },
-  "adminKey": {
-    "label": "관리자 키"
   },
   "auth": {
     "loginGoogle": "Google 로그인",
@@ -683,9 +679,9 @@
       "updated": "매치 {matchId} 승리 팀을 {winner}(으)로 수정했습니다.",
       "submittedFromBalance": "매치 {matchId} 결과가 입력되었습니다.",
       "deleted": "매치 {matchId}를 삭제했습니다.",
-      "updateFailure": "승리 팀 수정에 실패했습니다. 관리자 키와 서버 상태를 확인해 주세요.",
+      "updateFailure": "승리 팀 수정에 실패했습니다. 권한과 서버 상태를 확인해 주세요.",
       "deleteNotFound": "삭제 API를 찾지 못했습니다. 백엔드를 재시작하고 다시 시도해 주세요.",
-      "deleteFailure": "매치 삭제에 실패했습니다. 관리자 키와 서버 상태를 확인해 주세요.",
+      "deleteFailure": "매치 삭제에 실패했습니다. 권한과 서버 상태를 확인해 주세요.",
       "deleteConfirm": "매치 {matchId}를 삭제하시겠습니까? MMR이 롤백됩니다.",
       "selectedHint": "매치 {matchId}를 선택했습니다. 승리 팀을 확인하고 저장하세요.",
       "noWinner": "미입력",

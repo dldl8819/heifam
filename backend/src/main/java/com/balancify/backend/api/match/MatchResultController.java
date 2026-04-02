@@ -4,11 +4,10 @@ import com.balancify.backend.api.MmrMaskingMapper;
 import com.balancify.backend.api.match.dto.MatchResultRequest;
 import com.balancify.backend.api.match.dto.MatchResultResponse;
 import com.balancify.backend.security.AdminRequestResolver;
+import com.balancify.backend.security.AuthenticatedRequestResolver;
 import com.balancify.backend.service.MatchResultService;
 import com.balancify.backend.service.exception.MatchConflictException;
 import jakarta.servlet.http.HttpServletRequest;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
 import java.util.NoSuchElementException;
 import org.springframework.http.HttpStatus;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -25,18 +24,18 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/matches")
 public class MatchResultController {
 
-    private static final String USER_EMAIL_HEADER = "X-USER-EMAIL";
-    private static final String USER_NICKNAME_HEADER = "X-USER-NICKNAME";
-
     private final MatchResultService matchResultService;
     private final AdminRequestResolver adminRequestResolver;
+    private final AuthenticatedRequestResolver authenticatedRequestResolver;
 
     public MatchResultController(
         MatchResultService matchResultService,
-        AdminRequestResolver adminRequestResolver
+        AdminRequestResolver adminRequestResolver,
+        AuthenticatedRequestResolver authenticatedRequestResolver
     ) {
         this.matchResultService = matchResultService;
         this.adminRequestResolver = adminRequestResolver;
+        this.authenticatedRequestResolver = authenticatedRequestResolver;
     }
 
     @PostMapping("/{id}/result")
@@ -105,21 +104,15 @@ public class MatchResultController {
     }
 
     private String extractRequestEmail(HttpServletRequest request) {
-        if (request == null) {
-            return null;
-        }
-        String value = request.getHeader(USER_EMAIL_HEADER);
-        if (value == null || value.isBlank()) {
+        String value = authenticatedRequestResolver.resolve(request).email();
+        if (value.isBlank()) {
             return null;
         }
         return value.trim();
     }
 
     private String extractRequestNickname(HttpServletRequest request) {
-        if (request == null) {
-            return null;
-        }
-        String value = request.getHeader(USER_NICKNAME_HEADER);
+        String value = authenticatedRequestResolver.resolve(request).nickname();
         if (value == null || value.isBlank()) {
             return null;
         }
@@ -127,13 +120,6 @@ public class MatchResultController {
         if (trimmed.isEmpty()) {
             return null;
         }
-        if (!trimmed.contains("%")) {
-            return trimmed;
-        }
-        try {
-            return URLDecoder.decode(trimmed, StandardCharsets.UTF_8);
-        } catch (IllegalArgumentException ignored) {
-            return trimmed;
-        }
+        return trimmed;
     }
 }

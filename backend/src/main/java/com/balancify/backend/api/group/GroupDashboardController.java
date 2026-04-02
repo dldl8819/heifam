@@ -2,6 +2,7 @@ package com.balancify.backend.api.group;
 
 import com.balancify.backend.api.group.dto.GroupDashboardResponse;
 import com.balancify.backend.security.AdminRequestResolver;
+import com.balancify.backend.security.AuthenticatedRequestResolver;
 import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.DashboardQueryService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,21 +19,21 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/groups")
 public class GroupDashboardController {
 
-    private static final String USER_EMAIL_HEADER = "X-USER-EMAIL";
-    private static final String USER_NICKNAME_HEADER = "X-USER-NICKNAME";
-
     private final DashboardQueryService dashboardQueryService;
     private final AdminRequestResolver adminRequestResolver;
     private final AccessControlService accessControlService;
+    private final AuthenticatedRequestResolver authenticatedRequestResolver;
 
     public GroupDashboardController(
         DashboardQueryService dashboardQueryService,
         AdminRequestResolver adminRequestResolver,
-        AccessControlService accessControlService
+        AccessControlService accessControlService,
+        AuthenticatedRequestResolver authenticatedRequestResolver
     ) {
         this.dashboardQueryService = dashboardQueryService;
         this.adminRequestResolver = adminRequestResolver;
         this.accessControlService = accessControlService;
+        this.authenticatedRequestResolver = authenticatedRequestResolver;
     }
 
     @GetMapping("/{groupId}/dashboard")
@@ -40,8 +41,9 @@ public class GroupDashboardController {
         @PathVariable Long groupId,
         HttpServletRequest request
     ) {
-        String requestEmail = safeTrim(request == null ? null : request.getHeader(USER_EMAIL_HEADER));
-        String requestNickname = safeTrim(request == null ? null : request.getHeader(USER_NICKNAME_HEADER));
+        AuthenticatedRequestResolver.ResolvedRequestIdentity identity = authenticatedRequestResolver.resolve(request);
+        String requestEmail = safeTrim(identity.email());
+        String requestNickname = safeTrim(identity.nickname());
         AccessControlService.AccessProfile accessProfile = accessControlService.resolveAccessProfile(requestEmail);
         if (!accessProfile.superAdmin()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only super admins can access dashboard data");

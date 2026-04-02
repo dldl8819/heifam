@@ -11,21 +11,12 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "balancify.admin")
 public class AdminKeyProperties {
 
-    private String apiKey;
     private String emails;
     private String superEmails;
     private String allowedEmails;
     private Set<String> normalizedAdminEmails = Set.of();
     private Set<String> normalizedSuperAdminEmails = Set.of();
     private Set<String> normalizedAllowedEmails = Set.of();
-
-    public String getApiKey() {
-        return apiKey;
-    }
-
-    public void setApiKey(String apiKey) {
-        this.apiKey = apiKey;
-    }
 
     public String getEmails() {
         return emails;

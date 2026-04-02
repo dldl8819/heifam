@@ -24,7 +24,6 @@ import type {
   RankingResponse,
   TeamSide,
 } from '@/types/api'
-import { getStoredAdminApiKey } from '@/lib/admin-key'
 import { supabase } from '@/lib/supabase'
 
 const DEFAULT_DEV_API_BASE_URL = 'http://localhost:8080'
@@ -48,6 +47,7 @@ const USER_NICKNAME_HEADER = 'X-USER-NICKNAME'
 type SessionIdentity = {
   email: string
   nickname: string
+  accessToken: string
 }
 
 let cachedSessionIdentity: (SessionIdentity & { resolvedAt: number }) | null = null
@@ -74,6 +74,7 @@ type ApiRequestOptions = {
   includeUserNickname?: boolean
   userEmail?: string
   userNickname?: string
+  accessToken?: string
   timeoutMs?: number
   baseUrlOverride?: string
 }
@@ -111,12 +112,13 @@ function resolveSessionNickname(metadata: Record<string, unknown> | undefined): 
   )
 }
 
-async function resolveSessionUserIdentity(): Promise<{ email: string; nickname: string }> {
+async function resolveSessionUserIdentity(): Promise<SessionIdentity> {
   const now = Date.now()
   if (cachedSessionIdentity && now - cachedSessionIdentity.resolvedAt < SESSION_IDENTITY_CACHE_TTL_MS) {
     return {
       email: cachedSessionIdentity.email,
       nickname: cachedSessionIdentity.nickname,
+      accessToken: cachedSessionIdentity.accessToken,
     }
   }
 
@@ -128,6 +130,7 @@ async function resolveSessionUserIdentity(): Promise<{ email: string; nickname: 
     try {
       const { data } = await supabase.auth.getSession()
       const user = data.session?.user
+      const accessToken = data.session?.access_token?.trim() ?? ''
       const email = user?.email?.trim() ?? ''
       const nickname = resolveSessionNickname(
         user?.user_metadata && typeof user.user_metadata === 'object'
@@ -138,11 +141,12 @@ async function resolveSessionUserIdentity(): Promise<{ email: string; nickname: 
       const identity = {
         email,
         nickname: nickname || '운영진',
+        accessToken,
       }
       cachedSessionIdentity = { ...identity, resolvedAt: Date.now() }
       return identity
     } catch {
-      return { email: '', nickname: '' }
+      return { email: '', nickname: '', accessToken: '' }
     } finally {
       sessionIdentityPromise = null
     }
@@ -155,14 +159,14 @@ function buildHeaders(
   init: RequestInit | undefined,
   options: ApiRequestOptions | undefined,
   userEmail: string,
-  userNickname: string
+  userNickname: string,
+  accessToken: string
 ): HeadersInit {
   const headers = new Headers(init?.headers)
   headers.set('Content-Type', 'application/json')
 
-  const adminKey = getStoredAdminApiKey()
-  if (adminKey.length > 0) {
-    headers.set('X-ADMIN-KEY', adminKey)
+  if (accessToken.length > 0) {
+    headers.set('Authorization', `Bearer ${accessToken}`)
   }
 
   if (userEmail.length > 0) {
@@ -188,18 +192,17 @@ async function apiRequest<T>(
   const shouldIncludeUserEmail = options?.includeUserEmail ?? false
   const explicitUserEmail = options?.userEmail?.trim() ?? ''
   const explicitUserNickname = options?.userNickname?.trim() ?? ''
-  const shouldResolveUserEmail =
-    explicitUserEmail.length === 0 && (options?.adminOnly || requiresUserEmail || shouldIncludeUserEmail)
-  const identity =
-    explicitUserEmail.length > 0
-      ? { email: explicitUserEmail, nickname: explicitUserNickname }
-      : shouldResolveUserEmail
-        ? await resolveSessionUserIdentity()
-        : { email: '', nickname: '' }
-  const userEmail = identity.email
-  const userNickname = identity.nickname
+  const explicitAccessToken = options?.accessToken?.trim() ?? ''
+  const shouldResolveSessionIdentity =
+    explicitAccessToken.length === 0 && (options?.adminOnly || requiresUserEmail || shouldIncludeUserEmail)
+  const identity = shouldResolveSessionIdentity
+    ? await resolveSessionUserIdentity()
+    : { email: '', nickname: '', accessToken: '' }
+  const userEmail = explicitUserEmail.length > 0 ? explicitUserEmail : identity.email
+  const userNickname = explicitUserNickname.length > 0 ? explicitUserNickname : identity.nickname
+  const accessToken = explicitAccessToken.length > 0 ? explicitAccessToken : identity.accessToken
 
-  if (requiresUserEmail && userEmail.length === 0) {
+  if (requiresUserEmail && (userEmail.length === 0 || accessToken.length === 0)) {
     throw new ApiRequestError(401, '로그인이 필요합니다.')
   }
 
@@ -225,7 +228,7 @@ async function apiRequest<T>(
   try {
     response = await fetch(createUrl(path, options?.baseUrlOverride), {
       ...init,
-      headers: buildHeaders(init, options, userEmail, userNickname),
+      headers: buildHeaders(init, options, userEmail, userNickname, accessToken),
       signal: controller.signal,
     })
   } catch (error) {
@@ -619,12 +622,13 @@ export const apiClient = {
       },
       { includeUserEmail: true }
     ),
-  getMyAccess: (identity?: { email: string; nickname?: string }) =>
+  getMyAccess: (identity?: { email: string; nickname?: string; accessToken?: string }) =>
     apiRequest<AccessMeResponse>('/api/access/me', undefined, {
       requireUserEmail: true,
       includeUserEmail: true,
       userEmail: identity?.email,
       userNickname: identity?.nickname,
+      accessToken: identity?.accessToken,
       baseUrlOverride: ACCESS_API_BASE_URL,
     }),
   getAdminEmailList: () =>

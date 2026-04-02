@@ -20,8 +20,11 @@ SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/heifam
 SPRING_DATASOURCE_USERNAME=heifam_user
 SPRING_DATASOURCE_PASSWORD=replace-with-strong-password
 SPRING_DATASOURCE_SSLMODE=prefer
-ADMIN_API_KEY=replace-with-strong-admin-key
 ADMIN_EMAILS=admin1@example.com,admin2@example.com
+SUPER_ADMIN_EMAILS=super-admin@example.com
+ALLOWED_USER_EMAILS=member1@example.com,member2@example.com
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_ANON_KEY=replace-with-supabase-anon-key
 CORS_ALLOWED_ORIGINS=https://hei.heifam.com
 ```
 

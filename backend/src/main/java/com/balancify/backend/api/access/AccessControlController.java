@@ -6,6 +6,7 @@ import com.balancify.backend.api.access.dto.AccessEmailEntryResponse;
 import com.balancify.backend.api.access.dto.AccessEmailUpsertRequest;
 import com.balancify.backend.api.access.dto.AccessMeResponse;
 import com.balancify.backend.api.access.dto.AccessRaceUpdateRequest;
+import com.balancify.backend.security.AuthenticatedRequestResolver;
 import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.AccessControlService.AccessProfile;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,12 +26,15 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/access")
 public class AccessControlController {
 
-    private static final String USER_EMAIL_HEADER = "X-USER-EMAIL";
-
     private final AccessControlService accessControlService;
+    private final AuthenticatedRequestResolver authenticatedRequestResolver;
 
-    public AccessControlController(AccessControlService accessControlService) {
+    public AccessControlController(
+        AccessControlService accessControlService,
+        AuthenticatedRequestResolver authenticatedRequestResolver
+    ) {
         this.accessControlService = accessControlService;
+        this.authenticatedRequestResolver = authenticatedRequestResolver;
     }
 
     @GetMapping("/me")
@@ -217,11 +221,11 @@ public class AccessControlController {
     }
 
     private String requireRequestEmail(HttpServletRequest request) {
-        String requestEmail = safeTrim(request == null ? null : request.getHeader(USER_EMAIL_HEADER));
+        String requestEmail = authenticatedRequestResolver.resolve(request).email();
         if (requestEmail.isEmpty()) {
             throw new ResponseStatusException(
                 HttpStatus.UNAUTHORIZED,
-                "X-USER-EMAIL header is required"
+                "Valid Supabase bearer token is required"
             );
         }
         return requestEmail;

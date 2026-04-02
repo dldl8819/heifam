@@ -39,10 +39,16 @@ balancify:
     repeat-matchup-penalty-weight: ${MULTI_BALANCE_REPEAT_MATCHUP_WEIGHT:1.5}
     race-penalty-weight: ${MULTI_BALANCE_RACE_WEIGHT:1.0}
   admin:
-    api-key: ${ADMIN_API_KEY:}
     emails: ${ADMIN_EMAILS:}
     super-emails: ${SUPER_ADMIN_EMAILS:}
     allowed-emails: ${ALLOWED_USER_EMAILS:}
+  auth:
+    require-jwt: ${AUTH_REQUIRE_JWT:true}
+    allow-email-header-fallback: ${AUTH_ALLOW_EMAIL_HEADER_FALLBACK:false}
+    supabase-url: ${SUPABASE_URL:}
+    supabase-api-key: ${SUPABASE_ANON_KEY:${SUPABASE_SERVICE_ROLE_KEY:}}
+    verify-timeout-ms: ${SUPABASE_VERIFY_TIMEOUT_MS:3000}
+    verification-cache-ttl-seconds: ${SUPABASE_VERIFICATION_CACHE_TTL_SECONDS:15}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
   rank:

@@ -123,6 +123,7 @@ export default function AuthCallbackPage() {
         const access = await apiClient.getMyAccess({
           email: sessionEmail,
           nickname: resolveSessionNickname(session.user.user_metadata),
+          accessToken: session.access_token ?? '',
         })
         if (!access.allowed) {
           await supabase.auth.signOut()

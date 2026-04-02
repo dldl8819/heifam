@@ -12,12 +12,15 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Component
 public class ServiceAccessFilter extends OncePerRequestFilter {
 
-    private static final String USER_EMAIL_HEADER = "X-USER-EMAIL";
-
     private final AccessControlService accessControlService;
+    private final AuthenticatedRequestResolver authenticatedRequestResolver;
 
-    public ServiceAccessFilter(AccessControlService accessControlService) {
+    public ServiceAccessFilter(
+        AccessControlService accessControlService,
+        AuthenticatedRequestResolver authenticatedRequestResolver
+    ) {
         this.accessControlService = accessControlService;
+        this.authenticatedRequestResolver = authenticatedRequestResolver;
     }
 
     @Override
@@ -55,16 +58,17 @@ public class ServiceAccessFilter extends OncePerRequestFilter {
         HttpServletResponse response,
         FilterChain filterChain
     ) throws ServletException, IOException {
-        String requestEmail = safeTrim(request.getHeader(USER_EMAIL_HEADER));
-        if (requestEmail.isEmpty() || !accessControlService.isServiceAccessAllowed(requestEmail)) {
+        AuthenticatedRequestResolver.ResolvedRequestIdentity identity = authenticatedRequestResolver.resolve(request);
+        if (!identity.isAuthenticated()) {
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
+            return;
+        }
+
+        if (!accessControlService.isServiceAccessAllowed(identity.email())) {
             response.sendError(HttpServletResponse.SC_FORBIDDEN);
             return;
         }
 
         filterChain.doFilter(request, response);
-    }
-
-    private String safeTrim(String value) {
-        return value == null ? "" : value.trim();
     }
 }
