@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
 
-function buildDisplayName(value?: string | null): string {
+function buildIdentityLabel(value?: string | null): string {
   const normalizedValue = value?.trim()
   if (normalizedValue && normalizedValue.length > 0) {
     return normalizedValue
@@ -92,9 +92,9 @@ export function AuthControls() {
     }
   }
 
-  const displayName = buildDisplayName(
+  const identityLabel = buildIdentityLabel(
     nickname ||
-      user?.user_metadata?.nickname ||
+      user?.nickname ||
       user?.email?.split('@')[0]
   )
 
@@ -135,7 +135,7 @@ export function AuthControls() {
           aria-expanded={menuOpen}
           className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800/70 px-3 py-2 text-xs text-slate-300 transition-colors hover:bg-slate-700"
         >
-          <span>{displayName}</span>
+          <span>{identityLabel}</span>
           <svg
             viewBox="0 0 12 12"
             aria-hidden="true"

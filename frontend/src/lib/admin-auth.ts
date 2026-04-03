@@ -42,7 +42,7 @@ function resolveRole(profile: AccessMeResponse | null): AccessRole {
 }
 
 export function useAdminAuth(): AdminAuthState {
-  const { user, session, loading } = useAuth()
+  const { user, accessToken, loading } = useAuth()
   const email = user?.email?.trim().toLowerCase() ?? null
   const [accessProfile, setAccessProfile] = useState<AccessMeResponse | null>(null)
   const [, setAccessLoading] = useState<boolean>(false)
@@ -67,7 +67,7 @@ export function useAdminAuth(): AdminAuthState {
         try {
           const profile = await apiClient.getMyAccess({
             email,
-            accessToken: session?.access_token ?? '',
+            accessToken: accessToken ?? '',
           })
           primeAccessProfile(profile)
           setAccessProfile(profile)
@@ -122,7 +122,7 @@ export function useAdminAuth(): AdminAuthState {
     } finally {
       setAccessLoading(false)
     }
-  }, [email, session?.access_token])
+  }, [accessToken, email])
 
   useEffect(() => {
     if (loading) {

@@ -3,6 +3,8 @@ package com.balancify.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.balancify.backend.api.group.dto.GroupRecentMatchResponse;
@@ -86,6 +88,76 @@ class MatchQueryServiceTest {
         assertThat(response.homeMmr()).isEqualTo(880);
         assertThat(response.awayMmr()).isEqualTo(830);
         assertThat(response.mmrDiff()).isEqualTo(50);
+    }
+
+    @Test
+    void hidesLegacyRecordedNameWhenNicknameCannotBeResolvedFromEmail() {
+        Group group = new Group();
+        group.setId(1L);
+
+        Match match = new Match();
+        match.setId(201L);
+        match.setGroup(group);
+        match.setWinningTeam("AWAY");
+        match.setPlayedAt(OffsetDateTime.parse("2026-03-23T09:00:00Z"));
+        match.setResultRecordedByEmail("legacy@hei.gg");
+        match.setResultRecordedByNickname("김원섭");
+
+        Player alpha = player(3L, group, "소울", 600);
+        Player bravo = player(4L, group, "보이", 900);
+
+        when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(201L))
+            .thenReturn(List.of(
+                participant(match, alpha, "HOME", 610),
+                participant(match, bravo, "AWAY", 880)
+            ));
+        when(accessControlService.resolveAccessProfile(eq("legacy@hei.gg")))
+            .thenReturn(
+                new AccessControlService.AccessProfile(
+                    "legacy@hei.gg",
+                    null,
+                    "BLOCKED",
+                    false,
+                    false,
+                    false,
+                    null
+                )
+            );
+
+        List<GroupRecentMatchResponse> responses = matchQueryService.getRecentMatches(1L, 10);
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).resultRecordedByNickname()).isNull();
+    }
+
+    @Test
+    void hidesRecordedNameWhenRecordedEmailIsMissing() {
+        Group group = new Group();
+        group.setId(1L);
+
+        Match match = new Match();
+        match.setId(202L);
+        match.setGroup(group);
+        match.setWinningTeam("HOME");
+        match.setPlayedAt(OffsetDateTime.parse("2026-03-23T10:00:00Z"));
+        match.setResultRecordedByNickname("이민식");
+
+        Player alpha = player(5L, group, "아크", 400);
+        Player bravo = player(6L, group, "웃음", 500);
+
+        when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(202L))
+            .thenReturn(List.of(
+                participant(match, alpha, "HOME", 405),
+                participant(match, bravo, "AWAY", 495)
+            ));
+
+        List<GroupRecentMatchResponse> responses = matchQueryService.getRecentMatches(1L, 10);
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).resultRecordedByNickname()).isNull();
+        verify(accessControlService, never()).resolveAccessProfile(any());
     }
 
     private Player player(Long id, Group group, String nickname, int mmr) {

@@ -1,12 +1,17 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { User, Session } from '@supabase/supabase-js'
+import { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 
+export type AuthUser = {
+  email: string | null
+  nickname: string | null
+}
+
 type AuthContextType = {
-  user: User | null
-  session: Session | null
+  user: AuthUser | null
+  accessToken: string | null
   loading: boolean
   signOut: () => Promise<void>
 }
@@ -15,6 +20,32 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 const ENABLE_SUPABASE_PROFILE_SYNC =
   process.env.NEXT_PUBLIC_ENABLE_SUPABASE_PROFILE_SYNC === 'true'
 const INITIAL_SESSION_TIMEOUT_MS = 7000
+
+function toSafeNickname(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null
+  }
+
+  const normalized = value.trim()
+  return normalized.length > 0 ? normalized : null
+}
+
+function resolveAuthUser(user: User | null): AuthUser | null {
+  if (!user) {
+    return null
+  }
+
+  const nickname = toSafeNickname(
+    user.user_metadata && typeof user.user_metadata === 'object'
+      ? (user.user_metadata as Record<string, unknown>).nickname
+      : null,
+  )
+
+  return {
+    email: user.email?.trim() ?? null,
+    nickname,
+  }
+}
 
 function isSupabaseLockContentionError(error: unknown): boolean {
   if (!(error instanceof Error)) {
@@ -36,8 +67,8 @@ type AuthProviderProps = {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const [user, setUser] = useState<User | null>(null)
-  const [session, setSession] = useState<Session | null>(null)
+  const [user, setUser] = useState<AuthUser | null>(null)
+  const [accessToken, setAccessToken] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -55,8 +86,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (cancelled) {
           return
         }
-        setSession(session)
-        setUser(session?.user ?? null)
+        setAccessToken(session?.access_token ?? null)
+        setUser(resolveAuthUser(session?.user ?? null))
       })
       .catch((error) => {
         if (cancelled) {
@@ -65,7 +96,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (!isSupabaseLockContentionError(error)) {
           console.error('Failed to load auth session:', error)
         }
-        setSession(null)
+        setAccessToken(null)
         setUser(null)
       })
       .finally(() => {
@@ -82,8 +113,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (cancelled) {
         return
       }
-      setSession(session)
-      setUser(session?.user ?? null)
+      setAccessToken(session?.access_token ?? null)
+      setUser(resolveAuthUser(session?.user ?? null))
       setLoading(false)
 
       // If user signed in, save to users table
@@ -105,7 +136,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const value = {
     user,
-    session,
+    accessToken,
     loading,
     signOut,
   }

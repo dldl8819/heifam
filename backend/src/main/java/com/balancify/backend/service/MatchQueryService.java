@@ -145,15 +145,12 @@ public class MatchQueryService {
         }
 
         String recordedByEmail = safeTrim(match.getResultRecordedByEmail());
-        if (!recordedByEmail.isEmpty()) {
-            String accessNickname = safeTrim(accessControlService.resolveAccessProfile(recordedByEmail).nickname());
-            if (!accessNickname.isEmpty()) {
-                return accessNickname;
-            }
+        if (recordedByEmail.isEmpty()) {
+            return null;
         }
 
-        String recordedByNickname = safeTrim(match.getResultRecordedByNickname());
-        return recordedByNickname.isEmpty() ? null : recordedByNickname;
+        String accessNickname = safeTrim(accessControlService.resolveAccessProfile(recordedByEmail).nickname());
+        return accessNickname.isEmpty() ? null : accessNickname;
     }
 
     private String safeTrim(String value) {
