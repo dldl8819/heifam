@@ -14,6 +14,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +33,7 @@ public class AccessControlService {
     private static final Set<String> ALLOWED_RACES = Set.of("P", "T", "Z", "PT", "PZ", "TZ", "R");
     private static final int MAX_NICKNAME_LENGTH = 100;
 
+    @Autowired
     public AccessControlService(
         AdminKeyProperties adminKeyProperties,
         ManagedAdminEmailRepository managedAdminEmailRepository,
