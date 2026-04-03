@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useAdminAuth } from '@/lib/admin-auth'
 import { apiClient, isApiForbiddenError, isApiNotFoundError, isApiUnauthorizedError } from '@/lib/api'
@@ -110,6 +110,30 @@ export default function ResultsPage() {
     [searchParams]
   )
 
+  const recentMatchDisplayOrderMap = useMemo(
+    () =>
+      new Map(
+        recentMatches.map((recentMatch, index) => [recentMatch.matchId, index + 1]),
+      ),
+    [recentMatches],
+  )
+
+  const formatMatchReference = useCallback(
+    (matchId: number): string => {
+      if (isSuperAdmin) {
+        return t('results.recent.reference.matchId', { matchId })
+      }
+
+      const displayOrder = recentMatchDisplayOrderMap.get(matchId)
+      if (typeof displayOrder === 'number') {
+        return t('results.recent.reference.displayOrder', { order: displayOrder })
+      }
+
+      return t('results.recent.reference.generic')
+    },
+    [isSuperAdmin, recentMatchDisplayOrderMap],
+  )
+
   const loadRecentMatches = async () => {
     setRecentMatchesLoading(true)
     setRecentMatchesError(null)
@@ -165,7 +189,9 @@ export default function ResultsPage() {
             : 'HOME')
       )
       setRecentActionMessage(
-        t('results.recent.submittedFromBalance', { matchId: matched.matchId })
+        t('results.recent.submittedFromBalance', {
+          matchReference: formatMatchReference(matched.matchId),
+        })
       )
       setAppliedSearchSelection(true)
       return
@@ -187,7 +213,18 @@ export default function ResultsPage() {
     requestedFromBalance,
     requestedMatchId,
     requestedWinnerTeam,
+    formatMatchReference,
   ])
+
+  useEffect(() => {
+    if (!requestedFromBalance || requestedMatchId !== null || appliedSearchSelection) {
+      return
+    }
+
+    setSelectedRecentMatchId(null)
+    setRecentActionMessage(t('results.recent.submittedFromBalanceGeneric'))
+    setAppliedSearchSelection(true)
+  }, [appliedSearchSelection, requestedFromBalance, requestedMatchId])
 
   useEffect(() => {
     if (isAdmin) {
@@ -232,7 +269,7 @@ export default function ResultsPage() {
       setResult(response)
       setRecentActionMessage(
         t('results.recent.updated', {
-          matchId: selectedRecentMatchId,
+          matchReference: formatMatchReference(selectedRecentMatchId),
           winner: formatTeamLabel(selectedRecentWinnerTeam),
         }),
       )
@@ -259,7 +296,11 @@ export default function ResultsPage() {
     }
 
     const targetMatchId = selectedRecentMatchId
-    const confirmed = window.confirm(t('results.recent.deleteConfirm', { matchId: targetMatchId }))
+    const confirmed = window.confirm(
+      t('results.recent.deleteConfirm', {
+        matchReference: formatMatchReference(targetMatchId),
+      }),
+    )
     if (!confirmed) {
       return
     }
@@ -273,7 +314,11 @@ export default function ResultsPage() {
       setResult((previousResult) =>
         previousResult && previousResult.matchId === targetMatchId ? null : previousResult,
       )
-      setRecentActionMessage(t('results.recent.deleted', { matchId: targetMatchId }))
+      setRecentActionMessage(
+        t('results.recent.deleted', {
+          matchReference: formatMatchReference(targetMatchId),
+        }),
+      )
       await loadRecentMatches()
     } catch (deleteError) {
       if (isApiForbiddenError(deleteError)) {
@@ -377,7 +422,8 @@ export default function ResultsPage() {
             <table className="min-w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs tracking-wide text-slate-500">
                 <tr>
-                  <th className="px-3 py-2">{t('results.recent.table.matchId')}</th>
+                  <th className="px-3 py-2">{t('results.recent.table.displayOrder')}</th>
+                  {isSuperAdmin && <th className="px-3 py-2">{t('results.recent.table.matchId')}</th>}
                   <th className="px-3 py-2">{t('results.recent.table.playedAt')}</th>
                   <th className="px-3 py-2">{t('results.recent.table.recordedAt')}</th>
                   <th className="px-3 py-2">{t('results.recent.table.recordedBy')}</th>
@@ -396,7 +442,12 @@ export default function ResultsPage() {
                       selectedRecentMatchId === recentMatch.matchId ? 'bg-amber-50/60' : ''
                     }`}
                   >
-                    <td className="px-3 py-2 font-medium text-slate-900">{recentMatch.matchId}</td>
+                    <td className="px-3 py-2 font-medium text-slate-900">
+                      {recentMatchDisplayOrderMap.get(recentMatch.matchId) ?? '-'}
+                    </td>
+                    {isSuperAdmin && (
+                      <td className="px-3 py-2 font-medium text-slate-900">{recentMatch.matchId}</td>
+                    )}
                     <td className="px-3 py-2 text-slate-700">{formatPlayedAt(recentMatch.playedAt)}</td>
                     <td className="px-3 py-2 text-slate-700">{formatOptionalDate(recentMatch.resultRecordedAt)}</td>
                     <td className="px-3 py-2 text-slate-700">{formatRecordedBy(recentMatch.resultRecordedByNickname)}</td>

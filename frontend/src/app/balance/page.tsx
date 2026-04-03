@@ -131,7 +131,7 @@ function readPersistedBalanceState(): PersistedBalanceState | null {
 
 export default function BalancePage() {
   const router = useRouter()
-  const { isAdmin, canAccess } = useAdminAuth()
+  const { isAdmin, isSuperAdmin, canAccess } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
   const showMmr = isAdmin && mmrVisible
   const [players, setPlayers] = useState<BalancePlayerOption[]>([])
@@ -415,8 +415,12 @@ export default function BalancePage() {
         setResultMatchId(String(created.matchId))
         setMatchCreateMessage(
           confirmationStatus === 'REUSED_EXISTING'
-            ? t('balance.quickResult.matchReused', { matchId: created.matchId })
-            : t('balance.quickResult.matchCreated', { matchId: created.matchId })
+            ? isSuperAdmin
+              ? t('balance.quickResult.matchReused', { matchId: created.matchId })
+              : t('balance.quickResult.matchReusedGeneric')
+            : isSuperAdmin
+              ? t('balance.quickResult.matchCreated', { matchId: created.matchId })
+              : t('balance.quickResult.matchCreatedGeneric')
         )
         return created.matchId
       }
@@ -470,9 +474,13 @@ export default function BalancePage() {
         winnerTeam: resultWinnerTeam,
       })
       setResultSubmitSuccess(response)
-      router.push(
-        `/results?matchId=${response.matchId}&winnerTeam=${response.winnerTeam}&from=balance`
-      )
+      if (isSuperAdmin) {
+        router.push(
+          `/results?matchId=${response.matchId}&winnerTeam=${response.winnerTeam}&from=balance`
+        )
+      } else {
+        router.push('/results?from=balance')
+      }
     } catch (error) {
       if (isApiConflictError(error)) {
         setResultSubmitError(t('balance.quickResult.submitConflict'))
@@ -750,7 +758,9 @@ export default function BalancePage() {
         <p className="mt-1 text-xs text-slate-500">{t('balance.quickResult.description')}</p>
         <p className="mt-3 text-xs text-slate-600">
           {hasGeneratedMatchId
-            ? t('balance.quickResult.autoMatchId', { matchId: resultMatchId })
+            ? isSuperAdmin
+              ? t('balance.quickResult.autoMatchId', { matchId: resultMatchId })
+              : t('balance.quickResult.autoMatchReady')
             : canCreateMatchFromResult
               ? t('balance.quickResult.matchWillBeCreatedOnSubmit')
               : t('balance.quickResult.matchNotReady')}
@@ -800,7 +810,9 @@ export default function BalancePage() {
         )}
         {resultSubmitSuccess && (
           <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-            {t('balance.quickResult.success', { matchId: resultSubmitSuccess.matchId })}
+            {isSuperAdmin
+              ? t('balance.quickResult.success', { matchId: resultSubmitSuccess.matchId })
+              : t('balance.quickResult.successGeneric')}
           </div>
         )}
       </article>
