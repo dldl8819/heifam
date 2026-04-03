@@ -63,6 +63,10 @@ function formatTeamPlayers(match: RecentMatchItem, team: TeamSide): string {
   return players.map((player) => player.nickname).join(', ')
 }
 
+function isWinningTeam(team: TeamSide, winningTeam: TeamSide | null): boolean {
+  return winningTeam === team
+}
+
 export default function ResultsPage() {
   const searchParams = useSearchParams()
   const { isAdmin, isSuperAdmin } = useAdminAuth()
@@ -403,8 +407,24 @@ export default function ResultsPage() {
                         formatTeamLabel(recentMatch.winningTeam)
                       )}
                     </td>
-                    <td className="px-3 py-2 text-slate-700">{formatTeamPlayers(recentMatch, 'HOME')}</td>
-                    <td className="px-3 py-2 text-slate-700">{formatTeamPlayers(recentMatch, 'AWAY')}</td>
+                    <td
+                      className={`px-3 py-2 ${
+                        isWinningTeam('HOME', recentMatch.winningTeam)
+                          ? 'font-medium text-emerald-700'
+                          : 'text-slate-700'
+                      }`}
+                    >
+                      {formatTeamPlayers(recentMatch, 'HOME')}
+                    </td>
+                    <td
+                      className={`px-3 py-2 ${
+                        isWinningTeam('AWAY', recentMatch.winningTeam)
+                          ? 'font-medium text-emerald-700'
+                          : 'text-slate-700'
+                      }`}
+                    >
+                      {formatTeamPlayers(recentMatch, 'AWAY')}
+                    </td>
                     {showMmr && (
                       <td className="px-3 py-2 text-slate-700">
                         {typeof recentMatch.mmrDiff === 'number' ? recentMatch.mmrDiff : '-'}
@@ -479,8 +499,24 @@ export default function ResultsPage() {
                     key={`${participant.playerId}-${participant.nickname}`}
                     className="border-t border-slate-100"
                   >
-                    <td className="px-4 py-3 font-medium text-slate-900">{participant.nickname}</td>
-                    <td className="px-4 py-3 text-slate-700">{formatTeamLabel(participant.team)}</td>
+                    <td
+                      className={`px-4 py-3 font-medium ${
+                        participant.team === result.winnerTeam
+                          ? 'text-emerald-700'
+                          : 'text-slate-900'
+                      }`}
+                    >
+                      {participant.nickname}
+                    </td>
+                    <td
+                      className={`px-4 py-3 ${
+                        participant.team === result.winnerTeam
+                          ? 'font-medium text-emerald-700'
+                          : 'text-slate-700'
+                      }`}
+                    >
+                      {formatTeamLabel(participant.team)}
+                    </td>
                     {showMmr && (
                       <td className="px-4 py-3 text-slate-700">
                         {participantMmrBefore !== null ? participantMmrBefore : '-'}

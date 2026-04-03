@@ -681,7 +681,7 @@ class AdminKeyFilterTest {
             .andExpect(jsonPath("$.homeMmr").doesNotExist())
             .andExpect(jsonPath("$.awayMmr").doesNotExist())
             .andExpect(jsonPath("$.mmrDiff").doesNotExist())
-            .andExpect(jsonPath("$.expectedHomeWinRate").doesNotExist())
+            .andExpect(jsonPath("$.expectedHomeWinRate").value(0.61))
             .andExpect(jsonPath("$.homeTeam[0].mmr").doesNotExist())
             .andExpect(jsonPath("$.awayTeam[0].mmr").doesNotExist());
     }
@@ -774,7 +774,7 @@ class AdminKeyFilterTest {
             .andExpect(jsonPath("$.matches[0].homeMmr").doesNotExist())
             .andExpect(jsonPath("$.matches[0].awayMmr").doesNotExist())
             .andExpect(jsonPath("$.matches[0].mmrDiff").doesNotExist())
-            .andExpect(jsonPath("$.matches[0].expectedHomeWinRate").doesNotExist())
+            .andExpect(jsonPath("$.matches[0].expectedHomeWinRate").value(0.61))
             .andExpect(jsonPath("$.matches[0].homeTeam[0].mmr").doesNotExist())
             .andExpect(jsonPath("$.matches[0].awayTeam[0].mmr").doesNotExist());
     }

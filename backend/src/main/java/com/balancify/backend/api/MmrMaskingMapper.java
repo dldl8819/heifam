@@ -149,7 +149,7 @@ public final class MmrMaskingMapper {
             null,
             null,
             null,
-            null
+            response.expectedHomeWinRate()
         );
     }
 
@@ -167,7 +167,7 @@ public final class MmrMaskingMapper {
                     null,
                     null,
                     null,
-                    null,
+                    match.expectedHomeWinRate(),
                     match.raceSummary(),
                     match.penaltySummary()
                 )

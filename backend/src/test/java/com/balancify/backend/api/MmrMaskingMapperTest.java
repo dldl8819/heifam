@@ -41,7 +41,7 @@ class MmrMaskingMapperTest {
         assertThat(masked.homeMmr()).isNull();
         assertThat(masked.awayMmr()).isNull();
         assertThat(masked.mmrDiff()).isNull();
-        assertThat(masked.expectedHomeWinRate()).isNull();
+        assertThat(masked.expectedHomeWinRate()).isEqualTo(0.64);
         assertThat(masked.homeTeam().getFirst().mmr()).isNull();
         assertThat(masked.awayTeam().getFirst().mmr()).isNull();
     }
@@ -85,7 +85,7 @@ class MmrMaskingMapperTest {
         assertThat(maskedMatch.homeMmr()).isNull();
         assertThat(maskedMatch.awayMmr()).isNull();
         assertThat(maskedMatch.mmrDiff()).isNull();
-        assertThat(maskedMatch.expectedHomeWinRate()).isNull();
+        assertThat(maskedMatch.expectedHomeWinRate()).isEqualTo(0.58);
         assertThat(maskedMatch.homeTeam().getFirst().mmr()).isNull();
     }
 
