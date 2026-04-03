@@ -8,10 +8,10 @@ import { supabase } from '@/lib/supabase'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
 
-function buildDisplayName(name?: string | null): string {
-  const normalizedName = name?.trim()
-  if (normalizedName && normalizedName.length > 0) {
-    return normalizedName
+function buildDisplayName(value?: string | null): string {
+  const normalizedValue = value?.trim()
+  if (normalizedValue && normalizedValue.length > 0) {
+    return normalizedValue
   }
 
   return t('auth.noProfile')
@@ -95,8 +95,7 @@ export function AuthControls() {
   const displayName = buildDisplayName(
     nickname ||
       user?.user_metadata?.nickname ||
-      user?.user_metadata?.full_name ||
-      user?.user_metadata?.name
+      user?.email?.split('@')[0]
   )
 
   if (loading) {

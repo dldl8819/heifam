@@ -5,6 +5,7 @@ import com.balancify.backend.api.match.dto.MatchResultRequest;
 import com.balancify.backend.api.match.dto.MatchResultResponse;
 import com.balancify.backend.security.AdminRequestResolver;
 import com.balancify.backend.security.AuthenticatedRequestResolver;
+import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.MatchResultService;
 import com.balancify.backend.service.exception.MatchConflictException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,15 +28,18 @@ public class MatchResultController {
     private final MatchResultService matchResultService;
     private final AdminRequestResolver adminRequestResolver;
     private final AuthenticatedRequestResolver authenticatedRequestResolver;
+    private final AccessControlService accessControlService;
 
     public MatchResultController(
         MatchResultService matchResultService,
         AdminRequestResolver adminRequestResolver,
-        AuthenticatedRequestResolver authenticatedRequestResolver
+        AuthenticatedRequestResolver authenticatedRequestResolver,
+        AccessControlService accessControlService
     ) {
         this.matchResultService = matchResultService;
         this.adminRequestResolver = adminRequestResolver;
         this.authenticatedRequestResolver = authenticatedRequestResolver;
+        this.accessControlService = accessControlService;
     }
 
     @PostMapping("/{id}/result")
@@ -49,7 +53,7 @@ public class MatchResultController {
                 matchId,
                 request,
                 extractRequestEmail(httpRequest),
-                extractRequestNickname(httpRequest),
+                resolveRecordedByNickname(httpRequest),
                 false
             );
             if (adminRequestResolver.isAdminRequest(httpRequest)) {
@@ -77,7 +81,7 @@ public class MatchResultController {
                 matchId,
                 request,
                 extractRequestEmail(httpRequest),
-                extractRequestNickname(httpRequest),
+                resolveRecordedByNickname(httpRequest),
                 true
             );
             if (adminRequestResolver.isAdminRequest(httpRequest)) {
@@ -111,11 +115,17 @@ public class MatchResultController {
         return value.trim();
     }
 
-    private String extractRequestNickname(HttpServletRequest request) {
-        String value = authenticatedRequestResolver.resolve(request).nickname();
+    private String resolveRecordedByNickname(HttpServletRequest request) {
+        String email = extractRequestEmail(request);
+        if (email == null || email.isBlank()) {
+            return null;
+        }
+
+        String value = accessControlService.resolveAccessProfile(email).nickname();
         if (value == null || value.isBlank()) {
             return null;
         }
+
         String trimmed = value.trim();
         if (trimmed.isEmpty()) {
             return null;

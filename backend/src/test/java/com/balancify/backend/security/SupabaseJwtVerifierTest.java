@@ -57,7 +57,7 @@ class SupabaseJwtVerifierTest {
             signingKey,
             baseUrl + "/auth/v1",
             "member@hei.gg",
-            Map.of("full_name", "민식")
+            Map.of("nickname", "민식")
         );
 
         Optional<SupabaseJwtVerifier.VerifiedUser> verifiedUser = verifier.verify(token);
@@ -86,7 +86,7 @@ class SupabaseJwtVerifierTest {
             signingKey,
             "https://wrong.example.com/auth/v1",
             "member@hei.gg",
-            Map.of("full_name", "민식")
+            Map.of("nickname", "민식")
         );
 
         assertThat(verifier.verify(token)).isEmpty();
@@ -110,7 +110,7 @@ class SupabaseJwtVerifierTest {
             signingKey,
             baseUrl + "/auth/v1",
             "member@hei.gg",
-            Map.of("full_name", "민식"),
+            Map.of("nickname", "민식"),
             Instant.now().minusSeconds(120)
         );
 
@@ -138,7 +138,7 @@ class SupabaseJwtVerifierTest {
             attackerKey,
             baseUrl + "/auth/v1",
             "member@hei.gg",
-            Map.of("full_name", "민식")
+            Map.of("nickname", "민식")
         );
 
         assertThat(verifier.verify(token)).isEmpty();
@@ -163,7 +163,7 @@ class SupabaseJwtVerifierTest {
             signingKey,
             baseUrl + "/auth/v1",
             "member@hei.gg",
-            Map.of("full_name", "민식")
+            Map.of("nickname", "민식")
         );
 
         assertThat(verifier.verify(token)).isPresent();

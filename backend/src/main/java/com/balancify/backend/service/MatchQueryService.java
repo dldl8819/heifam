@@ -20,13 +20,16 @@ public class MatchQueryService {
 
     private final MatchRepository matchRepository;
     private final MatchParticipantRepository matchParticipantRepository;
+    private final AccessControlService accessControlService;
 
     public MatchQueryService(
         MatchRepository matchRepository,
-        MatchParticipantRepository matchParticipantRepository
+        MatchParticipantRepository matchParticipantRepository,
+        AccessControlService accessControlService
     ) {
         this.matchRepository = matchRepository;
         this.matchParticipantRepository = matchParticipantRepository;
+        this.accessControlService = accessControlService;
     }
 
     public List<GroupRecentMatchResponse> getRecentMatches(Long groupId, Integer limit) {
@@ -82,7 +85,7 @@ public class MatchQueryService {
                 normalizeStatus(match.getStatus()),
                 normalizeWinningTeam(match.getWinningTeam()),
                 match.getResultRecordedAt(),
-                match.getResultRecordedByNickname(),
+                resolveRecordedByNickname(match),
                 homeTeam,
                 awayTeam,
                 homeMmr,
@@ -134,5 +137,26 @@ public class MatchQueryService {
 
     private int safeInt(Integer value) {
         return value == null ? 0 : value;
+    }
+
+    private String resolveRecordedByNickname(Match match) {
+        if (match == null) {
+            return null;
+        }
+
+        String recordedByEmail = safeTrim(match.getResultRecordedByEmail());
+        if (!recordedByEmail.isEmpty()) {
+            String accessNickname = safeTrim(accessControlService.resolveAccessProfile(recordedByEmail).nickname());
+            if (!accessNickname.isEmpty()) {
+                return accessNickname;
+            }
+        }
+
+        String recordedByNickname = safeTrim(match.getResultRecordedByNickname());
+        return recordedByNickname.isEmpty() ? null : recordedByNickname;
+    }
+
+    private String safeTrim(String value) {
+        return value == null ? "" : value.trim();
     }
 }

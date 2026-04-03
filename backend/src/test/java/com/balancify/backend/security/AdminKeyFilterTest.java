@@ -3,7 +3,9 @@ package com.balancify.backend.security;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -157,6 +159,24 @@ class AdminKeyFilterTest {
             String email = argument == null ? "" : argument.toString().trim().toLowerCase(Locale.ROOT);
             return allowed.contains(email);
         });
+        when(accessControlService.resolveAccessProfile(any())).thenAnswer(invocation -> {
+            Object argument = invocation.getArgument(0);
+            String email = argument == null ? "" : argument.toString().trim().toLowerCase(Locale.ROOT);
+            boolean isSuperAdmin = superAdmins.contains(email);
+            boolean isAdmin = admins.contains(email) || isSuperAdmin;
+            boolean isAllowed = allowed.contains(email);
+            String nickname = email.contains("@") ? email.substring(0, email.indexOf('@')) : null;
+            String role = isSuperAdmin ? "SUPER_ADMIN" : isAdmin ? "ADMIN" : isAllowed ? "MEMBER" : "BLOCKED";
+            return new AccessControlService.AccessProfile(
+                email,
+                nickname,
+                role,
+                isAdmin,
+                isSuperAdmin,
+                isAllowed,
+                null
+            );
+        });
         when(authenticatedRequestResolver.resolve(any(HttpServletRequest.class))).thenAnswer(invocation -> {
             HttpServletRequest request = invocation.getArgument(0);
             String email = request.getHeader("X-USER-EMAIL");
@@ -195,6 +215,18 @@ class AdminKeyFilterTest {
 
     @Test
     void allowsMatchResultWhenUserEmailIsAllowedMember() throws Exception {
+        when(accessControlService.resolveAccessProfile(eq("member@hei.gg")))
+            .thenReturn(
+                new AccessControlService.AccessProfile(
+                    "member@hei.gg",
+                    "민식",
+                    "MEMBER",
+                    false,
+                    false,
+                    true,
+                    null
+                )
+            );
         when(matchResultService.processMatchResult(eq(1L), any(MatchResultRequest.class), any(), any(), anyBoolean()))
             .thenReturn(
                 new MatchResultResponse(
@@ -221,6 +253,7 @@ class AdminKeyFilterTest {
             .perform(
                 post("/api/matches/1/result")
                     .header("X-USER-EMAIL", "member@hei.gg")
+                    .header("X-USER-NICKNAME", "김원섭")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"winnerTeam\":\"HOME\"}")
             )
@@ -230,6 +263,51 @@ class AdminKeyFilterTest {
             .andExpect(jsonPath("$.participants[0].mmrBefore").doesNotExist())
             .andExpect(jsonPath("$.participants[0].mmrAfter").doesNotExist())
             .andExpect(jsonPath("$.participants[0].mmrDelta").doesNotExist());
+
+        verify(matchResultService).processMatchResult(
+            eq(1L),
+            any(MatchResultRequest.class),
+            eq("member@hei.gg"),
+            eq("민식"),
+            eq(false)
+        );
+    }
+
+    @Test
+    void omitsRecordedByNicknameWhenAccessProfileHasNoNickname() throws Exception {
+        when(accessControlService.resolveAccessProfile(eq("member@hei.gg")))
+            .thenReturn(
+                new AccessControlService.AccessProfile(
+                    "member@hei.gg",
+                    null,
+                    "MEMBER",
+                    false,
+                    false,
+                    true,
+                    null
+                )
+            );
+        when(matchResultService.processMatchResult(eq(1L), any(MatchResultRequest.class), any(), any(), anyBoolean()))
+            .thenReturn(new MatchResultResponse(1L, "HOME", 32, 0.5, 0.5, List.of()));
+        when(adminRequestResolver.isAdminRequest(any())).thenReturn(false);
+
+        mockMvc
+            .perform(
+                post("/api/matches/1/result")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .header("X-USER-NICKNAME", "김원섭")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"winnerTeam\":\"HOME\"}")
+            )
+            .andExpect(status().isOk());
+
+        verify(matchResultService).processMatchResult(
+            eq(1L),
+            any(MatchResultRequest.class),
+            eq("member@hei.gg"),
+            isNull(),
+            eq(false)
+        );
     }
 
     @Test

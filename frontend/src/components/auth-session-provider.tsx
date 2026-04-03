@@ -120,7 +120,6 @@ async function saveUserToDatabase(user: User) {
       .upsert({
         id: user.id,
         email: user.email,
-        name: user.user_metadata?.full_name || user.user_metadata?.name,
         avatar_url: user.user_metadata?.avatar_url,
         created_at: user.created_at,
         updated_at: new Date().toISOString(),

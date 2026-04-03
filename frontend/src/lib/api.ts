@@ -105,12 +105,7 @@ function resolveSessionNickname(metadata: Record<string, unknown> | undefined): 
     return ''
   }
 
-  return (
-    toSafeNickname(metadata.nickname) ||
-    toSafeNickname(metadata.full_name) ||
-    toSafeNickname(metadata.name) ||
-    toSafeNickname(metadata.preferred_username)
-  )
+  return toSafeNickname(metadata.nickname)
 }
 
 async function resolveSessionUserIdentity(): Promise<SessionIdentity> {
@@ -141,7 +136,7 @@ async function resolveSessionUserIdentity(): Promise<SessionIdentity> {
 
       const identity = {
         email,
-        nickname: nickname || '운영진',
+        nickname,
         accessToken,
       }
       cachedSessionIdentity = { ...identity, resolvedAt: Date.now() }

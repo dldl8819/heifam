@@ -177,13 +177,10 @@ public class SupabaseJwtVerifier {
             return "";
         }
 
-        String[] candidateKeys = new String[] { "nickname", "full_name", "name", "preferred_username" };
-        for (String candidateKey : candidateKeys) {
-            Object value = userMetadata.get(candidateKey);
-            String normalized = safeTrim(value == null ? "" : value.toString());
-            if (!normalized.isEmpty()) {
-                return normalized;
-            }
+        Object value = userMetadata.get("nickname");
+        String normalized = safeTrim(value == null ? "" : value.toString());
+        if (!normalized.isEmpty()) {
+            return normalized;
         }
 
         return "";

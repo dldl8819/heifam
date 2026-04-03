@@ -29,11 +29,14 @@ class MatchQueryServiceTest {
     @Mock
     private MatchParticipantRepository matchParticipantRepository;
 
+    @Mock
+    private AccessControlService accessControlService;
+
     private MatchQueryService matchQueryService;
 
     @BeforeEach
     void setUp() {
-        matchQueryService = new MatchQueryService(matchRepository, matchParticipantRepository);
+        matchQueryService = new MatchQueryService(matchRepository, matchParticipantRepository, accessControlService);
     }
 
     @Test
@@ -46,6 +49,8 @@ class MatchQueryServiceTest {
         match.setGroup(group);
         match.setWinningTeam("HOME");
         match.setPlayedAt(OffsetDateTime.parse("2026-03-23T08:00:00Z"));
+        match.setResultRecordedByEmail("kim@hei.gg");
+        match.setResultRecordedByNickname("김원섭");
 
         Player alpha = player(1L, group, "알파", 900);
         Player bravo = player(2L, group, "브라보", 850);
@@ -56,6 +61,18 @@ class MatchQueryServiceTest {
         when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of(match));
         when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(200L))
             .thenReturn(List.of(homeParticipant, awayParticipant));
+        when(accessControlService.resolveAccessProfile(eq("kim@hei.gg")))
+            .thenReturn(
+                new AccessControlService.AccessProfile(
+                    "kim@hei.gg",
+                    "민식",
+                    "MEMBER",
+                    false,
+                    false,
+                    true,
+                    null
+                )
+            );
 
         List<GroupRecentMatchResponse> responses = matchQueryService.getRecentMatches(1L, 10);
 
@@ -65,6 +82,7 @@ class MatchQueryServiceTest {
         assertThat(response.winningTeam()).isEqualTo("HOME");
         assertThat(response.homeTeam()).hasSize(1);
         assertThat(response.awayTeam()).hasSize(1);
+        assertThat(response.resultRecordedByNickname()).isEqualTo("민식");
         assertThat(response.homeMmr()).isEqualTo(880);
         assertThat(response.awayMmr()).isEqualTo(830);
         assertThat(response.mmrDiff()).isEqualTo(50);

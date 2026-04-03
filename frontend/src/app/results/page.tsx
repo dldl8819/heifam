@@ -156,6 +156,21 @@ export default function ResultsPage() {
       return
     }
 
+    if (requestedFromBalance) {
+      setSelectedRecentMatchId(null)
+      setSelectedRecentWinnerTeam(
+        requestedWinnerTeam ??
+          (matched.winningTeam === 'HOME' || matched.winningTeam === 'AWAY'
+            ? matched.winningTeam
+            : 'HOME')
+      )
+      setRecentActionMessage(
+        t('results.recent.submittedFromBalance', { matchId: matched.matchId })
+      )
+      setAppliedSearchSelection(true)
+      return
+    }
+
     setSelectedRecentMatchId(matched.matchId)
     setSelectedRecentWinnerTeam(
       requestedWinnerTeam ??
@@ -164,11 +179,6 @@ export default function ResultsPage() {
           : 'HOME')
     )
 
-    if (requestedFromBalance) {
-      setRecentActionMessage(
-        t('results.recent.submittedFromBalance', { matchId: matched.matchId })
-      )
-    }
     setAppliedSearchSelection(true)
   }, [
     appliedSearchSelection,

@@ -15,11 +15,7 @@ function resolveSessionNickname(metadata: unknown): string {
   }
 
   const source = metadata as Record<string, unknown>
-  const nickname =
-    source.nickname ??
-    source.full_name ??
-    source.name ??
-    source.preferred_username
+  const nickname = source.nickname
 
   return typeof nickname === 'string' ? nickname.trim() : ''
 }
