@@ -459,9 +459,10 @@
     },
     "quickResult": {
       "title": "밸런스에서 바로 결과 입력",
-      "description": "자동 생성된 매치에 승리 팀만 선택하면 이 화면에서 바로 반영할 수 있습니다.",
+      "description": "승리 팀을 선택해 결과를 반영하면 그때 매치가 저장되고 바로 결과가 입력됩니다.",
       "autoMatchId": "자동 생성 매치 ID: {matchId}",
-      "matchNotReady": "자동 생성된 매치 ID가 없습니다. 밸런스 매치를 먼저 생성해 주세요.",
+      "matchWillBeCreatedOnSubmit": "결과를 반영할 때 매치가 생성됩니다.",
+      "matchNotReady": "밸런스 매치를 먼저 생성해 주세요.",
       "winnerPlaceholder": "승리 팀을 선택해 주세요.",
       "winnerRequired": "승리 팀을 선택해 주세요.",
       "submit": "결과 바로 반영",

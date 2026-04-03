@@ -10,6 +10,7 @@ import com.balancify.backend.api.group.dto.DashboardRecentBalanceTeamPlayerRespo
 import com.balancify.backend.api.group.dto.DashboardTopRankingPreviewItemResponse;
 import com.balancify.backend.api.group.dto.GroupDashboardResponse;
 import com.balancify.backend.domain.Match;
+import com.balancify.backend.domain.MatchStatus;
 import com.balancify.backend.domain.MatchParticipant;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.MatchParticipantRepository;
@@ -145,7 +146,7 @@ public class DashboardQueryService {
 
     private Optional<DashboardRecentBalancePreviewResponse> buildRecentBalancePreview(Long groupId) {
         Optional<Match> latestMatch =
-            matchRepository.findTopByGroup_IdOrderByPlayedAtDescIdDesc(groupId);
+            matchRepository.findTopByGroup_IdAndStatusOrderByPlayedAtDescIdDesc(groupId, MatchStatus.COMPLETED);
         if (latestMatch.isEmpty()) {
             return Optional.empty();
         }

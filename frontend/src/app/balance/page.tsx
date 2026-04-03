@@ -281,9 +281,10 @@ export default function BalancePage() {
     allSelected &&
     !hasDuplicates
   const hasGeneratedMatchId = Number.isFinite(Number(resultMatchId)) && Number(resultMatchId) > 0
+  const canCreateMatchFromResult = result !== null && result.teamSize === 3
   const canSubmitQuickResult =
     canAccess &&
-    hasGeneratedMatchId &&
+    (hasGeneratedMatchId || canCreateMatchFromResult) &&
     (resultWinnerTeam === 'HOME' || resultWinnerTeam === 'AWAY') &&
     !resultSubmitting
 
@@ -361,57 +362,6 @@ export default function BalancePage() {
         teamSize,
       })
       setResult(response)
-
-      const homePlayerIds = response.homeTeam
-        .map((player) => player.playerId)
-        .filter((playerId): playerId is number => typeof playerId === 'number' && Number.isFinite(playerId))
-      const awayPlayerIds = response.awayTeam
-        .map((player) => player.playerId)
-        .filter((playerId): playerId is number => typeof playerId === 'number' && Number.isFinite(playerId))
-
-      if (response.teamSize === 3 && homePlayerIds.length === 3 && awayPlayerIds.length === 3) {
-        try {
-          const created = await apiClient.createGroupMatch(TEMP_GROUP_ID, {
-            homePlayerIds,
-            awayPlayerIds,
-          })
-
-          const confirmationStatus = created.confirmationStatus
-          if (confirmationStatus === 'DUPLICATE_REJECTED') {
-            setResultMatchId('')
-            setMatchCreateMessage(
-              created.message && created.message.trim().length > 0
-                ? created.message
-                : t('balance.quickResult.matchDuplicateRejected')
-            )
-          } else if (
-            (confirmationStatus === 'CREATED' || confirmationStatus === 'REUSED_EXISTING') &&
-            typeof created.matchId === 'number' &&
-            Number.isFinite(created.matchId) &&
-            created.matchId > 0
-          ) {
-            setResultMatchId(String(created.matchId))
-            setMatchCreateMessage(
-              confirmationStatus === 'REUSED_EXISTING'
-                ? t('balance.quickResult.matchReused', { matchId: created.matchId })
-                : t('balance.quickResult.matchCreated', { matchId: created.matchId })
-            )
-          } else {
-            setResultMatchId('')
-            setMatchCreateMessage(t('balance.quickResult.matchCreateFailed'))
-          }
-        } catch (createError) {
-          if (isApiForbiddenError(createError)) {
-            setMatchCreateMessage(t('balance.quickResult.matchCreateForbidden'))
-          } else {
-            setMatchCreateMessage(t('balance.quickResult.matchCreateFailed'))
-          }
-        }
-      } else if (response.teamSize === 2) {
-        setMatchCreateMessage(t('balance.quickResult.matchCreateOnlyThreeVsThree'))
-      } else {
-        setMatchCreateMessage(t('balance.quickResult.matchCreateMissingPlayers'))
-      }
     } catch {
       setSubmitError(t('balance.validation.generateFailed'))
     } finally {
@@ -419,17 +369,83 @@ export default function BalancePage() {
     }
   }
 
+  const createMatchFromResult = async (balanceResult: BalanceResponse): Promise<number | null> => {
+    const homePlayerIds = balanceResult.homeTeam
+      .map((player) => player.playerId)
+      .filter((playerId): playerId is number => typeof playerId === 'number' && Number.isFinite(playerId))
+    const awayPlayerIds = balanceResult.awayTeam
+      .map((player) => player.playerId)
+      .filter((playerId): playerId is number => typeof playerId === 'number' && Number.isFinite(playerId))
+
+    if (balanceResult.teamSize !== 3) {
+      setResultMatchId('')
+      setMatchCreateMessage(t('balance.quickResult.matchCreateOnlyThreeVsThree'))
+      return null
+    }
+
+    if (homePlayerIds.length !== 3 || awayPlayerIds.length !== 3) {
+      setResultMatchId('')
+      setMatchCreateMessage(t('balance.quickResult.matchCreateMissingPlayers'))
+      return null
+    }
+
+    try {
+      const created = await apiClient.createGroupMatch(TEMP_GROUP_ID, {
+        homePlayerIds,
+        awayPlayerIds,
+      })
+
+      const confirmationStatus = created.confirmationStatus
+      if (confirmationStatus === 'DUPLICATE_REJECTED') {
+        setResultMatchId('')
+        setMatchCreateMessage(
+          created.message && created.message.trim().length > 0
+            ? created.message
+            : t('balance.quickResult.matchDuplicateRejected')
+        )
+        return null
+      }
+
+      if (
+        (confirmationStatus === 'CREATED' || confirmationStatus === 'REUSED_EXISTING') &&
+        typeof created.matchId === 'number' &&
+        Number.isFinite(created.matchId) &&
+        created.matchId > 0
+      ) {
+        setResultMatchId(String(created.matchId))
+        setMatchCreateMessage(
+          confirmationStatus === 'REUSED_EXISTING'
+            ? t('balance.quickResult.matchReused', { matchId: created.matchId })
+            : t('balance.quickResult.matchCreated', { matchId: created.matchId })
+        )
+        return created.matchId
+      }
+
+      setResultMatchId('')
+      setMatchCreateMessage(t('balance.quickResult.matchCreateFailed'))
+      return null
+    } catch (createError) {
+      setResultMatchId('')
+      if (isApiForbiddenError(createError)) {
+        setMatchCreateMessage(t('balance.quickResult.matchCreateForbidden'))
+      } else {
+        setMatchCreateMessage(t('balance.quickResult.matchCreateFailed'))
+      }
+      return null
+    }
+  }
+
   const handleSubmitResult = async () => {
     setResultSubmitError(null)
     setResultSubmitSuccess(null)
+    setMatchCreateMessage(null)
 
     if (!canAccess) {
       setResultSubmitError(t('common.permissionDenied'))
       return
     }
 
-    const parsedMatchId = Number(resultMatchId)
-    if (!Number.isFinite(parsedMatchId) || parsedMatchId <= 0) {
+    if (!result) {
       setResultSubmitError(t('balance.quickResult.matchNotReady'))
       return
     }
@@ -441,6 +457,15 @@ export default function BalancePage() {
 
     setResultSubmitting(true)
     try {
+      let parsedMatchId = Number(resultMatchId)
+      if (!Number.isFinite(parsedMatchId) || parsedMatchId <= 0) {
+        const createdMatchId = await createMatchFromResult(result)
+        if (!createdMatchId) {
+          return
+        }
+        parsedMatchId = createdMatchId
+      }
+
       const response = await apiClient.submitMatchResult(parsedMatchId, {
         winnerTeam: resultWinnerTeam,
       })
@@ -726,7 +751,9 @@ export default function BalancePage() {
         <p className="mt-3 text-xs text-slate-600">
           {hasGeneratedMatchId
             ? t('balance.quickResult.autoMatchId', { matchId: resultMatchId })
-            : t('balance.quickResult.matchNotReady')}
+            : canCreateMatchFromResult
+              ? t('balance.quickResult.matchWillBeCreatedOnSubmit')
+              : t('balance.quickResult.matchNotReady')}
         </p>
         <div className="mt-3 grid gap-3 md:grid-cols-1">
           <label className="space-y-1 text-xs font-medium text-slate-500">
