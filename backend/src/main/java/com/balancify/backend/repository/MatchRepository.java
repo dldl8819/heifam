@@ -15,6 +15,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface MatchRepository extends JpaRepository<Match, Long> {
 
+    List<Match> findByWinningTeamIsNotNullOrderByPlayedAtAscIdAsc();
+
     Optional<Match> findTopByGroup_IdOrderByPlayedAtDescIdDesc(Long groupId);
 
     Optional<Match> findTopByGroup_IdAndStatusOrderByPlayedAtDescIdDesc(Long groupId, MatchStatus status);

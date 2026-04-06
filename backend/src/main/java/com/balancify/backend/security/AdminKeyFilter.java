@@ -83,6 +83,11 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             AuthType.SUPER_ADMIN_EMAIL
         ),
         new ProtectedRoute(
+            "POST",
+            PathPatternParser.defaultInstance.parse("/api/admin/rating/recalculate"),
+            AuthType.SUPER_ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
             "GET",
             PathPatternParser.defaultInstance.parse("/api/access/allowed-users"),
             AuthType.ADMIN_EMAIL

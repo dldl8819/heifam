@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.balancify.backend.api.HealthController;
+import com.balancify.backend.api.admin.AdminRatingController;
 import com.balancify.backend.api.group.GroupMatchAdminController;
 import com.balancify.backend.api.group.GroupMatchController;
 import com.balancify.backend.api.group.GroupDashboardController;
@@ -56,6 +57,7 @@ import com.balancify.backend.service.PlayerAdminService;
 import com.balancify.backend.service.PlayerQueryService;
 import com.balancify.backend.service.PlayerImportService;
 import com.balancify.backend.service.RankingService;
+import com.balancify.backend.service.RatingRecalculationService;
 import com.balancify.backend.service.TeamBalancingService;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -76,6 +78,7 @@ import org.springframework.test.web.servlet.MockMvc;
     MatchResultController.class,
     MatchImportController.class,
     MatchBalanceController.class,
+    AdminRatingController.class,
     HealthController.class,
     GroupDashboardController.class,
     GroupMatchController.class,
@@ -132,6 +135,9 @@ class AdminKeyFilterTest {
 
     @MockBean
     private MultiMatchBalancingService multiMatchBalancingService;
+
+    @MockBean
+    private RatingRecalculationService ratingRecalculationService;
 
     @MockBean
     private AdminRequestResolver adminRequestResolver;
@@ -612,6 +618,30 @@ class AdminKeyFilterTest {
             .perform(
                 delete("/api/matches/1")
                     .header("X-USER-EMAIL", "admin@hei.gg")
+            )
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void returnsForbiddenForRatingRecalculationWithoutSuperAdminEmail() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/admin/rating/recalculate")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"confirm\":true}")
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void allowsRatingRecalculationWithSuperAdminEmail() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/admin/rating/recalculate")
+                    .header("X-USER-EMAIL", "superadmin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"confirm\":true}")
             )
             .andExpect(status().isOk());
     }
