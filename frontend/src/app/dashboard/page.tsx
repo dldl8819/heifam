@@ -39,6 +39,11 @@ export default function DashboardPage() {
   const [ratingRecalculationResult, setRatingRecalculationResult] = useState<RatingRecalculationResponse | null>(null)
   const myRaceSummary = dashboard?.myRaceSummary
   const myGameTypeSummary = dashboard?.myGameTypeSummary
+  const currentKFactor = dashboard?.currentKFactor ?? 24
+  const canExecuteRatingRecalculation =
+    ratingRecalculationLoading === null &&
+    ratingRecalculationResult?.dryRun === true &&
+    ratingRecalculationResult.averageAbsoluteDeltaDifference > 0
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true)
@@ -101,7 +106,9 @@ export default function DashboardPage() {
       setRatingRecalculationResult(response)
       setRatingRecalculationMessage(
         dryRun
-          ? t('dashboard.ratingRecalculation.messages.dryRunSuccess')
+          ? response.averageAbsoluteDeltaDifference > 0
+            ? t('dashboard.ratingRecalculation.messages.dryRunSuccess')
+            : t('dashboard.ratingRecalculation.messages.noChanges')
           : t('dashboard.ratingRecalculation.messages.executeSuccess')
       )
 
@@ -145,6 +152,9 @@ export default function DashboardPage() {
             <div className="space-y-1">
               <h3 className="text-sm font-semibold text-slate-900">{t('dashboard.ratingRecalculation.title')}</h3>
               <p className="text-sm text-slate-600">{t('dashboard.ratingRecalculation.description')}</p>
+              <p className="text-xs font-medium text-slate-500">
+                {t('dashboard.ratingRecalculation.currentKFactor', { value: currentKFactor })}
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
@@ -165,7 +175,7 @@ export default function DashboardPage() {
                   }
                   void handleRatingRecalculation(false)
                 }}
-                disabled={ratingRecalculationLoading !== null || ratingRecalculationResult?.dryRun !== true}
+                disabled={!canExecuteRatingRecalculation}
                 className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {ratingRecalculationLoading === 'execute'
@@ -174,6 +184,13 @@ export default function DashboardPage() {
               </button>
             </div>
           </div>
+
+          {ratingRecalculationResult?.dryRun === true
+            && ratingRecalculationResult.averageAbsoluteDeltaDifference <= 0 && (
+              <p className="mt-3 text-xs font-medium text-slate-500">
+                {t('dashboard.ratingRecalculation.messages.executeDisabledNoChanges')}
+              </p>
+            )}
 
           {ratingRecalculationMessage && (
             <Alert appearance="light" className="mt-4 border-emerald-200 bg-emerald-50 text-emerald-900">

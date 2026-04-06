@@ -112,6 +112,7 @@ public final class MmrMaskingMapper {
         }
 
         return new GroupDashboardResponse(
+            response.currentKFactor(),
             maskedKpi,
             maskedTopPreview,
             maskedRecentPreview,

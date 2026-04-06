@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -36,15 +37,18 @@ public class DashboardQueryService {
     private final PlayerRepository playerRepository;
     private final MatchParticipantRepository matchParticipantRepository;
     private final MatchRepository matchRepository;
+    private final int currentKFactor;
 
     public DashboardQueryService(
         PlayerRepository playerRepository,
         MatchParticipantRepository matchParticipantRepository,
-        MatchRepository matchRepository
+        MatchRepository matchRepository,
+        @Value("${balancify.elo.k-factor:24}") int currentKFactor
     ) {
         this.playerRepository = playerRepository;
         this.matchParticipantRepository = matchParticipantRepository;
         this.matchRepository = matchRepository;
+        this.currentKFactor = currentKFactor;
     }
 
     public GroupDashboardResponse getGroupDashboard(Long groupId) {
@@ -136,6 +140,7 @@ public class DashboardQueryService {
             );
 
         return new GroupDashboardResponse(
+            currentKFactor,
             kpiSummary,
             topRankingPreview,
             recentBalancePreview,

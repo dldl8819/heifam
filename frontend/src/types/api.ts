@@ -284,6 +284,7 @@ export type GroupDashboardMyGameTypeSummary = {
 }
 
 export type GroupDashboardResponse = {
+  currentKFactor: number
   kpiSummary: GroupDashboardKpiSummary
   topRankingPreview: GroupDashboardTopRankingPreviewItem[]
   recentBalancePreview: GroupDashboardRecentBalancePreview | null

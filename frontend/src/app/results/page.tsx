@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useAdminAuth } from '@/lib/admin-auth'
 import { apiClient, isApiForbiddenError, isApiNotFoundError, isApiUnauthorizedError } from '@/lib/api'
@@ -8,6 +8,7 @@ import { Alert, AlertContent, AlertDescription, AlertIcon } from '@/components/u
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
+import { findUniquePlayerByNicknamePrefix } from '@/lib/player-autocomplete'
 import type { BalancePlayerOption, MatchResultResponse, RecentMatchItem, TeamSide } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
@@ -167,6 +168,9 @@ export default function ResultsPage() {
   const [recentMatchesLoading, setRecentMatchesLoading] = useState<boolean>(true)
   const [recentMatchesError, setRecentMatchesError] = useState<string | null>(null)
   const [appliedSearchSelection, setAppliedSearchSelection] = useState<boolean>(false)
+  const manualHomeInputRefs = useRef<Array<HTMLInputElement | null>>([])
+  const manualAwayInputRefs = useRef<Array<HTMLInputElement | null>>([])
+  const manualWinnerTeamRef = useRef<HTMLSelectElement | null>(null)
 
   const requestedMatchId = useMemo(() => {
     const raw = searchParams.get('matchId')
@@ -432,6 +436,60 @@ export default function ResultsPage() {
       previous.map((inputValue, index) => (index === slotIndex ? value : inputValue)),
     )
     setManualSubmitError(null)
+  }
+
+  const focusNextManualInput = (team: TeamSide, slotIndex: number) => {
+    window.requestAnimationFrame(() => {
+      const nextElement =
+        team === 'HOME'
+          ? manualHomeInputRefs.current[slotIndex + 1] ??
+            manualAwayInputRefs.current[0] ??
+            manualWinnerTeamRef.current
+          : manualAwayInputRefs.current[slotIndex + 1] ?? manualWinnerTeamRef.current
+
+      if (!nextElement) {
+        return
+      }
+
+      nextElement.focus()
+      if (nextElement instanceof HTMLInputElement) {
+        nextElement.select()
+      }
+    })
+  }
+
+  const handleManualSlotAutocomplete = (
+    team: TeamSide,
+    slotIndex: number,
+  ): boolean => {
+    const currentInput =
+      team === 'HOME'
+        ? manualHomeInputs[slotIndex] ?? ''
+        : manualAwayInputs[slotIndex] ?? ''
+    const matchedPlayer = findUniquePlayerByNicknamePrefix(manualPlayers, currentInput)
+    if (!matchedPlayer) {
+      return false
+    }
+
+    if (team === 'HOME') {
+      setManualHomeSlots((previous) =>
+        previous.map((playerId, index) => (index === slotIndex ? matchedPlayer.id : playerId)),
+      )
+      setManualHomeInputs((previous) =>
+        previous.map((inputValue, index) => (index === slotIndex ? matchedPlayer.nickname : inputValue)),
+      )
+    } else {
+      setManualAwaySlots((previous) =>
+        previous.map((playerId, index) => (index === slotIndex ? matchedPlayer.id : playerId)),
+      )
+      setManualAwayInputs((previous) =>
+        previous.map((inputValue, index) => (index === slotIndex ? matchedPlayer.nickname : inputValue)),
+      )
+    }
+
+    setManualSubmitError(null)
+    focusNextManualInput(team, slotIndex)
+    return true
   }
 
   const handleManualSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -718,6 +776,7 @@ export default function ResultsPage() {
                 <label className="space-y-1 text-sm">
                   <span className="font-medium text-slate-700">{t('results.manual.winnerLabel')}</span>
                   <select
+                    ref={manualWinnerTeamRef}
                     value={manualWinnerTeam}
                     onChange={(event) => setManualWinnerTeam(event.target.value as ManualWinnerTeam)}
                     className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
@@ -766,10 +825,26 @@ export default function ResultsPage() {
                             >
                               {t('results.manual.playerPlaceholder', { slot: slotIndex + 1 })}
                               <input
+                                ref={(element) => {
+                                  if (team === 'HOME') {
+                                    manualHomeInputRefs.current[slotIndex] = element
+                                    return
+                                  }
+                                  manualAwayInputRefs.current[slotIndex] = element
+                                }}
                                 value={inputs[slotIndex]}
                                 onChange={(event) =>
                                   handleManualSlotInputChange(team, slotIndex, event.target.value)
                                 }
+                                onKeyDown={(event) => {
+                                  if (
+                                    event.key === 'Tab' &&
+                                    !event.shiftKey &&
+                                    handleManualSlotAutocomplete(team, slotIndex)
+                                  ) {
+                                    event.preventDefault()
+                                  }
+                                }}
                                 className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
                                 placeholder={t('results.manual.playerInputPlaceholder')}
                               />

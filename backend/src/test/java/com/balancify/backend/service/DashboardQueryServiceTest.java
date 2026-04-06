@@ -40,7 +40,8 @@ class DashboardQueryServiceTest {
         dashboardQueryService = new DashboardQueryService(
             playerRepository,
             matchParticipantRepository,
-            matchRepository
+            matchRepository,
+            24
         );
     }
 
@@ -85,6 +86,7 @@ class DashboardQueryServiceTest {
 
         GroupDashboardResponse response = dashboardQueryService.getGroupDashboard(1L);
 
+        assertThat(response.currentKFactor()).isEqualTo(24);
         assertThat(response.kpiSummary().totalPlayers()).isEqualTo(6);
         assertThat(response.kpiSummary().topMmr()).isEqualTo(2000);
         assertThat(response.kpiSummary().averageMmr()).isEqualTo(1666.67);
@@ -118,6 +120,7 @@ class DashboardQueryServiceTest {
 
         GroupDashboardResponse response = dashboardQueryService.getGroupDashboard(99L);
 
+        assertThat(response.currentKFactor()).isEqualTo(24);
         assertThat(response.kpiSummary().totalPlayers()).isZero();
         assertThat(response.kpiSummary().topMmr()).isZero();
         assertThat(response.kpiSummary().averageMmr()).isZero();
@@ -170,6 +173,7 @@ class DashboardQueryServiceTest {
 
         GroupDashboardResponse response = dashboardQueryService.getGroupDashboard(1L, "Alpha");
 
+        assertThat(response.currentKFactor()).isEqualTo(24);
         assertThat(response.myRaceSummary().linked()).isTrue();
         assertThat(response.myRaceSummary().nickname()).isEqualTo("Alpha");
         assertThat(response.myRaceSummary().wins()).isEqualTo(2);

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAdminAuth } from '@/lib/admin-auth'
 import { apiClient, isApiConflictError, isApiForbiddenError, isApiUnauthorizedError } from '@/lib/api'
@@ -8,6 +8,7 @@ import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
+import { findUniquePlayerByNicknamePrefix } from '@/lib/player-autocomplete'
 import type { BalancePlayerOption, BalanceResponse, MatchResultResponse, TeamSide } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
@@ -150,6 +151,7 @@ export default function BalancePage() {
   const [resultSubmitSuccess, setResultSubmitSuccess] = useState<MatchResultResponse | null>(null)
   const [matchCreateMessage, setMatchCreateMessage] = useState<string | null>(null)
   const [persistedReady, setPersistedReady] = useState<boolean>(false)
+  const slotInputRefs = useRef<Array<HTMLInputElement | null>>([])
 
   const requiredPlayerCount = teamSize * 2
 
@@ -337,6 +339,36 @@ export default function BalancePage() {
       return next
     })
     setSubmitError(null)
+  }
+
+  const handleSlotAutocomplete = (index: number): boolean => {
+    const matchedPlayer = findUniquePlayerByNicknamePrefix(players, slotInputs[index] ?? '')
+    if (!matchedPlayer) {
+      return false
+    }
+
+    setSlots((prev) => {
+      const next = [...prev]
+      next[index] = matchedPlayer.id
+      return next
+    })
+    setSlotInputs((prev) => {
+      const next = [...prev]
+      next[index] = matchedPlayer.nickname
+      return next
+    })
+    setSubmitError(null)
+
+    window.requestAnimationFrame(() => {
+      const nextInput = slotInputRefs.current[index + 1]
+      if (!nextInput) {
+        return
+      }
+      nextInput.focus()
+      nextInput.select()
+    })
+
+    return true
   }
 
   const handleGenerate = async () => {
@@ -582,8 +614,16 @@ export default function BalancePage() {
                   >
                     {t('balance.selection.slot', { index: index + 1 })}
                     <input
+                      ref={(element) => {
+                        slotInputRefs.current[index] = element
+                      }}
                       value={slotInputs[index]}
                       onChange={(event) => handleSlotInputChange(index, event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Tab' && !event.shiftKey && handleSlotAutocomplete(index)) {
+                          event.preventDefault()
+                        }
+                      }}
                       className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
                       placeholder={t('balance.selection.placeholder')}
                     />

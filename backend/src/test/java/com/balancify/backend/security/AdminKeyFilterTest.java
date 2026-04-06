@@ -843,6 +843,7 @@ class AdminKeyFilterTest {
         when(dashboardQueryService.getGroupDashboard(eq(1L), eq("superadmin")))
             .thenReturn(
                 new GroupDashboardResponse(
+                    24,
                     new DashboardKpiSummaryResponse(10, 1400, 1320.5, 12),
                     List.of(new DashboardTopRankingPreviewItemResponse(1, "alpha", "P", 1400, 75.0)),
                     null,
