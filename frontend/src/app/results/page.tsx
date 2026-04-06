@@ -145,7 +145,6 @@ export default function ResultsPage() {
     createManualSlotInputs(3),
   )
   const [manualWinnerTeam, setManualWinnerTeam] = useState<TeamSide>('HOME')
-  const [manualNote, setManualNote] = useState<string>('')
   const [manualPlayers, setManualPlayers] = useState<BalancePlayerOption[]>([])
   const [manualPlayersLoading, setManualPlayersLoading] = useState<boolean>(false)
   const [manualPlayersError, setManualPlayersError] = useState<string | null>(null)
@@ -473,7 +472,6 @@ export default function ResultsPage() {
         homePlayerIds,
         awayPlayerIds,
         winnerTeam: manualWinnerTeam,
-        note: manualNote.trim().length > 0 ? manualNote.trim() : undefined,
       })
 
       setResult(response)
@@ -484,7 +482,6 @@ export default function ResultsPage() {
       setManualHomeInputs(createManualSlotInputs(manualTeamSize))
       setManualAwayInputs(createManualSlotInputs(manualTeamSize))
       setManualWinnerTeam('HOME')
-      setManualNote('')
       setManualSubmitSuccess(
         isSuperAdmin
           ? t('results.manual.successWithMatchId', { matchId: response.matchId })
@@ -694,10 +691,6 @@ export default function ResultsPage() {
             </p>
           ) : (
             <form className="mt-4 space-y-4" onSubmit={handleManualSubmit}>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                {t('results.manual.groupFixed')}
-              </div>
-
               <div className="grid gap-4 lg:grid-cols-2">
                 <label className="space-y-1 text-sm">
                   <span className="font-medium text-slate-700">{t('results.manual.teamSizeLabel')}</span>
@@ -791,18 +784,6 @@ export default function ResultsPage() {
                   ))}
                 </div>
               )}
-
-              <label className="block space-y-1 text-sm">
-                <span className="font-medium text-slate-700">{t('results.manual.noteLabel')}</span>
-                <input
-                  type="text"
-                  value={manualNote}
-                  onChange={(event) => setManualNote(event.target.value)}
-                  maxLength={255}
-                  placeholder={t('results.manual.notePlaceholder')}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-                />
-              </label>
 
               {manualSubmitError && (
                 <Alert variant="destructive" appearance="light" size="sm">
