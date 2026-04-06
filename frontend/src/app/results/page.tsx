@@ -15,6 +15,7 @@ const winnerTeamOptions: TeamSide[] = ['HOME', 'AWAY']
 const manualTeamSizeOptions = [3, 2] as const
 type OperatorEntryMode = 'existing' | 'manual'
 type SupportedTeamSize = (typeof manualTeamSizeOptions)[number]
+type ManualWinnerTeam = TeamSide | ''
 type ManualSlotValue = number | ''
 type ManualSlotInputValue = string
 
@@ -144,7 +145,7 @@ export default function ResultsPage() {
   const [manualAwayInputs, setManualAwayInputs] = useState<ManualSlotInputValue[]>(() =>
     createManualSlotInputs(3),
   )
-  const [manualWinnerTeam, setManualWinnerTeam] = useState<TeamSide>('HOME')
+  const [manualWinnerTeam, setManualWinnerTeam] = useState<ManualWinnerTeam>('')
   const [manualPlayers, setManualPlayers] = useState<BalancePlayerOption[]>([])
   const [manualPlayersLoading, setManualPlayersLoading] = useState<boolean>(false)
   const [manualPlayersError, setManualPlayersError] = useState<string | null>(null)
@@ -459,6 +460,11 @@ export default function ResultsPage() {
       return
     }
 
+    if (manualWinnerTeam !== 'HOME' && manualWinnerTeam !== 'AWAY') {
+      setManualSubmitError(t('results.manual.validation.winnerRequired'))
+      return
+    }
+
     setManualSubmitError(null)
     setManualSubmitSuccess(null)
     setError(null)
@@ -481,7 +487,7 @@ export default function ResultsPage() {
       setManualAwaySlots(createManualSlots(manualTeamSize))
       setManualHomeInputs(createManualSlotInputs(manualTeamSize))
       setManualAwayInputs(createManualSlotInputs(manualTeamSize))
-      setManualWinnerTeam('HOME')
+      setManualWinnerTeam('')
       setManualSubmitSuccess(
         isSuperAdmin
           ? t('results.manual.successWithMatchId', { matchId: response.matchId })
@@ -713,9 +719,10 @@ export default function ResultsPage() {
                   <span className="font-medium text-slate-700">{t('results.manual.winnerLabel')}</span>
                   <select
                     value={manualWinnerTeam}
-                    onChange={(event) => setManualWinnerTeam(event.target.value as TeamSide)}
+                    onChange={(event) => setManualWinnerTeam(event.target.value as ManualWinnerTeam)}
                     className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
                   >
+                    <option value="">{t('results.manual.validation.winnerRequired')}</option>
                     {winnerTeamOptions.map((team) => (
                       <option key={`manual-${team}`} value={team}>
                         {formatTeamLabel(team)}

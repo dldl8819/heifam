@@ -766,7 +766,8 @@
       "loadPlayersError": "수동 입력용 선수 목록을 불러오지 못했습니다.",
       "validation": {
         "playersRequired": "홈 팀과 어웨이 팀 선수를 모두 선택해 주세요.",
-        "duplicatePlayers": "같은 선수를 양 팀에 중복 선택할 수 없습니다."
+        "duplicatePlayers": "같은 선수를 양 팀에 중복 선택할 수 없습니다.",
+        "winnerRequired": "승리 팀을 선택해 주세요."
       }
     },
     "participants": {

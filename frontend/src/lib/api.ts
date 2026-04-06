@@ -44,6 +44,7 @@ const ACCESS_API_BASE_URL =
 const DEFAULT_API_REQUEST_TIMEOUT_MS = 10000
 const ACCESS_API_REQUEST_TIMEOUT_MS = process.env.NODE_ENV === 'production' ? 45000 : 15000
 const IMPORT_API_REQUEST_TIMEOUT_MS = 120000
+const RATING_RECALCULATION_API_REQUEST_TIMEOUT_MS = 300000
 const SESSION_IDENTITY_CACHE_TTL_MS = 5000
 const USER_EMAIL_HEADER = 'X-USER-EMAIL'
 const USER_NICKNAME_HEADER = 'X-USER-NICKNAME'
@@ -728,6 +729,7 @@ export const apiClient = {
       {
         requireUserEmail: true,
         includeUserEmail: true,
+        timeoutMs: RATING_RECALCULATION_API_REQUEST_TIMEOUT_MS,
       }
     ),
 }
