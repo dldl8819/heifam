@@ -390,7 +390,7 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void returnsForbiddenForManualMatchCreateWithoutAdminEmail() throws Exception {
+    void returnsForbiddenForManualMatchCreateWithoutUserEmail() throws Exception {
         mockMvc
             .perform(
                 post("/api/matches/manual")
@@ -409,11 +409,34 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void returnsForbiddenForManualMatchCreateWithMemberEmail() throws Exception {
+    void allowsManualMatchCreateWithMemberEmailAndMasksMmrFields() throws Exception {
+        when(manualMatchService.createManualMatch(any(), any(), any()))
+            .thenReturn(
+                new MatchResultResponse(
+                    201L,
+                    "HOME",
+                    32,
+                    0.52,
+                    0.48,
+                    List.of(
+                        new MatchResultParticipantResponse(
+                            10L,
+                            "alpha",
+                            "HOME",
+                            1200,
+                            1216,
+                            16
+                        )
+                    )
+                )
+            );
+        when(adminRequestResolver.isAdminRequest(any())).thenReturn(false);
+
         mockMvc
             .perform(
                 post("/api/matches/manual")
                     .header("X-USER-EMAIL", "member@hei.gg")
+                    .header("X-USER-NICKNAME", "민식")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                         {
@@ -425,7 +448,13 @@ class AdminKeyFilterTest {
                         }
                         """)
             )
-            .andExpect(status().isForbidden());
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.matchId").value(201))
+            .andExpect(jsonPath("$.homeExpectedWinRate").doesNotExist())
+            .andExpect(jsonPath("$.awayExpectedWinRate").doesNotExist())
+            .andExpect(jsonPath("$.participants[0].mmrBefore").doesNotExist())
+            .andExpect(jsonPath("$.participants[0].mmrAfter").doesNotExist())
+            .andExpect(jsonPath("$.participants[0].mmrDelta").doesNotExist());
     }
 
     @Test
@@ -461,6 +490,42 @@ class AdminKeyFilterTest {
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.matchId").value(201));
+    }
+
+    @Test
+    void allowsManualMatchCreateWithSuperAdminEmail() throws Exception {
+        when(manualMatchService.createManualMatch(any(), any(), any()))
+            .thenReturn(
+                new MatchResultResponse(
+                    301L,
+                    "AWAY",
+                    32,
+                    0.41,
+                    0.59,
+                    List.of()
+                )
+            );
+        when(adminRequestResolver.isAdminRequest(any())).thenReturn(true);
+
+        mockMvc
+            .perform(
+                post("/api/matches/manual")
+                    .header("X-USER-EMAIL", "superadmin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "groupId": 1,
+                          "teamSize": 3,
+                          "homePlayerIds": [1,2,3],
+                          "awayPlayerIds": [4,5,6],
+                          "winnerTeam": "AWAY"
+                        }
+                        """)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.matchId").value(301))
+            .andExpect(jsonPath("$.homeExpectedWinRate").value(0.41))
+            .andExpect(jsonPath("$.awayExpectedWinRate").value(0.59));
     }
 
     @Test

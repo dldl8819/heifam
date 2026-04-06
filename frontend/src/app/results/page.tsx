@@ -95,10 +95,11 @@ function formatManualPlayerLabel(player: BalancePlayerOption, showMmr: boolean):
 
 export default function ResultsPage() {
   const searchParams = useSearchParams()
-  const { isAdmin, isSuperAdmin } = useAdminAuth()
+  const { canAccess, isAdmin, isSuperAdmin } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
   const showMmr = isAdmin && mmrVisible
-  const [operatorEntryMode, setOperatorEntryMode] = useState<OperatorEntryMode>('existing')
+  const canUseManualEntry = canAccess
+  const [operatorEntryMode, setOperatorEntryMode] = useState<OperatorEntryMode>('manual')
   const [manualGroupId, setManualGroupId] = useState<number>(TEMP_GROUP_ID)
   const [manualTeamSize, setManualTeamSize] = useState<SupportedTeamSize>(3)
   const [manualHomeSlots, setManualHomeSlots] = useState<ManualSlotValue[]>(() => createManualSlots(3))
@@ -274,12 +275,18 @@ export default function ResultsPage() {
   }, [isAdmin])
 
   useEffect(() => {
+    if (!isAdmin && operatorEntryMode !== 'manual') {
+      setOperatorEntryMode('manual')
+    }
+  }, [isAdmin, operatorEntryMode])
+
+  useEffect(() => {
     setManualHomeSlots((previous) => resizeManualSlots(previous, manualTeamSize))
     setManualAwaySlots((previous) => resizeManualSlots(previous, manualTeamSize))
   }, [manualTeamSize])
 
   useEffect(() => {
-    if (!isAdmin) {
+    if (!canUseManualEntry) {
       setManualPlayers([])
       setManualPlayersError(null)
       setManualPlayersLoading(false)
@@ -339,7 +346,7 @@ export default function ResultsPage() {
     return () => {
       active = false
     }
-  }, [isAdmin, manualGroupId, showMmr])
+  }, [canUseManualEntry, manualGroupId, showMmr])
 
   const selectedManualPlayerIds = useMemo(
     () =>
@@ -374,8 +381,8 @@ export default function ResultsPage() {
   const handleManualSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    if (!isAdmin) {
-      setManualSubmitError(t('common.adminOnlyAction'))
+    if (!canUseManualEntry) {
+      setManualSubmitError(t('common.permissionDenied'))
       return
     }
 
@@ -576,7 +583,9 @@ export default function ResultsPage() {
 
   const resultsHeaderDescription = isAdmin
     ? t('results.descriptionAdmin')
-    : t('results.descriptionViewer')
+    : canUseManualEntry
+      ? t('results.descriptionMember')
+      : t('results.descriptionViewer')
 
   return (
     <section className="space-y-6">
@@ -585,37 +594,39 @@ export default function ResultsPage() {
         <p className="text-sm text-slate-600">{resultsHeaderDescription}</p>
       </header>
 
-      {isAdmin && (
+      {canUseManualEntry && (
         <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <h3 className="text-sm font-semibold text-slate-900">{t('results.operator.title')}</h3>
               <p className="text-xs text-slate-500">{t('results.operator.description')}</p>
             </div>
-            <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
-              {(['existing', 'manual'] as const).map((mode) => {
-                const selected = operatorEntryMode === mode
-                return (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => setOperatorEntryMode(mode)}
-                    className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                      selected
-                        ? 'bg-slate-900 text-white'
-                        : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                    }`}
-                  >
-                    {mode === 'existing'
-                      ? t('results.operator.mode.existing')
-                      : t('results.operator.mode.manual')}
-                  </button>
-                )
-              })}
-            </div>
+            {isAdmin && (
+              <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+                {(['existing', 'manual'] as const).map((mode) => {
+                  const selected = operatorEntryMode === mode
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setOperatorEntryMode(mode)}
+                      className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                        selected
+                          ? 'bg-slate-900 text-white'
+                          : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                      }`}
+                    >
+                      {mode === 'existing'
+                        ? t('results.operator.mode.existing')
+                        : t('results.operator.mode.manual')}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
-          {operatorEntryMode === 'existing' ? (
+          {isAdmin && operatorEntryMode === 'existing' ? (
             <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
               {t('results.operator.existingHelper')}
             </p>

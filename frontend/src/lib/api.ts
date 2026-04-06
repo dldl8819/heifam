@@ -476,7 +476,7 @@ export const apiClient = {
     apiRequest<MatchResultResponse>('/api/matches/manual', {
       method: 'POST',
       body: JSON.stringify(payload),
-    }, { adminOnly: true }),
+    }, { requireUserEmail: true }),
   updateMatchResult: (matchId: number, payload: MatchResultRequest) =>
     apiRequest<MatchResultResponse>(`/api/matches/${matchId}/result`, {
       method: 'PATCH',
