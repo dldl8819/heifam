@@ -16,6 +16,7 @@ const manualTeamSizeOptions = [3, 2] as const
 type OperatorEntryMode = 'existing' | 'manual'
 type SupportedTeamSize = (typeof manualTeamSizeOptions)[number]
 type ManualSlotValue = number | ''
+type ManualSlotInputValue = string
 
 function formatTeamLabel(team: TeamSide | string | null): string {
   if (team === null) {
@@ -86,11 +87,45 @@ function resizeManualSlots(
   return next
 }
 
+function createManualSlotInputs(teamSize: SupportedTeamSize): ManualSlotInputValue[] {
+  return Array.from({ length: teamSize }, () => '')
+}
+
+function resizeManualSlotInputs(
+  inputs: ManualSlotInputValue[],
+  teamSize: SupportedTeamSize,
+): ManualSlotInputValue[] {
+  const next = inputs.slice(0, teamSize)
+  while (next.length < teamSize) {
+    next.push('')
+  }
+  return next
+}
+
 function formatManualPlayerLabel(player: BalancePlayerOption, showMmr: boolean): string {
   const mmrText =
     showMmr && typeof player.currentMmr === 'number' ? ` · ${player.currentMmr} MMR` : ''
   const tierText = player.tier ? ` [${player.tier}]` : ''
   return `${player.nickname} (${player.race})${tierText}${mmrText}`
+}
+
+function findManualPlayerByInput(
+  players: BalancePlayerOption[],
+  inputValue: string,
+  showMmr: boolean,
+): BalancePlayerOption | null {
+  const input = inputValue.trim()
+  if (input.length === 0) {
+    return null
+  }
+
+  const normalizedInput = input.toLowerCase()
+  return (
+    players.find((player) => player.nickname.toLowerCase() === normalizedInput) ??
+    players.find((player) => formatManualPlayerLabel(player, showMmr).toLowerCase() === normalizedInput) ??
+    players.find((player) => formatManualPlayerLabel(player, true).toLowerCase() === normalizedInput) ??
+    null
+  )
 }
 
 export default function ResultsPage() {
@@ -100,10 +135,15 @@ export default function ResultsPage() {
   const showMmr = isAdmin && mmrVisible
   const canUseManualEntry = canAccess
   const [operatorEntryMode, setOperatorEntryMode] = useState<OperatorEntryMode>('manual')
-  const [manualGroupId, setManualGroupId] = useState<number>(TEMP_GROUP_ID)
   const [manualTeamSize, setManualTeamSize] = useState<SupportedTeamSize>(3)
   const [manualHomeSlots, setManualHomeSlots] = useState<ManualSlotValue[]>(() => createManualSlots(3))
   const [manualAwaySlots, setManualAwaySlots] = useState<ManualSlotValue[]>(() => createManualSlots(3))
+  const [manualHomeInputs, setManualHomeInputs] = useState<ManualSlotInputValue[]>(() =>
+    createManualSlotInputs(3),
+  )
+  const [manualAwayInputs, setManualAwayInputs] = useState<ManualSlotInputValue[]>(() =>
+    createManualSlotInputs(3),
+  )
   const [manualWinnerTeam, setManualWinnerTeam] = useState<TeamSide>('HOME')
   const [manualNote, setManualNote] = useState<string>('')
   const [manualPlayers, setManualPlayers] = useState<BalancePlayerOption[]>([])
@@ -283,6 +323,8 @@ export default function ResultsPage() {
   useEffect(() => {
     setManualHomeSlots((previous) => resizeManualSlots(previous, manualTeamSize))
     setManualAwaySlots((previous) => resizeManualSlots(previous, manualTeamSize))
+    setManualHomeInputs((previous) => resizeManualSlotInputs(previous, manualTeamSize))
+    setManualAwayInputs((previous) => resizeManualSlotInputs(previous, manualTeamSize))
   }, [manualTeamSize])
 
   useEffect(() => {
@@ -300,7 +342,7 @@ export default function ResultsPage() {
       setManualPlayersError(null)
 
       try {
-        const roster = await apiClient.getGroupPlayers(manualGroupId)
+        const roster = await apiClient.getGroupPlayers(TEMP_GROUP_ID)
         if (!active) {
           return
         }
@@ -346,7 +388,7 @@ export default function ResultsPage() {
     return () => {
       active = false
     }
-  }, [canUseManualEntry, manualGroupId, showMmr])
+  }, [canUseManualEntry, showMmr])
 
   const selectedManualPlayerIds = useMemo(
     () =>
@@ -356,26 +398,40 @@ export default function ResultsPage() {
     [manualAwaySlots, manualHomeSlots],
   )
 
-  const handleManualSlotChange = (
+  const selectedManualPlayerCountMap = useMemo(() => {
+    const counts = new Map<number, number>()
+    selectedManualPlayerIds.forEach((playerId) => {
+      counts.set(playerId, (counts.get(playerId) ?? 0) + 1)
+    })
+    return counts
+  }, [selectedManualPlayerIds])
+
+  const handleManualSlotInputChange = (
     team: TeamSide,
     slotIndex: number,
     value: string,
   ) => {
-    const normalizedValue = value.trim()
-    const parsedValue = normalizedValue.length === 0 ? NaN : Number.parseInt(normalizedValue, 10)
-    const nextValue: ManualSlotValue =
-      normalizedValue.length === 0 || !Number.isFinite(parsedValue) ? '' : parsedValue
+    const matchedPlayer = findManualPlayerByInput(manualPlayers, value, showMmr)
+    const nextValue: ManualSlotValue = matchedPlayer?.id ?? ''
 
     if (team === 'HOME') {
       setManualHomeSlots((previous) =>
         previous.map((playerId, index) => (index === slotIndex ? nextValue : playerId)),
       )
+      setManualHomeInputs((previous) =>
+        previous.map((inputValue, index) => (index === slotIndex ? value : inputValue)),
+      )
+      setManualSubmitError(null)
       return
     }
 
     setManualAwaySlots((previous) =>
       previous.map((playerId, index) => (index === slotIndex ? nextValue : playerId)),
     )
+    setManualAwayInputs((previous) =>
+      previous.map((inputValue, index) => (index === slotIndex ? value : inputValue)),
+    )
+    setManualSubmitError(null)
   }
 
   const handleManualSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -412,7 +468,7 @@ export default function ResultsPage() {
 
     try {
       const response = await apiClient.createManualMatch({
-        groupId: manualGroupId,
+        groupId: TEMP_GROUP_ID,
         teamSize: manualTeamSize,
         homePlayerIds,
         awayPlayerIds,
@@ -423,6 +479,12 @@ export default function ResultsPage() {
       setResult(response)
       setSelectedRecentMatchId(null)
       setSelectedRecentWinnerTeam(response.winnerTeam)
+      setManualHomeSlots(createManualSlots(manualTeamSize))
+      setManualAwaySlots(createManualSlots(manualTeamSize))
+      setManualHomeInputs(createManualSlotInputs(manualTeamSize))
+      setManualAwayInputs(createManualSlotInputs(manualTeamSize))
+      setManualWinnerTeam('HOME')
+      setManualNote('')
       setManualSubmitSuccess(
         isSuperAdmin
           ? t('results.manual.successWithMatchId', { matchId: response.matchId })
@@ -632,18 +694,11 @@ export default function ResultsPage() {
             </p>
           ) : (
             <form className="mt-4 space-y-4" onSubmit={handleManualSubmit}>
-              <div className="grid gap-4 lg:grid-cols-3">
-                <label className="space-y-1 text-sm">
-                  <span className="font-medium text-slate-700">{t('results.manual.groupLabel')}</span>
-                  <select
-                    value={manualGroupId}
-                    onChange={(event) => setManualGroupId(Number.parseInt(event.target.value, 10))}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-                  >
-                    <option value={TEMP_GROUP_ID}>{t('results.manual.groupOptionDefault')}</option>
-                  </select>
-                </label>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                {t('results.manual.groupFixed')}
+              </div>
 
+              <div className="grid gap-4 lg:grid-cols-2">
                 <label className="space-y-1 text-sm">
                   <span className="font-medium text-slate-700">{t('results.manual.teamSizeLabel')}</span>
                   <select
@@ -689,37 +744,48 @@ export default function ResultsPage() {
               ) : (
                 <div className="grid gap-4 lg:grid-cols-2">
                   {([
-                    ['HOME', manualHomeSlots, t('results.manual.homeTitle')],
-                    ['AWAY', manualAwaySlots, t('results.manual.awayTitle')],
-                  ] as const).map(([team, slots, title]) => (
+                    ['HOME', manualHomeSlots, manualHomeInputs, t('results.manual.homeTitle')],
+                    ['AWAY', manualAwaySlots, manualAwayInputs, t('results.manual.awayTitle')],
+                  ] as const).map(([team, slots, inputs, title]) => (
                     <div key={team} className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
                       <h4 className="text-sm font-semibold text-slate-900">{title}</h4>
                       <div className="space-y-2">
-                        {slots.map((selectedPlayerId, slotIndex) => (
-                          <select
-                            key={`${team}-slot-${slotIndex}`}
-                            value={selectedPlayerId}
-                            onChange={(event) => handleManualSlotChange(team, slotIndex, event.target.value)}
-                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-                          >
-                            <option value="">
+                        {slots.map((selectedPlayerId, slotIndex) => {
+                          const selectedPlayer =
+                            typeof selectedPlayerId === 'number'
+                              ? manualPlayers.find((player) => player.id === selectedPlayerId) ?? null
+                              : null
+                          const isDuplicateSelection =
+                            selectedPlayer !== null &&
+                            (selectedManualPlayerCountMap.get(selectedPlayer.id) ?? 0) > 1
+
+                          return (
+                            <label
+                              key={`${team}-slot-${slotIndex}`}
+                              className="space-y-1 text-xs font-medium text-slate-500"
+                            >
                               {t('results.manual.playerPlaceholder', { slot: slotIndex + 1 })}
-                            </option>
-                            {manualPlayers.map((player) => {
-                              const isSelectedElsewhere =
-                                selectedManualPlayerIds.includes(player.id) && selectedPlayerId !== player.id
-                              return (
-                                <option
-                                  key={`${team}-${slotIndex}-${player.id}`}
-                                  value={player.id}
-                                  disabled={isSelectedElsewhere}
-                                >
-                                  {formatManualPlayerLabel(player, showMmr)}
-                                </option>
-                              )
-                            })}
-                          </select>
-                        ))}
+                              <input
+                                value={inputs[slotIndex]}
+                                onChange={(event) =>
+                                  handleManualSlotInputChange(team, slotIndex, event.target.value)
+                                }
+                                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                                placeholder={t('results.manual.playerInputPlaceholder')}
+                              />
+                              {selectedPlayer && (
+                                <p className="text-[11px] text-slate-500">
+                                  {formatManualPlayerLabel(selectedPlayer, showMmr)}
+                                </p>
+                              )}
+                              {isDuplicateSelection && (
+                                <p className="text-[11px] text-rose-700">
+                                  {t('results.manual.validation.duplicatePlayers')}
+                                </p>
+                              )}
+                            </label>
+                          )
+                        })}
                       </div>
                     </div>
                   ))}

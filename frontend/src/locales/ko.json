@@ -720,13 +720,13 @@
       "existingHelper": "최근 경기 목록에서 원하는 경기를 선택한 뒤 승리 팀을 수정하거나 삭제할 수 있습니다."
     },
     "manual": {
-      "groupLabel": "그룹",
-      "groupOptionDefault": "기본 그룹",
+      "groupFixed": "현재 기본 그룹 기준으로 저장됩니다.",
       "teamSizeLabel": "팀 크기",
       "winnerLabel": "승리 팀",
       "homeTitle": "홈 팀",
       "awayTitle": "어웨이 팀",
-      "playerPlaceholder": "선수 {slot} 선택",
+      "playerPlaceholder": "선수 {slot}",
+      "playerInputPlaceholder": "닉네임 입력",
       "noteLabel": "메모",
       "notePlaceholder": "예: 리겜 수동 입력",
       "submit": "수동 경기 저장",
