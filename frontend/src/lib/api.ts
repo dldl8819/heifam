@@ -21,6 +21,8 @@ import type {
   PlayerRosterItem,
   PlayerRace,
   PlayerTierStatus,
+  RatingRecalculationRequest,
+  RatingRecalculationResponse,
   RecentMatchItem,
   RankingResponse,
   TeamSide,
@@ -714,6 +716,18 @@ export const apiClient = {
         includeUserEmail: true,
         timeoutMs: ACCESS_API_REQUEST_TIMEOUT_MS,
         baseUrlOverride: ACCESS_API_BASE_URL,
+      }
+    ),
+  recalculateRatings: (payload: RatingRecalculationRequest) =>
+    apiRequest<RatingRecalculationResponse>(
+      '/api/admin/rating/recalculate',
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      {
+        requireUserEmail: true,
+        includeUserEmail: true,
       }
     ),
 }

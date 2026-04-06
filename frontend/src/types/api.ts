@@ -97,6 +97,28 @@ export type ManualMatchCreateRequest = {
   note?: string
 }
 
+export type RatingRecalculationRequest = {
+  confirm?: boolean
+  dryRun?: boolean
+}
+
+export type RatingRecalculationPlayerChangeResponse = {
+  playerId: number
+  nickname: string
+  beforeMmr: number
+  afterMmr: number
+}
+
+export type RatingRecalculationResponse = {
+  processedMatches: number
+  updatedPlayers: number
+  durationMs: number
+  status: string
+  dryRun: boolean
+  averageAbsoluteDeltaDifference: number
+  samplePlayerChanges: RatingRecalculationPlayerChangeResponse[]
+}
+
 export type MatchConfirmationStatus =
   | 'CREATED'
   | 'REUSED_EXISTING'

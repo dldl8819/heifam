@@ -1,14 +1,14 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAdminAuth } from '@/lib/admin-auth'
 import { apiClient } from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
-import type { GroupDashboardResponse } from '@/types/api'
+import type { GroupDashboardResponse, RatingRecalculationResponse } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
 
@@ -27,19 +27,38 @@ function formatDateTime(value: string): string {
 }
 
 export default function DashboardPage() {
-  const { isAdmin } = useAdminAuth()
+  const { isAdmin, isSuperAdmin } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
   const showMmr = isAdmin && mmrVisible
   const [dashboard, setDashboard] = useState<GroupDashboardResponse | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+  const [ratingRecalculationLoading, setRatingRecalculationLoading] = useState<'dryRun' | 'execute' | null>(null)
+  const [ratingRecalculationError, setRatingRecalculationError] = useState<string | null>(null)
+  const [ratingRecalculationMessage, setRatingRecalculationMessage] = useState<string | null>(null)
+  const [ratingRecalculationResult, setRatingRecalculationResult] = useState<RatingRecalculationResponse | null>(null)
   const myRaceSummary = dashboard?.myRaceSummary
   const myGameTypeSummary = dashboard?.myGameTypeSummary
+
+  const fetchDashboard = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const response = await apiClient.getGroupDashboard(TEMP_GROUP_ID)
+      setDashboard(response)
+    } catch {
+      setDashboard(null)
+      setError(t('dashboard.loadError'))
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     let active = true
 
-    const fetchDashboard = async () => {
+    const run = async () => {
       setLoading(true)
       setError(null)
 
@@ -48,13 +67,11 @@ export default function DashboardPage() {
         if (!active) {
           return
         }
-
         setDashboard(response)
       } catch {
         if (!active) {
           return
         }
-
         setDashboard(null)
         setError(t('dashboard.loadError'))
       } finally {
@@ -64,12 +81,46 @@ export default function DashboardPage() {
       }
     }
 
-    void fetchDashboard()
+    void run()
 
     return () => {
       active = false
     }
   }, [])
+
+  const handleRatingRecalculation = useCallback(async (dryRun: boolean) => {
+    setRatingRecalculationLoading(dryRun ? 'dryRun' : 'execute')
+    setRatingRecalculationError(null)
+    setRatingRecalculationMessage(null)
+
+    try {
+      const response = await apiClient.recalculateRatings({
+        dryRun,
+        confirm: dryRun ? false : true,
+      })
+      setRatingRecalculationResult(response)
+      setRatingRecalculationMessage(
+        dryRun
+          ? t('dashboard.ratingRecalculation.messages.dryRunSuccess')
+          : t('dashboard.ratingRecalculation.messages.executeSuccess')
+      )
+
+      if (!dryRun) {
+        await fetchDashboard()
+      }
+    } catch (requestError) {
+      const fallbackMessage = dryRun
+        ? t('dashboard.ratingRecalculation.messages.dryRunFailure')
+        : t('dashboard.ratingRecalculation.messages.executeFailure')
+      if (requestError instanceof Error && requestError.message.trim().length > 0) {
+        setRatingRecalculationError(requestError.message)
+      } else {
+        setRatingRecalculationError(fallbackMessage)
+      }
+    } finally {
+      setRatingRecalculationLoading(null)
+    }
+  }, [fetchDashboard])
 
   return (
     <section className="space-y-6">
@@ -86,6 +137,122 @@ export default function DashboardPage() {
             <AlertDescription>{error}</AlertDescription>
           </AlertContent>
         </Alert>
+      )}
+
+      {isSuperAdmin && (
+        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-1">
+              <h3 className="text-sm font-semibold text-slate-900">{t('dashboard.ratingRecalculation.title')}</h3>
+              <p className="text-sm text-slate-600">{t('dashboard.ratingRecalculation.description')}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void handleRatingRecalculation(true)}
+                disabled={ratingRecalculationLoading !== null}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {ratingRecalculationLoading === 'dryRun'
+                  ? t('dashboard.ratingRecalculation.actions.dryRunLoading')
+                  : t('dashboard.ratingRecalculation.actions.dryRun')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!window.confirm(t('dashboard.ratingRecalculation.messages.executeConfirm'))) {
+                    return
+                  }
+                  void handleRatingRecalculation(false)
+                }}
+                disabled={ratingRecalculationLoading !== null || ratingRecalculationResult?.dryRun !== true}
+                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {ratingRecalculationLoading === 'execute'
+                  ? t('dashboard.ratingRecalculation.actions.executeLoading')
+                  : t('dashboard.ratingRecalculation.actions.execute')}
+              </button>
+            </div>
+          </div>
+
+          {ratingRecalculationMessage && (
+            <Alert appearance="light" className="mt-4 border-emerald-200 bg-emerald-50 text-emerald-900">
+              <AlertIcon icon="success">✓</AlertIcon>
+              <AlertContent>
+                <AlertTitle>{t('dashboard.ratingRecalculation.messages.title')}</AlertTitle>
+                <AlertDescription>{ratingRecalculationMessage}</AlertDescription>
+              </AlertContent>
+            </Alert>
+          )}
+
+          {ratingRecalculationError && (
+            <Alert variant="destructive" appearance="light" className="mt-4">
+              <AlertIcon icon="destructive">!</AlertIcon>
+              <AlertContent>
+                <AlertTitle>{t('dashboard.ratingRecalculation.messages.errorTitle')}</AlertTitle>
+                <AlertDescription>{ratingRecalculationError}</AlertDescription>
+              </AlertContent>
+            </Alert>
+          )}
+
+          {ratingRecalculationResult && (
+            <div className="mt-4 space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  {t('dashboard.ratingRecalculation.summary.status')}:{' '}
+                  <span className="font-semibold text-slate-900">{ratingRecalculationResult.status}</span>
+                </div>
+                <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  {t('dashboard.ratingRecalculation.summary.processedMatches')}:{' '}
+                  <span className="font-semibold text-slate-900">{ratingRecalculationResult.processedMatches}</span>
+                </div>
+                <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  {t('dashboard.ratingRecalculation.summary.updatedPlayers')}:{' '}
+                  <span className="font-semibold text-slate-900">{ratingRecalculationResult.updatedPlayers}</span>
+                </div>
+                <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  {t('dashboard.ratingRecalculation.summary.durationMs')}:{' '}
+                  <span className="font-semibold text-slate-900">{ratingRecalculationResult.durationMs}</span>
+                </div>
+              </div>
+
+              <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                {t('dashboard.ratingRecalculation.summary.averageAbsoluteDeltaDifference')}:{' '}
+                <span className="font-semibold text-slate-900">
+                  {ratingRecalculationResult.averageAbsoluteDeltaDifference.toFixed(2)}
+                </span>
+              </div>
+
+              <div className="overflow-x-auto rounded-lg border border-slate-200">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-xs tracking-wide text-slate-500">
+                    <tr>
+                      <th className="px-3 py-2">{t('dashboard.ratingRecalculation.samples.nickname')}</th>
+                      <th className="px-3 py-2">{t('dashboard.ratingRecalculation.samples.beforeMmr')}</th>
+                      <th className="px-3 py-2">{t('dashboard.ratingRecalculation.samples.afterMmr')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ratingRecalculationResult.samplePlayerChanges.map((player) => (
+                      <tr key={`rating-replay-${player.playerId}`} className="border-t border-slate-100">
+                        <td className="px-3 py-2 font-medium text-slate-900">{player.nickname}</td>
+                        <td className="px-3 py-2 text-slate-700">{player.beforeMmr}</td>
+                        <td className="px-3 py-2 text-slate-700">{player.afterMmr}</td>
+                      </tr>
+                    ))}
+                    {ratingRecalculationResult.samplePlayerChanges.length === 0 && (
+                      <tr className="border-t border-slate-100">
+                        <td className="px-3 py-4 text-center text-sm text-slate-500" colSpan={3}>
+                          {t('dashboard.ratingRecalculation.samples.empty')}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </section>
       )}
 
       <section className={`grid gap-4 sm:grid-cols-2 ${showMmr ? 'xl:grid-cols-4' : 'xl:grid-cols-2'}`}>
