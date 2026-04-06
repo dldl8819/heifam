@@ -49,6 +49,11 @@ public class AdminKeyFilter extends OncePerRequestFilter {
         ),
         new ProtectedRoute(
             "POST",
+            PathPatternParser.defaultInstance.parse("/api/matches/manual"),
+            AuthType.ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "POST",
             PathPatternParser.defaultInstance.parse("/api/matches/{id}/result"),
             AuthType.SERVICE_ACCESS
         ),

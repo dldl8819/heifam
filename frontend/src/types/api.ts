@@ -88,6 +88,15 @@ export type MatchResultRequest = {
   winnerTeam: TeamSide
 }
 
+export type ManualMatchCreateRequest = {
+  groupId: number
+  teamSize: number
+  homePlayerIds: number[]
+  awayPlayerIds: number[]
+  winnerTeam: TeamSide
+  note?: string
+}
+
 export type MatchConfirmationStatus =
   | 'CREATED'
   | 'REUSED_EXISTING'

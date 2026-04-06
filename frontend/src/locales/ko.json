@@ -709,6 +709,36 @@
         "action": "선택"
       }
     },
+    "operator": {
+      "title": "운영진 입력",
+      "description": "기존 경기 수정 또는 수동 경기 입력 중 원하는 방식을 선택하세요.",
+      "mode": {
+        "existing": "기존 경기 결과 입력",
+        "manual": "수동 경기 입력"
+      },
+      "existingHelper": "최근 경기 목록에서 원하는 경기를 선택한 뒤 승리 팀을 수정하거나 삭제할 수 있습니다."
+    },
+    "manual": {
+      "groupLabel": "그룹",
+      "groupOptionDefault": "기본 그룹",
+      "teamSizeLabel": "팀 크기",
+      "winnerLabel": "승리 팀",
+      "homeTitle": "홈 팀",
+      "awayTitle": "어웨이 팀",
+      "playerPlaceholder": "선수 {slot} 선택",
+      "noteLabel": "메모",
+      "notePlaceholder": "예: 리겜 수동 입력",
+      "submit": "수동 경기 저장",
+      "submitting": "저장 중...",
+      "success": "수동 경기 입력을 완료했습니다.",
+      "successWithMatchId": "수동 경기 입력을 완료했습니다. 매치 ID: {matchId}",
+      "failure": "수동 경기 입력에 실패했습니다. 입력값과 서버 상태를 확인해 주세요.",
+      "loadPlayersError": "수동 입력용 선수 목록을 불러오지 못했습니다.",
+      "validation": {
+        "playersRequired": "홈 팀과 어웨이 팀 선수를 모두 선택해 주세요.",
+        "duplicatePlayers": "같은 선수를 양 팀에 중복 선택할 수 없습니다."
+      }
+    },
     "participants": {
       "title": "참가자 MMR 변동",
       "nickname": "닉네임",

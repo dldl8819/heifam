@@ -38,6 +38,10 @@ public class Match {
     @Column(nullable = false, length = 20)
     private MatchStatus status = MatchStatus.DRAFT;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private MatchSource source = MatchSource.BALANCED;
+
     @Column(name = "team_size", nullable = false)
     private Integer teamSize = 3;
 
@@ -50,6 +54,9 @@ public class Match {
 
     @Column(name = "team_signature", length = 255)
     private String teamSignature;
+
+    @Column(length = 255)
+    private String note;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
@@ -106,6 +113,14 @@ public class Match {
         this.status = status;
     }
 
+    public MatchSource getSource() {
+        return source;
+    }
+
+    public void setSource(MatchSource source) {
+        this.source = source;
+    }
+
     public Integer getTeamSize() {
         return teamSize;
     }
@@ -136,6 +151,14 @@ public class Match {
 
     public void setTeamSignature(String teamSignature) {
         this.teamSignature = teamSignature;
+    }
+
+    public String getNote() {
+        return note;
+    }
+
+    public void setNote(String note) {
+        this.note = note;
     }
 
     public OffsetDateTime getCreatedAt() {
@@ -188,6 +211,9 @@ public class Match {
         if (status == null) {
             status = MatchStatus.DRAFT;
         }
+        if (source == null) {
+            source = MatchSource.BALANCED;
+        }
         if (teamSize == null || teamSize <= 0) {
             teamSize = 3;
         }
@@ -198,6 +224,9 @@ public class Match {
         updatedAt = OffsetDateTime.now();
         if (status == null) {
             status = MatchStatus.DRAFT;
+        }
+        if (source == null) {
+            source = MatchSource.BALANCED;
         }
         if (teamSize == null || teamSize <= 0) {
             teamSize = 3;

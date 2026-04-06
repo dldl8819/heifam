@@ -119,8 +119,12 @@ public class MatchResultService {
 
         List<MatchParticipant> participants =
             matchParticipantRepository.findByMatchIdWithPlayerAndMatch(matchId);
-        if (participants.size() != 6) {
-            throw new IllegalArgumentException("Exactly 6 participants are required");
+        int teamSize = resolveRequiredTeamSize(match, participants);
+        int requiredParticipants = teamSize * 2;
+        if (participants.size() != requiredParticipants) {
+            throw new IllegalArgumentException(
+                "Exactly %d participants are required".formatted(requiredParticipants)
+            );
         }
 
         List<MatchParticipant> homeParticipants = participants.stream()
@@ -130,8 +134,10 @@ public class MatchResultService {
             .filter(participant -> TEAM_AWAY.equals(normalizeTeam(participant.getTeam())))
             .toList();
 
-        if (homeParticipants.size() != 3 || awayParticipants.size() != 3) {
-            throw new IllegalArgumentException("Match must have 3 HOME and 3 AWAY participants");
+        if (homeParticipants.size() != teamSize || awayParticipants.size() != teamSize) {
+            throw new IllegalArgumentException(
+                "Match must have %d HOME and %d AWAY participants".formatted(teamSize, teamSize)
+            );
         }
 
         double homeAverageMmr = calculateAverageMmr(homeParticipants);
@@ -203,7 +209,7 @@ public class MatchResultService {
         match.setWinningTeam(winnerTeam);
         match.setStatus(MatchStatus.COMPLETED);
         if (match.getTeamSize() == null || match.getTeamSize() <= 0) {
-            match.setTeamSize(Math.max(1, participants.size() / 2));
+            match.setTeamSize(teamSize);
         }
         match.setResultRecordedAt(OffsetDateTime.now());
         match.setResultRecordedByEmail(normalizedRecordedByEmail);
@@ -243,6 +249,19 @@ public class MatchResultService {
 
     private int safeMmr(Integer mmr) {
         return mmr == null ? 0 : mmr;
+    }
+
+    private int resolveRequiredTeamSize(Match match, List<MatchParticipant> participants) {
+        Integer declaredTeamSize = match.getTeamSize();
+        if (declaredTeamSize != null && declaredTeamSize > 0) {
+            return declaredTeamSize;
+        }
+
+        if (participants == null || participants.isEmpty() || participants.size() % 2 != 0) {
+            throw new IllegalArgumentException("Match participants are invalid");
+        }
+
+        return participants.size() / 2;
     }
 
     private int resolveCompletedRankedGamesAfterResult(

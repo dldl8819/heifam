@@ -1,11 +1,13 @@
 package com.balancify.backend.api.match;
 
 import com.balancify.backend.api.MmrMaskingMapper;
+import com.balancify.backend.api.match.dto.ManualMatchCreateRequest;
 import com.balancify.backend.api.match.dto.MatchResultRequest;
 import com.balancify.backend.api.match.dto.MatchResultResponse;
 import com.balancify.backend.security.AdminRequestResolver;
 import com.balancify.backend.security.AuthenticatedRequestResolver;
 import com.balancify.backend.service.AccessControlService;
+import com.balancify.backend.service.ManualMatchService;
 import com.balancify.backend.service.MatchResultService;
 import com.balancify.backend.service.exception.MatchConflictException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,20 +28,48 @@ import org.springframework.web.server.ResponseStatusException;
 public class MatchResultController {
 
     private final MatchResultService matchResultService;
+    private final ManualMatchService manualMatchService;
     private final AdminRequestResolver adminRequestResolver;
     private final AuthenticatedRequestResolver authenticatedRequestResolver;
     private final AccessControlService accessControlService;
 
     public MatchResultController(
         MatchResultService matchResultService,
+        ManualMatchService manualMatchService,
         AdminRequestResolver adminRequestResolver,
         AuthenticatedRequestResolver authenticatedRequestResolver,
         AccessControlService accessControlService
     ) {
         this.matchResultService = matchResultService;
+        this.manualMatchService = manualMatchService;
         this.adminRequestResolver = adminRequestResolver;
         this.authenticatedRequestResolver = authenticatedRequestResolver;
         this.accessControlService = accessControlService;
+    }
+
+    @PostMapping("/manual")
+    public MatchResultResponse createManualMatch(
+        @RequestBody ManualMatchCreateRequest request,
+        HttpServletRequest httpRequest
+    ) {
+        try {
+            MatchResultResponse response = manualMatchService.createManualMatch(
+                request,
+                extractRequestEmail(httpRequest),
+                resolveRecordedByNickname(httpRequest)
+            );
+            if (adminRequestResolver.isAdminRequest(httpRequest)) {
+                return response;
+            }
+
+            return MmrMaskingMapper.maskMatchResult(response);
+        } catch (MatchConflictException | ObjectOptimisticLockingFailureException exception) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, exception.getMessage());
+        } catch (NoSuchElementException exception) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, exception.getMessage());
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+        }
     }
 
     @PostMapping("/{id}/result")

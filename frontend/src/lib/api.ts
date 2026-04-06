@@ -17,6 +17,7 @@ import type {
   MultiBalanceResponse,
   MatchResultRequest,
   MatchResultResponse,
+  ManualMatchCreateRequest,
   PlayerRosterItem,
   PlayerRace,
   PlayerTierStatus,
@@ -471,6 +472,11 @@ export const apiClient = {
       method: 'POST',
       body: JSON.stringify(payload),
     }, { requireUserEmail: true, includeUserEmail: true, includeUserNickname: true }),
+  createManualMatch: (payload: ManualMatchCreateRequest) =>
+    apiRequest<MatchResultResponse>('/api/matches/manual', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }, { adminOnly: true }),
   updateMatchResult: (matchId: number, payload: MatchResultRequest) =>
     apiRequest<MatchResultResponse>(`/api/matches/${matchId}/result`, {
       method: 'PATCH',

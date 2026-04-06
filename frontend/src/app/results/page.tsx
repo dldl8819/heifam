@@ -4,14 +4,18 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useAdminAuth } from '@/lib/admin-auth'
 import { apiClient, isApiForbiddenError, isApiNotFoundError, isApiUnauthorizedError } from '@/lib/api'
-import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
+import { Alert, AlertContent, AlertDescription, AlertIcon } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
-import type { MatchResultResponse, RecentMatchItem, TeamSide } from '@/types/api'
+import type { BalancePlayerOption, MatchResultResponse, RecentMatchItem, TeamSide } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
 const winnerTeamOptions: TeamSide[] = ['HOME', 'AWAY']
+const manualTeamSizeOptions = [3, 2] as const
+type OperatorEntryMode = 'existing' | 'manual'
+type SupportedTeamSize = (typeof manualTeamSizeOptions)[number]
+type ManualSlotValue = number | ''
 
 function formatTeamLabel(team: TeamSide | string | null): string {
   if (team === null) {
@@ -67,11 +71,46 @@ function isWinningTeam(team: TeamSide, winningTeam: TeamSide | null): boolean {
   return winningTeam === team
 }
 
+function createManualSlots(teamSize: SupportedTeamSize): ManualSlotValue[] {
+  return Array.from({ length: teamSize }, () => '')
+}
+
+function resizeManualSlots(
+  slots: ManualSlotValue[],
+  teamSize: SupportedTeamSize,
+): ManualSlotValue[] {
+  const next = slots.slice(0, teamSize)
+  while (next.length < teamSize) {
+    next.push('')
+  }
+  return next
+}
+
+function formatManualPlayerLabel(player: BalancePlayerOption, showMmr: boolean): string {
+  const mmrText =
+    showMmr && typeof player.currentMmr === 'number' ? ` · ${player.currentMmr} MMR` : ''
+  const tierText = player.tier ? ` [${player.tier}]` : ''
+  return `${player.nickname} (${player.race})${tierText}${mmrText}`
+}
+
 export default function ResultsPage() {
   const searchParams = useSearchParams()
   const { isAdmin, isSuperAdmin } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
   const showMmr = isAdmin && mmrVisible
+  const [operatorEntryMode, setOperatorEntryMode] = useState<OperatorEntryMode>('existing')
+  const [manualGroupId, setManualGroupId] = useState<number>(TEMP_GROUP_ID)
+  const [manualTeamSize, setManualTeamSize] = useState<SupportedTeamSize>(3)
+  const [manualHomeSlots, setManualHomeSlots] = useState<ManualSlotValue[]>(() => createManualSlots(3))
+  const [manualAwaySlots, setManualAwaySlots] = useState<ManualSlotValue[]>(() => createManualSlots(3))
+  const [manualWinnerTeam, setManualWinnerTeam] = useState<TeamSide>('HOME')
+  const [manualNote, setManualNote] = useState<string>('')
+  const [manualPlayers, setManualPlayers] = useState<BalancePlayerOption[]>([])
+  const [manualPlayersLoading, setManualPlayersLoading] = useState<boolean>(false)
+  const [manualPlayersError, setManualPlayersError] = useState<string | null>(null)
+  const [manualSubmitting, setManualSubmitting] = useState<boolean>(false)
+  const [manualSubmitError, setManualSubmitError] = useState<string | null>(null)
+  const [manualSubmitSuccess, setManualSubmitSuccess] = useState<string | null>(null)
   const [selectedRecentMatchId, setSelectedRecentMatchId] = useState<number | null>(null)
   const [selectedRecentWinnerTeam, setSelectedRecentWinnerTeam] = useState<TeamSide>('HOME')
   const [isRecentSaving, setIsRecentSaving] = useState<boolean>(false)
@@ -234,6 +273,170 @@ export default function ResultsPage() {
     setSelectedRecentMatchId(null)
   }, [isAdmin])
 
+  useEffect(() => {
+    setManualHomeSlots((previous) => resizeManualSlots(previous, manualTeamSize))
+    setManualAwaySlots((previous) => resizeManualSlots(previous, manualTeamSize))
+  }, [manualTeamSize])
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setManualPlayers([])
+      setManualPlayersError(null)
+      setManualPlayersLoading(false)
+      return
+    }
+
+    let active = true
+
+    const loadManualPlayers = async () => {
+      setManualPlayersLoading(true)
+      setManualPlayersError(null)
+
+      try {
+        const roster = await apiClient.getGroupPlayers(manualGroupId)
+        if (!active) {
+          return
+        }
+
+        const nextPlayers = roster
+          .map((player) => ({
+            id: player.id,
+            nickname: player.nickname,
+            race: player.race,
+            currentMmr: player.currentMmr,
+            tier: player.tier,
+          }))
+          .sort((left, right) => {
+            if (!showMmr) {
+              return left.nickname.localeCompare(right.nickname, 'ko-KR')
+            }
+
+            const leftMmr = typeof left.currentMmr === 'number' ? left.currentMmr : -1
+            const rightMmr = typeof right.currentMmr === 'number' ? right.currentMmr : -1
+            if (rightMmr !== leftMmr) {
+              return rightMmr - leftMmr
+            }
+
+            return left.nickname.localeCompare(right.nickname, 'ko-KR')
+          })
+
+        setManualPlayers(nextPlayers)
+      } catch {
+        if (!active) {
+          return
+        }
+        setManualPlayers([])
+        setManualPlayersError(t('results.manual.loadPlayersError'))
+      } finally {
+        if (active) {
+          setManualPlayersLoading(false)
+        }
+      }
+    }
+
+    void loadManualPlayers()
+
+    return () => {
+      active = false
+    }
+  }, [isAdmin, manualGroupId, showMmr])
+
+  const selectedManualPlayerIds = useMemo(
+    () =>
+      [...manualHomeSlots, ...manualAwaySlots].filter(
+        (playerId): playerId is number => typeof playerId === 'number' && Number.isFinite(playerId),
+      ),
+    [manualAwaySlots, manualHomeSlots],
+  )
+
+  const handleManualSlotChange = (
+    team: TeamSide,
+    slotIndex: number,
+    value: string,
+  ) => {
+    const normalizedValue = value.trim()
+    const parsedValue = normalizedValue.length === 0 ? NaN : Number.parseInt(normalizedValue, 10)
+    const nextValue: ManualSlotValue =
+      normalizedValue.length === 0 || !Number.isFinite(parsedValue) ? '' : parsedValue
+
+    if (team === 'HOME') {
+      setManualHomeSlots((previous) =>
+        previous.map((playerId, index) => (index === slotIndex ? nextValue : playerId)),
+      )
+      return
+    }
+
+    setManualAwaySlots((previous) =>
+      previous.map((playerId, index) => (index === slotIndex ? nextValue : playerId)),
+    )
+  }
+
+  const handleManualSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (!isAdmin) {
+      setManualSubmitError(t('common.adminOnlyAction'))
+      return
+    }
+
+    const homePlayerIds = manualHomeSlots.filter(
+      (playerId): playerId is number => typeof playerId === 'number' && Number.isFinite(playerId),
+    )
+    const awayPlayerIds = manualAwaySlots.filter(
+      (playerId): playerId is number => typeof playerId === 'number' && Number.isFinite(playerId),
+    )
+
+    if (homePlayerIds.length !== manualTeamSize || awayPlayerIds.length !== manualTeamSize) {
+      setManualSubmitError(t('results.manual.validation.playersRequired'))
+      return
+    }
+
+    const allPlayerIds = [...homePlayerIds, ...awayPlayerIds]
+    if (new Set(allPlayerIds).size !== allPlayerIds.length) {
+      setManualSubmitError(t('results.manual.validation.duplicatePlayers'))
+      return
+    }
+
+    setManualSubmitError(null)
+    setManualSubmitSuccess(null)
+    setError(null)
+    setRecentActionMessage(null)
+    setManualSubmitting(true)
+
+    try {
+      const response = await apiClient.createManualMatch({
+        groupId: manualGroupId,
+        teamSize: manualTeamSize,
+        homePlayerIds,
+        awayPlayerIds,
+        winnerTeam: manualWinnerTeam,
+        note: manualNote.trim().length > 0 ? manualNote.trim() : undefined,
+      })
+
+      setResult(response)
+      setSelectedRecentMatchId(null)
+      setSelectedRecentWinnerTeam(response.winnerTeam)
+      setManualSubmitSuccess(
+        isSuperAdmin
+          ? t('results.manual.successWithMatchId', { matchId: response.matchId })
+          : t('results.manual.success'),
+      )
+      await loadRecentMatches()
+    } catch (manualError) {
+      if (isApiUnauthorizedError(manualError)) {
+        setManualSubmitError(t('common.adminLoginRequired'))
+      } else if (isApiForbiddenError(manualError)) {
+        setManualSubmitError(t('common.permissionDenied'))
+      } else if (manualError instanceof Error && manualError.message.trim().length > 0) {
+        setManualSubmitError(manualError.message)
+      } else {
+        setManualSubmitError(t('results.manual.failure'))
+      }
+    } finally {
+      setManualSubmitting(false)
+    }
+  }
+
   const handlePickRecentMatch = (recentMatch: RecentMatchItem) => {
     if (!isAdmin) {
       return
@@ -381,6 +584,174 @@ export default function ResultsPage() {
         <h2 className="text-2xl font-semibold tracking-tight">{t('results.title')}</h2>
         <p className="text-sm text-slate-600">{resultsHeaderDescription}</p>
       </header>
+
+      {isAdmin && (
+        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <h3 className="text-sm font-semibold text-slate-900">{t('results.operator.title')}</h3>
+              <p className="text-xs text-slate-500">{t('results.operator.description')}</p>
+            </div>
+            <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+              {(['existing', 'manual'] as const).map((mode) => {
+                const selected = operatorEntryMode === mode
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setOperatorEntryMode(mode)}
+                    className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                      selected
+                        ? 'bg-slate-900 text-white'
+                        : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                    }`}
+                  >
+                    {mode === 'existing'
+                      ? t('results.operator.mode.existing')
+                      : t('results.operator.mode.manual')}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {operatorEntryMode === 'existing' ? (
+            <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+              {t('results.operator.existingHelper')}
+            </p>
+          ) : (
+            <form className="mt-4 space-y-4" onSubmit={handleManualSubmit}>
+              <div className="grid gap-4 lg:grid-cols-3">
+                <label className="space-y-1 text-sm">
+                  <span className="font-medium text-slate-700">{t('results.manual.groupLabel')}</span>
+                  <select
+                    value={manualGroupId}
+                    onChange={(event) => setManualGroupId(Number.parseInt(event.target.value, 10))}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                  >
+                    <option value={TEMP_GROUP_ID}>{t('results.manual.groupOptionDefault')}</option>
+                  </select>
+                </label>
+
+                <label className="space-y-1 text-sm">
+                  <span className="font-medium text-slate-700">{t('results.manual.teamSizeLabel')}</span>
+                  <select
+                    value={manualTeamSize}
+                    onChange={(event) => setManualTeamSize(event.target.value === '2' ? 2 : 3)}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                  >
+                    {manualTeamSizeOptions.map((teamSizeOption) => (
+                      <option key={teamSizeOption} value={teamSizeOption}>
+                        {teamSizeOption === 3
+                          ? t('balance.mode.threeVsThree')
+                          : t('balance.mode.twoVsTwo')}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="space-y-1 text-sm">
+                  <span className="font-medium text-slate-700">{t('results.manual.winnerLabel')}</span>
+                  <select
+                    value={manualWinnerTeam}
+                    onChange={(event) => setManualWinnerTeam(event.target.value as TeamSide)}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                  >
+                    {winnerTeamOptions.map((team) => (
+                      <option key={`manual-${team}`} value={team}>
+                        {formatTeamLabel(team)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              {manualPlayersLoading ? (
+                <LoadingIndicator label={t('common.loading')} />
+              ) : manualPlayersError ? (
+                <Alert variant="destructive" appearance="light" size="sm">
+                  <AlertIcon icon="destructive">!</AlertIcon>
+                  <AlertContent>
+                    <AlertDescription>{manualPlayersError}</AlertDescription>
+                  </AlertContent>
+                </Alert>
+              ) : (
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {([
+                    ['HOME', manualHomeSlots, t('results.manual.homeTitle')],
+                    ['AWAY', manualAwaySlots, t('results.manual.awayTitle')],
+                  ] as const).map(([team, slots, title]) => (
+                    <div key={team} className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+                      <h4 className="text-sm font-semibold text-slate-900">{title}</h4>
+                      <div className="space-y-2">
+                        {slots.map((selectedPlayerId, slotIndex) => (
+                          <select
+                            key={`${team}-slot-${slotIndex}`}
+                            value={selectedPlayerId}
+                            onChange={(event) => handleManualSlotChange(team, slotIndex, event.target.value)}
+                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                          >
+                            <option value="">
+                              {t('results.manual.playerPlaceholder', { slot: slotIndex + 1 })}
+                            </option>
+                            {manualPlayers.map((player) => {
+                              const isSelectedElsewhere =
+                                selectedManualPlayerIds.includes(player.id) && selectedPlayerId !== player.id
+                              return (
+                                <option
+                                  key={`${team}-${slotIndex}-${player.id}`}
+                                  value={player.id}
+                                  disabled={isSelectedElsewhere}
+                                >
+                                  {formatManualPlayerLabel(player, showMmr)}
+                                </option>
+                              )
+                            })}
+                          </select>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <label className="block space-y-1 text-sm">
+                <span className="font-medium text-slate-700">{t('results.manual.noteLabel')}</span>
+                <input
+                  type="text"
+                  value={manualNote}
+                  onChange={(event) => setManualNote(event.target.value)}
+                  maxLength={255}
+                  placeholder={t('results.manual.notePlaceholder')}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                />
+              </label>
+
+              {manualSubmitError && (
+                <Alert variant="destructive" appearance="light" size="sm">
+                  <AlertIcon icon="destructive">!</AlertIcon>
+                  <AlertContent>
+                    <AlertDescription>{manualSubmitError}</AlertDescription>
+                  </AlertContent>
+                </Alert>
+              )}
+              {manualSubmitSuccess && (
+                <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                  {manualSubmitSuccess}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={manualSubmitting || manualPlayersLoading}
+                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                {manualSubmitting ? t('results.manual.submitting') : t('results.manual.submit')}
+              </button>
+            </form>
+          )}
+        </article>
+      )}
 
       <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <h3 className="text-sm font-semibold text-slate-900">{t('results.recent.title')}</h3>

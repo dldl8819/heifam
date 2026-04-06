@@ -48,6 +48,7 @@ import com.balancify.backend.service.GroupMatchAdminService;
 import com.balancify.backend.service.MatchQueryService;
 import com.balancify.backend.service.MatchImportService;
 import com.balancify.backend.service.MatchResultService;
+import com.balancify.backend.service.ManualMatchService;
 import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.DashboardQueryService;
 import com.balancify.backend.service.MultiMatchBalancingService;
@@ -98,6 +99,9 @@ class AdminKeyFilterTest {
 
     @MockBean
     private MatchResultService matchResultService;
+
+    @MockBean
+    private ManualMatchService manualMatchService;
 
     @MockBean
     private MatchImportService matchImportService;
@@ -383,6 +387,80 @@ class AdminKeyFilterTest {
             .andExpect(jsonPath("$.participants[0].mmrBefore").value(1200))
             .andExpect(jsonPath("$.participants[0].mmrAfter").value(1216))
             .andExpect(jsonPath("$.participants[0].mmrDelta").value(16));
+    }
+
+    @Test
+    void returnsForbiddenForManualMatchCreateWithoutAdminEmail() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/matches/manual")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "groupId": 1,
+                          "teamSize": 3,
+                          "homePlayerIds": [1,2,3],
+                          "awayPlayerIds": [4,5,6],
+                          "winnerTeam": "HOME"
+                        }
+                        """)
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void returnsForbiddenForManualMatchCreateWithMemberEmail() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/matches/manual")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "groupId": 1,
+                          "teamSize": 3,
+                          "homePlayerIds": [1,2,3],
+                          "awayPlayerIds": [4,5,6],
+                          "winnerTeam": "HOME"
+                        }
+                        """)
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void allowsManualMatchCreateWithAdminEmail() throws Exception {
+        when(manualMatchService.createManualMatch(any(), any(), any()))
+            .thenReturn(
+                new MatchResultResponse(
+                    201L,
+                    "HOME",
+                    32,
+                    0.52,
+                    0.48,
+                    List.of()
+                )
+            );
+        when(adminRequestResolver.isAdminRequest(any())).thenReturn(true);
+
+        mockMvc
+            .perform(
+                post("/api/matches/manual")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "groupId": 1,
+                          "teamSize": 3,
+                          "homePlayerIds": [1,2,3],
+                          "awayPlayerIds": [4,5,6],
+                          "winnerTeam": "HOME",
+                          "note": "리겜 수동 입력"
+                        }
+                        """)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.matchId").value(201));
     }
 
     @Test

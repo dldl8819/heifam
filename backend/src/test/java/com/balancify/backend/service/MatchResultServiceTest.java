@@ -186,6 +186,41 @@ class MatchResultServiceTest {
     }
 
     @Test
+    void processesTwoVsTwoResultAndUpdatesMmrForAllParticipants() {
+        Match match = new Match();
+        match.setId(22L);
+        match.setStatus(MatchStatus.CONFIRMED);
+        match.setTeamSize(2);
+
+        Group group = new Group();
+        group.setId(1L);
+
+        List<MatchParticipant> participants = List.of(
+            participant(41L, match, player(31L, group, "H1", 1200), "HOME"),
+            participant(42L, match, player(32L, group, "H2", 1100), "HOME"),
+            participant(43L, match, player(33L, group, "A1", 1000), "AWAY"),
+            participant(44L, match, player(34L, group, "A2", 900), "AWAY")
+        );
+
+        when(matchRepository.findByIdForUpdate(22L)).thenReturn(Optional.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(22L)).thenReturn(participants);
+        when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(playerRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(mmrHistoryRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MatchResultResponse response = matchResultService.processMatchResult(
+            22L,
+            new MatchResultRequest("AWAY")
+        );
+
+        assertThat(response.matchId()).isEqualTo(22L);
+        assertThat(response.participants()).hasSize(4);
+        assertThat(match.getWinningTeam()).isEqualTo("AWAY");
+        participants.forEach(participant -> assertThat(participant.getMmrAfter()).isNotNull());
+    }
+
+    @Test
     void deletesMatchAndRollsBackPlayerMmr() {
         Match match = new Match();
         match.setId(99L);
