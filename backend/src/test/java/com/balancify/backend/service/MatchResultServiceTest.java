@@ -32,6 +32,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class MatchResultServiceTest {
 
+    private static final int DEFAULT_BASE_K_FACTOR = 24;
+
     @Mock
     private MatchRepository matchRepository;
 
@@ -48,12 +50,16 @@ class MatchResultServiceTest {
 
     @BeforeEach
     void setUp() {
-        matchResultService = new MatchResultService(
+        matchResultService = createService(DEFAULT_BASE_K_FACTOR);
+    }
+
+    private MatchResultService createService(int baseKFactor) {
+        return new MatchResultService(
             matchRepository,
             matchParticipantRepository,
             playerRepository,
             mmrHistoryRepository,
-            32,
+            baseKFactor,
             300,
             900,
             0.6,
@@ -82,12 +88,12 @@ class MatchResultServiceTest {
         );
 
         double homeExpected = 1.0 / (1.0 + Math.pow(10.0, (950.0 - 1100.0) / 400.0));
-        int homeDelta = (int) Math.round(32 * (1.0 - homeExpected));
-        int awayDelta = (int) Math.round(32 * (0.0 - (1.0 - homeExpected)));
+        int homeDelta = (int) Math.round(DEFAULT_BASE_K_FACTOR * (1.0 - homeExpected));
+        int awayDelta = (int) Math.round(DEFAULT_BASE_K_FACTOR * (0.0 - (1.0 - homeExpected)));
 
         assertThat(response.matchId()).isEqualTo(1L);
         assertThat(response.winnerTeam()).isEqualTo("HOME");
-        assertThat(response.kFactor()).isEqualTo(32);
+        assertThat(response.kFactor()).isEqualTo(DEFAULT_BASE_K_FACTOR);
         assertThat(response.homeExpectedWinRate()).isEqualTo(Math.round(homeExpected * 10000.0) / 10000.0);
         assertThat(response.awayExpectedWinRate()).isEqualTo(Math.round((1.0 - homeExpected) * 10000.0) / 10000.0);
         assertThat(response.participants()).hasSize(6);
@@ -182,7 +188,7 @@ class MatchResultServiceTest {
 
         MatchResultResponse response = matchResultService.processMatchResult(2L, new MatchResultRequest("HOME"));
 
-        assertThat(response.kFactor()).isEqualTo(22);
+        assertThat(response.kFactor()).isEqualTo(17);
     }
 
     @Test
@@ -288,7 +294,46 @@ class MatchResultServiceTest {
 
         MatchResultResponse response = matchResultService.processMatchResult(3L, new MatchResultRequest("HOME"));
 
-        assertThat(response.kFactor()).isLessThan(32);
+        assertThat(response.kFactor()).isLessThan(DEFAULT_BASE_K_FACTOR);
+    }
+
+    @Test
+    void strongerTeamWinResultsInSmallerPositiveDeltaThanUnderdogWin() {
+        MatchResultResponse favoredWin = processStandardResult(10L, "HOME", matchResultService);
+        MatchResultResponse underdogWin = processStandardResult(11L, "AWAY", matchResultService);
+
+        int favoredWinnerDelta = participantDelta(favoredWin, "HOME", "H1");
+        int underdogWinnerDelta = participantDelta(underdogWin, "AWAY", "A1");
+
+        assertThat(favoredWinnerDelta).isPositive();
+        assertThat(underdogWinnerDelta).isPositive();
+        assertThat(underdogWinnerDelta).isGreaterThan(favoredWinnerDelta);
+    }
+
+    @Test
+    void strongerTeamLossResultsInLargerNegativeDeltaThanUnderdogLoss() {
+        MatchResultResponse favoredWin = processStandardResult(12L, "HOME", matchResultService);
+        MatchResultResponse underdogWin = processStandardResult(13L, "AWAY", matchResultService);
+
+        int strongerTeamLossDelta = participantDelta(underdogWin, "HOME", "H1");
+        int weakerTeamLossDelta = participantDelta(favoredWin, "AWAY", "A1");
+
+        assertThat(strongerTeamLossDelta).isNegative();
+        assertThat(weakerTeamLossDelta).isNegative();
+        assertThat(Math.abs(strongerTeamLossDelta)).isGreaterThan(Math.abs(weakerTeamLossDelta));
+    }
+
+    @Test
+    void loweringBaseKFactorReducesAbsoluteDeltaSizes() {
+        MatchResultService legacyVolatilityService = createService(32);
+
+        MatchResultResponse legacyResponse = processStandardResult(14L, "AWAY", legacyVolatilityService);
+        MatchResultResponse loweredResponse = processStandardResult(15L, "AWAY", matchResultService);
+
+        int legacyUpsetDelta = participantDelta(legacyResponse, "AWAY", "A1");
+        int loweredUpsetDelta = participantDelta(loweredResponse, "AWAY", "A1");
+
+        assertThat(Math.abs(loweredUpsetDelta)).isLessThan(Math.abs(legacyUpsetDelta));
     }
 
     private List<MatchParticipant> buildParticipants(Match match) {
@@ -335,5 +380,35 @@ class MatchResultServiceTest {
         participant.setPlayer(player);
         participant.setTeam(team);
         return participant;
+    }
+
+    private MatchResultResponse processStandardResult(
+        Long matchId,
+        String winnerTeam,
+        MatchResultService service
+    ) {
+        Match match = new Match();
+        match.setId(matchId);
+        match.setStatus(MatchStatus.CONFIRMED);
+
+        List<MatchParticipant> participants = buildParticipants(match);
+
+        when(matchRepository.findByIdForUpdate(matchId)).thenReturn(Optional.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(matchId)).thenReturn(participants);
+        when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(playerRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(mmrHistoryRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        return service.processMatchResult(matchId, new MatchResultRequest(winnerTeam));
+    }
+
+    private int participantDelta(MatchResultResponse response, String team, String nickname) {
+        return response.participants().stream()
+            .filter(participant -> team.equals(participant.team()))
+            .filter(participant -> nickname.equals(participant.nickname()))
+            .findFirst()
+            .orElseThrow()
+            .mmrDelta();
     }
 }

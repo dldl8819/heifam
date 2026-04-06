@@ -47,7 +47,7 @@ public class MatchResultService {
         MatchParticipantRepository matchParticipantRepository,
         PlayerRepository playerRepository,
         MmrHistoryRepository mmrHistoryRepository,
-        @Value("${balancify.elo.k-factor:32}") int baseKFactor,
+        @Value("${balancify.elo.k-factor:24}") int baseKFactor,
         @Value("${balancify.elo.large-gap-threshold:300}") double largeGapThreshold,
         @Value("${balancify.elo.large-gap-range:900}") double largeGapRange,
         @Value("${balancify.elo.large-gap-min-multiplier:0.6}") double largeGapMinMultiplier,

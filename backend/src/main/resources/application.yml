@@ -26,7 +26,7 @@ spring:
 
 balancify:
   elo:
-    k-factor: ${ELO_K_FACTOR:32}
+    k-factor: ${ELO_K_FACTOR:24}
     large-gap-threshold: ${ELO_LARGE_GAP_THRESHOLD:300}
     large-gap-range: ${ELO_LARGE_GAP_RANGE:900}
     large-gap-min-multiplier: ${ELO_LARGE_GAP_MIN_MULTIPLIER:0.6}
