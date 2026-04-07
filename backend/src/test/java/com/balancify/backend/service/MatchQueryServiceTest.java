@@ -53,6 +53,7 @@ class MatchQueryServiceTest {
         match.setPlayedAt(OffsetDateTime.parse("2026-03-23T08:00:00Z"));
         match.setResultRecordedByEmail("kim@hei.gg");
         match.setResultRecordedByNickname("김원섭");
+        match.setRaceComposition("PTZ");
 
         Player alpha = player(1L, group, "알파", 900);
         Player bravo = player(2L, group, "브라보", 850);
@@ -85,9 +86,60 @@ class MatchQueryServiceTest {
         assertThat(response.homeTeam()).hasSize(1);
         assertThat(response.awayTeam()).hasSize(1);
         assertThat(response.resultRecordedByNickname()).isEqualTo("민식");
+        assertThat(response.homeRaceComposition()).isEqualTo("PTZ");
+        assertThat(response.awayRaceComposition()).isEqualTo("PTZ");
         assertThat(response.homeMmr()).isEqualTo(880);
         assertThat(response.awayMmr()).isEqualTo(830);
         assertThat(response.mmrDiff()).isEqualTo(50);
+    }
+
+    @Test
+    void derivesTeamRaceCompositionFromAssignedRacesWhenStoredCompositionIsMissing() {
+        Group group = new Group();
+        group.setId(1L);
+
+        Match match = new Match();
+        match.setId(203L);
+        match.setGroup(group);
+        match.setWinningTeam("HOME");
+        match.setPlayedAt(OffsetDateTime.parse("2026-03-23T11:00:00Z"));
+        match.setResultRecordedByEmail("kim@hei.gg");
+
+        Player homeOne = player(7L, group, "용이", 800);
+        Player homeTwo = player(8L, group, "헌터", 780);
+        Player awayOne = player(9L, group, "보이", 900);
+        Player awayTwo = player(10L, group, "잡종", 760);
+
+        MatchParticipant homeP = participant(match, homeOne, "HOME", 805);
+        homeP.setAssignedRace("P");
+        MatchParticipant homeT = participant(match, homeTwo, "HOME", 775);
+        homeT.setAssignedRace("T");
+        MatchParticipant awayP = participant(match, awayOne, "AWAY", 905);
+        awayP.setAssignedRace("P");
+        MatchParticipant awayT = participant(match, awayTwo, "AWAY", 755);
+        awayT.setAssignedRace("T");
+
+        when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(203L))
+            .thenReturn(List.of(homeP, homeT, awayP, awayT));
+        when(accessControlService.resolveAccessProfile(eq("kim@hei.gg")))
+            .thenReturn(
+                new AccessControlService.AccessProfile(
+                    "kim@hei.gg",
+                    "민식",
+                    "MEMBER",
+                    false,
+                    false,
+                    true,
+                    null
+                )
+            );
+
+        List<GroupRecentMatchResponse> responses = matchQueryService.getRecentMatches(1L, 10);
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).homeRaceComposition()).isEqualTo("PT");
+        assertThat(responses.get(0).awayRaceComposition()).isEqualTo("PT");
     }
 
     @Test

@@ -875,6 +875,8 @@ class AdminKeyFilterTest {
                         "HOME",
                         OffsetDateTime.parse("2026-04-01T12:40:00Z"),
                         "운영진",
+                        "PTZ",
+                        "PTZ",
                         List.of(new GroupRecentMatchPlayerResponse(10L, "alpha", "HOME", 1200)),
                         List.of(new GroupRecentMatchPlayerResponse(20L, "bravo", "AWAY", 1184)),
                         3600,

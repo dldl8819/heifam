@@ -387,6 +387,10 @@ function normalizeRecentMatchItem(value: unknown): RecentMatchItem | null {
   const resultRecordedAt = typeof source.resultRecordedAt === 'string' ? source.resultRecordedAt : null
   const resultRecordedByNickname =
     typeof source.resultRecordedByNickname === 'string' ? source.resultRecordedByNickname : null
+  const homeRaceComposition =
+    typeof source.homeRaceComposition === 'string' ? source.homeRaceComposition : null
+  const awayRaceComposition =
+    typeof source.awayRaceComposition === 'string' ? source.awayRaceComposition : null
   const homeMmr = toNumber(source.homeMmr)
   const awayMmr = toNumber(source.awayMmr)
   const mmrDiff = toNumber(source.mmrDiff)
@@ -412,6 +416,8 @@ function normalizeRecentMatchItem(value: unknown): RecentMatchItem | null {
     winningTeam: normalizeWinnerTeam(source.winningTeam),
     resultRecordedAt,
     resultRecordedByNickname,
+    homeRaceComposition,
+    awayRaceComposition,
     homeTeam,
     awayTeam,
     homeMmr: homeMmr ?? undefined,

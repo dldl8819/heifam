@@ -86,6 +86,8 @@ public class MatchQueryService {
                 normalizeWinningTeam(match.getWinningTeam()),
                 match.getResultRecordedAt(),
                 resolveRecordedByNickname(match),
+                resolveTeamRaceComposition(match, participants, "HOME"),
+                resolveTeamRaceComposition(match, participants, "AWAY"),
                 homeTeam,
                 awayTeam,
                 homeMmr,
@@ -155,5 +157,58 @@ public class MatchQueryService {
 
     private String safeTrim(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private String resolveTeamRaceComposition(
+        Match match,
+        List<MatchParticipant> participants,
+        String team
+    ) {
+        String storedRaceComposition = safeTrim(match == null ? null : match.getRaceComposition()).toUpperCase(Locale.ROOT);
+        if (!storedRaceComposition.isEmpty()) {
+            return storedRaceComposition;
+        }
+
+        List<String> assignedRaces = new ArrayList<>();
+        for (MatchParticipant participant : participants) {
+            if (!team.equals(normalizeTeam(participant.getTeam()))) {
+                continue;
+            }
+
+            String concreteRace = resolveConcreteParticipantRace(participant);
+            if (concreteRace == null) {
+                return null;
+            }
+            assignedRaces.add(concreteRace);
+        }
+
+        if (assignedRaces.isEmpty()) {
+            return null;
+        }
+
+        return RaceCompositionPolicy.canonicalize(assignedRaces);
+    }
+
+    private String resolveConcreteParticipantRace(MatchParticipant participant) {
+        if (participant == null) {
+            return null;
+        }
+
+        String assignedRace = safeTrim(participant.getAssignedRace());
+        if (!assignedRace.isEmpty()) {
+            return PlayerRacePolicy.normalizeAssignedRace(assignedRace);
+        }
+
+        String capability = safeTrim(participant.getRace());
+        if (capability.isEmpty() && participant.getPlayer() != null) {
+            capability = safeTrim(participant.getPlayer().getRace());
+        }
+
+        if (capability.isEmpty()) {
+            return null;
+        }
+
+        String normalizedCapability = PlayerRacePolicy.normalizeCapabilityOrDefault(capability, "");
+        return normalizedCapability.length() == 1 ? normalizedCapability : null;
     }
 }

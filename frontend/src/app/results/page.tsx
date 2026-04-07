@@ -77,6 +77,19 @@ function formatTeamPlayers(match: RecentMatchItem, team: TeamSide): string {
   return players.map((player) => player.nickname).join(', ')
 }
 
+function formatRaceMatchup(match: RecentMatchItem): string {
+  const home = match.homeRaceComposition?.trim() ?? ''
+  const away = match.awayRaceComposition?.trim() ?? ''
+
+  if (home.length === 0 && away.length === 0) {
+    return '-'
+  }
+  if (home.length > 0 && away.length > 0) {
+    return home === away ? home : `${home} / ${away}`
+  }
+  return home.length > 0 ? home : away
+}
+
 function isWinningTeam(team: TeamSide, winningTeam: TeamSide | null): boolean {
   return winningTeam === team
 }
@@ -975,6 +988,7 @@ export default function ResultsPage() {
                   <th className="px-3 py-2">{t('results.recent.table.recordedAt')}</th>
                   <th className="px-3 py-2">{t('results.recent.table.recordedBy')}</th>
                   <th className="px-3 py-2">{t('results.recent.table.winner')}</th>
+                  <th className="px-3 py-2">{t('results.recent.table.raceComposition')}</th>
                   <th className="px-3 py-2">{t('results.recent.table.homeTeam')}</th>
                   <th className="px-3 py-2">{t('results.recent.table.awayTeam')}</th>
                   {showMmr && <th className="px-3 py-2">{t('results.recent.table.mmrDiff')}</th>}
@@ -1014,6 +1028,9 @@ export default function ResultsPage() {
                       ) : (
                         formatTeamLabel(recentMatch.winningTeam)
                       )}
+                    </td>
+                    <td className="px-3 py-2 text-slate-700">
+                      {formatRaceMatchup(recentMatch)}
                     </td>
                     <td
                       className={`px-3 py-2 ${

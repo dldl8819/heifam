@@ -170,6 +170,8 @@ export type RecentMatchItem = {
   winningTeam: TeamSide | null
   resultRecordedAt: string | null
   resultRecordedByNickname: string | null
+  homeRaceComposition: string | null
+  awayRaceComposition: string | null
   homeTeam: RecentMatchPlayer[]
   awayTeam: RecentMatchPlayer[]
   homeMmr?: number

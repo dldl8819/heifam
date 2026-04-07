@@ -12,6 +12,8 @@ public record GroupRecentMatchResponse(
     String winningTeam,
     OffsetDateTime resultRecordedAt,
     String resultRecordedByNickname,
+    String homeRaceComposition,
+    String awayRaceComposition,
     List<GroupRecentMatchPlayerResponse> homeTeam,
     List<GroupRecentMatchPlayerResponse> awayTeam,
     Integer homeMmr,

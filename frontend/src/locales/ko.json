@@ -750,6 +750,7 @@
         "recordedAt": "입력 시각",
         "recordedBy": "입력자",
         "winner": "승리 팀",
+        "raceComposition": "종족전",
         "homeTeam": "홈 팀",
         "awayTeam": "어웨이 팀",
         "mmrDiff": "MMR 차이",

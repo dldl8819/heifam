@@ -132,6 +132,8 @@ public final class MmrMaskingMapper {
                     response.winningTeam(),
                     response.resultRecordedAt(),
                     response.resultRecordedByNickname(),
+                    response.homeRaceComposition(),
+                    response.awayRaceComposition(),
                     maskRecentMatchPlayers(response.homeTeam()),
                     maskRecentMatchPlayers(response.awayTeam()),
                     null,
