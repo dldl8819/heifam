@@ -31,8 +31,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class DashboardQueryService {
 
-    private static final List<String> DASHBOARD_RACE_ORDER = List.of("P", "T", "Z", "PT", "PZ", "TZ", "R");
-    private static final List<String> GAME_TYPE_RACE_ORDER = List.of("P", "T", "Z", "R");
+    private static final List<String> DASHBOARD_RACE_ORDER = List.of("P", "T", "Z", "PT", "PZ", "TZ", "PTZ");
+    private static final List<String> GAME_TYPE_RACE_ORDER = List.of("P", "T", "Z", "PTZ");
 
     private final PlayerRepository playerRepository;
     private final MatchParticipantRepository matchParticipantRepository;
@@ -412,20 +412,16 @@ public class DashboardQueryService {
     }
 
     private String normalizeRace(String race) {
-        if (race == null || race.isBlank()) {
-            return "P";
-        }
-
-        String normalized = race.trim().toUpperCase();
-        return switch (normalized) {
-            case "P", "T", "Z", "PT", "PZ", "TZ", "R" -> normalized;
-            default -> "P";
-        };
+        return PlayerRacePolicy.toDisplayRace(race);
     }
 
     private String resolveParticipantRace(MatchParticipant participant) {
         if (participant == null) {
             return "P";
+        }
+        String assignedRace = participant.getAssignedRace();
+        if (assignedRace != null && !assignedRace.isBlank()) {
+            return PlayerRacePolicy.normalizeAssignedRace(assignedRace);
         }
         String participantRace = participant.getRace();
         if (participantRace != null && !participantRace.isBlank()) {
@@ -471,7 +467,7 @@ public class DashboardQueryService {
         String normalized = normalizeRace(race);
         return switch (normalized) {
             case "P", "T", "Z" -> normalized;
-            default -> "R";
+            default -> "PTZ";
         };
     }
 

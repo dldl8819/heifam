@@ -1,5 +1,6 @@
 package com.balancify.backend.domain;
 
+import com.balancify.backend.service.PlayerRacePolicy;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -50,7 +51,9 @@ public class UserRacePreference {
     }
 
     private String normalizeRace(String value) {
-        return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
+        return value == null || value.isBlank()
+            ? ""
+            : PlayerRacePolicy.normalizeCapability(value);
     }
 
     public Long getId() {

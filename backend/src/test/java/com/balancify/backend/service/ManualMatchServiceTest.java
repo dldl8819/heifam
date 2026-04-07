@@ -46,6 +46,7 @@ class ManualMatchServiceTest {
             eq(3),
             eq(MatchSource.MANUAL),
             eq("리겜 수동 입력"),
+            eq("PPT"),
             eq(false)
         )).thenReturn(match);
         when(matchResultService.processMatchResult(
@@ -63,7 +64,8 @@ class ManualMatchServiceTest {
                 List.of(1L, 2L, 3L),
                 List.of(4L, 5L, 6L),
                 "HOME",
-                "리겜 수동 입력"
+                "리겜 수동 입력",
+                "PPT"
             ),
             "admin@hei.gg",
             "운영진"

@@ -99,9 +99,11 @@ public class MultiMatchBalancingService {
 
         List<PlayerSnapshot> orderedPlayers = loadPlayers(groupId, playerIds);
         MultiBalanceMode balanceMode = MultiBalanceMode.fromNullable(request.balanceMode());
+        String raceComposition = RaceCompositionPolicy.normalizeForAnyTeamSize(request.raceComposition());
         WeightProfile weightProfile = resolveWeightProfile(balanceMode);
 
         MatchAllocationPlan allocationPlan = buildAllocationPlan(orderedPlayers.size());
+        validateRaceCompositionAllocation(allocationPlan.teamSizes(), raceComposition);
         int assignedPlayersCount = allocationPlan.assignedPlayers();
         int waitingPlayersCount = allocationPlan.waitingPlayers();
 
@@ -117,8 +119,17 @@ public class MultiMatchBalancingService {
         );
 
         RecentHistory history = loadRecentHistory(groupId);
-        List<MatchGroup> distributedGroups = distributePlayersToGroups(assignedPlayers, allocationPlan.teamSizes());
-        List<MatchEvaluation> evaluatedMatches = evaluateGroups(distributedGroups, history, weightProfile);
+        List<MatchGroup> distributedGroups = distributePlayersToGroups(
+            assignedPlayers,
+            allocationPlan.teamSizes(),
+            raceComposition
+        );
+        List<MatchEvaluation> evaluatedMatches = evaluateGroups(
+            distributedGroups,
+            history,
+            weightProfile,
+            raceComposition
+        );
 
         List<MultiBalanceMatchResponse> matches = evaluatedMatches.stream()
             .map(MatchEvaluation::response)
@@ -191,7 +202,15 @@ public class MultiMatchBalancingService {
         return new MatchAllocationPlan(teamSizes, assignedCount, waitingCount);
     }
 
-    private List<MatchGroup> distributePlayersToGroups(List<PlayerSnapshot> sortedPlayers, List<Integer> teamSizes) {
+    private List<MatchGroup> distributePlayersToGroups(
+        List<PlayerSnapshot> sortedPlayers,
+        List<Integer> teamSizes,
+        String raceComposition
+    ) {
+        if (raceComposition != null) {
+            return distributePlayersToRaceConstrainedGroups(sortedPlayers, teamSizes, raceComposition);
+        }
+
         List<MatchGroup> groups = new ArrayList<>();
         for (int index = 0; index < teamSizes.size(); index++) {
             groups.add(new MatchGroup(index + 1, teamSizes.get(index)));
@@ -206,6 +225,192 @@ public class MultiMatchBalancingService {
             target.totalMmr = target.totalMmr + player.mmr();
         }
         return groups;
+    }
+
+    private List<MatchGroup> distributePlayersToRaceConstrainedGroups(
+        List<PlayerSnapshot> sortedPlayers,
+        List<Integer> teamSizes,
+        String raceComposition
+    ) {
+        if (teamSizes.isEmpty()) {
+            return List.of();
+        }
+
+        int teamSize = raceComposition.length();
+        validateRaceCompositionAllocation(teamSizes, raceComposition);
+        int groupPlayerCount = teamSize * 2;
+        RaceGroupingPlan groupingPlan = searchRaceConstrainedGroups(
+            sortedPlayers,
+            groupPlayerCount,
+            raceComposition,
+            new HashMap<>()
+        );
+        if (groupingPlan == null) {
+            throw new IllegalArgumentException("선택한 종족 조합으로 매치를 구성할 수 없습니다");
+        }
+
+        List<MatchGroup> groups = new ArrayList<>();
+        for (int index = 0; index < groupingPlan.groups().size(); index++) {
+            MatchGroup group = new MatchGroup(index + 1, teamSize);
+            for (PlayerSnapshot player : groupingPlan.groups().get(index)) {
+                group.players().add(player);
+                group.totalMmr = group.totalMmr + player.mmr();
+            }
+            groups.add(group);
+        }
+        return groups;
+    }
+
+    private RaceGroupingPlan searchRaceConstrainedGroups(
+        List<PlayerSnapshot> remainingPlayers,
+        int groupPlayerCount,
+        String raceComposition,
+        Map<String, Boolean> viabilityCache
+    ) {
+        if (remainingPlayers.isEmpty()) {
+            return new RaceGroupingPlan(List.of(), 0.0, List.of());
+        }
+        if (remainingPlayers.size() < groupPlayerCount || remainingPlayers.size() % groupPlayerCount != 0) {
+            return null;
+        }
+
+        double targetGroupMmr = remainingPlayers.stream()
+            .mapToInt(PlayerSnapshot::mmr)
+            .sum() / (double) (remainingPlayers.size() / groupPlayerCount);
+
+        PlayerSnapshot anchor = remainingPlayers.getFirst();
+        List<PlayerSnapshot> candidateGroup = new ArrayList<>();
+        candidateGroup.add(anchor);
+        RaceGroupingPlan[] bestPlan = new RaceGroupingPlan[1];
+
+        chooseRaceConstrainedGroup(
+            remainingPlayers,
+            groupPlayerCount,
+            raceComposition,
+            targetGroupMmr,
+            viabilityCache,
+            1,
+            candidateGroup,
+            bestPlan
+        );
+
+        return bestPlan[0];
+    }
+
+    private void chooseRaceConstrainedGroup(
+        List<PlayerSnapshot> remainingPlayers,
+        int groupPlayerCount,
+        String raceComposition,
+        double targetGroupMmr,
+        Map<String, Boolean> viabilityCache,
+        int startIndex,
+        List<PlayerSnapshot> candidateGroup,
+        RaceGroupingPlan[] bestPlan
+    ) {
+        if (candidateGroup.size() == groupPlayerCount) {
+            if (!isRaceCompatibleGroup(candidateGroup, raceComposition, viabilityCache)) {
+                return;
+            }
+
+            List<PlayerSnapshot> nextRemaining = subtractPlayers(remainingPlayers, candidateGroup);
+            RaceGroupingPlan remainderPlan = searchRaceConstrainedGroups(
+                nextRemaining,
+                groupPlayerCount,
+                raceComposition,
+                viabilityCache
+            );
+            if (remainderPlan == null) {
+                return;
+            }
+
+            List<List<PlayerSnapshot>> groups = new ArrayList<>();
+            groups.add(List.copyOf(candidateGroup));
+            groups.addAll(remainderPlan.groups());
+
+            double score = Math.abs(sumMmr(candidateGroup) - targetGroupMmr) + remainderPlan.score();
+            RaceGroupingPlan currentPlan = new RaceGroupingPlan(groups, score, buildPlanKey(groups));
+            if (currentPlan.isBetterThan(bestPlan[0])) {
+                bestPlan[0] = currentPlan;
+            }
+            return;
+        }
+
+        int remainingNeeded = groupPlayerCount - candidateGroup.size();
+        for (int index = startIndex; index <= remainingPlayers.size() - remainingNeeded; index++) {
+            candidateGroup.add(remainingPlayers.get(index));
+            chooseRaceConstrainedGroup(
+                remainingPlayers,
+                groupPlayerCount,
+                raceComposition,
+                targetGroupMmr,
+                viabilityCache,
+                index + 1,
+                candidateGroup,
+                bestPlan
+            );
+            candidateGroup.remove(candidateGroup.size() - 1);
+        }
+    }
+
+    private boolean isRaceCompatibleGroup(
+        List<PlayerSnapshot> players,
+        String raceComposition,
+        Map<String, Boolean> viabilityCache
+    ) {
+        String cacheKey = players.stream()
+            .map(PlayerSnapshot::id)
+            .sorted()
+            .map(String::valueOf)
+            .reduce((left, right) -> left + "-" + right)
+            .orElse("");
+        Boolean cached = viabilityCache.get(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+
+        boolean valid;
+        try {
+            valid = !teamBalancingService.generateCandidates(
+                players.stream()
+                    .map(player -> new BalancePlayerDto(player.id(), player.nickname(), player.mmr()))
+                    .toList(),
+                raceComposition.length(),
+                players.stream().map(PlayerSnapshot::race).toList(),
+                raceComposition
+            ).isEmpty();
+        } catch (IllegalArgumentException | IllegalStateException exception) {
+            valid = false;
+        }
+        viabilityCache.put(cacheKey, valid);
+        return valid;
+    }
+
+    private List<PlayerSnapshot> subtractPlayers(
+        List<PlayerSnapshot> source,
+        List<PlayerSnapshot> toRemove
+    ) {
+        Set<Long> removedIds = toRemove.stream()
+            .map(PlayerSnapshot::id)
+            .collect(HashSet::new, Set::add, Set::addAll);
+        return source.stream()
+            .filter(player -> !removedIds.contains(player.id()))
+            .toList();
+    }
+
+    private double sumMmr(List<PlayerSnapshot> players) {
+        return players.stream().mapToInt(PlayerSnapshot::mmr).sum();
+    }
+
+    private List<Long> buildPlanKey(List<List<PlayerSnapshot>> groups) {
+        List<Long> key = new ArrayList<>();
+        for (List<PlayerSnapshot> group : groups) {
+            group.stream()
+                .map(PlayerSnapshot::id)
+                .sorted()
+                .forEach(key::add);
+            key.add(-1L);
+        }
+        return key;
     }
 
     private MatchGroup selectBestGroupForPlayer(List<MatchGroup> groups, PlayerSnapshot player) {
@@ -239,7 +444,8 @@ public class MultiMatchBalancingService {
     private List<MatchEvaluation> evaluateGroups(
         List<MatchGroup> groups,
         RecentHistory history,
-        WeightProfile weightProfile
+        WeightProfile weightProfile,
+        String raceComposition
     ) {
         List<MatchEvaluation> evaluations = new ArrayList<>();
         for (MatchGroup group : groups) {
@@ -255,7 +461,8 @@ public class MultiMatchBalancingService {
                 indexById(group.players()),
                 history,
                 weightProfile,
-                evaluations
+                evaluations,
+                raceComposition
             );
             evaluations.add(evaluation);
         }
@@ -269,9 +476,28 @@ public class MultiMatchBalancingService {
         Map<Long, PlayerSnapshot> byId,
         RecentHistory history,
         WeightProfile weights,
-        List<MatchEvaluation> selectedSoFar
+        List<MatchEvaluation> selectedSoFar,
+        String raceComposition
     ) {
-        List<TeamBalancingService.BalanceCandidate> candidates = teamBalancingService.generateCandidates(players, teamSize);
+        List<TeamBalancingService.BalanceCandidate> candidates = raceComposition == null
+            ? teamBalancingService.generateCandidates(players, teamSize)
+            : teamBalancingService.generateCandidates(
+                players,
+                teamSize,
+                players.stream()
+                    .map(player -> {
+                        if (player.playerId() == null) {
+                            throw new IllegalArgumentException("선수 종족 정보가 올바르지 않습니다.");
+                        }
+                        PlayerSnapshot snapshot = byId.get(player.playerId());
+                        if (snapshot == null) {
+                            throw new IllegalArgumentException("선수 종족 정보가 올바르지 않습니다.");
+                        }
+                        return snapshot.race();
+                    })
+                    .toList(),
+                raceComposition
+            );
         CandidateScore best = null;
 
         for (TeamBalancingService.BalanceCandidate candidate : candidates) {
@@ -371,8 +597,7 @@ public class MultiMatchBalancingService {
     private Map<String, Integer> countRaces(List<BalancePlayerDto> team, Map<Long, PlayerSnapshot> byId) {
         Map<String, Integer> counts = new HashMap<>();
         for (BalancePlayerDto player : team) {
-            PlayerSnapshot snapshot = player.playerId() == null ? null : byId.get(player.playerId());
-            String race = snapshot == null ? "R" : snapshot.race();
+            String race = normalizeTeamRace(player, byId);
             counts.merge(race, 1, Integer::sum);
         }
         return counts;
@@ -454,11 +679,22 @@ public class MultiMatchBalancingService {
     private String buildRaceSummary(List<BalancePlayerDto> team, Map<Long, PlayerSnapshot> byId) {
         List<String> races = new ArrayList<>();
         for (BalancePlayerDto player : team) {
-            PlayerSnapshot snapshot = player.playerId() == null ? null : byId.get(player.playerId());
-            races.add(snapshot == null ? "R" : snapshot.race());
+            races.add(normalizeTeamRace(player, byId));
         }
         races.sort(Comparator.naturalOrder());
         return String.join("", races);
+    }
+
+    private String normalizeTeamRace(BalancePlayerDto player, Map<Long, PlayerSnapshot> byId) {
+        if (player.assignedRace() != null && !player.assignedRace().isBlank()) {
+            return PlayerRacePolicy.normalizeAssignedRace(player.assignedRace());
+        }
+
+        PlayerSnapshot snapshot = player.playerId() == null ? null : byId.get(player.playerId());
+        if (snapshot == null) {
+            return "PTZ";
+        }
+        return PlayerRacePolicy.toDisplayRace(snapshot.race());
     }
 
     private Map<Long, PlayerSnapshot> indexById(List<PlayerSnapshot> players) {
@@ -594,14 +830,23 @@ public class MultiMatchBalancingService {
     }
 
     private String normalizeRace(String race) {
-        if (race == null || race.isBlank()) {
-            return "R";
-        }
-        return race.trim().toUpperCase(Locale.ROOT);
+        return PlayerRacePolicy.normalizeCapabilityOrDefault(race, "P");
     }
 
     private int safeMmr(Integer mmr) {
         return mmr == null ? 0 : mmr;
+    }
+
+    private void validateRaceCompositionAllocation(List<Integer> teamSizes, String raceComposition) {
+        if (raceComposition == null || teamSizes.isEmpty()) {
+            return;
+        }
+
+        int requiredTeamSize = raceComposition.length();
+        boolean mixedTeamSizes = teamSizes.stream().anyMatch(teamSize -> teamSize != requiredTeamSize);
+        if (mixedTeamSizes) {
+            throw new IllegalArgumentException("선택한 종족 조합은 현재 동일한 팀 크기 경기에서만 지원합니다");
+        }
     }
 
     private record PlayerSnapshot(
@@ -694,6 +939,29 @@ public class MultiMatchBalancingService {
                 return racePenalty < other.racePenalty;
             }
             return interMatchPenalty < other.interMatchPenalty;
+        }
+    }
+
+    private record RaceGroupingPlan(
+        List<List<PlayerSnapshot>> groups,
+        double score,
+        List<Long> orderKey
+    ) {
+        private boolean isBetterThan(RaceGroupingPlan other) {
+            if (other == null) {
+                return true;
+            }
+            if (Double.compare(score, other.score) != 0) {
+                return score < other.score;
+            }
+            int minSize = Math.min(orderKey.size(), other.orderKey.size());
+            for (int index = 0; index < minSize; index++) {
+                int compare = Long.compare(orderKey.get(index), other.orderKey.get(index));
+                if (compare != 0) {
+                    return compare < 0;
+                }
+            }
+            return orderKey.size() < other.orderKey.size();
         }
     }
 }

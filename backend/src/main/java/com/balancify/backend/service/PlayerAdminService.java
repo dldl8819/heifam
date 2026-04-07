@@ -7,14 +7,11 @@ import com.balancify.backend.repository.PlayerRepository;
 import java.util.List;
 import java.util.Locale;
 import java.util.NoSuchElementException;
-import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class PlayerAdminService {
-
-    private static final Set<String> ALLOWED_RACES = Set.of("P", "T", "Z", "PT", "PZ", "TZ", "R");
 
     private final PlayerRepository playerRepository;
 
@@ -53,10 +50,11 @@ public class PlayerAdminService {
         }
 
         if (!normalizedRace.isEmpty()) {
-            if (!ALLOWED_RACES.contains(normalizedRace)) {
-                throw new IllegalArgumentException("Race must be one of P,T,Z,PT,PZ,TZ,R");
+            try {
+                player.setRace(PlayerRacePolicy.normalizeCapability(normalizedRace));
+            } catch (IllegalArgumentException exception) {
+                throw new IllegalArgumentException("Race must be one of P,T,Z,PT,PZ,TZ,PTZ");
             }
-            player.setRace(normalizedRace);
         }
 
         playerRepository.save(player);

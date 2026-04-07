@@ -46,7 +46,7 @@ public class MatchBalanceController {
             }
 
             return MmrMaskingMapper.maskBalance(response);
-        } catch (IllegalArgumentException exception) {
+        } catch (IllegalArgumentException | IllegalStateException exception) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
         }
     }
@@ -63,7 +63,7 @@ public class MatchBalanceController {
             }
 
             return MmrMaskingMapper.maskMultiBalance(response);
-        } catch (IllegalArgumentException exception) {
+        } catch (IllegalArgumentException | IllegalStateException exception) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
         }
     }

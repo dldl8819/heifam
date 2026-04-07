@@ -147,15 +147,7 @@ public class PlayerQueryService {
     }
 
     private String normalizeRace(String race) {
-        if (race == null || race.isBlank()) {
-            return "P";
-        }
-
-        String normalized = race.trim().toUpperCase();
-        return switch (normalized) {
-            case "P", "T", "Z", "PT", "PZ", "TZ", "R" -> normalized;
-            default -> "P";
-        };
+        return PlayerRacePolicy.toDisplayRace(race);
     }
 
     private int safeInt(Integer value) {

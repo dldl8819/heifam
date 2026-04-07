@@ -15,7 +15,7 @@ const RACE_OPTIONS: Array<{ value: PlayerRace; label: string }> = [
   { value: 'PT', label: 'PT' },
   { value: 'PZ', label: 'PZ' },
   { value: 'TZ', label: 'TZ' },
-  { value: 'R', label: 'R (PTZ)' },
+  { value: 'PTZ', label: 'PTZ' },
 ]
 
 export function UserRaceSetupModal() {

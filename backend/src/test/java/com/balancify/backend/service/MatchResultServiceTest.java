@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.balancify.backend.api.match.dto.MatchResultRequest;
+import com.balancify.backend.api.match.dto.MatchResultParticipantResponse;
 import com.balancify.backend.api.match.dto.MatchResultResponse;
 import com.balancify.backend.domain.Group;
 import com.balancify.backend.domain.Match;
@@ -74,6 +75,12 @@ class MatchResultServiceTest {
         match.setStatus(MatchStatus.CONFIRMED);
 
         List<MatchParticipant> participants = buildParticipants(match);
+        participants.get(0).setAssignedRace("P");
+        participants.get(1).setAssignedRace("P");
+        participants.get(2).setAssignedRace("T");
+        participants.get(3).setAssignedRace("P");
+        participants.get(4).setAssignedRace("P");
+        participants.get(5).setAssignedRace("T");
 
         when(matchRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(match));
         when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(1L)).thenReturn(participants);
@@ -97,6 +104,9 @@ class MatchResultServiceTest {
         assertThat(response.homeExpectedWinRate()).isEqualTo(Math.round(homeExpected * 10000.0) / 10000.0);
         assertThat(response.awayExpectedWinRate()).isEqualTo(Math.round((1.0 - homeExpected) * 10000.0) / 10000.0);
         assertThat(response.participants()).hasSize(6);
+        assertThat(response.participants())
+            .extracting(MatchResultParticipantResponse::assignedRace)
+            .containsExactly("P", "P", "T", "P", "P", "T");
 
         participants.stream()
             .filter(participant -> "HOME".equals(participant.getTeam()))

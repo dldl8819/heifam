@@ -1,5 +1,7 @@
 export type TeamSide = 'HOME' | 'AWAY'
-export type PlayerRace = 'P' | 'T' | 'Z' | 'PT' | 'PZ' | 'TZ' | 'R'
+export type AssignedRace = 'P' | 'T' | 'Z'
+export type PlayerRace = 'P' | 'T' | 'Z' | 'PT' | 'PZ' | 'TZ' | 'PTZ'
+export type RaceComposition = 'PP' | 'PT' | 'PZ' | 'PPP' | 'PPT' | 'PPZ' | 'PTZ'
 export type MatchTeamSide = TeamSide | 'UNKNOWN'
 
 export type HealthResponse = {
@@ -11,6 +13,7 @@ export type BalancePlayerInput = {
   playerId?: number
   name: string
   mmr?: number
+  assignedRace?: AssignedRace
 }
 
 export type BalancePlayerOption = {
@@ -26,6 +29,7 @@ export type BalanceRequest = {
   playerIds?: number[]
   teamSize?: number
   players?: BalancePlayerInput[]
+  raceComposition?: RaceComposition
 }
 
 export type BalanceResponse = {
@@ -42,6 +46,7 @@ export type MultiBalanceRequest = {
   groupId: number
   playerIds: number[]
   balanceMode?: MultiBalanceMode
+  raceComposition?: RaceComposition
 }
 
 export type MultiBalanceMode =
@@ -94,6 +99,7 @@ export type ManualMatchCreateRequest = {
   homePlayerIds: number[]
   awayPlayerIds: number[]
   winnerTeam: TeamSide
+  raceComposition?: RaceComposition
   note?: string
 }
 
@@ -135,6 +141,7 @@ export type MatchResultParticipant = {
   playerId: number
   nickname: string
   team: MatchTeamSide
+  assignedRace?: AssignedRace
   mmrBefore?: number
   mmrAfter?: number
   mmrDelta?: number

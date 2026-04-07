@@ -6,13 +6,14 @@ public record BalanceRequest(
     Long groupId,
     List<Long> playerIds,
     Integer teamSize,
-    List<BalancePlayerDto> players
+    List<BalancePlayerDto> players,
+    String raceComposition
 ) {
     public BalanceRequest(List<BalancePlayerDto> players) {
-        this(null, null, null, players);
+        this(null, null, null, players, null);
     }
 
     public BalanceRequest(Long groupId, List<Long> playerIds, Integer teamSize) {
-        this(groupId, playerIds, teamSize, null);
+        this(groupId, playerIds, teamSize, null, null);
     }
 }

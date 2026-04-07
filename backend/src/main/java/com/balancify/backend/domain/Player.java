@@ -11,6 +11,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import com.balancify.backend.service.PlayerRacePolicy;
 import java.time.OffsetDateTime;
 
 @Entity
@@ -28,7 +29,7 @@ public class Player {
     @Column(nullable = false, length = 50)
     private String nickname;
 
-    @Column(nullable = false, length = 2)
+    @Column(nullable = false, length = 3)
     private String race = "P";
 
     @Column(length = 20)
@@ -75,7 +76,7 @@ public class Player {
     }
 
     public void setRace(String race) {
-        this.race = race;
+        this.race = PlayerRacePolicy.normalizeCapabilityOrDefault(race, "P");
     }
 
     public String getTier() {
@@ -127,6 +128,7 @@ public class Player {
     @PrePersist
     @PreUpdate
     private void syncTierWithMmr() {
+        this.race = PlayerRacePolicy.normalizeCapabilityOrDefault(this.race, "P");
         if (this.tier == null || this.tier.isBlank()) {
             this.tier = PlayerTierPolicy.resolveTier(this.mmr);
         }

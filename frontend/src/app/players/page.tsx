@@ -31,7 +31,7 @@ type TierChangeTarget = {
   baseMmr: number
   currentMmr: number
 }
-const PLAYER_RACE_OPTIONS: PlayerRace[] = ['P', 'T', 'Z', 'PT', 'PZ', 'TZ', 'R']
+const PLAYER_RACE_OPTIONS: PlayerRace[] = ['P', 'T', 'Z', 'PT', 'PZ', 'TZ', 'PTZ']
 const TIER_DOWNLOAD_ORDER: Record<PlayerTierStatus, number> = {
   S: 0,
   'A+': 1,

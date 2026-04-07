@@ -479,6 +479,7 @@ class GroupMatchAdminServiceTest {
             2,
             MatchSource.MANUAL,
             "리겜 수동 입력",
+            null,
             false
         );
 
@@ -527,6 +528,7 @@ class GroupMatchAdminServiceTest {
             3,
             MatchSource.MANUAL,
             null,
+            null,
             false
         );
         Match secondCreated = groupMatchAdminService.createConfirmedMatch(
@@ -535,6 +537,7 @@ class GroupMatchAdminServiceTest {
             List.of(4L, 5L, 6L),
             3,
             MatchSource.MANUAL,
+            null,
             null,
             false
         );
@@ -573,6 +576,7 @@ class GroupMatchAdminServiceTest {
             3,
             MatchSource.MANUAL,
             null,
+            null,
             false
         );
 
@@ -580,12 +584,136 @@ class GroupMatchAdminServiceTest {
         verify(matchRepository).save(any(Match.class));
     }
 
+    @Test
+    void storesRaceCompositionWhenManualMatchMatchesSelection() {
+        Group group = new Group();
+        group.setId(1L);
+
+        List<Player> players = List.of(
+            player(1L, group, "P"),
+            player(2L, group, "P"),
+            player(3L, group, "T"),
+            player(4L, group, "P"),
+            player(5L, group, "P"),
+            player(6L, group, "T")
+        );
+
+        Match savedMatch = new Match();
+        savedMatch.setId(980L);
+        savedMatch.setGroup(group);
+
+        when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
+        when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L, 5L, 6L)))
+            .thenReturn(players);
+        when(matchRepository.save(any(Match.class))).thenReturn(savedMatch);
+
+        Match created = groupMatchAdminService.createConfirmedMatch(
+            1L,
+            List.of(1L, 2L, 3L),
+            List.of(4L, 5L, 6L),
+            3,
+            MatchSource.MANUAL,
+            null,
+            "PPT",
+            false
+        );
+
+        assertThat(created.getId()).isEqualTo(980L);
+
+        ArgumentCaptor<Match> matchCaptor = ArgumentCaptor.forClass(Match.class);
+        verify(matchRepository).save(matchCaptor.capture());
+        assertThat(matchCaptor.getValue().getRaceComposition()).isEqualTo("PPT");
+    }
+
+    @Test
+    void storesAssignedRaceForFlexiblePlayers() {
+        Group group = new Group();
+        group.setId(1L);
+
+        List<Player> players = List.of(
+            player(1L, group, "PT"),
+            player(2L, group, "P"),
+            player(3L, group, "P"),
+            player(4L, group, "PT"),
+            player(5L, group, "P"),
+            player(6L, group, "P")
+        );
+
+        Match savedMatch = new Match();
+        savedMatch.setId(981L);
+        savedMatch.setGroup(group);
+
+        when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
+        when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L, 5L, 6L)))
+            .thenReturn(players);
+        when(matchRepository.save(any(Match.class))).thenReturn(savedMatch);
+
+        groupMatchAdminService.createConfirmedMatch(
+            1L,
+            List.of(1L, 2L, 3L),
+            List.of(4L, 5L, 6L),
+            3,
+            MatchSource.MANUAL,
+            null,
+            "PPT",
+            false
+        );
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<MatchParticipant>> participantsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(matchParticipantRepository).saveAll(participantsCaptor.capture());
+
+        List<MatchParticipant> participants = participantsCaptor.getValue();
+        assertThat(participants).hasSize(6);
+        assertThat(participants)
+            .extracting(MatchParticipant::getAssignedRace)
+            .containsExactlyInAnyOrder("P", "P", "T", "P", "P", "T");
+    }
+
+    @Test
+    void rejectsManualMatchWhenTeamRaceCompositionDoesNotMatchSelection() {
+        Group group = new Group();
+        group.setId(1L);
+
+        List<Player> players = List.of(
+            player(1L, group, "P"),
+            player(2L, group, "P"),
+            player(3L, group, "P"),
+            player(4L, group, "P"),
+            player(5L, group, "T"),
+            player(6L, group, "T")
+        );
+
+        when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
+        when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L, 5L, 6L)))
+            .thenReturn(players);
+
+        assertThatThrownBy(() ->
+            groupMatchAdminService.createConfirmedMatch(
+                1L,
+                List.of(1L, 2L, 3L),
+                List.of(4L, 5L, 6L),
+                3,
+                MatchSource.MANUAL,
+                null,
+                "PPT",
+                false
+            )
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("선택한 종족 조합으로 매치를 구성할 수 없습니다");
+    }
+
     private Player player(Long id, Group group) {
+        return player(id, group, "P");
+    }
+
+    private Player player(Long id, Group group, String race) {
         Player player = new Player();
         player.setId(id);
         player.setGroup(group);
         player.setNickname("P" + id);
-        player.setRace("P");
+        player.setRace(race);
         player.setTier("A");
         player.setMmr(800);
         return player;

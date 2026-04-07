@@ -193,6 +193,7 @@ public final class MmrMaskingMapper {
                 participant.playerId(),
                 participant.nickname(),
                 participant.team(),
+                participant.assignedRace(),
                 null,
                 null,
                 null
@@ -228,7 +229,7 @@ public final class MmrMaskingMapper {
     private static List<BalancePlayerDto> maskBalancePlayers(List<BalancePlayerDto> players) {
         return players
             .stream()
-            .map(player -> new BalancePlayerDto(player.playerId(), player.name(), null))
+            .map(player -> new BalancePlayerDto(player.playerId(), player.name(), null, player.assignedRace()))
             .toList();
     }
 }

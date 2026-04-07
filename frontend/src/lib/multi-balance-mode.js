@@ -21,11 +21,14 @@ export function normalizeMultiBalanceMode(mode) {
     : DEFAULT_MULTI_BALANCE_MODE
 }
 
-export function buildMultiBalanceRequestPayload(groupId, playerIds, balanceMode) {
+export function buildMultiBalanceRequestPayload(groupId, playerIds, balanceMode, raceComposition) {
   return {
     groupId,
     playerIds,
     balanceMode: normalizeMultiBalanceMode(balanceMode),
+    raceComposition: typeof raceComposition === 'string' && raceComposition.trim().length > 0
+      ? raceComposition.trim().toUpperCase()
+      : undefined,
   }
 }
 

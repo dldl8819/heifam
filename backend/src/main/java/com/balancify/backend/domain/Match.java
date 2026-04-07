@@ -58,6 +58,9 @@ public class Match {
     @Column(length = 255)
     private String note;
 
+    @Column(name = "race_composition", length = 10)
+    private String raceComposition;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
@@ -159,6 +162,14 @@ public class Match {
 
     public void setNote(String note) {
         this.note = note;
+    }
+
+    public String getRaceComposition() {
+        return raceComposition;
+    }
+
+    public void setRaceComposition(String raceComposition) {
+        this.raceComposition = raceComposition;
     }
 
     public OffsetDateTime getCreatedAt() {

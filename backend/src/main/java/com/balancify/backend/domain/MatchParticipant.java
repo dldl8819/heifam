@@ -1,5 +1,6 @@
 package com.balancify.backend.domain;
 
+import com.balancify.backend.service.PlayerRacePolicy;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -11,7 +12,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
-import java.util.Locale;
 
 @Entity
 @Table(name = "match_participants")
@@ -32,8 +32,11 @@ public class MatchParticipant {
     @Column(nullable = false, length = 20)
     private String team;
 
-    @Column(nullable = false, length = 2)
+    @Column(nullable = false, length = 3)
     private String race = "P";
+
+    @Column(name = "assigned_race", length = 1)
+    private String assignedRace;
 
     @Column
     private Integer mmrBefore;
@@ -81,7 +84,15 @@ public class MatchParticipant {
     }
 
     public void setRace(String race) {
-        this.race = normalizeRace(race);
+        this.race = normalizeCapability(race);
+    }
+
+    public String getAssignedRace() {
+        return assignedRace;
+    }
+
+    public void setAssignedRace(String assignedRace) {
+        this.assignedRace = normalizeAssignedRace(assignedRace);
     }
 
     public Integer getMmrBefore() {
@@ -111,18 +122,20 @@ public class MatchParticipant {
     @PrePersist
     @PreUpdate
     private void normalizeParticipantRace() {
-        this.race = normalizeRace(this.race);
+        this.race = normalizeCapability(this.race);
+        this.assignedRace = normalizeAssignedRace(this.assignedRace);
     }
 
-    private String normalizeRace(String value) {
+    private String normalizeCapability(String value) {
         if (value == null || value.isBlank()) {
             return "P";
         }
+        return PlayerRacePolicy.normalizeCapabilityOrDefault(value, "P");
+    }
 
-        String normalized = value.trim().toUpperCase(Locale.ROOT);
-        return switch (normalized) {
-            case "P", "T", "Z", "PT", "PZ", "TZ", "R" -> normalized;
-            default -> "P";
-        };
+    private String normalizeAssignedRace(String value) {
+        return value == null || value.isBlank()
+            ? null
+            : PlayerRacePolicy.normalizeAssignedRace(value);
     }
 }

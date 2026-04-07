@@ -282,7 +282,7 @@ function toNumber(value: unknown): number | null {
   return null
 }
 
-function normalizeRace(value: unknown): 'P' | 'T' | 'Z' | 'PT' | 'PZ' | 'TZ' | 'R' {
+function normalizeRace(value: unknown): 'P' | 'T' | 'Z' | 'PT' | 'PZ' | 'TZ' | 'PTZ' {
   if (typeof value !== 'string') {
     return 'P'
   }
@@ -295,7 +295,7 @@ function normalizeRace(value: unknown): 'P' | 'T' | 'Z' | 'PT' | 'PZ' | 'TZ' | '
     normalized === 'PT' ||
     normalized === 'PZ' ||
     normalized === 'TZ' ||
-    normalized === 'R'
+    normalized === 'PTZ'
   ) {
     return normalized
   }
@@ -491,7 +491,7 @@ export const apiClient = {
     }, { adminOnly: true }),
   createGroupMatch: (
     groupId: number,
-    payload: { homePlayerIds: number[]; awayPlayerIds: number[] }
+    payload: { homePlayerIds: number[]; awayPlayerIds: number[]; raceComposition?: string }
   ) =>
     apiRequest<CreateGroupMatchResponse>(
       `/api/groups/${groupId}/matches`,

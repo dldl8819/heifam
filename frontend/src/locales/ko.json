@@ -383,7 +383,7 @@
       "success": "선수 일괄 등록이 완료되었습니다.",
       "failure": "선수 일괄 등록에 실패했습니다. 요청 형식과 서버 상태를 확인해 주세요.",
       "invalidFormat": "형식을 확인해 주세요. 예: `민식 B+ P` 또는 JSON.",
-      "placeholder": "민식 B+ P\n테란고수 A+ T\n유니버 재배정대상 R"
+      "placeholder": "민식 B+ P\n테란고수 A+ T\n유니버 재배정대상 PTZ"
     },
     "download": {
       "button": "티어/이름 정렬 명단 다운로드",
@@ -461,6 +461,10 @@
       "helperTwoVsTwo": "2:2 모드는 4명을 정확히 선택해 팀 밸런스를 계산합니다.",
       "helperThreeVsThree": "3:3 모드는 6명을 정확히 선택해 팀 밸런스를 계산합니다."
     },
+    "raceComposition": {
+      "label": "종족 조합",
+      "placeholder": "종족 조합을 선택해 주세요."
+    },
     "selection": {
       "title": "선수 선택 ({count}명)",
       "slot": "슬롯 {index}",
@@ -485,6 +489,7 @@
     "result": {
       "homeTeam": "홈 팀",
       "awayTeam": "어웨이 팀",
+      "assignedRace": "배정 종족",
       "homeMmr": "홈 MMR",
       "awayMmr": "어웨이 MMR",
       "metricsTitle": "밸런스 지표",
@@ -559,6 +564,11 @@
         }
       }
     },
+    "raceComposition": {
+      "label": "종족 조합",
+      "placeholder": "종족 조합을 선택해 주세요.",
+      "unavailable": "현재 선택 인원은 동일한 팀 크기 경기로만 배정될 때 종족 조합을 지원합니다."
+    },
     "validation": {
       "selectPlayers": "참가 선수를 선택해 주세요.",
       "minimumFour": "최소 4명 이상 선택해야 합니다."
@@ -578,6 +588,7 @@
       "matchType2v2": "2:2",
       "homeTeam": "홈팀",
       "awayTeam": "어웨이팀",
+      "assignedRace": "배정 종족",
       "homeMmr": "홈팀 총 MMR",
       "awayMmr": "어웨이팀 총 MMR",
       "mmrDiff": "MMR 차이",
@@ -756,6 +767,8 @@
     },
     "manual": {
       "teamSizeLabel": "팀 크기",
+      "raceCompositionLabel": "종족 조합",
+      "raceCompositionPlaceholder": "종족 조합을 선택해 주세요.",
       "winnerLabel": "승리 팀",
       "homeTitle": "홈 팀",
       "awayTitle": "어웨이 팀",
@@ -777,6 +790,7 @@
       "title": "참가자 MMR 변동",
       "nickname": "닉네임",
       "team": "팀",
+      "assignedRace": "배정 종족",
       "beforeMmr": "이전 MMR",
       "afterMmr": "변경 후 MMR",
       "delta": "MMR 증감"

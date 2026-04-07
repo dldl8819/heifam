@@ -200,6 +200,7 @@ public class MatchResultService {
                 player.getId(),
                 player.getNickname(),
                 normalizeTeam(participant.getTeam()),
+                resolveAssignedRace(participant),
                 baseMmrBefore,
                 mmrAfter,
                 mmrDelta
@@ -333,6 +334,24 @@ public class MatchResultService {
 
         int effective = (int) Math.round(baseKFactor * gapMultiplier * tierMultiplier);
         return Math.max(4, effective);
+    }
+
+    private String resolveAssignedRace(MatchParticipant participant) {
+        if (participant == null) {
+            return null;
+        }
+
+        try {
+            if (participant.getAssignedRace() != null && !participant.getAssignedRace().isBlank()) {
+                return PlayerRacePolicy.normalizeAssignedRace(participant.getAssignedRace());
+            }
+            if (participant.getRace() != null && participant.getRace().length() == 1) {
+                return PlayerRacePolicy.normalizeAssignedRace(participant.getRace());
+            }
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+        return null;
     }
 
     private double round4(double value) {

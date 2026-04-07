@@ -30,7 +30,6 @@ public class AccessControlService {
     private final ConcurrentMap<String, CachedAccessState> accessStateCache = new ConcurrentHashMap<>();
     private final long accessStateCacheTtlMs;
 
-    private static final Set<String> ALLOWED_RACES = Set.of("P", "T", "Z", "PT", "PZ", "TZ", "R");
     private static final int MAX_NICKNAME_LENGTH = 100;
 
     @Autowired
@@ -95,8 +94,8 @@ public class AccessControlService {
         }
 
         String normalizedRace = normalizeRace(race);
-        if (!ALLOWED_RACES.contains(normalizedRace)) {
-            throw new IllegalArgumentException("Invalid race. Allowed values: P, T, Z, PT, PZ, TZ, R");
+        if (normalizedRace.isEmpty()) {
+            throw new IllegalArgumentException("Invalid race. Allowed values: P, T, Z, PT, PZ, TZ, PTZ");
         }
 
         UserRacePreference preference = userRacePreferenceRepository
@@ -381,7 +380,14 @@ public class AccessControlService {
     }
 
     private String normalizeRace(String value) {
-        return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        try {
+            return PlayerRacePolicy.normalizeCapability(value.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ignored) {
+            return "";
+        }
     }
 
     private record AccessState(

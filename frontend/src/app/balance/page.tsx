@@ -9,7 +9,14 @@ import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
 import { findUniquePlayerByNicknamePrefix } from '@/lib/player-autocomplete'
-import type { BalancePlayerOption, BalanceResponse, MatchResultResponse, TeamSide } from '@/types/api'
+import { getRaceCompositionOptions, normalizeRaceComposition } from '@/lib/race-composition'
+import type {
+  BalancePlayerOption,
+  BalanceResponse,
+  MatchResultResponse,
+  RaceComposition,
+  TeamSide,
+} from '@/types/api'
 
 const TEMP_GROUP_ID = 1
 const MAX_SLOT_COUNT = 6
@@ -25,6 +32,7 @@ type SupportedTeamSize = 2 | 3
 
 type PersistedBalanceState = {
   teamSize: SupportedTeamSize
+  raceComposition: RaceComposition | null
   slots: Array<number | null>
   slotInputs: string[]
   result: BalanceResponse | null
@@ -43,6 +51,13 @@ function formatTeamLabel(team: TeamSide | string): string {
     : team === 'AWAY'
       ? t('results.team.away')
       : team
+}
+
+function formatAssignedRace(assignedRace?: string): string {
+  if (!assignedRace) {
+    return ''
+  }
+  return ` · ${t('balance.result.assignedRace')}: ${assignedRace}`
 }
 
 function createEmptySlots(): Array<number | null> {
@@ -111,6 +126,10 @@ function readPersistedBalanceState(): PersistedBalanceState | null {
     const parsed = JSON.parse(raw) as Record<string, unknown>
     return {
       teamSize: sanitizePersistedTeamSize(parsed.teamSize),
+      raceComposition: normalizeRaceComposition(
+        sanitizePersistedTeamSize(parsed.teamSize),
+        typeof parsed.raceComposition === 'string' ? parsed.raceComposition : null
+      ),
       slots: sanitizePersistedSlots(parsed.slots),
       slotInputs: sanitizePersistedSlotInputs(parsed.slotInputs),
       result:
@@ -137,6 +156,7 @@ export default function BalancePage() {
   const showMmr = isAdmin && mmrVisible
   const [players, setPlayers] = useState<BalancePlayerOption[]>([])
   const [teamSize, setTeamSize] = useState<SupportedTeamSize>(3)
+  const [raceComposition, setRaceComposition] = useState<RaceComposition | null>(null)
   const [slots, setSlots] = useState<Array<number | null>>(createEmptySlots)
   const [slotInputs, setSlotInputs] = useState<string[]>(createEmptySlotInputs)
   const [playersLoading, setPlayersLoading] = useState<boolean>(true)
@@ -227,6 +247,7 @@ export default function BalancePage() {
     if (persisted) {
       setSlots(persisted.slots)
       setSlotInputs(persisted.slotInputs)
+      setRaceComposition(persisted.raceComposition)
       setResult(persisted.result)
       setResultMatchId(persisted.resultMatchId)
       setResultWinnerTeam(persisted.winnerTeam)
@@ -241,6 +262,7 @@ export default function BalancePage() {
 
     const payload: PersistedBalanceState = {
       teamSize,
+      raceComposition,
       slots,
       slotInputs,
       result,
@@ -253,7 +275,7 @@ export default function BalancePage() {
     } catch {
       return
     }
-  }, [teamSize, slots, slotInputs, result, resultMatchId, resultWinnerTeam, persistedReady])
+  }, [teamSize, raceComposition, slots, slotInputs, result, resultMatchId, resultWinnerTeam, persistedReady])
 
   const activeSlotIndexes = useMemo(
     () => Array.from({ length: requiredPlayerCount }, (_, index) => index),
@@ -298,6 +320,7 @@ export default function BalancePage() {
     if (nextTeamSize !== null) {
       setTeamSize(nextTeamSize)
     }
+    setRaceComposition(null)
     setSlots(createEmptySlots())
     setSlotInputs(createEmptySlotInputs())
     setSubmitError(null)
@@ -314,6 +337,16 @@ export default function BalancePage() {
       return
     }
     clearSelectionAndResult(nextTeamSize)
+  }
+
+  const handleRaceCompositionChange = (value: string) => {
+    setRaceComposition(normalizeRaceComposition(teamSize, value))
+    setResult(null)
+    setResultMatchId('')
+    setResultWinnerTeam('')
+    setMatchCreateMessage(null)
+    setResultSubmitError(null)
+    setResultSubmitSuccess(null)
   }
 
   const handleSlotInputChange = (index: number, value: string) => {
@@ -392,10 +425,15 @@ export default function BalancePage() {
         groupId: TEMP_GROUP_ID,
         playerIds: selectedPlayerIds,
         teamSize,
+        raceComposition: raceComposition ?? undefined,
       })
       setResult(response)
-    } catch {
-      setSubmitError(t('balance.validation.generateFailed'))
+    } catch (error) {
+      if (error instanceof Error && error.message.trim().length > 0) {
+        setSubmitError(error.message)
+      } else {
+        setSubmitError(t('balance.validation.generateFailed'))
+      }
     } finally {
       setSubmitting(false)
     }
@@ -425,6 +463,7 @@ export default function BalancePage() {
       const created = await apiClient.createGroupMatch(TEMP_GROUP_ID, {
         homePlayerIds,
         awayPlayerIds,
+        raceComposition: raceComposition ?? undefined,
       })
 
       const confirmationStatus = created.confirmationStatus
@@ -586,6 +625,22 @@ export default function BalancePage() {
                 })}
               </div>
             </div>
+
+            <label className="space-y-1 text-xs font-medium text-slate-500">
+              {t('balance.raceComposition.label')}
+              <select
+                value={raceComposition ?? ''}
+                onChange={(event) => handleRaceCompositionChange(event.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              >
+                <option value="">{t('balance.raceComposition.placeholder')}</option>
+                {getRaceCompositionOptions(teamSize).map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
 
           {playersLoading ? (
@@ -719,7 +774,10 @@ export default function BalancePage() {
                   key={`home-${player.name}`}
                   className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm"
                 >
-                  <span className="font-medium text-slate-800">{player.name}</span>
+                  <span className="font-medium text-slate-800">
+                    {player.name}
+                    {formatAssignedRace(player.assignedRace)}
+                  </span>
                   {showMmr && (
                     <span className="text-slate-600">
                       {typeof player.mmr === 'number' ? `${player.mmr} MMR` : '-'}
@@ -744,7 +802,10 @@ export default function BalancePage() {
                   key={`away-${player.name}`}
                   className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm"
                 >
-                  <span className="font-medium text-slate-800">{player.name}</span>
+                  <span className="font-medium text-slate-800">
+                    {player.name}
+                    {formatAssignedRace(player.assignedRace)}
+                  </span>
                   {showMmr && (
                     <span className="text-slate-600">
                       {typeof player.mmr === 'number' ? `${player.mmr} MMR` : '-'}

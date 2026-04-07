@@ -8,6 +8,7 @@ export function normalizeMultiBalanceMode(mode: string | null | undefined): Mult
 export function buildMultiBalanceRequestPayload(
   groupId: number,
   playerIds: number[],
-  balanceMode: string | null | undefined
+  balanceMode: string | null | undefined,
+  raceComposition?: string | null | undefined
 ): MultiBalanceRequest
 export function getMultiBalanceModeLabelKey(mode: string | null | undefined): string

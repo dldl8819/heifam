@@ -225,6 +225,62 @@ class MultiMatchBalancingServiceTest {
             .hasMessage("playerIds must not contain duplicates");
     }
 
+    @Test
+    void respectsRaceCompositionForSingleThreeVsThreeMultiBalanceRequest() {
+        MultiMatchBalancingService service = createService();
+        List<Player> players = createPlayers(1L, 6, 1500, 20, List.of("P", "P", "T", "P", "P", "T"));
+        List<Long> playerIds = players.stream().map(Player::getId).toList();
+        when(playerRepository.findByGroup_IdAndIdIn(1L, playerIds)).thenReturn(players);
+
+        MultiBalanceResponse response = service.balance(new MultiBalanceRequest(1L, playerIds, "MMR_FIRST", "PPT"));
+
+        assertThat(response.matches()).hasSize(1);
+        assertThat(response.matches().get(0).raceSummary().home()).isEqualTo("PPT");
+        assertThat(response.matches().get(0).raceSummary().away()).isEqualTo("PPT");
+    }
+
+    @Test
+    void supportsFlexiblePlayersForRaceConstrainedThreeVsThreeMultiBalanceRequest() {
+        MultiMatchBalancingService service = createService();
+        List<Player> players = createPlayers(1L, 6, 1500, 20, List.of("PT", "P", "P", "PT", "P", "P"));
+        List<Long> playerIds = players.stream().map(Player::getId).toList();
+        when(playerRepository.findByGroup_IdAndIdIn(1L, playerIds)).thenReturn(players);
+
+        MultiBalanceResponse response = service.balance(new MultiBalanceRequest(1L, playerIds, "MMR_FIRST", "PPT"));
+
+        assertThat(response.matches()).hasSize(1);
+        assertThat(assignedRaceSummary(response.matches().get(0).homeTeam())).isEqualTo("PPT");
+        assertThat(assignedRaceSummary(response.matches().get(0).awayTeam())).isEqualTo("PPT");
+    }
+
+    @Test
+    void supportsFlexiblePlayersForRaceConstrainedTwoVsTwoMultiBalanceRequest() {
+        MultiMatchBalancingService service = createService();
+        List<Player> players = createPlayers(1L, 4, 1500, 20, List.of("PT", "P", "PT", "P"));
+        List<Long> playerIds = players.stream().map(Player::getId).toList();
+        when(playerRepository.findByGroup_IdAndIdIn(1L, playerIds)).thenReturn(players);
+
+        MultiBalanceResponse response = service.balance(new MultiBalanceRequest(1L, playerIds, "MMR_FIRST", "PT"));
+
+        assertThat(response.matches()).hasSize(1);
+        assertThat(assignedRaceSummary(response.matches().get(0).homeTeam())).isEqualTo("PT");
+        assertThat(assignedRaceSummary(response.matches().get(0).awayTeam())).isEqualTo("PT");
+    }
+
+    @Test
+    void rejectsRaceCompositionForMixedTeamSizeMultiBalanceRequest() {
+        MultiMatchBalancingService service = createService();
+        List<Player> players = createPlayers(1L, 10, 1500, 20, List.of("P", "P", "T", "P", "P", "T", "P", "P", "T", "Z"));
+        List<Long> playerIds = players.stream().map(Player::getId).toList();
+        when(playerRepository.findByGroup_IdAndIdIn(1L, playerIds)).thenReturn(players);
+
+        assertThatThrownBy(() ->
+            service.balance(new MultiBalanceRequest(1L, playerIds, "MMR_FIRST", "PPT"))
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("선택한 종족 조합은 현재 동일한 팀 크기 경기에서만 지원합니다");
+    }
+
     private MultiMatchBalancingService createService() {
         return new MultiMatchBalancingService(
             playerRepository,
@@ -260,6 +316,13 @@ class MultiMatchBalancingServiceTest {
             match.awayTeam().forEach(player -> allIds.add(player.playerId()));
         }
         return allIds;
+    }
+
+    private String assignedRaceSummary(List<com.balancify.backend.api.match.dto.BalancePlayerDto> team) {
+        return team.stream()
+            .map(com.balancify.backend.api.match.dto.BalancePlayerDto::assignedRace)
+            .sorted()
+            .reduce("", String::concat);
     }
 
     private void stubRecentMatch(

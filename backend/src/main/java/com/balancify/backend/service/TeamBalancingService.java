@@ -30,19 +30,31 @@ public class TeamBalancingService {
 
         int teamSize = normalizeTeamSize(request.teamSize());
         int requiredPlayers = teamSize * 2;
-        List<BalancePlayerDto> players = resolvePlayers(request, requiredPlayers, teamSize);
+        String raceComposition = RaceCompositionPolicy.normalizeForTeamSize(request.raceComposition(), teamSize);
+        List<BalancePlayerSelection> players = resolvePlayers(
+            request,
+            requiredPlayers,
+            teamSize,
+            raceComposition != null
+        );
 
-        for (BalancePlayerDto player : players) {
-            if (player == null) {
+        for (BalancePlayerSelection player : players) {
+            if (player == null || player.dto() == null) {
                 throw new IllegalArgumentException("Player entry must not be null");
             }
         }
 
-        List<BalanceCandidate> candidates = generateCandidates(players, teamSize);
+        List<BalanceCandidate> candidates = generateCandidatesInternal(players, teamSize, raceComposition);
         BalanceCandidate best = candidates
             .stream()
             .min(Comparator.comparingInt(BalanceCandidate::mmrDiff))
-            .orElseThrow(() -> new IllegalStateException("Unable to split players into two teams"));
+            .orElseThrow(() ->
+                new IllegalStateException(
+                    raceComposition == null
+                        ? "Unable to split players into two teams"
+                        : "선택한 종족 조합으로 매치를 구성할 수 없습니다"
+                )
+            );
 
         return toResponse(best);
     }
@@ -55,6 +67,42 @@ public class TeamBalancingService {
     }
 
     public List<BalanceCandidate> generateCandidates(List<BalancePlayerDto> players, int teamSize) {
+        List<BalancePlayerSelection> selections = players.stream()
+            .map(player -> new BalancePlayerSelection(player, null))
+            .toList();
+        return generateCandidatesInternal(selections, teamSize, null);
+    }
+
+    public List<BalanceCandidate> generateCandidates(
+        List<BalancePlayerDto> players,
+        int teamSize,
+        List<String> playerRaces,
+        String raceComposition
+    ) {
+        if (playerRaces == null || players == null || playerRaces.size() != players.size()) {
+            throw new IllegalArgumentException("선수 종족 정보가 올바르지 않습니다.");
+        }
+
+        String normalizedRaceComposition = RaceCompositionPolicy.normalizeForTeamSize(raceComposition, teamSize);
+        List<BalancePlayerSelection> selections = new ArrayList<>();
+        for (int index = 0; index < players.size(); index++) {
+            selections.add(
+                new BalancePlayerSelection(
+                    players.get(index),
+                    normalizedRaceComposition == null
+                        ? null
+                        : PlayerRacePolicy.normalizeCapability(playerRaces.get(index))
+                )
+            );
+        }
+        return generateCandidatesInternal(selections, teamSize, normalizedRaceComposition);
+    }
+
+    private List<BalanceCandidate> generateCandidatesInternal(
+        List<BalancePlayerSelection> players,
+        int teamSize,
+        String raceComposition
+    ) {
         int normalizedTeamSize = normalizeTeamSize(teamSize);
         int requiredPlayers = normalizedTeamSize * 2;
         if (players == null || players.size() != requiredPlayers) {
@@ -63,8 +111,8 @@ public class TeamBalancingService {
             );
         }
 
-        for (BalancePlayerDto player : players) {
-            if (player == null) {
+        for (BalancePlayerSelection player : players) {
+            if (player == null || player.dto() == null) {
                 throw new IllegalArgumentException("Player entry must not be null");
             }
         }
@@ -76,20 +124,47 @@ public class TeamBalancingService {
                 continue;
             }
 
-            List<BalancePlayerDto> homeTeam = new ArrayList<>();
-            List<BalancePlayerDto> awayTeam = new ArrayList<>();
+            List<BalancePlayerDto> rawHomeTeam = new ArrayList<>();
+            List<BalancePlayerDto> rawAwayTeam = new ArrayList<>();
+            List<String> homeCapabilities = new ArrayList<>();
+            List<String> awayCapabilities = new ArrayList<>();
             int homeMmr = 0;
             int awayMmr = 0;
 
             for (int i = 0; i < players.size(); i++) {
-                BalancePlayerDto player = players.get(i);
+                BalancePlayerSelection player = players.get(i);
                 if ((mask & (1 << i)) != 0) {
-                    homeTeam.add(player);
-                    homeMmr += player.mmr();
+                    rawHomeTeam.add(player.dto());
+                    homeMmr += player.dto().mmr();
+                    if (raceComposition != null) {
+                        homeCapabilities.add(player.normalizedRace());
+                    }
                 } else {
-                    awayTeam.add(player);
-                    awayMmr += player.mmr();
+                    rawAwayTeam.add(player.dto());
+                    awayMmr += player.dto().mmr();
+                    if (raceComposition != null) {
+                        awayCapabilities.add(player.normalizedRace());
+                    }
                 }
+            }
+
+            List<BalancePlayerDto> homeTeam = rawHomeTeam;
+            List<BalancePlayerDto> awayTeam = rawAwayTeam;
+            if (raceComposition != null) {
+                PlayerRacePolicy.TeamRaceAssignment homeAssignment =
+                    PlayerRacePolicy.assignToComposition(homeCapabilities, raceComposition);
+                if (homeAssignment == null) {
+                    continue;
+                }
+
+                PlayerRacePolicy.TeamRaceAssignment awayAssignment =
+                    PlayerRacePolicy.assignToComposition(awayCapabilities, raceComposition);
+                if (awayAssignment == null) {
+                    continue;
+                }
+
+                homeTeam = applyAssignedRaces(rawHomeTeam, homeAssignment);
+                awayTeam = applyAssignedRaces(rawAwayTeam, awayAssignment);
             }
 
             int diff = Math.abs(homeMmr - awayMmr);
@@ -97,7 +172,11 @@ public class TeamBalancingService {
         }
 
         if (candidates.isEmpty()) {
-            throw new IllegalStateException("Unable to split players into two teams");
+            throw new IllegalStateException(
+                raceComposition == null
+                    ? "Unable to split players into two teams"
+                    : "선택한 종족 조합으로 매치를 구성할 수 없습니다"
+            );
         }
 
         return candidates;
@@ -124,14 +203,24 @@ public class TeamBalancingService {
         return normalized;
     }
 
-    private List<BalancePlayerDto> resolvePlayers(BalanceRequest request, int requiredPlayers, int teamSize) {
+    private List<BalancePlayerSelection> resolvePlayers(
+        BalanceRequest request,
+        int requiredPlayers,
+        int teamSize,
+        boolean requireRaceData
+    ) {
         if (request.players() != null && !request.players().isEmpty()) {
             if (request.players().size() != requiredPlayers) {
                 throw new IllegalArgumentException(
                     "teamSize=" + teamSize + " requires exactly " + requiredPlayers + " players"
                 );
             }
-            return request.players();
+            if (requireRaceData) {
+                throw new IllegalArgumentException("선수 종족 정보가 올바르지 않습니다.");
+            }
+            return request.players().stream()
+                .map(player -> new BalancePlayerSelection(player, null))
+                .toList();
         }
 
         if (request.groupId() == null || request.groupId() <= 0) {
@@ -164,13 +253,16 @@ public class TeamBalancingService {
             loadedById.put(player.getId(), player);
         }
 
-        List<BalancePlayerDto> resolved = new ArrayList<>();
+        List<BalancePlayerSelection> resolved = new ArrayList<>();
         for (Long playerId : request.playerIds()) {
             Player player = loadedById.get(playerId);
             if (player == null) {
                 throw new IllegalArgumentException("Players not found in group: [" + playerId + "]");
             }
-            resolved.add(new BalancePlayerDto(player.getId(), player.getNickname(), safeMmr(player.getMmr())));
+            resolved.add(new BalancePlayerSelection(
+                new BalancePlayerDto(player.getId(), player.getNickname(), safeMmr(player.getMmr())),
+                requireRaceData ? PlayerRacePolicy.normalizeCapability(player.getRace()) : null
+            ));
         }
         return resolved;
     }
@@ -185,6 +277,28 @@ public class TeamBalancingService {
         return mmr == null ? 0 : mmr;
     }
 
+    private List<BalancePlayerDto> applyAssignedRaces(
+        List<BalancePlayerDto> players,
+        PlayerRacePolicy.TeamRaceAssignment assignment
+    ) {
+        List<String> assignedRaces = assignment.assignedRaces();
+        if (players.size() != assignedRaces.size()) {
+            throw new IllegalStateException("배정 종족 정보가 올바르지 않습니다.");
+        }
+
+        List<BalancePlayerDto> assignedPlayers = new ArrayList<>(players.size());
+        for (int index = 0; index < players.size(); index++) {
+            BalancePlayerDto player = players.get(index);
+            assignedPlayers.add(new BalancePlayerDto(
+                player.playerId(),
+                player.name(),
+                player.mmr(),
+                assignedRaces.get(index)
+            ));
+        }
+        return assignedPlayers;
+    }
+
     public record BalanceCandidate(
         int teamSize,
         List<BalancePlayerDto> homeTeam,
@@ -192,6 +306,12 @@ public class TeamBalancingService {
         int homeMmr,
         int awayMmr,
         int mmrDiff
+    ) {
+    }
+
+    private record BalancePlayerSelection(
+        BalancePlayerDto dto,
+        String normalizedRace
     ) {
     }
 }

@@ -67,6 +67,7 @@ public class GroupMatchAdminService {
             TEAM_SIZE_3V3,
             MatchSource.BALANCED,
             null,
+            request.raceComposition(),
             true
         );
 
@@ -93,6 +94,7 @@ public class GroupMatchAdminService {
         int teamSize,
         MatchSource source,
         String note,
+        String raceComposition,
         boolean protectFromDuplicates
     ) {
         return createMatchInternal(
@@ -102,11 +104,17 @@ public class GroupMatchAdminService {
             teamSize,
             source,
             note,
+            raceComposition,
             protectFromDuplicates
         ).match();
     }
 
-    private MatchParticipant createParticipant(Match match, Player player, String team) {
+    private MatchParticipant createParticipant(
+        Match match,
+        Player player,
+        String team,
+        String assignedRace
+    ) {
         if (player == null) {
             throw new IllegalArgumentException("Player not found in group");
         }
@@ -116,6 +124,7 @@ public class GroupMatchAdminService {
         participant.setPlayer(player);
         participant.setTeam(team);
         participant.setRace(player.getRace());
+        participant.setAssignedRace(assignedRace);
         participant.setMmrBefore(player.getMmr());
         participant.setMmrAfter(player.getMmr());
         participant.setMmrDelta(0);
@@ -144,9 +153,14 @@ public class GroupMatchAdminService {
         int requestedTeamSize,
         MatchSource source,
         String note,
+        String rawRaceComposition,
         boolean protectFromDuplicates
     ) {
         int normalizedTeamSize = normalizeRequestedTeamSize(requestedTeamSize);
+        String normalizedRaceComposition = RaceCompositionPolicy.normalizeForTeamSize(
+            rawRaceComposition,
+            normalizedTeamSize
+        );
         List<Long> homePlayerIds = normalizePlayerIds(rawHomePlayerIds);
         List<Long> awayPlayerIds = normalizePlayerIds(rawAwayPlayerIds);
 
@@ -176,6 +190,12 @@ public class GroupMatchAdminService {
 
         Map<Long, Player> playersById = players.stream()
             .collect(Collectors.toMap(Player::getId, Function.identity()));
+        MatchRaceAssignments raceAssignments = assignRaceComposition(
+            homePlayerIds,
+            awayPlayerIds,
+            playersById,
+            normalizedRaceComposition
+        );
 
         Signature requestedSignature = buildRequestedSignature(homePlayerIds, awayPlayerIds);
         if (protectFromDuplicates) {
@@ -226,18 +246,68 @@ public class GroupMatchAdminService {
         match.setParticipantSignature(requestedSignature.participantSignature());
         match.setTeamSignature(requestedSignature.teamSignature());
         match.setNote(normalizeNote(note));
+        match.setRaceComposition(normalizedRaceComposition);
         Match savedMatch = matchRepository.save(match);
 
         List<MatchParticipant> participants = new ArrayList<>();
-        for (Long playerId : homePlayerIds) {
-            participants.add(createParticipant(savedMatch, playersById.get(playerId), TEAM_HOME));
+        for (int index = 0; index < homePlayerIds.size(); index++) {
+            Long playerId = homePlayerIds.get(index);
+            participants.add(createParticipant(
+                savedMatch,
+                playersById.get(playerId),
+                TEAM_HOME,
+                raceAssignments.homeAssignedRaces().get(index)
+            ));
         }
-        for (Long playerId : awayPlayerIds) {
-            participants.add(createParticipant(savedMatch, playersById.get(playerId), TEAM_AWAY));
+        for (int index = 0; index < awayPlayerIds.size(); index++) {
+            Long playerId = awayPlayerIds.get(index);
+            participants.add(createParticipant(
+                savedMatch,
+                playersById.get(playerId),
+                TEAM_AWAY,
+                raceAssignments.awayAssignedRaces().get(index)
+            ));
         }
 
         matchParticipantRepository.saveAll(participants);
         return new MatchCreationOutcome(savedMatch, false);
+    }
+
+    private MatchRaceAssignments assignRaceComposition(
+        List<Long> homePlayerIds,
+        List<Long> awayPlayerIds,
+        Map<Long, Player> playersById,
+        String raceComposition
+    ) {
+        if (raceComposition == null) {
+            return MatchRaceAssignments.none(homePlayerIds.size(), awayPlayerIds.size());
+        }
+
+        List<String> homeCapabilities = homePlayerIds.stream()
+            .map(playerId -> resolveCapability(playersById, playerId))
+            .toList();
+        List<String> awayCapabilities = awayPlayerIds.stream()
+            .map(playerId -> resolveCapability(playersById, playerId))
+            .toList();
+
+        PlayerRacePolicy.TeamRaceAssignment homeAssignment =
+            PlayerRacePolicy.assignToComposition(homeCapabilities, raceComposition);
+        PlayerRacePolicy.TeamRaceAssignment awayAssignment =
+            PlayerRacePolicy.assignToComposition(awayCapabilities, raceComposition);
+
+        if (homeAssignment == null || awayAssignment == null) {
+            throw new IllegalArgumentException("선택한 종족 조합으로 매치를 구성할 수 없습니다");
+        }
+
+        return new MatchRaceAssignments(homeAssignment.assignedRaces(), awayAssignment.assignedRaces());
+    }
+
+    private String resolveCapability(Map<Long, Player> playersById, Long playerId) {
+        Player player = playersById.get(playerId);
+        if (player == null) {
+            throw new IllegalArgumentException("Player not found in group");
+        }
+        return PlayerRacePolicy.normalizeCapability(player.getRace());
     }
 
     private Signature buildRequestedSignature(List<Long> homePlayerIds, List<Long> awayPlayerIds) {
@@ -358,5 +428,17 @@ public class GroupMatchAdminService {
         Match match,
         boolean reusedExisting
     ) {
+    }
+
+    private record MatchRaceAssignments(
+        List<String> homeAssignedRaces,
+        List<String> awayAssignedRaces
+    ) {
+        private static MatchRaceAssignments none(int homeSize, int awaySize) {
+            return new MatchRaceAssignments(
+                new ArrayList<>(java.util.Collections.nCopies(homeSize, null)),
+                new ArrayList<>(java.util.Collections.nCopies(awaySize, null))
+            );
+        }
     }
 }

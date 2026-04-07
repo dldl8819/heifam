@@ -13,11 +13,13 @@ import {
   getMultiBalanceModeLabelKey,
   MULTI_BALANCE_MODE_OPTIONS,
 } from '@/lib/multi-balance-mode'
+import { getRaceCompositionOptions, normalizeRaceComposition } from '@/lib/race-composition'
 import type {
   BalancePlayerInput,
   BalancePlayerOption,
   MultiBalanceMode,
   MultiBalanceResponse,
+  RaceComposition,
 } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
@@ -29,13 +31,58 @@ function formatPercent(value: number): string {
 }
 
 function buildPlayerLine(player: BalancePlayerInput, showMmr: boolean): string {
+  const assignedRaceText = player.assignedRace
+    ? ` · ${t('multiBalance.result.assignedRace')}: ${player.assignedRace}`
+    : ''
   if (!showMmr) {
-    return player.name
+    return `${player.name}${assignedRaceText}`
   }
 
   return typeof player.mmr === 'number'
-    ? `${player.name} (${player.mmr} MMR)`
-    : player.name
+    ? `${player.name}${assignedRaceText} (${player.mmr} MMR)`
+    : `${player.name}${assignedRaceText}`
+}
+
+function deriveMultiBalanceTeamSizes(totalPlayers: number): number[] {
+  if (totalPlayers < 4) {
+    return []
+  }
+
+  let match3Count = Math.floor(totalPlayers / 6)
+  let remaining = totalPlayers - match3Count * 6
+
+  if (remaining === 2 && match3Count > 0 && totalPlayers < 18) {
+    match3Count -= 1
+    remaining += 6
+  }
+
+  const match2Count = Math.floor(remaining / 4)
+  const teamSizes: number[] = []
+
+  for (let index = 0; index < match3Count; index += 1) {
+    teamSizes.push(3)
+  }
+  for (let index = 0; index < match2Count; index += 1) {
+    teamSizes.push(2)
+  }
+
+  return teamSizes
+}
+
+function deriveRaceCompositionTeamSize(totalPlayers: number): 2 | 3 | null {
+  const teamSizes = deriveMultiBalanceTeamSizes(totalPlayers)
+  if (teamSizes.length === 0) {
+    return null
+  }
+
+  const uniqueTeamSizes = [...new Set(teamSizes)]
+  if (uniqueTeamSizes.length !== 1) {
+    return null
+  }
+
+  return uniqueTeamSizes[0] === 2 || uniqueTeamSizes[0] === 3
+    ? (uniqueTeamSizes[0] as 2 | 3)
+    : null
 }
 
 export default function MultiBalancePage() {
@@ -51,6 +98,7 @@ export default function MultiBalancePage() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [result, setResult] = useState<MultiBalanceResponse | null>(null)
   const [balanceMode, setBalanceMode] = useState<MultiBalanceMode>(DEFAULT_MULTI_BALANCE_MODE)
+  const [raceComposition, setRaceComposition] = useState<RaceComposition | null>(null)
 
   useEffect(() => {
     let active = true
@@ -123,6 +171,23 @@ export default function MultiBalancePage() {
     () => players.filter((player) => selectedIds.includes(player.id)),
     [players, selectedIds],
   )
+  const raceCompositionTeamSize = useMemo(
+    () => deriveRaceCompositionTeamSize(selectedIds.length),
+    [selectedIds.length],
+  )
+  const raceCompositionOptions = useMemo(
+    () => (raceCompositionTeamSize ? getRaceCompositionOptions(raceCompositionTeamSize) : []),
+    [raceCompositionTeamSize],
+  )
+
+  useEffect(() => {
+    if (!raceCompositionTeamSize) {
+      setRaceComposition(null)
+      return
+    }
+
+    setRaceComposition((previous) => normalizeRaceComposition(raceCompositionTeamSize, previous))
+  }, [raceCompositionTeamSize])
 
   const selectedTotalMmr = selectedPlayers.reduce(
     (sum, player) => sum + (typeof player.currentMmr === 'number' ? player.currentMmr : 0),
@@ -166,7 +231,7 @@ export default function MultiBalancePage() {
     setSubmitting(true)
     try {
       const response = await apiClient.balanceMatchMulti(
-        buildMultiBalanceRequestPayload(TEMP_GROUP_ID, selectedIds, balanceMode)
+        buildMultiBalanceRequestPayload(TEMP_GROUP_ID, selectedIds, balanceMode, raceComposition)
       )
       setResult(response)
     } catch (error) {
@@ -293,6 +358,34 @@ export default function MultiBalancePage() {
               })}
             </div>
           </div>
+
+          <label className="mt-4 block space-y-1 text-xs font-medium text-slate-500">
+            {t('multiBalance.raceComposition.label')}
+            <select
+              value={raceComposition ?? ''}
+              onChange={(event) =>
+                setRaceComposition(
+                  raceCompositionTeamSize
+                    ? normalizeRaceComposition(raceCompositionTeamSize, event.target.value)
+                    : null,
+                )
+              }
+              disabled={raceCompositionOptions.length === 0}
+              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:bg-slate-100"
+            >
+              <option value="">{t('multiBalance.raceComposition.placeholder')}</option>
+              {raceCompositionOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+            {raceCompositionOptions.length === 0 && selectedIds.length >= 4 && (
+              <p className="text-[11px] text-slate-500">
+                {t('multiBalance.raceComposition.unavailable')}
+              </p>
+            )}
+          </label>
 
           {validationMessage && (
             <p className="mt-3 text-xs text-amber-700">{validationMessage}</p>

@@ -5,9 +5,14 @@ import java.util.List;
 public record MultiBalanceRequest(
     Long groupId,
     List<Long> playerIds,
-    String balanceMode
+    String balanceMode,
+    String raceComposition
 ) {
     public MultiBalanceRequest(Long groupId, List<Long> playerIds) {
-        this(groupId, playerIds, null);
+        this(groupId, playerIds, null, null);
+    }
+
+    public MultiBalanceRequest(Long groupId, List<Long> playerIds, String balanceMode) {
+        this(groupId, playerIds, balanceMode, null);
     }
 }

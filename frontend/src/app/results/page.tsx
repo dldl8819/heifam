@@ -9,7 +9,14 @@ import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
 import { findUniquePlayerByNicknamePrefix } from '@/lib/player-autocomplete'
-import type { BalancePlayerOption, MatchResultResponse, RecentMatchItem, TeamSide } from '@/types/api'
+import { getRaceCompositionOptions, normalizeRaceComposition } from '@/lib/race-composition'
+import type {
+  BalancePlayerOption,
+  MatchResultResponse,
+  RaceComposition,
+  RecentMatchItem,
+  TeamSide,
+} from '@/types/api'
 
 const TEMP_GROUP_ID = 1
 const winnerTeamOptions: TeamSide[] = ['HOME', 'AWAY']
@@ -138,6 +145,7 @@ export default function ResultsPage() {
   const canUseManualEntry = canAccess
   const [operatorEntryMode, setOperatorEntryMode] = useState<OperatorEntryMode>('manual')
   const [manualTeamSize, setManualTeamSize] = useState<SupportedTeamSize>(3)
+  const [manualRaceComposition, setManualRaceComposition] = useState<RaceComposition | null>(null)
   const [manualHomeSlots, setManualHomeSlots] = useState<ManualSlotValue[]>(() => createManualSlots(3))
   const [manualAwaySlots, setManualAwaySlots] = useState<ManualSlotValue[]>(() => createManualSlots(3))
   const [manualHomeInputs, setManualHomeInputs] = useState<ManualSlotInputValue[]>(() =>
@@ -193,6 +201,11 @@ export default function ResultsPage() {
     () => searchParams.get('from') === 'balance',
     [searchParams]
   )
+  const showAssignedRaceColumn =
+    result?.participants.some(
+      (participant) =>
+        typeof participant.assignedRace === 'string' && participant.assignedRace.trim().length > 0,
+    ) ?? false
 
   const recentMatchDisplayOrderMap = useMemo(
     () =>
@@ -329,6 +342,7 @@ export default function ResultsPage() {
     setManualAwaySlots((previous) => resizeManualSlots(previous, manualTeamSize))
     setManualHomeInputs((previous) => resizeManualSlotInputs(previous, manualTeamSize))
     setManualAwayInputs((previous) => resizeManualSlotInputs(previous, manualTeamSize))
+    setManualRaceComposition((previous) => normalizeRaceComposition(manualTeamSize, previous))
   }, [manualTeamSize])
 
   useEffect(() => {
@@ -536,6 +550,7 @@ export default function ResultsPage() {
         homePlayerIds,
         awayPlayerIds,
         winnerTeam: manualWinnerTeam,
+        raceComposition: manualRaceComposition ?? undefined,
       })
 
       setResult(response)
@@ -546,6 +561,7 @@ export default function ResultsPage() {
       setManualHomeInputs(createManualSlotInputs(manualTeamSize))
       setManualAwayInputs(createManualSlotInputs(manualTeamSize))
       setManualWinnerTeam('')
+      setManualRaceComposition(null)
       setManualSubmitSuccess(
         isSuperAdmin
           ? t('results.manual.successWithMatchId', { matchId: response.matchId })
@@ -773,6 +789,26 @@ export default function ResultsPage() {
                   </select>
                 </label>
 
+                <label className="space-y-1 text-sm">
+                  <span className="font-medium text-slate-700">{t('results.manual.raceCompositionLabel')}</span>
+                  <select
+                    value={manualRaceComposition ?? ''}
+                    onChange={(event) =>
+                      setManualRaceComposition(normalizeRaceComposition(manualTeamSize, event.target.value))
+                    }
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                  >
+                    <option value="">{t('results.manual.raceCompositionPlaceholder')}</option>
+                    {getRaceCompositionOptions(manualTeamSize).map((option) => (
+                      <option key={`manual-race-${option}`} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-1">
                 <label className="space-y-1 text-sm">
                   <span className="font-medium text-slate-700">{t('results.manual.winnerLabel')}</span>
                   <select
@@ -1052,6 +1088,9 @@ export default function ResultsPage() {
               <tr>
                 <th className="px-4 py-3">{t('results.participants.nickname')}</th>
                 <th className="px-4 py-3">{t('results.participants.team')}</th>
+                {showAssignedRaceColumn && (
+                  <th className="px-4 py-3">{t('results.participants.assignedRace')}</th>
+                )}
                 {showMmr && <th className="px-4 py-3">{t('results.participants.beforeMmr')}</th>}
                 {showMmr && <th className="px-4 py-3">{t('results.participants.afterMmr')}</th>}
                 {showMmr && <th className="px-4 py-3">{t('results.participants.delta')}</th>}
@@ -1089,6 +1128,11 @@ export default function ResultsPage() {
                     >
                       {formatTeamLabel(participant.team)}
                     </td>
+                    {showAssignedRaceColumn && (
+                      <td className="px-4 py-3 text-slate-700">
+                        {participant.assignedRace ?? '-'}
+                      </td>
+                    )}
                     {showMmr && (
                       <td className="px-4 py-3 text-slate-700">
                         {participantMmrBefore !== null ? participantMmrBefore : '-'}

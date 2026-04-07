@@ -36,10 +36,10 @@ class TeamBalancingServiceTest {
     @Test
     void generatesBalancedTwoVsTwoFromPlayerIds() {
         List<Player> players = createPlayers(1L, List.of(
-            new PlayerSeed(1L, "A", 1600),
-            new PlayerSeed(2L, "B", 1520),
-            new PlayerSeed(3L, "C", 1490),
-            new PlayerSeed(4L, "D", 1440)
+            new PlayerSeed(1L, "A", 1600, "P"),
+            new PlayerSeed(2L, "B", 1520, "P"),
+            new PlayerSeed(3L, "C", 1490, "T"),
+            new PlayerSeed(4L, "D", 1440, "T")
         ));
         when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L)))
             .thenReturn(players);
@@ -80,6 +80,89 @@ class TeamBalancingServiceTest {
         response.homeTeam().forEach(player -> allPlayerNames.add(player.name()));
         response.awayTeam().forEach(player -> allPlayerNames.add(player.name()));
         assertThat(allPlayerNames).containsExactlyInAnyOrder("A", "B", "C", "D", "E", "F");
+    }
+
+    @Test
+    void respectsRaceCompositionForThreeVsThree() {
+        List<Player> players = createPlayers(1L, List.of(
+            new PlayerSeed(1L, "A", 1500, "P"),
+            new PlayerSeed(2L, "B", 1480, "P"),
+            new PlayerSeed(3L, "C", 1460, "T"),
+            new PlayerSeed(4L, "D", 1440, "P"),
+            new PlayerSeed(5L, "E", 1420, "P"),
+            new PlayerSeed(6L, "F", 1400, "T")
+        ));
+        when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L, 5L, 6L)))
+            .thenReturn(players);
+
+        BalanceResponse response = service.balance(
+            new BalanceRequest(1L, List.of(1L, 2L, 3L, 4L, 5L, 6L), 3, null, "PPT")
+        );
+
+        assertThat(canonicalRaceSummary(response.homeTeam(), players)).isEqualTo("PPT");
+        assertThat(canonicalRaceSummary(response.awayTeam(), players)).isEqualTo("PPT");
+    }
+
+    @Test
+    void supportsFlexibleRaceSlotsForThreeVsThreeComposition() {
+        List<Player> players = createPlayers(1L, List.of(
+            new PlayerSeed(1L, "A", 1500, "PT"),
+            new PlayerSeed(2L, "B", 1480, "P"),
+            new PlayerSeed(3L, "C", 1460, "P"),
+            new PlayerSeed(4L, "D", 1440, "PT"),
+            new PlayerSeed(5L, "E", 1420, "P"),
+            new PlayerSeed(6L, "F", 1400, "P")
+        ));
+        when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L, 5L, 6L)))
+            .thenReturn(players);
+
+        BalanceResponse response = service.balance(
+            new BalanceRequest(1L, List.of(1L, 2L, 3L, 4L, 5L, 6L), 3, null, "PPT")
+        );
+
+        assertThat(canonicalRaceSummary(response.homeTeam(), players)).isEqualTo("PPT");
+        assertThat(canonicalRaceSummary(response.awayTeam(), players)).isEqualTo("PPT");
+        assertThat(response.homeTeam()).allMatch(player -> player.assignedRace() != null);
+        assertThat(response.awayTeam()).allMatch(player -> player.assignedRace() != null);
+    }
+
+    @Test
+    void supportsFlexibleRaceSlotsForTwoVsTwoComposition() {
+        List<Player> players = createPlayers(1L, List.of(
+            new PlayerSeed(1L, "A", 1600, "PT"),
+            new PlayerSeed(2L, "B", 1520, "P"),
+            new PlayerSeed(3L, "C", 1490, "PT"),
+            new PlayerSeed(4L, "D", 1440, "P")
+        ));
+        when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L)))
+            .thenReturn(players);
+
+        BalanceResponse response = service.balance(
+            new BalanceRequest(1L, List.of(1L, 2L, 3L, 4L), 2, null, "PT")
+        );
+
+        assertThat(canonicalRaceSummary(response.homeTeam(), players)).isEqualTo("PT");
+        assertThat(canonicalRaceSummary(response.awayTeam(), players)).isEqualTo("PT");
+    }
+
+    @Test
+    void rejectsRaceCompositionWhenNoValidSplitExists() {
+        List<Player> players = createPlayers(1L, List.of(
+            new PlayerSeed(1L, "A", 1500, "P"),
+            new PlayerSeed(2L, "B", 1480, "P"),
+            new PlayerSeed(3L, "C", 1460, "P"),
+            new PlayerSeed(4L, "D", 1440, "P"),
+            new PlayerSeed(5L, "E", 1420, "P"),
+            new PlayerSeed(6L, "F", 1400, "T")
+        ));
+        when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L, 5L, 6L)))
+            .thenReturn(players);
+
+        assertThatThrownBy(() ->
+            service.balance(new BalanceRequest(1L, List.of(1L, 2L, 3L, 4L, 5L, 6L), 3, null, "PPT"))
+        )
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("선택한 종족 조합으로 매치를 구성할 수 없습니다");
     }
 
     @Test
@@ -136,10 +219,25 @@ class TeamBalancingServiceTest {
             player.setId(seed.id());
             player.setGroup(group);
             player.setNickname(seed.nickname());
+            player.setRace(seed.race());
             player.setMmr(seed.mmr());
             players.add(player);
         }
         return players;
+    }
+
+    private String canonicalRaceSummary(List<BalancePlayerDto> team, List<Player> players) {
+        return team.stream()
+            .map(player -> player.assignedRace() != null
+                ? player.assignedRace()
+                : players.stream()
+                    .filter(candidate -> candidate.getNickname().equals(player.name()))
+                    .findFirst()
+                    .orElseThrow()
+                    .getRace()
+            )
+            .sorted()
+            .reduce("", String::concat);
     }
 
     private List<BalancePlayerDto> allPlayers(BalanceResponse response) {
@@ -173,6 +271,6 @@ class TeamBalancingServiceTest {
         return minDiff;
     }
 
-    private record PlayerSeed(Long id, String nickname, int mmr) {
+    private record PlayerSeed(Long id, String nickname, int mmr, String race) {
     }
 }

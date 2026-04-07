@@ -22,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class PlayerImportService {
 
     private static final String REASSIGNMENT_TIER = "재배정대상";
-    private static final Set<String> ALLOWED_RACES = Set.of("P", "T", "Z", "PT", "PZ", "TZ", "R");
     private static final Map<String, Integer> DEFAULT_BASE_MMR_BY_TIER = defaultBaseMmrByTier();
 
     private final PlayerRepository playerRepository;
@@ -132,8 +131,8 @@ public class PlayerImportService {
 
         tier = normalizeTier(tier);
         String race = normalizeRace(row.race());
-        if (race != null && !ALLOWED_RACES.contains(race)) {
-            return ValidationResult.invalid(nickname, "Race must be one of P,T,Z,PT,PZ,TZ,R");
+        if (race == null && row.race() != null && !row.race().trim().isEmpty()) {
+            return ValidationResult.invalid(nickname, "Race must be one of P,T,Z,PT,PZ,TZ,PTZ");
         }
         boolean reassignmentTier = REASSIGNMENT_TIER.equals(tier);
         Integer baseMmr = row.baseMmr();
@@ -209,7 +208,11 @@ public class PlayerImportService {
         if (normalizedRace.isEmpty()) {
             return null;
         }
-        return normalizedRace.toUpperCase(Locale.ROOT);
+        try {
+            return PlayerRacePolicy.normalizeCapability(normalizedRace.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 
     private static Map<String, Integer> defaultBaseMmrByTier() {

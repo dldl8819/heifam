@@ -474,11 +474,7 @@ public class CaptainDraftService {
     }
 
     private String normalizeRace(String race) {
-        String normalized = safeTrim(race).toUpperCase();
-        return switch (normalized) {
-            case "P", "T", "Z", "PT", "PZ", "TZ", "R" -> normalized;
-            default -> "P";
-        };
+        return PlayerRacePolicy.toDisplayRace(race);
     }
 
     private int safeInt(Integer value) {

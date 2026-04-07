@@ -7,8 +7,19 @@ public record MatchResultParticipantResponse(
     Long playerId,
     String nickname,
     String team,
+    String assignedRace,
     Integer mmrBefore,
     Integer mmrAfter,
     Integer mmrDelta
 ) {
+    public MatchResultParticipantResponse(
+        Long playerId,
+        String nickname,
+        String team,
+        Integer mmrBefore,
+        Integer mmrAfter,
+        Integer mmrDelta
+    ) {
+        this(playerId, nickname, team, null, mmrBefore, mmrAfter, mmrDelta);
+    }
 }

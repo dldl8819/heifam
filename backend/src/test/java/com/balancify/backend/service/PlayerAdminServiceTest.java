@@ -61,7 +61,7 @@ class PlayerAdminServiceTest {
         playerAdminService.updatePlayer(
             1L,
             10L,
-            new GroupPlayerUpdateRequest(null, "R")
+            new GroupPlayerUpdateRequest(null, "PTZ")
         );
 
         verify(playerRepository, never()).findByGroup_IdAndNicknameIgnoreCase(anyLong(), anyString());
@@ -119,7 +119,7 @@ class PlayerAdminServiceTest {
             )
         )
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Race must be one of P,T,Z,PT,PZ,TZ,R");
+            .hasMessage("Race must be one of P,T,Z,PT,PZ,TZ,PTZ");
     }
 
     @Test
