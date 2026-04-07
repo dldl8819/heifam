@@ -198,17 +198,6 @@ public class MatchQueryService {
         if (!assignedRace.isEmpty()) {
             return PlayerRacePolicy.normalizeAssignedRace(assignedRace);
         }
-
-        String capability = safeTrim(participant.getRace());
-        if (capability.isEmpty() && participant.getPlayer() != null) {
-            capability = safeTrim(participant.getPlayer().getRace());
-        }
-
-        if (capability.isEmpty()) {
-            return null;
-        }
-
-        String normalizedCapability = PlayerRacePolicy.normalizeCapabilityOrDefault(capability, "");
-        return normalizedCapability.length() == 1 ? normalizedCapability : null;
+        return null;
     }
 }

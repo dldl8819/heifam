@@ -143,6 +143,55 @@ class MatchQueryServiceTest {
     }
 
     @Test
+    void doesNotGuessLegacyRaceCompositionFromPlayerRaceWithoutAssignedRace() {
+        Group group = new Group();
+        group.setId(1L);
+
+        Match match = new Match();
+        match.setId(204L);
+        match.setGroup(group);
+        match.setWinningTeam("HOME");
+        match.setPlayedAt(OffsetDateTime.parse("2026-03-23T12:00:00Z"));
+        match.setResultRecordedByEmail("kim@hei.gg");
+
+        Player homeOne = player(11L, group, "용이", 800);
+        Player homeTwo = player(12L, group, "헌터", 780);
+        Player homeThree = player(13L, group, "스벅", 760);
+        Player awayOne = player(14L, group, "보이", 900);
+        Player awayTwo = player(15L, group, "잡종", 760);
+        Player awayThree = player(16L, group, "워터", 740);
+
+        when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(204L))
+            .thenReturn(List.of(
+                participant(match, homeOne, "HOME", 805),
+                participant(match, homeTwo, "HOME", 775),
+                participant(match, homeThree, "HOME", 755),
+                participant(match, awayOne, "AWAY", 905),
+                participant(match, awayTwo, "AWAY", 755),
+                participant(match, awayThree, "AWAY", 735)
+            ));
+        when(accessControlService.resolveAccessProfile(eq("kim@hei.gg")))
+            .thenReturn(
+                new AccessControlService.AccessProfile(
+                    "kim@hei.gg",
+                    "민식",
+                    "MEMBER",
+                    false,
+                    false,
+                    true,
+                    null
+                )
+            );
+
+        List<GroupRecentMatchResponse> responses = matchQueryService.getRecentMatches(1L, 10);
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).homeRaceComposition()).isNull();
+        assertThat(responses.get(0).awayRaceComposition()).isNull();
+    }
+
+    @Test
     void hidesLegacyRecordedNameWhenNicknameCannotBeResolvedFromEmail() {
         Group group = new Group();
         group.setId(1L);
