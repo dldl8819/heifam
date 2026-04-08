@@ -99,6 +99,22 @@ export default function CaptainDraftPage() {
     [playerMap, selectedParticipantIds],
   )
 
+  const homeCaptainOptions = useMemo(
+    () =>
+      selectedParticipants.filter(
+        (participant) => awayCaptainId == null || participant.id !== awayCaptainId,
+      ),
+    [awayCaptainId, selectedParticipants],
+  )
+
+  const awayCaptainOptions = useMemo(
+    () =>
+      selectedParticipants.filter(
+        (participant) => homeCaptainId == null || participant.id !== homeCaptainId,
+      ),
+    [homeCaptainId, selectedParticipants],
+  )
+
   const actingCaptainTeam: CaptainDraftTeam = useMemo(() => {
     if (!draft || !actingCaptainId) {
       return 'UNASSIGNED'
@@ -282,6 +298,12 @@ export default function CaptainDraftPage() {
     setSetsPerRound(calculatedSets)
   }, [selectedParticipantIds.length, draft])
 
+  useEffect(() => {
+    if (homeCaptainId != null && awayCaptainId != null && homeCaptainId === awayCaptainId) {
+      setAwayCaptainId(null)
+    }
+  }, [homeCaptainId, awayCaptainId])
+
   const handleToggleParticipant = (playerId: number) => {
     setMessage(null)
     setError(null)
@@ -303,6 +325,18 @@ export default function CaptainDraftPage() {
       }
       return next
     })
+  }
+
+  const handleHomeCaptainChange = (value: string) => {
+    setMessage(null)
+    setError(null)
+    setHomeCaptainId(normalizeSelectionValue(value))
+  }
+
+  const handleAwayCaptainChange = (value: string) => {
+    setMessage(null)
+    setError(null)
+    setAwayCaptainId(normalizeSelectionValue(value))
   }
 
   const handleCreateDraft = async () => {
@@ -581,11 +615,11 @@ export default function CaptainDraftPage() {
               {t('captainDraft.captain.home')}
               <select
                 value={homeCaptainId ?? ''}
-                onChange={(event) => setHomeCaptainId(normalizeSelectionValue(event.target.value))}
+                onChange={(event) => handleHomeCaptainChange(event.target.value)}
                 className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
               >
                 <option value="">-</option>
-                {selectedParticipants.map((participant) => (
+                {homeCaptainOptions.map((participant) => (
                   <option key={`home-cap-${participant.id}`} value={participant.id}>
                     {participant.nickname} ({participant.race})
                   </option>
@@ -597,11 +631,11 @@ export default function CaptainDraftPage() {
               {t('captainDraft.captain.away')}
               <select
                 value={awayCaptainId ?? ''}
-                onChange={(event) => setAwayCaptainId(normalizeSelectionValue(event.target.value))}
+                onChange={(event) => handleAwayCaptainChange(event.target.value)}
                 className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
               >
                 <option value="">-</option>
-                {selectedParticipants.map((participant) => (
+                {awayCaptainOptions.map((participant) => (
                   <option key={`away-cap-${participant.id}`} value={participant.id}>
                     {participant.nickname} ({participant.race})
                   </option>
