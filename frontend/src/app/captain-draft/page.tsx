@@ -351,16 +351,51 @@ export default function CaptainDraftPage() {
     }
   }
 
-  const handleRefreshDraft = async () => {
-    if (!draft?.draftId) {
-      return
-    }
+  const handleResetDraftSetup = () => {
+    setSearch('')
+    setSelectedParticipantIds([])
+    setHomeCaptainId(null)
+    setAwayCaptainId(null)
+    setActingCaptainId(null)
+    setSetsPerRound(4)
+    setDraft(null)
+    setDraftLoading(false)
+    setSelectedPickPlayerId(null)
+    setEntrySelections({})
     setError(null)
+    setMessage(null)
+  }
+
+  const handleRefreshDraft = async () => {
+    setError(null)
+    setMessage(null)
+    setDraftLoading(true)
     try {
-      const refreshed = await apiClient.getCaptainDraft(TEMP_GROUP_ID, draft.draftId)
+      const refreshed = await apiClient.getLatestCaptainDraft(TEMP_GROUP_ID)
       setDraft(refreshed)
-    } catch {
-      setError(t('captainDraft.validation.loadFailed'))
+      const participantIds = refreshed.participants.map((participant) => participant.playerId)
+      setSelectedParticipantIds(participantIds)
+      setHomeCaptainId(refreshed.homeCaptainPlayerId)
+      setAwayCaptainId(refreshed.awayCaptainPlayerId)
+      setActingCaptainId(refreshed.homeCaptainPlayerId)
+      setSelectedPickPlayerId(null)
+      setSetsPerRound(refreshed.setsPerRound)
+      setEntrySelections({})
+    } catch (refreshError) {
+      if (isApiNotFoundError(refreshError)) {
+        setDraft(null)
+        setSelectedParticipantIds([])
+        setHomeCaptainId(null)
+        setAwayCaptainId(null)
+        setActingCaptainId(null)
+        setSelectedPickPlayerId(null)
+        setEntrySelections({})
+        setSetsPerRound(4)
+      } else {
+        setError(t('captainDraft.validation.loadFailed'))
+      }
+    } finally {
+      setDraftLoading(false)
     }
   }
 
@@ -600,6 +635,13 @@ export default function CaptainDraftPage() {
           <div className="mt-4 flex gap-2">
             <button
               type="button"
+              onClick={handleResetDraftSetup}
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              {t('captainDraft.actions.reset')}
+            </button>
+            <button
+              type="button"
               onClick={handleCreateDraft}
               disabled={isCreatingDraft}
               className="flex-1 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
@@ -609,7 +651,7 @@ export default function CaptainDraftPage() {
             <button
               type="button"
               onClick={handleRefreshDraft}
-              disabled={!draft || draftLoading}
+              disabled={draftLoading}
               className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
             >
               {t('captainDraft.actions.refresh')}
