@@ -549,6 +549,10 @@ export default function ResultsPage() {
       setManualSubmitError(t('results.manual.validation.winnerRequired'))
       return
     }
+    if (!manualRaceComposition) {
+      setManualSubmitError(t('results.manual.validation.raceCompositionRequired'))
+      return
+    }
 
     setManualSubmitError(null)
     setManualSubmitSuccess(null)
@@ -563,7 +567,7 @@ export default function ResultsPage() {
         homePlayerIds,
         awayPlayerIds,
         winnerTeam: manualWinnerTeam,
-        raceComposition: manualRaceComposition ?? undefined,
+        raceComposition: manualRaceComposition,
       })
 
       setResult(response)
@@ -932,11 +936,16 @@ export default function ResultsPage() {
 
               <button
                 type="submit"
-                disabled={manualSubmitting || manualPlayersLoading}
+                disabled={manualSubmitting || manualPlayersLoading || manualRaceComposition === null}
                 className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 {manualSubmitting ? t('results.manual.submitting') : t('results.manual.submit')}
               </button>
+              {!manualRaceComposition && (
+                <p className="text-xs text-rose-700">
+                  {t('results.manual.validation.raceCompositionRequired')}
+                </p>
+              )}
             </form>
           )}
         </article>

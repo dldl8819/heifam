@@ -484,6 +484,7 @@
       "needExact": "{count}명을 정확히 선택해야 생성할 수 있습니다.",
       "noPlayers": "선택 가능한 선수가 없습니다.",
       "duplicate": "중복 선택은 불가합니다.",
+      "raceCompositionRequired": "종족 조합을 선택해 주세요.",
       "generateFailed": "밸런스 계산에 실패했습니다. 백엔드 상태를 확인해 주세요."
     },
     "result": {
@@ -785,6 +786,7 @@
       "validation": {
         "playersRequired": "홈 팀과 어웨이 팀 선수를 모두 선택해 주세요.",
         "duplicatePlayers": "같은 선수를 양 팀에 중복 선택할 수 없습니다.",
+        "raceCompositionRequired": "종족 조합을 선택해 주세요.",
         "winnerRequired": "승리 팀을 선택해 주세요."
       }
     },

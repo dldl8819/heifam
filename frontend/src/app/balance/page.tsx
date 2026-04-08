@@ -303,7 +303,8 @@ export default function BalancePage() {
     !submitting &&
     players.length > 0 &&
     allSelected &&
-    !hasDuplicates
+    !hasDuplicates &&
+    raceComposition !== null
   const hasGeneratedMatchId = Number.isFinite(Number(resultMatchId)) && Number(resultMatchId) > 0
   const canCreateMatchFromResult = result !== null && result.teamSize === 3
   const canSubmitQuickResult =
@@ -417,6 +418,10 @@ export default function BalancePage() {
       setSubmitError(t('balance.validation.needExact', { count: requiredPlayerCount }))
       return
     }
+    if (!raceComposition) {
+      setSubmitError(t('balance.validation.raceCompositionRequired'))
+      return
+    }
 
     setSubmitting(true)
     try {
@@ -425,7 +430,7 @@ export default function BalancePage() {
         groupId: TEMP_GROUP_ID,
         playerIds: selectedPlayerIds,
         teamSize,
-        raceComposition: raceComposition ?? undefined,
+        raceComposition,
       })
       setResult(response)
     } catch (error) {
@@ -458,12 +463,17 @@ export default function BalancePage() {
       setMatchCreateMessage(t('balance.quickResult.matchCreateMissingPlayers'))
       return null
     }
+    if (!raceComposition) {
+      setResultMatchId('')
+      setMatchCreateMessage(t('balance.validation.raceCompositionRequired'))
+      return null
+    }
 
     try {
       const created = await apiClient.createGroupMatch(TEMP_GROUP_ID, {
         homePlayerIds,
         awayPlayerIds,
-        raceComposition: raceComposition ?? undefined,
+        raceComposition,
       })
 
       const confirmationStatus = created.confirmationStatus
@@ -527,6 +537,10 @@ export default function BalancePage() {
 
     if (resultWinnerTeam !== 'HOME' && resultWinnerTeam !== 'AWAY') {
       setResultSubmitError(t('balance.quickResult.winnerRequired'))
+      return
+    }
+    if (!raceComposition) {
+      setResultSubmitError(t('balance.validation.raceCompositionRequired'))
       return
     }
 
@@ -752,6 +766,11 @@ export default function BalancePage() {
           )}
           {hasDuplicates && (
             <p className="mt-2 text-xs text-rose-700">{t('balance.validation.duplicate')}</p>
+          )}
+          {!raceComposition && (
+            <p className="mt-2 text-xs text-rose-700">
+              {t('balance.validation.raceCompositionRequired')}
+            </p>
           )}
           {submitError && (
             <Alert variant="destructive" appearance="light" size="sm" className="mt-2">

@@ -102,4 +102,15 @@ class ManualMatchServiceTest {
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("winnerTeam must be HOME or AWAY");
     }
+
+    @Test
+    void rejectsMissingRaceComposition() {
+        assertThatThrownBy(() -> manualMatchService.createManualMatch(
+            new ManualMatchCreateRequest(1L, 3, List.of(1L, 2L, 3L), List.of(4L, 5L, 6L), "HOME", null),
+            "admin@hei.gg",
+            "운영진"
+        ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("종족 조합을 선택해 주세요.");
+    }
 }

@@ -38,6 +38,10 @@ public class TeamBalancingService {
             raceComposition != null
         );
 
+        if (raceComposition == null) {
+            throw new IllegalArgumentException("종족 조합을 선택해 주세요.");
+        }
+
         for (BalancePlayerSelection player : players) {
             if (player == null || player.dto() == null) {
                 throw new IllegalArgumentException("Player entry must not be null");

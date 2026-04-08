@@ -40,6 +40,9 @@ public class ManualMatchService {
         if (request.winnerTeam() == null || request.winnerTeam().isBlank()) {
             throw new IllegalArgumentException("winnerTeam must be HOME or AWAY");
         }
+        if (request.raceComposition() == null || request.raceComposition().isBlank()) {
+            throw new IllegalArgumentException("종족 조합을 선택해 주세요.");
+        }
 
         Match match = groupMatchAdminService.createConfirmedMatch(
             request.groupId(),

@@ -11,9 +11,7 @@ import com.balancify.backend.domain.Group;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.PlayerRepository;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,7 +43,7 @@ class TeamBalancingServiceTest {
             .thenReturn(players);
 
         BalanceResponse response = service.balance(
-            new BalanceRequest(1L, List.of(1L, 2L, 3L, 4L), 2)
+            new BalanceRequest(1L, List.of(1L, 2L, 3L, 4L), 2, null, "PT")
         );
 
         assertThat(response.teamSize()).isEqualTo(2);
@@ -57,7 +55,7 @@ class TeamBalancingServiceTest {
     }
 
     @Test
-    void generatesBalancedThreeVsThreeFromPlayersPayload() {
+    void rejectsMissingRaceComposition() {
         BalanceRequest request = new BalanceRequest(List.of(
             new BalancePlayerDto("A", 1400),
             new BalancePlayerDto("B", 1300),
@@ -67,19 +65,9 @@ class TeamBalancingServiceTest {
             new BalancePlayerDto("F", 900)
         ));
 
-        BalanceResponse response = service.balance(request);
-
-        assertThat(response.teamSize()).isEqualTo(3);
-        assertThat(response.homeTeam()).hasSize(3);
-        assertThat(response.awayTeam()).hasSize(3);
-        assertThat(response.homeMmr() + response.awayMmr()).isEqualTo(6900);
-        assertThat(response.mmrDiff()).isEqualTo(findMinimumDiff(allPlayers(response), 3));
-        assertThat(response.expectedHomeWinRate()).isBetween(0.0, 1.0);
-
-        Set<String> allPlayerNames = new HashSet<>();
-        response.homeTeam().forEach(player -> allPlayerNames.add(player.name()));
-        response.awayTeam().forEach(player -> allPlayerNames.add(player.name()));
-        assertThat(allPlayerNames).containsExactlyInAnyOrder("A", "B", "C", "D", "E", "F");
+        assertThatThrownBy(() -> service.balance(request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("종족 조합을 선택해 주세요.");
     }
 
     @Test
@@ -193,7 +181,7 @@ class TeamBalancingServiceTest {
     }
 
     @Test
-    void defaultsTeamSizeToThreeWhenOmitted() {
+    void rejectsMissingRaceCompositionWhenTeamSizeDefaultsToThree() {
         BalanceRequest request = new BalanceRequest(List.of(
             new BalancePlayerDto("A", 1000),
             new BalancePlayerDto("B", 1000),
@@ -203,10 +191,9 @@ class TeamBalancingServiceTest {
             new BalancePlayerDto("F", 1000)
         ));
 
-        BalanceResponse response = service.balance(request);
-        assertThat(response.teamSize()).isEqualTo(3);
-        assertThat(response.mmrDiff()).isZero();
-        assertThat(response.expectedHomeWinRate()).isEqualTo(0.5);
+        assertThatThrownBy(() -> service.balance(request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("종족 조합을 선택해 주세요.");
     }
 
     private List<Player> createPlayers(Long groupId, List<PlayerSeed> seeds) {
