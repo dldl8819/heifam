@@ -80,13 +80,31 @@ export default function RankingPage() {
       setError(null)
 
       try {
-        const response = await apiClient.getRanking(TEMP_GROUP_ID)
+        const [response, players] = await Promise.all([
+          apiClient.getRanking(TEMP_GROUP_ID),
+          apiClient.getGroupPlayers(TEMP_GROUP_ID),
+        ])
 
         if (!active) {
           return
         }
 
-        setRows(response)
+        const tierByNickname = new Map(
+          players.map((player) => [player.nickname.trim().toLowerCase(), player.tier])
+        )
+
+        setRows(
+          response.map((row) => {
+            const fallbackTier = tierByNickname.get(row.nickname.trim().toLowerCase())
+            return {
+              ...row,
+              tier:
+                typeof row.tier === 'string' && row.tier.trim().length > 0 && row.tier !== 'UNASSIGNED'
+                  ? row.tier
+                  : fallbackTier ?? row.tier,
+            }
+          })
+        )
       } catch {
         if (!active) {
           return
