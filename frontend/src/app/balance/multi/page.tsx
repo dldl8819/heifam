@@ -32,7 +32,7 @@ function formatPercent(value: number): string {
 
 function buildPlayerLine(player: BalancePlayerInput, showMmr: boolean): string {
   const assignedRaceText = player.assignedRace
-    ? ` · ${t('multiBalance.result.assignedRace')}: ${player.assignedRace}`
+    ? ` · ${player.assignedRace}`
     : ''
   if (!showMmr) {
     return `${player.name}${assignedRaceText}`

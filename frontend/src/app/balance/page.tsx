@@ -57,7 +57,7 @@ function formatAssignedRace(assignedRace?: string): string {
   if (!assignedRace) {
     return ''
   }
-  return ` · ${t('balance.result.assignedRace')}: ${assignedRace}`
+  return ` · ${assignedRace}`
 }
 
 function createEmptySlots(): Array<number | null> {
