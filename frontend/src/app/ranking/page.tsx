@@ -157,6 +157,7 @@ export default function RankingPage() {
               <th className="px-4 py-3">{t('ranking.table.rank')}</th>
               <th className="px-4 py-3">{t('ranking.table.nickname')}</th>
               <th className="px-4 py-3">{t('ranking.table.race')}</th>
+              <th className="px-4 py-3">{t('ranking.table.tier')}</th>
               {showMmr && <th className="px-4 py-3">{t('ranking.table.currentMmr')}</th>}
               <th className="px-4 py-3">{t('ranking.table.wins')}</th>
               <th className="px-4 py-3">{t('ranking.table.losses')}</th>
@@ -172,7 +173,7 @@ export default function RankingPage() {
             {loading &&
               (
                 <tr className="border-t border-slate-100">
-                  <td className="px-4 py-3" colSpan={showMmr ? 11 : 9}>
+                  <td className="px-4 py-3" colSpan={showMmr ? 12 : 10}>
                     <LoadingIndicator label={t('common.loading')} />
                   </td>
                 </tr>
@@ -180,7 +181,7 @@ export default function RankingPage() {
 
             {!loading && error && (
               <tr className="border-t border-slate-100">
-                <td className="px-4 py-8 text-center text-sm text-slate-500" colSpan={showMmr ? 11 : 9}>
+                <td className="px-4 py-8 text-center text-sm text-slate-500" colSpan={showMmr ? 12 : 10}>
                   <Alert variant="destructive" appearance="light">
                     <AlertIcon icon="destructive">!</AlertIcon>
                     <AlertContent>
@@ -194,7 +195,7 @@ export default function RankingPage() {
 
             {!loading && !error && sortedRows.length === 0 && (
               <tr className="border-t border-slate-100">
-                <td className="px-4 py-8 text-center text-sm text-slate-500" colSpan={showMmr ? 11 : 9}>
+                <td className="px-4 py-8 text-center text-sm text-slate-500" colSpan={showMmr ? 12 : 10}>
                   {t('ranking.empty')}
                 </td>
               </tr>
@@ -214,6 +215,7 @@ export default function RankingPage() {
                     <td className="px-4 py-3 font-semibold text-slate-900">{row.rank}</td>
                     <td className="px-4 py-3 font-medium text-slate-900">{row.nickname}</td>
                     <td className="px-4 py-3 text-slate-700">{row.race}</td>
+                    <td className="px-4 py-3 text-slate-700">{row.tier}</td>
                     {showMmr && (
                       <td className="px-4 py-3 text-slate-700">
                         {typeof row.currentMmr === 'number' ? row.currentMmr : '-'}

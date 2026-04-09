@@ -822,6 +822,7 @@
       "rank": "순위",
       "nickname": "닉네임",
       "race": "종족",
+      "tier": "티어",
       "currentMmr": "현재 MMR",
       "wins": "승",
       "losses": "패",

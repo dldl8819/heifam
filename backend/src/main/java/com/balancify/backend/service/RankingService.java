@@ -62,13 +62,20 @@ public class RankingService {
             RankingStats stats = calculateStats(history);
             int currentMmr = safeInt(player.getMmr());
             String currentTier = PlayerTierPolicy.resolveTierForSnapshot(player.getTier(), currentMmr);
-            int effectiveMmr = applyDormancyMmr(currentTier, currentMmr, resolveLastPlayedAt(history), player.getCreatedAt(), now);
+            DormancyAdjustment dormancyAdjustment = applyDormancyAdjustment(
+                currentTier,
+                currentMmr,
+                resolveLastPlayedAt(history),
+                player.getCreatedAt(),
+                now
+            );
 
             candidates.add(new RankingCandidate(
                 player.getId(),
                 player.getNickname(),
                 normalizeRace(player.getRace()),
-                effectiveMmr,
+                dormancyAdjustment.tier(),
+                dormancyAdjustment.mmr(),
                 stats
             ));
         }
@@ -88,6 +95,7 @@ public class RankingService {
                 rank++,
                 candidate.nickname(),
                 candidate.race(),
+                candidate.tier(),
                 candidate.mmr(),
                 stats.wins(),
                 stats.losses(),
@@ -111,7 +119,7 @@ public class RankingService {
         return null;
     }
 
-    private int applyDormancyMmr(
+    private DormancyAdjustment applyDormancyAdjustment(
         String currentTier,
         int currentMmr,
         OffsetDateTime lastPlayedAt,
@@ -119,24 +127,27 @@ public class RankingService {
         OffsetDateTime now
     ) {
         if (!dormancyEnabled || dormancyDemoteSteps <= 0) {
-            return currentMmr;
+            return new DormancyAdjustment(currentTier, currentMmr);
         }
 
         OffsetDateTime activityReference = lastPlayedAt != null ? lastPlayedAt : createdAt;
         if (activityReference == null) {
-            return currentMmr;
+            return new DormancyAdjustment(currentTier, currentMmr);
         }
 
         long inactiveDays = ChronoUnit.DAYS.between(activityReference.toInstant(), now.toInstant());
         if (inactiveDays < dormancyInactiveDays) {
-            return currentMmr;
+            return new DormancyAdjustment(currentTier, currentMmr);
         }
 
-        return PlayerTierPolicy.resolveDormancyAdjustedMmr(
+        String demotedTier = PlayerTierPolicy.demoteTier(currentTier, dormancyDemoteSteps);
+        int demotedMmr = PlayerTierPolicy.resolveDormancyAdjustedMmr(
             currentTier,
             currentMmr,
             dormancyDemoteSteps
         );
+        String effectiveTier = PlayerTierPolicy.resolveTierForSnapshot(demotedTier, demotedMmr);
+        return new DormancyAdjustment(effectiveTier, demotedMmr);
     }
 
     private RankingStats calculateStats(List<MatchParticipant> history) {
@@ -229,8 +240,15 @@ public class RankingService {
         Long playerId,
         String nickname,
         String race,
+        String tier,
         int mmr,
         RankingStats stats
+    ) {
+    }
+
+    private record DormancyAdjustment(
+        String tier,
+        int mmr
     ) {
     }
 

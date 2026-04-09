@@ -7,6 +7,7 @@ public record RankingItemResponse(
     int rank,
     String nickname,
     String race,
+    String tier,
     Integer currentMmr,
     int wins,
     int losses,

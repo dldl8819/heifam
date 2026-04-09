@@ -50,6 +50,7 @@ public final class MmrMaskingMapper {
                     response.rank(),
                     response.nickname(),
                     response.race(),
+                    response.tier(),
                     null,
                     response.wins(),
                     response.losses(),

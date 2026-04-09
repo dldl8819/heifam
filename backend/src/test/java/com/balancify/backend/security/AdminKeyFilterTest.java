@@ -778,6 +778,7 @@ class AdminKeyFilterTest {
                         1,
                         "alpha",
                         "P",
+                        "A+",
                         1216,
                         2,
                         1,

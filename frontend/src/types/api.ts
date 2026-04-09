@@ -183,6 +183,7 @@ export type RankingItem = {
   rank: number
   nickname: string
   race: PlayerRace
+  tier: PlayerTierStatus
   currentMmr?: number
   wins: number
   losses: number
