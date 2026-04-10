@@ -1,6 +1,16 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  type CSSProperties,
+  type ClipboardEvent as ReactClipboardEvent,
+  type DragEvent as ReactDragEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { useRouter } from 'next/navigation'
 import { useAdminAuth } from '@/lib/admin-auth'
 import { apiClient, isApiConflictError, isApiForbiddenError, isApiUnauthorizedError } from '@/lib/api'
@@ -312,6 +322,39 @@ export default function BalancePage() {
     (hasGeneratedMatchId || canCreateMatchFromResult) &&
     (resultWinnerTeam === 'HOME' || resultWinnerTeam === 'AWAY') &&
     !resultSubmitting
+  const protectedMmrStyle: CSSProperties | undefined = showMmr
+    ? {
+        WebkitTouchCallout: 'none',
+        WebkitUserSelect: 'none',
+        userSelect: 'none',
+      }
+    : undefined
+  const handleProtectedClipboard = (event: ReactClipboardEvent<HTMLElement>) => {
+    if (!showMmr) {
+      return
+    }
+    event.preventDefault()
+  }
+  const handleProtectedContextMenu = (event: ReactMouseEvent<HTMLElement>) => {
+    if (!showMmr) {
+      return
+    }
+    event.preventDefault()
+  }
+  const handleProtectedDragStart = (event: ReactDragEvent<HTMLElement>) => {
+    if (!showMmr) {
+      return
+    }
+    event.preventDefault()
+  }
+  const handleProtectedKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {
+    if (!showMmr) {
+      return
+    }
+    if ((event.ctrlKey || event.metaKey) && ['c', 'x'].includes(event.key.toLowerCase())) {
+      event.preventDefault()
+    }
+  }
 
   const totalSelectedMmr = selectedPlayers.reduce(
     (sum, player) => sum + (typeof player.currentMmr === 'number' ? player.currentMmr : 0),
@@ -709,7 +752,17 @@ export default function BalancePage() {
           )}
         </article>
 
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <article
+          className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${
+            showMmr ? 'select-none' : ''
+          }`}
+          onCopy={handleProtectedClipboard}
+          onCut={handleProtectedClipboard}
+          onContextMenu={handleProtectedContextMenu}
+          onDragStart={handleProtectedDragStart}
+          onKeyDown={handleProtectedKeyDown}
+          style={protectedMmrStyle}
+        >
           <h3 className="text-sm font-semibold text-slate-900">{t('balance.summary.title')}</h3>
           <p className="mt-1 text-xs text-slate-500">
             {t('balance.summary.selectedCount', {
@@ -785,7 +838,17 @@ export default function BalancePage() {
 
       {result && (
         <section className="grid gap-4 lg:grid-cols-2">
-          <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <article
+            className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${
+              showMmr ? 'select-none' : ''
+            }`}
+            onCopy={handleProtectedClipboard}
+            onCut={handleProtectedClipboard}
+            onContextMenu={handleProtectedContextMenu}
+            onDragStart={handleProtectedDragStart}
+            onKeyDown={handleProtectedKeyDown}
+            style={protectedMmrStyle}
+          >
             <h3 className="text-sm font-semibold text-slate-900">{t('balance.result.homeTeam')}</h3>
             <ul className="mt-3 space-y-2">
               {result.homeTeam.map((player) => (
@@ -813,7 +876,17 @@ export default function BalancePage() {
             )}
           </article>
 
-          <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <article
+            className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${
+              showMmr ? 'select-none' : ''
+            }`}
+            onCopy={handleProtectedClipboard}
+            onCut={handleProtectedClipboard}
+            onContextMenu={handleProtectedContextMenu}
+            onDragStart={handleProtectedDragStart}
+            onKeyDown={handleProtectedKeyDown}
+            style={protectedMmrStyle}
+          >
             <h3 className="text-sm font-semibold text-slate-900">{t('balance.result.awayTeam')}</h3>
             <ul className="mt-3 space-y-2">
               {result.awayTeam.map((player) => (
@@ -841,7 +914,17 @@ export default function BalancePage() {
             )}
           </article>
 
-          <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-2">
+          <article
+            className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-2 ${
+              showMmr ? 'select-none' : ''
+            }`}
+            onCopy={handleProtectedClipboard}
+            onCut={handleProtectedClipboard}
+            onContextMenu={handleProtectedContextMenu}
+            onDragStart={handleProtectedDragStart}
+            onKeyDown={handleProtectedKeyDown}
+            style={protectedMmrStyle}
+          >
             <h3 className="text-sm font-semibold text-slate-900">{t('balance.result.metricsTitle')}</h3>
             <div className={`mt-3 grid gap-3 ${showMmr ? 'sm:grid-cols-3' : 'sm:grid-cols-1'}`}>
               {showMmr && (
