@@ -144,6 +144,51 @@ class GroupMatchAdminServiceTest {
     }
 
     @Test
+    void createsTwoVsTwoBalancedMatchWithRaceComposition() {
+        Group group = new Group();
+        group.setId(1L);
+        group.setName("Group 1");
+
+        Match savedMatch = new Match();
+        savedMatch.setId(502L);
+        savedMatch.setGroup(group);
+
+        List<Player> players = List.of(
+            player(1L, group, "PT"),
+            player(2L, group, "P"),
+            player(3L, group, "PT"),
+            player(4L, group, "P")
+        );
+
+        when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
+        when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L)))
+            .thenReturn(players);
+        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any(), any()))
+            .thenReturn(List.of());
+        when(matchRepository.save(any(Match.class))).thenReturn(savedMatch);
+
+        CreateGroupMatchResponse response = groupMatchAdminService.createMatch(
+            1L,
+            new CreateGroupMatchRequest(List.of(1L, 2L), List.of(3L, 4L), 2, "PT")
+        );
+
+        assertThat(response.matchId()).isEqualTo(502L);
+        assertThat(response.confirmationStatus()).isEqualTo("CREATED");
+
+        ArgumentCaptor<Match> matchCaptor = ArgumentCaptor.forClass(Match.class);
+        verify(matchRepository).save(matchCaptor.capture());
+        assertThat(matchCaptor.getValue().getTeamSize()).isEqualTo(2);
+        assertThat(matchCaptor.getValue().getRaceComposition()).isEqualTo("PT");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<MatchParticipant>> participantsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(matchParticipantRepository).saveAll(participantsCaptor.capture());
+        assertThat(participantsCaptor.getValue())
+            .extracting(MatchParticipant::getAssignedRace)
+            .containsExactlyInAnyOrder("P", "T", "P", "T");
+    }
+
+    @Test
     void throwsWhenDuplicatePlayerExistsAcrossTeams() {
         assertThatThrownBy(() ->
             groupMatchAdminService.createMatch(

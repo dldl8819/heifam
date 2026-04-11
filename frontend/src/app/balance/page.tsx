@@ -70,6 +70,24 @@ function formatAssignedRace(assignedRace?: string): string {
   return ` · ${assignedRace}`
 }
 
+function resolveReadableApiErrorMessage(error: unknown): string | null {
+  if (!(error instanceof Error)) {
+    return null
+  }
+
+  const message = error.message.trim()
+  if (
+    message.length === 0 ||
+    message.startsWith('{') ||
+    message.startsWith('[') ||
+    /^API request failed \(\d+\)$/.test(message)
+  ) {
+    return null
+  }
+
+  return message
+}
+
 function createEmptySlots(): Array<number | null> {
   return Array.from({ length: MAX_SLOT_COUNT }, () => null)
 }
@@ -552,7 +570,8 @@ export default function BalancePage() {
       if (isApiForbiddenError(createError)) {
         setMatchCreateMessage(t('balance.quickResult.matchCreateForbidden'))
       } else {
-        setMatchCreateMessage(t('balance.quickResult.matchCreateFailed'))
+        const readableMessage = resolveReadableApiErrorMessage(createError)
+        setMatchCreateMessage(readableMessage ?? t('balance.quickResult.matchCreateFailed'))
       }
       return null
     }
