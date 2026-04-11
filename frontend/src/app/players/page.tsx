@@ -587,8 +587,10 @@ export default function PlayersPage() {
     })
   }, [raceFilter, rows, search])
 
+  const showStatusColumn = isAdmin
   const showActionsColumn = isAdmin
-  const tableColumnCount = 7 + (showMmrColumn ? 1 : 0) + (showActionsColumn ? 1 : 0)
+  const tableColumnCount =
+    6 + (showStatusColumn ? 1 : 0) + (showMmrColumn ? 1 : 0) + (showActionsColumn ? 1 : 0)
   const tierChangeTargets = useMemo<TierChangeTarget[]>(
     () =>
       rows
@@ -865,7 +867,7 @@ export default function PlayersPage() {
               <th className="px-4 py-3">{t('players.table.nickname')}</th>
               <th className="px-4 py-3">{t('players.table.race')}</th>
               <th className="px-4 py-3">{t('players.table.tier')}</th>
-              <th className="px-4 py-3">{t('players.table.status')}</th>
+              {showStatusColumn && <th className="px-4 py-3">{t('players.table.status')}</th>}
               {showMmrColumn && <th className="px-4 py-3">{t('players.table.currentMmr')}</th>}
               <th className="px-4 py-3">{t('players.table.wins')}</th>
               <th className="px-4 py-3">{t('players.table.losses')}</th>
@@ -968,17 +970,19 @@ export default function PlayersPage() {
                         {row.tier === 'UNASSIGNED' ? t('players.table.unassigned') : row.tier}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`rounded-md px-2 py-1 text-xs font-semibold ${
-                          isActive
-                            ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
-                            : 'border border-slate-300 bg-slate-200 text-slate-700'
-                        }`}
-                      >
-                        {isActive ? t('players.table.active') : t('players.table.inactive')}
-                      </span>
-                    </td>
+                    {showStatusColumn && (
+                      <td className="px-4 py-3">
+                        <span
+                          className={`rounded-md px-2 py-1 text-xs font-semibold ${
+                            isActive
+                              ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
+                              : 'border border-slate-300 bg-slate-200 text-slate-700'
+                          }`}
+                        >
+                          {isActive ? t('players.table.active') : t('players.table.inactive')}
+                        </span>
+                      </td>
+                    )}
                     {showMmrColumn && (
                       <td className={`px-4 py-3 ${isActive ? 'text-slate-700' : 'text-slate-600'}`}>
                         {isEditing && isSuperAdmin ? (
