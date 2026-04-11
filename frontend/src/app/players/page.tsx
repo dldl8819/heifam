@@ -59,6 +59,27 @@ function comparePlayersByTierThenNickname(a: PlayerRosterItem, b: PlayerRosterIt
   return a.nickname.localeCompare(b.nickname, 'ko-KR')
 }
 
+function sortRosterRows(rows: PlayerRosterItem[], showMmrColumn: boolean): PlayerRosterItem[] {
+  return [...rows].sort((a, b) => {
+    const aActive = a.active !== false
+    const bActive = b.active !== false
+    if (aActive !== bActive) {
+      return aActive ? -1 : 1
+    }
+    if (b.games !== a.games) {
+      return b.games - a.games
+    }
+    if (showMmrColumn) {
+      const aMmr = typeof a.currentMmr === 'number' ? a.currentMmr : -1
+      const bMmr = typeof b.currentMmr === 'number' ? b.currentMmr : -1
+      if (bMmr !== aMmr) {
+        return bMmr - aMmr
+      }
+    }
+    return a.nickname.localeCompare(b.nickname, 'ko-KR')
+  })
+}
+
 function escapeCsvCell(value: string): string {
   return `"${value.replace(/"/g, '""')}"`
 }
@@ -246,21 +267,7 @@ export default function PlayersPage() {
       const response = await apiClient.getGroupPlayers(TEMP_GROUP_ID, {
         includeInactive: isAdmin && showInactive,
       })
-      setRows(
-        [...response].sort((a, b) => {
-          if (b.games !== a.games) {
-            return b.games - a.games
-          }
-          if (showMmrColumn) {
-            const aMmr = typeof a.currentMmr === 'number' ? a.currentMmr : -1
-            const bMmr = typeof b.currentMmr === 'number' ? b.currentMmr : -1
-            if (bMmr !== aMmr) {
-              return bMmr - aMmr
-            }
-          }
-          return a.nickname.localeCompare(b.nickname, 'ko-KR')
-        })
-      )
+      setRows(sortRosterRows(response, showMmrColumn))
     } catch {
       setRows([])
       setError(t('players.loadError'))
@@ -532,6 +539,16 @@ export default function PlayersPage() {
     setPlayerActionSuccess(null)
     try {
       await apiClient.updateGroupPlayer(TEMP_GROUP_ID, player.id, { active: nextActive })
+      setRows((currentRows) => {
+        const nextRows = currentRows.map((row) =>
+          row.id === player.id ? { ...row, active: nextActive } : row
+        )
+        if (!showInactive && !nextActive) {
+          return nextRows.filter((row) => row.id !== player.id)
+        }
+
+        return sortRosterRows(nextRows, showMmrColumn)
+      })
       if (editingPlayerId === player.id) {
         setEditingPlayerId(null)
         setEditingNickname('')
@@ -545,7 +562,6 @@ export default function PlayersPage() {
       setPlayerActionSuccess(
         nextActive ? t('players.actions.reactivateSuccess') : t('players.actions.deactivateSuccess')
       )
-      await fetchRoster()
     } catch (actionError) {
       if (isApiForbiddenError(actionError)) {
         setPlayerActionError(t('common.permissionDenied'))
@@ -572,7 +588,7 @@ export default function PlayersPage() {
   }, [raceFilter, rows, search])
 
   const showActionsColumn = isAdmin
-  const tableColumnCount = 6 + (showMmrColumn ? 1 : 0) + (showActionsColumn ? 1 : 0)
+  const tableColumnCount = 7 + (showMmrColumn ? 1 : 0) + (showActionsColumn ? 1 : 0)
   const tierChangeTargets = useMemo<TierChangeTarget[]>(
     () =>
       rows
@@ -849,6 +865,7 @@ export default function PlayersPage() {
               <th className="px-4 py-3">{t('players.table.nickname')}</th>
               <th className="px-4 py-3">{t('players.table.race')}</th>
               <th className="px-4 py-3">{t('players.table.tier')}</th>
+              <th className="px-4 py-3">{t('players.table.status')}</th>
               {showMmrColumn && <th className="px-4 py-3">{t('players.table.currentMmr')}</th>}
               <th className="px-4 py-3">{t('players.table.wins')}</th>
               <th className="px-4 py-3">{t('players.table.losses')}</th>
@@ -895,11 +912,13 @@ export default function PlayersPage() {
                 return (
                   <tr
                     key={row.id}
-                    className={`border-t border-slate-100 transition-colors hover:bg-slate-50/70 ${
-                      isActive ? '' : 'bg-slate-50/80 text-slate-500'
+                    className={`border-t border-slate-100 transition-colors ${
+                      isActive
+                        ? 'hover:bg-slate-50/70'
+                        : 'bg-slate-100/90 hover:bg-slate-200/70'
                     }`}
                   >
-                    <td className="px-4 py-3 font-medium text-slate-900">
+                    <td className={`px-4 py-3 font-medium ${isActive ? 'text-slate-900' : 'text-slate-700'}`}>
                       {isEditing ? (
                         <input
                           type="text"
@@ -923,7 +942,7 @@ export default function PlayersPage() {
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-slate-700">
+                    <td className={`px-4 py-3 ${isActive ? 'text-slate-700' : 'text-slate-600'}`}>
                       {isEditing ? (
                         <select
                           value={editingRace}
@@ -949,8 +968,19 @@ export default function PlayersPage() {
                         {row.tier === 'UNASSIGNED' ? t('players.table.unassigned') : row.tier}
                       </span>
                     </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`rounded-md px-2 py-1 text-xs font-semibold ${
+                          isActive
+                            ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
+                            : 'border border-slate-300 bg-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {isActive ? t('players.table.active') : t('players.table.inactive')}
+                      </span>
+                    </td>
                     {showMmrColumn && (
-                      <td className="px-4 py-3 text-slate-700">
+                      <td className={`px-4 py-3 ${isActive ? 'text-slate-700' : 'text-slate-600'}`}>
                         {isEditing && isSuperAdmin ? (
                           <input
                             type="number"
@@ -966,9 +996,9 @@ export default function PlayersPage() {
                         )}
                       </td>
                     )}
-                    <td className="px-4 py-3 text-slate-700">{row.wins}</td>
-                    <td className="px-4 py-3 text-slate-700">{row.losses}</td>
-                    <td className="px-4 py-3 text-slate-700">{row.games}</td>
+                    <td className={`px-4 py-3 ${isActive ? 'text-slate-700' : 'text-slate-600'}`}>{row.wins}</td>
+                    <td className={`px-4 py-3 ${isActive ? 'text-slate-700' : 'text-slate-600'}`}>{row.losses}</td>
+                    <td className={`px-4 py-3 ${isActive ? 'text-slate-700' : 'text-slate-600'}`}>{row.games}</td>
                     {showActionsColumn && (
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-2">
@@ -1048,7 +1078,11 @@ export default function PlayersPage() {
                             type="button"
                             disabled={busy || editingPlayerId !== null || editingMmrPlayerId !== null}
                             onClick={() => handleTogglePlayerActive(row)}
-                            className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-slate-900 hover:bg-slate-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                            className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                              isActive
+                                ? 'border border-slate-300 text-slate-700 hover:border-slate-900 hover:bg-slate-900 hover:text-white'
+                                : 'border border-emerald-300 text-emerald-700 hover:border-emerald-600 hover:bg-emerald-600 hover:text-white'
+                            }`}
                           >
                             {isToggling
                               ? t('players.actions.toggling')

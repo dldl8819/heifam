@@ -459,6 +459,8 @@
       "nickname": "닉네임",
       "race": "종족",
       "tier": "티어",
+      "status": "상태",
+      "active": "활성",
       "currentMmr": "현재 MMR",
       "wins": "승",
       "losses": "패",
