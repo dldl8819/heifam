@@ -316,7 +316,7 @@ export default function BalancePage() {
     !hasDuplicates &&
     raceComposition !== null
   const hasGeneratedMatchId = Number.isFinite(Number(resultMatchId)) && Number(resultMatchId) > 0
-  const canCreateMatchFromResult = result !== null && result.teamSize === 3
+  const canCreateMatchFromResult = result !== null
   const canSubmitQuickResult =
     canAccess &&
     (hasGeneratedMatchId || canCreateMatchFromResult) &&
@@ -495,13 +495,7 @@ export default function BalancePage() {
       .map((player) => player.playerId)
       .filter((playerId): playerId is number => typeof playerId === 'number' && Number.isFinite(playerId))
 
-    if (balanceResult.teamSize !== 3) {
-      setResultMatchId('')
-      setMatchCreateMessage(t('balance.quickResult.matchCreateOnlyThreeVsThree'))
-      return null
-    }
-
-    if (homePlayerIds.length !== 3 || awayPlayerIds.length !== 3) {
+    if (homePlayerIds.length !== balanceResult.teamSize || awayPlayerIds.length !== balanceResult.teamSize) {
       setResultMatchId('')
       setMatchCreateMessage(t('balance.quickResult.matchCreateMissingPlayers'))
       return null
@@ -516,6 +510,7 @@ export default function BalancePage() {
       const created = await apiClient.createGroupMatch(TEMP_GROUP_ID, {
         homePlayerIds,
         awayPlayerIds,
+        teamSize: balanceResult.teamSize,
         raceComposition,
       })
 

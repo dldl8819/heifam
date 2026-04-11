@@ -102,6 +102,48 @@ class GroupMatchAdminServiceTest {
     }
 
     @Test
+    void createsTwoVsTwoBalancedMatchWhenTeamSizeIsProvided() {
+        Group group = new Group();
+        group.setId(1L);
+        group.setName("Group 1");
+
+        Match savedMatch = new Match();
+        savedMatch.setId(501L);
+        savedMatch.setGroup(group);
+
+        List<Player> players = List.of(
+            player(1L, group),
+            player(2L, group),
+            player(3L, group),
+            player(4L, group)
+        );
+
+        when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
+        when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L)))
+            .thenReturn(players);
+        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any(), any()))
+            .thenReturn(List.of());
+        when(matchRepository.save(any(Match.class))).thenReturn(savedMatch);
+
+        CreateGroupMatchResponse response = groupMatchAdminService.createMatch(
+            1L,
+            new CreateGroupMatchRequest(List.of(1L, 2L), List.of(3L, 4L), 2)
+        );
+
+        assertThat(response.matchId()).isEqualTo(501L);
+        assertThat(response.confirmationStatus()).isEqualTo("CREATED");
+        verify(matchRepository).findRecentDuplicateCandidates(
+            eq(1L),
+            eq(2),
+            eq(MatchSource.BALANCED),
+            eq("1-2-3-4"),
+            any(),
+            any()
+        );
+        verify(matchParticipantRepository).saveAll(any());
+    }
+
+    @Test
     void throwsWhenDuplicatePlayerExistsAcrossTeams() {
         assertThatThrownBy(() ->
             groupMatchAdminService.createMatch(

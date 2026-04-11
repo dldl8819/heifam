@@ -64,7 +64,7 @@ public class GroupMatchAdminService {
             groupId,
             request.homePlayerIds(),
             request.awayPlayerIds(),
-            TEAM_SIZE_3V3,
+            normalizeRequestedTeamSize(request.teamSize()),
             MatchSource.BALANCED,
             null,
             request.raceComposition(),
@@ -183,7 +183,10 @@ public class GroupMatchAdminService {
         Group group = groupRepository.findByIdForUpdate(groupId)
             .orElseThrow(() -> new NoSuchElementException("Group not found: " + groupId));
 
-        List<Player> players = playerRepository.findByGroup_IdAndIdIn(groupId, new ArrayList<>(allIds));
+        List<Player> players = playerRepository.findByGroup_IdAndIdIn(groupId, new ArrayList<>(allIds))
+            .stream()
+            .filter(Player::isActive)
+            .toList();
         if (players.size() != normalizedTeamSize * 2) {
             throw new IllegalArgumentException("All players must belong to the group");
         }

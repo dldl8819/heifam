@@ -517,7 +517,7 @@ export const apiClient = {
     }, { adminOnly: true }),
   createGroupMatch: (
     groupId: number,
-    payload: { homePlayerIds: number[]; awayPlayerIds: number[]; raceComposition?: string }
+    payload: { homePlayerIds: number[]; awayPlayerIds: number[]; teamSize?: number; raceComposition?: string }
   ) =>
     apiRequest<CreateGroupMatchResponse>(
       `/api/groups/${groupId}/matches`,
