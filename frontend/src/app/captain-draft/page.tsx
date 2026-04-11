@@ -1,12 +1,21 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { apiClient, isApiNotFoundError } from '@/lib/api'
 import { useAdminAuth } from '@/lib/admin-auth'
+import { TierParticipantBoard } from '@/components/tier-participant-board'
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
-import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
+import {
+  autocompleteParticipantSlot,
+  compactParticipantIds,
+  createParticipantSlots,
+  createParticipantSlotsFromIds,
+  fillParticipantSlotLabels,
+  type ParticipantSlotState,
+  updateParticipantSlotInput,
+} from '@/lib/participant-slots'
 import type {
   CaptainDraftResponse,
   CaptainDraftTeam,
@@ -14,6 +23,7 @@ import type {
 } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
+const MINIMUM_PARTICIPANT_SLOTS = 8
 
 function teamLabel(team: CaptainDraftTeam): string {
   if (team === 'HOME') {
@@ -49,9 +59,9 @@ export default function CaptainDraftPage() {
   const [players, setPlayers] = useState<PlayerRosterItem[]>([])
   const [playersLoading, setPlayersLoading] = useState<boolean>(true)
   const [playersError, setPlayersError] = useState<string | null>(null)
-  const [search, setSearch] = useState<string>('')
-
-  const [selectedParticipantIds, setSelectedParticipantIds] = useState<number[]>([])
+  const [participantSlots, setParticipantSlots] = useState<ParticipantSlotState[]>(() =>
+    createParticipantSlots(MINIMUM_PARTICIPANT_SLOTS),
+  )
   const [homeCaptainId, setHomeCaptainId] = useState<number | null>(null)
   const [awayCaptainId, setAwayCaptainId] = useState<number | null>(null)
   const [actingCaptainId, setActingCaptainId] = useState<number | null>(null)
@@ -69,6 +79,7 @@ export default function CaptainDraftPage() {
 
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const participantInputRefs = useRef<Array<HTMLInputElement | null>>([])
 
   const playerMap = useMemo(() => {
     const map = new Map<number, PlayerRosterItem>()
@@ -78,18 +89,10 @@ export default function CaptainDraftPage() {
     return map
   }, [players])
 
-  const draftParticipantIds = useMemo(
-    () => new Set((draft?.participants ?? []).map((participant) => participant.playerId)),
-    [draft],
+  const selectedParticipantIds = useMemo(
+    () => compactParticipantIds(participantSlots),
+    [participantSlots],
   )
-
-  const filteredPlayers = useMemo(() => {
-    const keyword = search.trim().toLowerCase()
-    const filtered = players.filter((player) =>
-      keyword.length === 0 ? true : player.nickname.toLowerCase().includes(keyword),
-    )
-    return filtered.sort((a, b) => a.nickname.localeCompare(b.nickname, 'ko-KR'))
-  }, [players, search])
 
   const selectedParticipants = useMemo(
     () =>
@@ -221,8 +224,17 @@ export default function CaptainDraftPage() {
           return
         }
         setDraft(response)
-        const participantIds = response.participants.map((participant) => participant.playerId)
-        setSelectedParticipantIds(participantIds)
+        setParticipantSlots(
+          createParticipantSlotsFromIds(
+            response.participants.map((participant) => ({
+              id: participant.playerId,
+              nickname: participant.nickname,
+              race: participant.race,
+            })),
+            response.participants.map((participant) => participant.playerId),
+            MINIMUM_PARTICIPANT_SLOTS,
+          ),
+        )
         setHomeCaptainId(response.homeCaptainPlayerId)
         setAwayCaptainId(response.awayCaptainPlayerId)
         setActingCaptainId((current) => current ?? response.homeCaptainPlayerId)
@@ -248,6 +260,16 @@ export default function CaptainDraftPage() {
       mounted = false
     }
   }, [])
+
+  useEffect(() => {
+    if (players.length === 0) {
+      return
+    }
+
+    setParticipantSlots((previous) =>
+      fillParticipantSlotLabels(previous, players, MINIMUM_PARTICIPANT_SLOTS),
+    )
+  }, [players])
 
   useEffect(() => {
     if (!draft?.draftId) {
@@ -304,27 +326,58 @@ export default function CaptainDraftPage() {
     }
   }, [homeCaptainId, awayCaptainId])
 
-  const handleToggleParticipant = (playerId: number) => {
+  useEffect(() => {
+    if (homeCaptainId != null && !selectedParticipantIds.includes(homeCaptainId)) {
+      setHomeCaptainId(null)
+    }
+    if (awayCaptainId != null && !selectedParticipantIds.includes(awayCaptainId)) {
+      setAwayCaptainId(null)
+    }
+    if (actingCaptainId != null && !selectedParticipantIds.includes(actingCaptainId)) {
+      setActingCaptainId(null)
+    }
+  }, [actingCaptainId, awayCaptainId, homeCaptainId, selectedParticipantIds])
+
+  const handleParticipantSlotInputChange = (index: number, value: string) => {
     setMessage(null)
     setError(null)
-    setSelectedParticipantIds((previous) => {
-      const exists = previous.includes(playerId)
-      if (!exists) {
-        return [...previous, playerId]
-      }
+    setParticipantSlots((previous) =>
+      updateParticipantSlotInput({
+        slots: previous,
+        index,
+        inputValue: value,
+        players,
+        showMmr,
+        minimumSlots: MINIMUM_PARTICIPANT_SLOTS,
+      }),
+    )
+  }
 
-      const next = previous.filter((id) => id !== playerId)
-      if (homeCaptainId === playerId) {
-        setHomeCaptainId(null)
-      }
-      if (awayCaptainId === playerId) {
-        setAwayCaptainId(null)
-      }
-      if (actingCaptainId === playerId) {
-        setActingCaptainId(null)
-      }
-      return next
+  const handleParticipantSlotAutocomplete = (index: number): boolean => {
+    const nextSlots = autocompleteParticipantSlot({
+      slots: participantSlots,
+      index,
+      players,
+      minimumSlots: MINIMUM_PARTICIPANT_SLOTS,
     })
+    if (!nextSlots) {
+      return false
+    }
+
+    setMessage(null)
+    setError(null)
+    setParticipantSlots(nextSlots)
+
+    window.requestAnimationFrame(() => {
+      const nextInput = participantInputRefs.current[index + 1]
+      if (!nextInput) {
+        return
+      }
+      nextInput.focus()
+      nextInput.select()
+    })
+
+    return true
   }
 
   const handleHomeCaptainChange = (value: string) => {
@@ -386,8 +439,7 @@ export default function CaptainDraftPage() {
   }
 
   const handleResetDraftSetup = () => {
-    setSearch('')
-    setSelectedParticipantIds([])
+    setParticipantSlots(createParticipantSlots(MINIMUM_PARTICIPANT_SLOTS))
     setHomeCaptainId(null)
     setAwayCaptainId(null)
     setActingCaptainId(null)
@@ -407,8 +459,17 @@ export default function CaptainDraftPage() {
     try {
       const refreshed = await apiClient.getLatestCaptainDraft(TEMP_GROUP_ID)
       setDraft(refreshed)
-      const participantIds = refreshed.participants.map((participant) => participant.playerId)
-      setSelectedParticipantIds(participantIds)
+      setParticipantSlots(
+        createParticipantSlotsFromIds(
+          refreshed.participants.map((participant) => ({
+            id: participant.playerId,
+            nickname: participant.nickname,
+            race: participant.race,
+          })),
+          refreshed.participants.map((participant) => participant.playerId),
+          MINIMUM_PARTICIPANT_SLOTS,
+        ),
+      )
       setHomeCaptainId(refreshed.homeCaptainPlayerId)
       setAwayCaptainId(refreshed.awayCaptainPlayerId)
       setActingCaptainId(refreshed.homeCaptainPlayerId)
@@ -418,7 +479,7 @@ export default function CaptainDraftPage() {
     } catch (refreshError) {
       if (isApiNotFoundError(refreshError)) {
         setDraft(null)
-        setSelectedParticipantIds([])
+        setParticipantSlots(createParticipantSlots(MINIMUM_PARTICIPANT_SLOTS))
         setHomeCaptainId(null)
         setAwayCaptainId(null)
         setActingCaptainId(null)
@@ -545,67 +606,24 @@ export default function CaptainDraftPage() {
       )}
 
       <div className="grid gap-4 xl:grid-cols-3">
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm xl:col-span-2">
-          <h3 className="text-sm font-semibold text-slate-900">{t('captainDraft.attendance.title')}</h3>
-          <p className="mt-1 text-xs text-slate-500">{t('captainDraft.attendance.helper')}</p>
-
-          <label className="mt-3 block space-y-1 text-xs font-medium text-slate-500">
-            {t('captainDraft.attendance.searchLabel')}
-            <input
-              type="text"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder={t('captainDraft.attendance.searchPlaceholder')}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-            />
-          </label>
-
-          <p className="mt-3 text-xs text-slate-500">
-            {t('captainDraft.attendance.selectedCount', { count: selectedParticipantIds.length })}
-          </p>
-
-          {playersLoading ? (
-            <LoadingIndicator className="mt-3" label={t('common.loading')} />
-          ) : (
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {filteredPlayers.map((player) => {
-                const selected = selectedParticipantIds.includes(player.id)
-                const inCurrentDraft = draftParticipantIds.has(player.id)
-                return (
-                  <button
-                    key={player.id}
-                    type="button"
-                    onClick={() => handleToggleParticipant(player.id)}
-                    className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-                      selected
-                        ? 'border-indigo-500 bg-indigo-50 text-indigo-900'
-                        : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50'
-                    }`}
-                  >
-                    <p className="font-medium">
-                      {player.nickname} ({player.race})
-                    </p>
-                    {showMmr && (
-                      <p className="mt-1 text-xs text-slate-500">
-                        {typeof player.currentMmr === 'number' ? `${player.currentMmr} MMR` : '-'}
-                      </p>
-                    )}
-                    {inCurrentDraft && (
-                      <p className="mt-1 text-[11px] text-indigo-700">
-                        {t('captainDraft.attendance.inCurrentDraft')}
-                      </p>
-                    )}
-                  </button>
-                )
-              })}
-              {filteredPlayers.length === 0 && (
-                <div className="rounded-lg border border-dashed border-slate-200 px-3 py-8 text-center text-sm text-slate-500 sm:col-span-2">
-                  {t('captainDraft.attendance.empty')}
-                </div>
-              )}
-            </div>
-          )}
-        </article>
+        <div className="xl:col-span-2">
+          <TierParticipantBoard
+            title={t('captainDraft.attendance.title')}
+            helper={t('captainDraft.attendance.helper')}
+            players={players}
+            slots={participantSlots}
+            showMmr={showMmr}
+            loading={playersLoading}
+            selectedCountLabel={t('captainDraft.attendance.selectedCount', { count: selectedParticipantIds.length })}
+            emptyMessage={t('captainDraft.attendance.empty')}
+            duplicateMessage={t('balance.validation.duplicate')}
+            resetLabel={t('captainDraft.actions.reset')}
+            inputRefs={participantInputRefs}
+            onReset={handleResetDraftSetup}
+            onSlotInputChange={handleParticipantSlotInputChange}
+            onSlotAutocomplete={handleParticipantSlotAutocomplete}
+          />
+        </div>
 
         <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <h3 className="text-sm font-semibold text-slate-900">{t('captainDraft.captain.title')}</h3>

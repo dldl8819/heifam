@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAdminAuth } from '@/lib/admin-auth'
 import { apiClient } from '@/lib/api'
+import { TierParticipantBoard } from '@/components/tier-participant-board'
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
-import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
 import {
@@ -13,6 +13,14 @@ import {
   getMultiBalanceModeLabelKey,
   MULTI_BALANCE_MODE_OPTIONS,
 } from '@/lib/multi-balance-mode'
+import {
+  autocompleteParticipantSlot,
+  compactParticipantIds,
+  createParticipantSlots,
+  fillParticipantSlotLabels,
+  type ParticipantSlotState,
+  updateParticipantSlotInput,
+} from '@/lib/participant-slots'
 import { getRaceCompositionOptions, normalizeRaceComposition } from '@/lib/race-composition'
 import type {
   BalancePlayerInput,
@@ -24,6 +32,7 @@ import type {
 
 const TEMP_GROUP_ID = 1
 const MODE_OPTIONS: MultiBalanceMode[] = [...MULTI_BALANCE_MODE_OPTIONS]
+const MINIMUM_SELECTION_SLOTS = 4
 
 function formatPercent(value: number): string {
   const percent = value <= 1 ? value * 100 : value
@@ -92,13 +101,15 @@ export default function MultiBalancePage() {
   const [players, setPlayers] = useState<BalancePlayerOption[]>([])
   const [playersLoading, setPlayersLoading] = useState<boolean>(true)
   const [playersError, setPlayersError] = useState<string | null>(null)
-  const [search, setSearch] = useState<string>('')
-  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [participantSlots, setParticipantSlots] = useState<ParticipantSlotState[]>(() =>
+    createParticipantSlots(MINIMUM_SELECTION_SLOTS),
+  )
   const [submitting, setSubmitting] = useState<boolean>(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [result, setResult] = useState<MultiBalanceResponse | null>(null)
   const [balanceMode, setBalanceMode] = useState<MultiBalanceMode>(DEFAULT_MULTI_BALANCE_MODE)
   const [raceComposition, setRaceComposition] = useState<RaceComposition | null>(null)
+  const participantInputRefs = useRef<Array<HTMLInputElement | null>>([])
 
   useEffect(() => {
     let active = true
@@ -155,17 +166,21 @@ export default function MultiBalancePage() {
       active = false
     }
   }, [showMmr])
-
-  const filteredPlayers = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase()
-    if (normalizedSearch.length === 0) {
-      return players
+ 
+  useEffect(() => {
+    if (players.length === 0) {
+      return
     }
 
-    return players.filter((player) =>
-      player.nickname.toLowerCase().includes(normalizedSearch),
+    setParticipantSlots((previous) =>
+      fillParticipantSlotLabels(previous, players, MINIMUM_SELECTION_SLOTS),
     )
-  }, [players, search])
+  }, [players])
+
+  const selectedIds = useMemo(
+    () => compactParticipantIds(participantSlots),
+    [participantSlots],
+  )
 
   const selectedPlayers = useMemo(
     () => players.filter((player) => selectedIds.includes(player.id)),
@@ -202,21 +217,54 @@ export default function MultiBalancePage() {
         ? t('multiBalance.validation.minimumFour')
         : null
 
-  const handleTogglePlayer = (playerId: number) => {
+  const handleResetSelection = () => {
+    setParticipantSlots(createParticipantSlots(MINIMUM_SELECTION_SLOTS))
+    setBalanceMode(DEFAULT_MULTI_BALANCE_MODE)
+    setRaceComposition(null)
     setSubmitError(null)
     setResult(null)
-    setSelectedIds((prev) =>
-      prev.includes(playerId)
-        ? prev.filter((id) => id !== playerId)
-        : [...prev, playerId],
+  }
+
+  const handleParticipantSlotInputChange = (index: number, value: string) => {
+    setSubmitError(null)
+    setResult(null)
+    setParticipantSlots((previous) =>
+      updateParticipantSlotInput({
+        slots: previous,
+        index,
+        inputValue: value,
+        players,
+        showMmr,
+        minimumSlots: MINIMUM_SELECTION_SLOTS,
+      }),
     )
   }
 
-  const handleResetSelection = () => {
-    setSelectedIds([])
-    setBalanceMode(DEFAULT_MULTI_BALANCE_MODE)
+  const handleParticipantSlotAutocomplete = (index: number): boolean => {
+    const nextSlots = autocompleteParticipantSlot({
+      slots: participantSlots,
+      index,
+      players,
+      minimumSlots: MINIMUM_SELECTION_SLOTS,
+    })
+    if (!nextSlots) {
+      return false
+    }
+
     setSubmitError(null)
     setResult(null)
+    setParticipantSlots(nextSlots)
+
+    window.requestAnimationFrame(() => {
+      const nextInput = participantInputRefs.current[index + 1]
+      if (!nextInput) {
+        return
+      }
+      nextInput.focus()
+      nextInput.select()
+    })
+
+    return true
   }
 
   const handleGenerateMultiBalance = async () => {
@@ -266,63 +314,24 @@ export default function MultiBalancePage() {
       )}
 
       <div className="grid gap-4 xl:grid-cols-3">
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm xl:col-span-2">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold text-slate-900">{t('multiBalance.selection.title')}</h3>
-            <button
-              type="button"
-              onClick={handleResetSelection}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
-            >
-              {t('multiBalance.selection.reset')}
-            </button>
-          </div>
-
-          <label className="mt-3 block space-y-1 text-xs font-medium text-slate-500">
-            {t('multiBalance.selection.searchLabel')}
-            <input
-              type="text"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder={t('multiBalance.selection.searchPlaceholder')}
-              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-            />
-          </label>
-
-          {playersLoading ? (
-            <LoadingIndicator className="mt-4" label={t('common.loading')} />
-          ) : (
-            <div className="mt-4 grid gap-2 sm:grid-cols-2">
-              {filteredPlayers.map((player) => {
-                const selected = selectedIds.includes(player.id)
-                return (
-                  <button
-                    key={player.id}
-                    type="button"
-                    onClick={() => handleTogglePlayer(player.id)}
-                    className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-                      selected
-                        ? 'border-indigo-500 bg-indigo-50 text-indigo-900'
-                        : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50'
-                    }`}
-                  >
-                    <span className="font-medium">
-                      {player.nickname} ({player.race})
-                    </span>
-                    <span className="text-xs">
-                      {showMmr && typeof player.currentMmr === 'number' ? player.currentMmr : '-'}
-                    </span>
-                  </button>
-                )
-              })}
-              {filteredPlayers.length === 0 && (
-                <div className="rounded-lg border border-dashed border-slate-200 px-3 py-6 text-center text-sm text-slate-500 sm:col-span-2">
-                  {t('multiBalance.selection.empty')}
-                </div>
-              )}
-            </div>
-          )}
-        </article>
+        <div className="xl:col-span-2">
+          <TierParticipantBoard
+            title={t('multiBalance.selection.title')}
+            helper={t('multiBalance.selection.helper')}
+            players={players}
+            slots={participantSlots}
+            showMmr={showMmr}
+            loading={playersLoading}
+            selectedCountLabel={t('multiBalance.summary.selectedCount', { count: selectedIds.length })}
+            emptyMessage={t('multiBalance.selection.empty')}
+            duplicateMessage={t('balance.validation.duplicate')}
+            resetLabel={t('multiBalance.selection.reset')}
+            inputRefs={participantInputRefs}
+            onReset={handleResetSelection}
+            onSlotInputChange={handleParticipantSlotInputChange}
+            onSlotAutocomplete={handleParticipantSlotAutocomplete}
+          />
+        </div>
 
         <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <h3 className="text-sm font-semibold text-slate-900">{t('multiBalance.summary.title')}</h3>

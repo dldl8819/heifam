@@ -159,7 +159,14 @@
     "permissionDenied": "권한이 없습니다. 관리자 계정으로 로그인해 주세요.",
     "adminReadOnly": "이 계정은 관리자 권한이 없어 읽기 전용입니다.",
     "adminReadOnlyWithEmail": "403 권한 없음: {email} 계정은 읽기 전용입니다.",
-    "adminOnlyAction": "관리자 전용 기능입니다. 권한이 있는 계정으로 로그인해 주세요."
+    "adminOnlyAction": "관리자 전용 기능입니다. 권한이 있는 계정으로 로그인해 주세요.",
+    "tierBoard": {
+      "title": "Hei 티어표",
+      "index": "구분",
+      "unassigned": "재배정 대상",
+      "slot": "참가자 {index}",
+      "placeholder": "닉네임 입력..."
+    }
   },
   "access": {
     "blockedTitle": "접속 권한이 없습니다",
@@ -536,6 +543,7 @@
     "generateError": "다중 밸런스 생성에 실패했습니다.",
     "selection": {
       "title": "참가자 선택",
+      "helper": "밸런스 매치처럼 닉네임을 입력하면 티어표에 바로 배치됩니다.",
       "reset": "초기화",
       "searchLabel": "닉네임 검색",
       "searchPlaceholder": "닉네임 입력...",
