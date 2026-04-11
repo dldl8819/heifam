@@ -221,6 +221,7 @@ export type PlayerRosterItem = {
   wins: number
   losses: number
   games: number
+  active?: boolean
 }
 
 export type GroupPlayerMmrUpdateRequest = {
