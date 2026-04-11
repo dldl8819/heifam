@@ -339,10 +339,12 @@ export default function MultiBalancePage() {
             {t('multiBalance.summary.selectedCount', { count: selectedIds.length })}
           </p>
 
-          <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-            {t('multiBalance.summary.totalMmr')}:{' '}
-            <span className="font-semibold">{showMmr ? selectedTotalMmr : '-'}</span>
-          </div>
+          {showMmr && (
+            <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              {t('multiBalance.summary.totalMmr')}:{' '}
+              <span className="font-semibold">{selectedTotalMmr}</span>
+            </div>
+          )}
 
           <div className="mt-4 space-y-2">
             <p className="text-xs font-semibold text-slate-700">{t('multiBalance.mode.title')}</p>
@@ -469,106 +471,131 @@ export default function MultiBalancePage() {
             )}
           </article>
 
-          <div className="grid gap-4">
-            {result.matches.map((match) => (
-              <article
-                key={`multi-match-${match.matchNumber}`}
-                className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
-              >
-                <h4 className="text-sm font-semibold text-slate-900">
-                  {t('multiBalance.result.matchNumber', { number: match.matchNumber })}
-                </h4>
-                <p className="mt-1 text-xs text-slate-600">
-                  {t('multiBalance.result.matchType')}:{' '}
-                  <span className="font-semibold">
-                    {match.matchType === '3v3'
-                      ? t('multiBalance.result.matchType3v3')
-                      : t('multiBalance.result.matchType2v2')}
-                  </span>
-                </p>
-
-                <div className="mt-3 grid gap-4 lg:grid-cols-2">
-                  <div>
-                    <p className="text-xs font-semibold text-slate-500">{t('multiBalance.result.homeTeam')}</p>
-                    <ul className="mt-2 space-y-2">
-                      {match.homeTeam.map((player) => (
-                        <li
-                          key={`multi-home-${match.matchNumber}-${player.name}`}
-                          className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800"
-                        >
-                          {buildPlayerLine(player, showMmr)}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div>
-                    <p className="text-xs font-semibold text-slate-500">{t('multiBalance.result.awayTeam')}</p>
-                    <ul className="mt-2 space-y-2">
-                      {match.awayTeam.map((player) => (
-                        <li
-                          key={`multi-away-${match.matchNumber}-${player.name}`}
-                          className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800"
-                        >
-                          {buildPlayerLine(player, showMmr)}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                  <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                    {t('multiBalance.result.homeMmr')}:{' '}
-                    <span className="font-semibold">
-                      {showMmr && typeof match.homeMmr === 'number' ? match.homeMmr : '-'}
-                    </span>
-                  </div>
-                  <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                    {t('multiBalance.result.awayMmr')}:{' '}
-                    <span className="font-semibold">
-                      {showMmr && typeof match.awayMmr === 'number' ? match.awayMmr : '-'}
-                    </span>
-                  </div>
-                  <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                    {t('multiBalance.result.mmrDiff')}:{' '}
-                    <span className="font-semibold">
-                      {showMmr && typeof match.mmrDiff === 'number' ? match.mmrDiff : '-'}
-                    </span>
-                  </div>
-                  <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                    {t('multiBalance.result.expectedHomeWinRate')}:{' '}
-                    <span className="font-semibold">
+          <div className="overflow-x-auto rounded-xl border border-slate-300 bg-white shadow-sm">
+            <table className={`table-fixed border-collapse text-sm ${showMmr ? 'min-w-[1320px]' : 'min-w-[980px]'}`}>
+              <thead>
+                <tr className="bg-[#f4eadf] text-slate-900">
+                  <th className="w-24 border border-slate-400 px-3 py-2 text-center font-semibold">
+                    {t('multiBalance.result.matchNumberHeader')}
+                  </th>
+                  <th className="w-24 border border-slate-400 px-3 py-2 text-center font-semibold">
+                    {t('multiBalance.result.matchType')}
+                  </th>
+                  <th className="w-28 border border-slate-400 px-3 py-2 text-center font-semibold">
+                    {t('multiBalance.result.raceComposition')}
+                  </th>
+                  <th className="w-64 border border-slate-400 px-3 py-2 text-center font-semibold text-sky-700">
+                    {t('multiBalance.result.homeSheetLabel')}
+                  </th>
+                  <th className="w-64 border border-slate-400 px-3 py-2 text-center font-semibold text-rose-700">
+                    {t('multiBalance.result.awaySheetLabel')}
+                  </th>
+                  {showMmr && (
+                    <th className="w-28 border border-slate-400 px-3 py-2 text-center font-semibold">
+                      {t('multiBalance.result.homeMmr')}
+                    </th>
+                  )}
+                  {showMmr && (
+                    <th className="w-28 border border-slate-400 px-3 py-2 text-center font-semibold">
+                      {t('multiBalance.result.awayMmr')}
+                    </th>
+                  )}
+                  {showMmr && (
+                    <th className="w-24 border border-slate-400 px-3 py-2 text-center font-semibold">
+                      {t('multiBalance.result.mmrDiff')}
+                    </th>
+                  )}
+                  <th className="w-28 border border-slate-400 px-3 py-2 text-center font-semibold">
+                    {t('multiBalance.result.expectedHomeWinRate')}
+                  </th>
+                  <th className="w-24 border border-slate-400 px-3 py-2 text-center font-semibold">
+                    {t('multiBalance.result.repeatTeammatePenalty')}
+                  </th>
+                  <th className="w-24 border border-slate-400 px-3 py-2 text-center font-semibold">
+                    {t('multiBalance.result.repeatMatchupPenalty')}
+                  </th>
+                  <th className="w-24 border border-slate-400 px-3 py-2 text-center font-semibold">
+                    {t('multiBalance.result.racePenalty')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.matches.map((match, matchIndex) => (
+                  <tr
+                    key={`multi-match-${match.matchNumber}`}
+                    className={matchIndex % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}
+                  >
+                    <td className="border border-slate-300 px-3 py-3 text-center font-semibold text-slate-900">
+                      {t('multiBalance.result.matchNumber', { number: match.matchNumber })}
+                    </td>
+                    <td className="border border-slate-300 px-3 py-3 text-center text-slate-700">
+                      {match.matchType === '3v3'
+                        ? t('multiBalance.result.matchType3v3')
+                        : t('multiBalance.result.matchType2v2')}
+                    </td>
+                    <td className="border border-slate-300 px-3 py-3 text-center text-slate-700">
+                      <div>{match.raceSummary.home || '-'}</div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        {match.raceSummary.away || '-'}
+                      </div>
+                    </td>
+                    <td className="border border-slate-300 px-3 py-3 align-top">
+                      <div className="space-y-2">
+                        {match.homeTeam.map((player) => (
+                          <div
+                            key={`multi-home-${match.matchNumber}-${player.name}`}
+                            className="rounded-md bg-sky-50 px-2 py-1.5 text-sm font-medium text-sky-800"
+                          >
+                            {buildPlayerLine(player, showMmr)}
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="border border-slate-300 px-3 py-3 align-top">
+                      <div className="space-y-2">
+                        {match.awayTeam.map((player) => (
+                          <div
+                            key={`multi-away-${match.matchNumber}-${player.name}`}
+                            className="rounded-md bg-rose-50 px-2 py-1.5 text-sm font-medium text-rose-800"
+                          >
+                            {buildPlayerLine(player, showMmr)}
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                    {showMmr && (
+                      <td className="border border-slate-300 px-3 py-3 text-center text-slate-700">
+                        {typeof match.homeMmr === 'number' ? match.homeMmr : '-'}
+                      </td>
+                    )}
+                    {showMmr && (
+                      <td className="border border-slate-300 px-3 py-3 text-center text-slate-700">
+                        {typeof match.awayMmr === 'number' ? match.awayMmr : '-'}
+                      </td>
+                    )}
+                    {showMmr && (
+                      <td className="border border-slate-300 px-3 py-3 text-center text-slate-700">
+                        {typeof match.mmrDiff === 'number' ? match.mmrDiff : '-'}
+                      </td>
+                    )}
+                    <td className="border border-slate-300 px-3 py-3 text-center text-slate-700">
                       {typeof match.expectedHomeWinRate === 'number'
                         ? formatPercent(match.expectedHomeWinRate)
                         : '-'}
-                    </span>
-                  </div>
-                </div>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                  <div className="rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-900">
-                    {t('multiBalance.result.raceHome')}:{' '}
-                    <span className="font-semibold">{match.raceSummary.home || '-'}</span>
-                  </div>
-                  <div className="rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-900">
-                    {t('multiBalance.result.raceAway')}:{' '}
-                    <span className="font-semibold">{match.raceSummary.away || '-'}</span>
-                  </div>
-                  <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700">
-                    {t('multiBalance.result.repeatTeammatePenalty')}:{' '}
-                    <span className="font-semibold">{match.penaltySummary.repeatTeammatePenalty}</span>
-                  </div>
-                  <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700">
-                    {t('multiBalance.result.repeatMatchupPenalty')}:{' '}
-                    <span className="font-semibold">{match.penaltySummary.repeatMatchupPenalty}</span>
-                  </div>
-                </div>
-                <div className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700">
-                  {t('multiBalance.result.racePenalty')}:{' '}
-                  <span className="font-semibold">{match.penaltySummary.racePenalty}</span>
-                </div>
-              </article>
-            ))}
+                    </td>
+                    <td className="border border-slate-300 px-3 py-3 text-center text-slate-700">
+                      {match.penaltySummary.repeatTeammatePenalty}
+                    </td>
+                    <td className="border border-slate-300 px-3 py-3 text-center text-slate-700">
+                      {match.penaltySummary.repeatMatchupPenalty}
+                    </td>
+                    <td className="border border-slate-300 px-3 py-3 text-center text-slate-700">
+                      {match.penaltySummary.racePenalty}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </section>
       )}
