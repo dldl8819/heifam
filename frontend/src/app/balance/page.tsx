@@ -161,7 +161,7 @@ function readPersistedBalanceState(): PersistedBalanceState | null {
 
 export default function BalancePage() {
   const router = useRouter()
-  const { isAdmin, isSuperAdmin, canAccess } = useAdminAuth()
+  const { isAdmin, isSuperAdmin, isLoggedIn } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
   const showMmr = isAdmin && mmrVisible
   const [players, setPlayers] = useState<BalancePlayerOption[]>([])
@@ -318,7 +318,7 @@ export default function BalancePage() {
   const hasGeneratedMatchId = Number.isFinite(Number(resultMatchId)) && Number(resultMatchId) > 0
   const canCreateMatchFromResult = result !== null
   const canSubmitQuickResult =
-    canAccess &&
+    isLoggedIn &&
     (hasGeneratedMatchId || canCreateMatchFromResult) &&
     (resultWinnerTeam === 'HOME' || resultWinnerTeam === 'AWAY') &&
     !resultSubmitting
@@ -563,8 +563,8 @@ export default function BalancePage() {
     setResultSubmitSuccess(null)
     setMatchCreateMessage(null)
 
-    if (!canAccess) {
-      setResultSubmitError(t('common.permissionDenied'))
+    if (!isLoggedIn) {
+      setResultSubmitError(t('common.adminLoginRequired'))
       return
     }
 
