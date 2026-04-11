@@ -93,6 +93,27 @@ export class ApiRequestError extends Error {
   }
 }
 
+function extractApiErrorMessage(status: number, rawText: string): string {
+  const text = rawText.trim()
+  if (text.length === 0) {
+    return `API request failed (${status})`
+  }
+
+  try {
+    const parsed = JSON.parse(text) as Record<string, unknown>
+    const candidates = [parsed.message, parsed.reason, parsed.error]
+    for (const candidate of candidates) {
+      if (typeof candidate === 'string' && candidate.trim().length > 0) {
+        return candidate.trim()
+      }
+    }
+  } catch {
+    return text
+  }
+
+  return text
+}
+
 function toSafeNickname(value: unknown): string {
   if (typeof value !== 'string') {
     return ''
@@ -247,9 +268,7 @@ async function apiRequest<T>(
     const message = (await response.text()).trim()
     throw new ApiRequestError(
       response.status,
-      message.length > 0
-        ? `API request failed (${response.status}): ${message}`
-        : `API request failed (${response.status})`
+      extractApiErrorMessage(response.status, message)
     )
   }
 
@@ -461,6 +480,7 @@ function normalizePlayerRosterItem(value: unknown): PlayerRosterItem | null {
     wins,
     losses,
     games,
+    active: typeof source.active === 'boolean' ? source.active : true,
   }
 }
 
@@ -519,7 +539,7 @@ export const apiClient = {
   updateGroupPlayer: (
     groupId: number,
     playerId: number,
-    payload: { nickname?: string; race?: string }
+    payload: { nickname?: string; race?: string; active?: boolean }
   ) =>
     apiRequest<void>(
       `/api/groups/${groupId}/players/${playerId}`,
@@ -559,8 +579,12 @@ export const apiClient = {
       },
       { adminOnly: true, timeoutMs: IMPORT_API_REQUEST_TIMEOUT_MS }
     ),
-  getGroupPlayers: async (groupId: number): Promise<PlayerRosterItem[]> => {
-    const payload = await apiRequest<unknown>(`/api/groups/${groupId}/players`, undefined, {
+  getGroupPlayers: async (
+    groupId: number,
+    options?: { includeInactive?: boolean }
+  ): Promise<PlayerRosterItem[]> => {
+    const query = options?.includeInactive ? '?includeInactive=true' : ''
+    const payload = await apiRequest<unknown>(`/api/groups/${groupId}/players${query}`, undefined, {
       includeUserEmail: true,
     })
     if (!Array.isArray(payload)) {
