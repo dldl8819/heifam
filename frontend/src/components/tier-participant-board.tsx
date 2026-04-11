@@ -29,83 +29,27 @@ type TierParticipantBoardProps = {
   onSlotAutocomplete: (index: number) => boolean
 }
 
-type TierColumn = {
+type TierRow = {
   key: PlayerTierStatus
   label: string
-  headerClassName: string
-  cellClassName: string
+  rowHeaderClassName: string
 }
 
-type TierBoardPlayer = SelectableParticipant & {
-  slotIndex: number
-}
-
-const TIER_COLUMNS: TierColumn[] = [
-  {
-    key: 'S',
-    label: 'S',
-    headerClassName: 'bg-slate-50 text-slate-900',
-    cellClassName: 'bg-white',
-  },
-  {
-    key: 'A+',
-    label: 'A+',
-    headerClassName: 'bg-sky-100 text-sky-950',
-    cellClassName: 'bg-sky-50/50',
-  },
-  {
-    key: 'A',
-    label: 'A',
-    headerClassName: 'bg-sky-100 text-sky-950',
-    cellClassName: 'bg-sky-50/50',
-  },
-  {
-    key: 'A-',
-    label: 'A-',
-    headerClassName: 'bg-sky-100 text-sky-950',
-    cellClassName: 'bg-sky-50/50',
-  },
-  {
-    key: 'B+',
-    label: 'B+',
-    headerClassName: 'bg-amber-100 text-amber-950',
-    cellClassName: 'bg-amber-50/60',
-  },
-  {
-    key: 'B',
-    label: 'B',
-    headerClassName: 'bg-amber-100 text-amber-950',
-    cellClassName: 'bg-amber-50/60',
-  },
-  {
-    key: 'B-',
-    label: 'B-',
-    headerClassName: 'bg-amber-100 text-amber-950',
-    cellClassName: 'bg-amber-50/60',
-  },
-  {
-    key: 'C+',
-    label: 'C+',
-    headerClassName: 'bg-lime-100 text-lime-950',
-    cellClassName: 'bg-lime-50/60',
-  },
-  {
-    key: 'C',
-    label: 'C',
-    headerClassName: 'bg-lime-100 text-lime-950',
-    cellClassName: 'bg-lime-50/60',
-  },
-  {
-    key: 'C-',
-    label: 'C-',
-    headerClassName: 'bg-lime-100 text-lime-950',
-    cellClassName: 'bg-lime-50/60',
-  },
+const TIER_ROWS: TierRow[] = [
+  { key: 'S', label: 'S', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950' },
+  { key: 'A+', label: 'A+', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950' },
+  { key: 'A', label: 'A', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950' },
+  { key: 'A-', label: 'A-', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950' },
+  { key: 'B+', label: 'B+', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950' },
+  { key: 'B', label: 'B', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950' },
+  { key: 'B-', label: 'B-', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950' },
+  { key: 'C+', label: 'C+', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950' },
+  { key: 'C', label: 'C', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950' },
+  { key: 'C-', label: 'C-', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950' },
   {
     key: 'UNASSIGNED',
     label: t('common.tierBoard.unassigned'),
-    headerClassName: 'bg-orange-100 text-orange-950',
-    cellClassName: 'bg-orange-50/60',
+    rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950',
   },
 ]
 
@@ -124,34 +68,25 @@ export function TierParticipantBoard({
   emptyMessage,
   duplicateMessage,
   resetLabel,
-  minimumBoardRows = 12,
+  minimumBoardRows = 6,
   inputRefs,
   onReset,
   onSlotInputChange,
   onSlotAutocomplete,
 }: TierParticipantBoardProps) {
-  const selectedPlayers = slots.flatMap((slot, slotIndex) => {
+  const selectedPlayers = slots.flatMap((slot) => {
     if (typeof slot.playerId !== 'number' || !Number.isFinite(slot.playerId)) {
       return []
     }
 
     const player = players.find((candidate) => candidate.id === slot.playerId)
-    if (!player) {
-      return []
-    }
-
-    return [
-      {
-        ...player,
-        slotIndex,
-      },
-    ]
+    return player ? [player] : []
   })
 
-  const buckets = TIER_COLUMNS.reduce<Record<PlayerTierStatus, TierBoardPlayer[]>>(
-    (accumulator, column) => ({
+  const buckets = TIER_ROWS.reduce<Record<PlayerTierStatus, SelectableParticipant[]>>(
+    (accumulator, row) => ({
       ...accumulator,
-      [column.key]: [],
+      [row.key]: [],
     }),
     {
       S: [],
@@ -172,9 +107,9 @@ export function TierParticipantBoard({
     buckets[normalizeTier(player.tier)].push(player)
   })
 
-  const boardRowCount = Math.max(
+  const boardColumnCount = Math.max(
     minimumBoardRows,
-    ...TIER_COLUMNS.map((column) => buckets[column.key].length),
+    ...TIER_ROWS.map((row) => buckets[row.key].length),
   )
   const selectedPlayerIds = new Set(
     slots.flatMap((slot) =>
@@ -265,76 +200,54 @@ export function TierParticipantBoard({
             })}
           </div>
 
-          <div className="mt-5 rounded-[28px] border border-[#dacdb5] bg-[#fbf4e8] p-4 shadow-sm sm:p-5">
-            <div className="space-y-3">
-              <div className="text-center">
-                <p className="text-[11px] font-semibold tracking-[0.35em] text-[#8b7551]">HEI</p>
-                <div className="mt-2 flex items-center gap-4 text-[#6f5b3c]">
-                  <div className="h-px flex-1 bg-[#bca98b]" />
-                  <h4 className="text-2xl font-semibold tracking-tight sm:text-4xl">
-                    {t('common.tierBoard.title')}
-                  </h4>
-                  <div className="h-px flex-1 bg-[#bca98b]" />
-                </div>
-                <p className="mt-2 text-xs text-[#8b7551]">{selectedCountLabel}</p>
-              </div>
+          <div className="mt-5 rounded-[24px] border border-[#d5c4ab] bg-[#fbf4e8] p-4 shadow-sm sm:p-5">
+            <div className="text-center">
+              <h4 className="text-2xl font-semibold tracking-tight text-[#6f5b3c] sm:text-4xl">
+                {t('common.tierBoard.title')}
+              </h4>
+              <p className="mt-2 text-xs text-[#8b7551]">{selectedCountLabel}</p>
+            </div>
 
-              <div className="overflow-x-auto rounded-2xl border border-[#c9baa0] bg-white/80">
-                <table className="min-w-[1040px] w-full table-fixed border-collapse text-xs sm:text-sm">
-                  <thead>
-                    <tr className="text-center">
-                      <th className="w-14 border border-[#ccbca0] bg-[#f2e6d4] px-2 py-2 font-semibold text-[#594629]">
-                        {t('common.tierBoard.index')}
+            <div className="mt-4 overflow-x-auto rounded-xl border border-[#8d7760] bg-white/90">
+              <table
+                className="w-full border-collapse text-xs sm:text-sm"
+                style={{ minWidth: `${Math.max(520, 96 + boardColumnCount * 104)}px` }}
+              >
+                <tbody>
+                  {TIER_ROWS.map((row) => (
+                    <tr key={`tier-board-row-${row.key}`} className="text-center">
+                      <th
+                        className={cn(
+                          'w-20 border border-[#8d7760] px-2 py-2 font-semibold',
+                          row.rowHeaderClassName,
+                        )}
+                      >
+                        {row.label}
                       </th>
-                      {TIER_COLUMNS.map((column) => (
-                        <th
-                          key={`tier-board-header-${column.key}`}
-                          className={cn(
-                            'border border-[#ccbca0] px-2 py-2 font-semibold',
-                            column.headerClassName,
-                          )}
-                        >
-                          {column.label}
-                        </th>
-                      ))}
+                      {Array.from({ length: boardColumnCount }, (_, columnIndex) => {
+                        const player = buckets[row.key][columnIndex] ?? null
+                        return (
+                          <td
+                            key={`tier-board-cell-${row.key}-${columnIndex}`}
+                            className={cn(
+                              'h-10 border border-[#8d7760] px-2 py-1.5 align-middle',
+                              player ? 'bg-[#dff0f7]' : 'bg-white',
+                            )}
+                          >
+                            {player ? (
+                              <span className="block truncate text-sm font-medium text-slate-900">
+                                {player.nickname}
+                              </span>
+                            ) : (
+                              <span className="text-transparent">.</span>
+                            )}
+                          </td>
+                        )
+                      })}
                     </tr>
-                  </thead>
-                  <tbody>
-                    {Array.from({ length: boardRowCount }, (_, rowIndex) => (
-                      <tr key={`tier-board-row-${rowIndex}`} className="text-center">
-                        <td className="border border-[#d8c9af] bg-[#faf4ea] px-2 py-2 font-medium text-slate-700">
-                          {rowIndex + 1}
-                        </td>
-                        {TIER_COLUMNS.map((column) => {
-                          const player = buckets[column.key][rowIndex] ?? null
-                          return (
-                            <td
-                              key={`tier-board-cell-${column.key}-${rowIndex}`}
-                              className={cn(
-                                'h-12 border border-[#d8c9af] px-2 py-2 align-middle',
-                                column.cellClassName,
-                              )}
-                            >
-                              {player ? (
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className="truncate font-semibold text-slate-900">
-                                    {player.nickname}
-                                  </span>
-                                  <span className="shrink-0 text-[11px] font-medium text-slate-500">
-                                    {player.race}
-                                  </span>
-                                </div>
-                              ) : (
-                                <span className="text-transparent">.</span>
-                              )}
-                            </td>
-                          )
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </>
