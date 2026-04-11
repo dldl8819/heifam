@@ -62,8 +62,11 @@ public class PlayerQueryService {
         this.clock = clock;
     }
 
-    public List<GroupPlayerResponse> getGroupPlayers(Long groupId) {
+    public List<GroupPlayerResponse> getGroupPlayers(Long groupId, boolean includeInactive) {
         List<Player> players = new ArrayList<>(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId));
+        if (!includeInactive) {
+            players = new ArrayList<>(players.stream().filter(Player::isActive).toList());
+        }
         players.sort(
             Comparator
                 .comparingInt((Player player) -> safeInt(player.getMmr()))
@@ -126,7 +129,8 @@ public class PlayerQueryService {
                 dormancyAdjustment.mmr(),
                 stats.wins,
                 stats.losses,
-                games
+                games,
+                player.isActive()
             ));
         }
 

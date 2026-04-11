@@ -46,6 +46,9 @@ public class CaptainDraftEntry {
     @JoinColumn(name = "away_player_id")
     private Player awayPlayer;
 
+    @Column(length = 10)
+    private String winnerTeam;
+
     @Column(nullable = false)
     private OffsetDateTime updatedAt = OffsetDateTime.now();
 
@@ -109,6 +112,14 @@ public class CaptainDraftEntry {
 
     public void setAwayPlayer(Player awayPlayer) {
         this.awayPlayer = awayPlayer;
+    }
+
+    public String getWinnerTeam() {
+        return winnerTeam;
+    }
+
+    public void setWinnerTeam(String winnerTeam) {
+        this.winnerTeam = winnerTeam;
     }
 
     public OffsetDateTime getUpdatedAt() {

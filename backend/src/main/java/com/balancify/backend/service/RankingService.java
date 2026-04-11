@@ -44,7 +44,10 @@ public class RankingService {
     }
 
     public List<RankingItemResponse> getGroupRanking(Long groupId) {
-        List<Player> players = playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId);
+        List<Player> players = playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId)
+            .stream()
+            .filter(Player::isActive)
+            .toList();
         List<MatchParticipant> matchParticipants =
             matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(groupId);
 

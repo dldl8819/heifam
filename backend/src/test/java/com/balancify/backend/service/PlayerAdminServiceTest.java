@@ -1,9 +1,11 @@
 package com.balancify.backend.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -20,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 @ExtendWith(MockitoExtension.class)
 class PlayerAdminServiceTest {
@@ -45,7 +48,7 @@ class PlayerAdminServiceTest {
         playerAdminService.updatePlayer(
             1L,
             10L,
-            new GroupPlayerUpdateRequest(" 새닉네임 ", "tz")
+            new GroupPlayerUpdateRequest(" 새닉네임 ", "tz", null)
         );
 
         verify(playerRepository).findByGroup_IdAndNicknameIgnoreCase(1L, "새닉네임");
@@ -61,7 +64,7 @@ class PlayerAdminServiceTest {
         playerAdminService.updatePlayer(
             1L,
             10L,
-            new GroupPlayerUpdateRequest(null, "PTZ")
+            new GroupPlayerUpdateRequest(null, "PTZ", null)
         );
 
         verify(playerRepository, never()).findByGroup_IdAndNicknameIgnoreCase(anyLong(), anyString());
@@ -77,7 +80,7 @@ class PlayerAdminServiceTest {
             playerAdminService.updatePlayer(
                 1L,
                 10L,
-                new GroupPlayerUpdateRequest("   ", " ")
+                new GroupPlayerUpdateRequest("   ", " ", null)
             )
         )
             .isInstanceOf(IllegalArgumentException.class)
@@ -99,7 +102,7 @@ class PlayerAdminServiceTest {
             playerAdminService.updatePlayer(
                 1L,
                 10L,
-                new GroupPlayerUpdateRequest("새닉네임", null)
+                new GroupPlayerUpdateRequest("새닉네임", null, null)
             )
         )
             .isInstanceOf(IllegalArgumentException.class)
@@ -115,11 +118,28 @@ class PlayerAdminServiceTest {
             playerAdminService.updatePlayer(
                 1L,
                 10L,
-                new GroupPlayerUpdateRequest(null, "X")
+                new GroupPlayerUpdateRequest(null, "X", null)
             )
         )
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Race must be one of P,T,Z,PT,PZ,TZ,PTZ");
+    }
+
+    @Test
+    void updatesOnlyActiveFlagWhenRequested() {
+        Player player = player(10L, 1L, "기존닉");
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+        when(playerRepository.save(any(Player.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        playerAdminService.updatePlayer(
+            1L,
+            10L,
+            new GroupPlayerUpdateRequest(null, null, false)
+        );
+
+        assertThat(player.isActive()).isFalse();
+        verify(playerRepository, never()).findByGroup_IdAndNicknameIgnoreCase(anyLong(), anyString());
+        verify(playerRepository).save(player);
     }
 
     @Test
@@ -169,6 +189,18 @@ class PlayerAdminServiceTest {
         playerAdminService.deletePlayer(1L, 10L);
 
         verify(playerRepository).delete(player);
+        verify(playerRepository).flush();
+    }
+
+    @Test
+    void throwsConflictFriendlyMessageWhenPlayerHasHistoryReferences() {
+        Player player = player(10L, 1L, "대상");
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+        doThrow(new DataIntegrityViolationException("fk")).when(playerRepository).flush();
+
+        assertThatThrownBy(() -> playerAdminService.deletePlayer(1L, 10L))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("매치 또는 드래프트 기록이 남아 있는 선수는 삭제할 수 없습니다.");
     }
 
     private Player player(Long playerId, Long groupId, String nickname) {

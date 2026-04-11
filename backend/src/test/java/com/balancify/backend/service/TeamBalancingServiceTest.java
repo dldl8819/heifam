@@ -154,6 +154,25 @@ class TeamBalancingServiceTest {
     }
 
     @Test
+    void rejectsInactivePlayersFromSelection() {
+        List<Player> players = createPlayers(1L, List.of(
+            new PlayerSeed(1L, "A", 1600, "P"),
+            new PlayerSeed(2L, "B", 1520, "P"),
+            new PlayerSeed(3L, "C", 1490, "T"),
+            new PlayerSeed(4L, "D", 1440, "T")
+        ));
+        players.get(1).setActive(false);
+        when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L)))
+            .thenReturn(players);
+
+        assertThatThrownBy(() ->
+            service.balance(new BalanceRequest(1L, List.of(1L, 2L, 3L, 4L), 2, null, "PT"))
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Players not found in group: [2]");
+    }
+
+    @Test
     void rejectsInvalidTwoVsTwoPlayerCount() {
         assertThatThrownBy(() ->
             service.balance(new BalanceRequest(1L, List.of(1L, 2L, 3L), 2))

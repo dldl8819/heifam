@@ -13,6 +13,7 @@ public record GroupPlayerResponse(
     Integer currentMmr,
     int wins,
     int losses,
-    int games
+    int games,
+    boolean active
 ) {
 }

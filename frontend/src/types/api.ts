@@ -321,6 +321,7 @@ export type CaptainDraftEntryUpdateItem = {
   roundNumber: number
   setNumber: number
   playerId: number | null
+  winnerTeam: TeamSide | null
 }
 
 export type CaptainDraftEntriesUpdateRequest = {
@@ -354,6 +355,7 @@ export type CaptainDraftEntry = {
   homePlayerNickname: string | null
   awayPlayerId: number | null
   awayPlayerNickname: string | null
+  winnerTeam: TeamSide | null
 }
 
 export type CaptainDraftResponse = {

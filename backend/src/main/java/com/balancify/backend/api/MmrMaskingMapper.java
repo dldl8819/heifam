@@ -36,7 +36,8 @@ public final class MmrMaskingMapper {
                     null,
                     response.wins(),
                     response.losses(),
-                    response.games()
+                    response.games(),
+                    response.active()
                 )
             )
             .toList();

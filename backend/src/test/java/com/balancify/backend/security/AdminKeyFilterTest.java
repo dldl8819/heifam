@@ -709,7 +709,7 @@ class AdminKeyFilterTest {
 
     @Test
     void hidesMmrFieldsFromMemberForGroupPlayers() throws Exception {
-        when(playerQueryService.getGroupPlayers(eq(1L)))
+        when(playerQueryService.getGroupPlayers(eq(1L), eq(false)))
             .thenReturn(
                 List.of(
                     new GroupPlayerResponse(
@@ -722,7 +722,8 @@ class AdminKeyFilterTest {
                         1216,
                         2,
                         1,
-                        3
+                        3,
+                        true
                     )
                 )
             );
@@ -740,7 +741,7 @@ class AdminKeyFilterTest {
 
     @Test
     void returnsMmrFieldsForAdminForGroupPlayers() throws Exception {
-        when(playerQueryService.getGroupPlayers(eq(1L)))
+        when(playerQueryService.getGroupPlayers(eq(1L), eq(false)))
             .thenReturn(
                 List.of(
                     new GroupPlayerResponse(
@@ -753,7 +754,8 @@ class AdminKeyFilterTest {
                         1216,
                         2,
                         1,
-                        3
+                        3,
+                        true
                     )
                 )
             );
@@ -979,6 +981,24 @@ class AdminKeyFilterTest {
             .andExpect(jsonPath("$.expectedHomeWinRate").value(0.61))
             .andExpect(jsonPath("$.homeTeam[0].mmr").value(1200))
             .andExpect(jsonPath("$.awayTeam[0].mmr").value(1170));
+    }
+
+    @Test
+    void returnsReadableMessageForBalanceBadRequest() throws Exception {
+        when(teamBalancingService.balance(any()))
+            .thenThrow(new IllegalArgumentException("선택한 종족 조합으로 매치를 구성할 수 없습니다"));
+        when(adminRequestResolver.isAdminRequest(any())).thenReturn(false);
+
+        mockMvc
+            .perform(
+                post("/api/matches/balance")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"groupId\":1,\"playerIds\":[1,2,3,4,5,6],\"teamSize\":3,\"raceComposition\":\"PPT\"}")
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("선택한 종족 조합으로 매치를 구성할 수 없습니다"))
+            .andExpect(jsonPath("$.path").value("/api/matches/balance"));
     }
 
     @Test

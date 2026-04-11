@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -29,10 +30,15 @@ public class GroupPlayerController {
     @GetMapping("/{groupId}/players")
     public List<GroupPlayerResponse> getGroupPlayers(
         @PathVariable Long groupId,
+        @RequestParam(name = "includeInactive", defaultValue = "false") boolean includeInactive,
         HttpServletRequest request
     ) {
-        List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(groupId);
-        if (adminRequestResolver.isAdminRequest(request)) {
+        boolean adminRequest = adminRequestResolver.isAdminRequest(request);
+        List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(
+            groupId,
+            adminRequest && includeInactive
+        );
+        if (adminRequest) {
             return response;
         }
 

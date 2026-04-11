@@ -245,16 +245,17 @@ public class TeamBalancingService {
         }
 
         List<Player> loadedPlayers = playerRepository.findByGroup_IdAndIdIn(request.groupId(), request.playerIds());
-        if (loadedPlayers.size() != request.playerIds().size()) {
-            Set<Long> foundIds = new HashSet<>();
-            loadedPlayers.forEach(player -> foundIds.add(player.getId()));
-            List<Long> missingIds = request.playerIds().stream().filter(id -> !foundIds.contains(id)).distinct().toList();
-            throw new IllegalArgumentException("Players not found in group: " + missingIds);
-        }
-
         Map<Long, Player> loadedById = new HashMap<>();
         for (Player player : loadedPlayers) {
-            loadedById.put(player.getId(), player);
+            if (player.isActive()) {
+                loadedById.put(player.getId(), player);
+            }
+        }
+        if (loadedById.size() != request.playerIds().size()) {
+            Set<Long> foundIds = new HashSet<>();
+            loadedById.values().forEach(player -> foundIds.add(player.getId()));
+            List<Long> missingIds = request.playerIds().stream().filter(id -> !foundIds.contains(id)).distinct().toList();
+            throw new IllegalArgumentException("Players not found in group: " + missingIds);
         }
 
         List<BalancePlayerSelection> resolved = new ArrayList<>();

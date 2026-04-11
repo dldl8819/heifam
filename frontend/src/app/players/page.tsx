@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { useAdminAuth } from '@/lib/admin-auth'
-import { apiClient, isApiForbiddenError, isApiNotFoundError, isApiUnauthorizedError } from '@/lib/api'
+import { apiClient, isApiConflictError, isApiForbiddenError, isApiNotFoundError, isApiUnauthorizedError } from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
@@ -233,6 +233,8 @@ export default function PlayersPage() {
   const [editingMmrValue, setEditingMmrValue] = useState<string>('')
   const [savingMmrPlayerId, setSavingMmrPlayerId] = useState<number | null>(null)
   const [deletingPlayerId, setDeletingPlayerId] = useState<number | null>(null)
+  const [togglingPlayerId, setTogglingPlayerId] = useState<number | null>(null)
+  const [showInactive, setShowInactive] = useState<boolean>(false)
   const [playerActionError, setPlayerActionError] = useState<string | null>(null)
   const [playerActionSuccess, setPlayerActionSuccess] = useState<string | null>(null)
 
@@ -241,7 +243,9 @@ export default function PlayersPage() {
     setError(null)
 
     try {
-      const response = await apiClient.getGroupPlayers(TEMP_GROUP_ID)
+      const response = await apiClient.getGroupPlayers(TEMP_GROUP_ID, {
+        includeInactive: isAdmin && showInactive,
+      })
       setRows(
         [...response].sort((a, b) => {
           if (b.games !== a.games) {
@@ -263,7 +267,7 @@ export default function PlayersPage() {
     } finally {
       setLoading(false)
     }
-  }, [showMmrColumn])
+  }, [isAdmin, showInactive, showMmrColumn])
 
   useEffect(() => {
     void fetchRoster()
@@ -492,6 +496,12 @@ export default function PlayersPage() {
     } catch (actionError) {
       if (isApiForbiddenError(actionError)) {
         setPlayerActionError(t('common.permissionDenied'))
+      } else if (isApiConflictError(actionError)) {
+        if (actionError instanceof Error && actionError.message.trim().length > 0) {
+          setPlayerActionError(actionError.message)
+        } else {
+          setPlayerActionError(t('players.actions.deleteConflict'))
+        }
       } else if (isApiNotFoundError(actionError)) {
         setPlayerActionError(t('players.actions.deleteNotFound'))
       } else {
@@ -499,6 +509,55 @@ export default function PlayersPage() {
       }
     } finally {
       setDeletingPlayerId(null)
+    }
+  }
+
+  const handleTogglePlayerActive = async (player: PlayerRosterItem) => {
+    if (!isAdmin) {
+      setPlayerActionError(t('common.adminOnlyAction'))
+      return
+    }
+
+    const nextActive = player.active === false
+    const confirmMessage = nextActive
+      ? t('players.actions.reactivateConfirm', { nickname: player.nickname })
+      : t('players.actions.deactivateConfirm', { nickname: player.nickname })
+
+    if (!window.confirm(confirmMessage)) {
+      return
+    }
+
+    setTogglingPlayerId(player.id)
+    setPlayerActionError(null)
+    setPlayerActionSuccess(null)
+    try {
+      await apiClient.updateGroupPlayer(TEMP_GROUP_ID, player.id, { active: nextActive })
+      if (editingPlayerId === player.id) {
+        setEditingPlayerId(null)
+        setEditingNickname('')
+        setEditingRace('P')
+        setEditingInlineMmrValue('')
+      }
+      if (editingMmrPlayerId === player.id) {
+        setEditingMmrPlayerId(null)
+        setEditingMmrValue('')
+      }
+      setPlayerActionSuccess(
+        nextActive ? t('players.actions.reactivateSuccess') : t('players.actions.deactivateSuccess')
+      )
+      await fetchRoster()
+    } catch (actionError) {
+      if (isApiForbiddenError(actionError)) {
+        setPlayerActionError(t('common.permissionDenied'))
+      } else if (isApiNotFoundError(actionError)) {
+        setPlayerActionError(t('players.actions.updateNotFound'))
+      } else {
+        setPlayerActionError(
+          nextActive ? t('players.actions.reactivateFailure') : t('players.actions.deactivateFailure')
+        )
+      }
+    } finally {
+      setTogglingPlayerId(null)
     }
   }
 
@@ -513,6 +572,7 @@ export default function PlayersPage() {
   }, [raceFilter, rows, search])
 
   const showActionsColumn = isAdmin
+  const tableColumnCount = 6 + (showMmrColumn ? 1 : 0) + (showActionsColumn ? 1 : 0)
   const tierChangeTargets = useMemo<TierChangeTarget[]>(
     () =>
       rows
@@ -758,6 +818,17 @@ export default function PlayersPage() {
             </select>
           </label>
         </div>
+        {isAdmin && (
+          <label className="mt-3 inline-flex items-center gap-2 text-xs font-medium text-slate-600">
+            <input
+              type="checkbox"
+              checked={showInactive}
+              onChange={(event) => setShowInactive(event.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
+            />
+            <span>{t('players.filters.includeInactive')}</span>
+          </label>
+        )}
         {isSuperAdmin && (
           <div className="mt-3 flex justify-end">
             <button
@@ -791,7 +862,7 @@ export default function PlayersPage() {
                 <tr className="border-t border-slate-100">
                   <td
                     className="px-4 py-3"
-                    colSpan={showMmrColumn && showActionsColumn ? 8 : 6}
+                    colSpan={tableColumnCount}
                   >
                     <LoadingIndicator label={t('common.loading')} />
                   </td>
@@ -800,10 +871,10 @@ export default function PlayersPage() {
 
             {!loading && filteredRows.length === 0 && (
               <tr className="border-t border-slate-100">
-                <td
-                  className="px-4 py-8 text-center text-sm text-slate-500"
-                  colSpan={showMmrColumn && showActionsColumn ? 8 : 6}
-                >
+                  <td
+                    className="px-4 py-8 text-center text-sm text-slate-500"
+                    colSpan={tableColumnCount}
+                  >
                   {t('players.table.empty')}
                 </td>
               </tr>
@@ -816,11 +887,18 @@ export default function PlayersPage() {
                 const isSaving = savingPlayerId === row.id
                 const isSavingMmr = savingMmrPlayerId === row.id
                 const isDeleting = deletingPlayerId === row.id
-                const busy = isSaving || isSavingMmr || isDeleting
+                const isToggling = togglingPlayerId === row.id
+                const busy = isSaving || isSavingMmr || isDeleting || isToggling
+                const isActive = row.active !== false
                 const tierChangeTarget = tierChangeTargetById.get(row.id)
 
                 return (
-                  <tr key={row.id} className="border-t border-slate-100 transition-colors hover:bg-slate-50/70">
+                  <tr
+                    key={row.id}
+                    className={`border-t border-slate-100 transition-colors hover:bg-slate-50/70 ${
+                      isActive ? '' : 'bg-slate-50/80 text-slate-500'
+                    }`}
+                  >
                     <td className="px-4 py-3 font-medium text-slate-900">
                       {isEditing ? (
                         <input
@@ -832,6 +910,11 @@ export default function PlayersPage() {
                       ) : (
                         <div className="flex flex-wrap items-center gap-2">
                           <span>{row.nickname}</span>
+                          {!isActive && (
+                            <span className="rounded-md border border-slate-300 bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                              {t('players.table.inactive')}
+                            </span>
+                          )}
                           {isAdmin && tierChangeTarget && (
                             <span className="rounded-md border border-amber-300 bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
                               {t('players.tierChange.badge')}
@@ -960,6 +1043,19 @@ export default function PlayersPage() {
                                 {t('players.actions.mmrEdit')}
                               </button>
                             ))}
+
+                          <button
+                            type="button"
+                            disabled={busy || editingPlayerId !== null || editingMmrPlayerId !== null}
+                            onClick={() => handleTogglePlayerActive(row)}
+                            className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-slate-900 hover:bg-slate-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {isToggling
+                              ? t('players.actions.toggling')
+                              : isActive
+                                ? t('players.actions.deactivate')
+                                : t('players.actions.reactivate')}
+                          </button>
 
                           <button
                             type="button"

@@ -96,6 +96,7 @@ class CaptainDraftServiceTest {
         assertThat(response.homeCaptainPlayerId()).isEqualTo(1L);
         assertThat(response.awayCaptainPlayerId()).isEqualTo(2L);
         assertThat(response.entries()).hasSize(16);
+        assertThat(response.entries()).allSatisfy(entry -> assertThat(entry.winnerTeam()).isNull());
         assertThat(response.picks()).isEmpty();
     }
 
@@ -161,11 +162,47 @@ class CaptainDraftServiceTest {
             100L,
             new CaptainDraftEntriesUpdateRequest(
                 1L,
-                List.of(new CaptainDraftEntryUpdateItemRequest(1, 1, 4L))
+                List.of(new CaptainDraftEntryUpdateItemRequest(1, 1, 4L, null))
             )
         ))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Entry player must belong to captain's team");
+    }
+
+    @Test
+    void updateEntriesStoresWinnerTeamWhenBothPlayersExist() {
+        Group group = group(1L);
+        CaptainDraft draft = draft(group, 100L, "READY", 4, "UNASSIGNED", 1L, 2L);
+
+        List<CaptainDraftParticipant> participants = List.of(
+            participant(draft, player(group, 1L), true, "HOME", null),
+            participant(draft, player(group, 2L), true, "AWAY", null),
+            participant(draft, player(group, 3L), false, "HOME", 1),
+            participant(draft, player(group, 4L), false, "AWAY", 1)
+        );
+        CaptainDraftEntry entry = entry(draft, 1, "PPP", 1);
+        entry.setHomePlayer(player(group, 3L));
+        entry.setAwayPlayer(player(group, 4L));
+
+        when(captainDraftRepository.findByIdAndGroup_Id(100L, 1L)).thenReturn(Optional.of(draft));
+        when(captainDraftParticipantRepository.findByDraftIdWithPlayer(100L)).thenReturn(participants);
+        when(captainDraftEntryRepository.findByDraftIdWithPlayers(100L)).thenReturn(List.of(entry));
+        when(captainDraftEntryRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CaptainDraftResponse response = captainDraftService.updateEntries(
+            1L,
+            100L,
+            new CaptainDraftEntriesUpdateRequest(
+                1L,
+                List.of(new CaptainDraftEntryUpdateItemRequest(1, 1, 3L, "HOME"))
+            )
+        );
+
+        assertThat(response.entries()).singleElement().satisfies(updatedEntry -> {
+            assertThat(updatedEntry.homePlayerId()).isEqualTo(3L);
+            assertThat(updatedEntry.awayPlayerId()).isEqualTo(4L);
+            assertThat(updatedEntry.winnerTeam()).isEqualTo("HOME");
+        });
     }
 
     private Group group(Long id) {

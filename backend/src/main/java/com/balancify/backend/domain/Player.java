@@ -45,6 +45,9 @@ public class Player {
     private String note;
 
     @Column(nullable = false)
+    private boolean active = true;
+
+    @Column(nullable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
     public Long getId() {
@@ -115,6 +118,14 @@ public class Player {
 
     public void setNote(String note) {
         this.note = note;
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
     }
 
     public OffsetDateTime getCreatedAt() {

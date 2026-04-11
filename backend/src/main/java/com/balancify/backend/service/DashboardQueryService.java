@@ -56,7 +56,12 @@ public class DashboardQueryService {
     }
 
     public GroupDashboardResponse getGroupDashboard(Long groupId, String requesterNickname) {
-        List<Player> players = new ArrayList<>(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId));
+        List<Player> players = new ArrayList<>(
+            playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId)
+                .stream()
+                .filter(Player::isActive)
+                .toList()
+        );
         players.sort(
             Comparator
                 .comparingInt((Player player) -> safeInt(player.getMmr()))

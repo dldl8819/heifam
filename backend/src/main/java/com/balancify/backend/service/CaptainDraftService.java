@@ -85,7 +85,10 @@ public class CaptainDraftService {
         Group group = groupRepository.findById(groupId)
             .orElseThrow(() -> new NoSuchElementException("Group not found: " + groupId));
 
-        List<Player> players = playerRepository.findByGroup_IdAndIdIn(groupId, participantPlayerIds);
+        List<Player> players = playerRepository.findByGroup_IdAndIdIn(groupId, participantPlayerIds)
+            .stream()
+            .filter(Player::isActive)
+            .toList();
         if (players.size() != participantPlayerIds.size()) {
             throw new IllegalArgumentException("All participants must belong to the group");
         }
@@ -311,6 +314,13 @@ public class CaptainDraftService {
             } else {
                 targetEntry.setAwayPlayer(selectedPlayer);
             }
+
+            String winnerTeam = normalizeWinnerTeam(updateItem.winnerTeam());
+            if (winnerTeam != null
+                && (targetEntry.getHomePlayer() == null || targetEntry.getAwayPlayer() == null)) {
+                throw new IllegalArgumentException("Winner team requires both home and away players");
+            }
+            targetEntry.setWinnerTeam(winnerTeam);
         }
 
         captainDraftEntryRepository.saveAll(entries);
@@ -434,7 +444,8 @@ public class CaptainDraftService {
                 entry.getHomePlayer() == null ? null : entry.getHomePlayer().getId(),
                 entry.getHomePlayer() == null ? null : entry.getHomePlayer().getNickname(),
                 entry.getAwayPlayer() == null ? null : entry.getAwayPlayer().getId(),
-                entry.getAwayPlayer() == null ? null : entry.getAwayPlayer().getNickname()
+                entry.getAwayPlayer() == null ? null : entry.getAwayPlayer().getNickname(),
+                normalizeWinnerTeam(entry.getWinnerTeam())
             ))
             .toList();
 
@@ -475,6 +486,18 @@ public class CaptainDraftService {
 
     private String normalizeRace(String race) {
         return PlayerRacePolicy.toDisplayRace(race);
+    }
+
+    private String normalizeWinnerTeam(String winnerTeam) {
+        String normalized = safeTrim(winnerTeam).toUpperCase();
+        if (normalized.isEmpty()) {
+            return null;
+        }
+        return switch (normalized) {
+            case TEAM_HOME -> TEAM_HOME;
+            case TEAM_AWAY -> TEAM_AWAY;
+            default -> throw new IllegalArgumentException("winnerTeam must be HOME or AWAY");
+        };
     }
 
     private int safeInt(Integer value) {

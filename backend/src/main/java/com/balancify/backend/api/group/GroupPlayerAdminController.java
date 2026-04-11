@@ -76,6 +76,12 @@ public class GroupPlayerAdminController {
     ) {
         try {
             playerAdminService.deletePlayer(groupId, playerId);
+        } catch (IllegalStateException illegalStateException) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                illegalStateException.getMessage(),
+                illegalStateException
+            );
         } catch (NoSuchElementException noSuchElementException) {
             throw new ResponseStatusException(
                 HttpStatus.NOT_FOUND,

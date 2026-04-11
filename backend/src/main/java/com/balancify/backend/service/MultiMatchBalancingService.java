@@ -150,16 +150,17 @@ public class MultiMatchBalancingService {
 
     private List<PlayerSnapshot> loadPlayers(Long groupId, List<Long> playerIds) {
         List<Player> loaded = playerRepository.findByGroup_IdAndIdIn(groupId, playerIds);
-        if (loaded.size() != playerIds.size()) {
-            Set<Long> foundIds = new HashSet<>();
-            loaded.forEach(player -> foundIds.add(player.getId()));
-            List<Long> missing = playerIds.stream().filter(id -> !foundIds.contains(id)).distinct().toList();
-            throw new IllegalArgumentException("Players not found in group: " + missing);
-        }
-
         Map<Long, Player> byId = new HashMap<>();
         for (Player player : loaded) {
-            byId.put(player.getId(), player);
+            if (player.isActive()) {
+                byId.put(player.getId(), player);
+            }
+        }
+        if (byId.size() != playerIds.size()) {
+            Set<Long> foundIds = new HashSet<>();
+            byId.values().forEach(player -> foundIds.add(player.getId()));
+            List<Long> missing = playerIds.stream().filter(id -> !foundIds.contains(id)).distinct().toList();
+            throw new IllegalArgumentException("Players not found in group: " + missing);
         }
 
         List<PlayerSnapshot> ordered = new ArrayList<>();

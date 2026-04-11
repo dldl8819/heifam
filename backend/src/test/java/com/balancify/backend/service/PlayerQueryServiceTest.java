@@ -69,7 +69,7 @@ class PlayerQueryServiceTest {
         when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L))
             .thenReturn(participants);
 
-        List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L);
+        List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L, false);
 
         assertThat(response).hasSize(3);
 
@@ -103,7 +103,7 @@ class PlayerQueryServiceTest {
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(99L)).thenReturn(List.of());
         when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(99L)).thenReturn(List.of());
 
-        List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(99L);
+        List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(99L, false);
         assertThat(response).isEmpty();
     }
 
@@ -120,7 +120,7 @@ class PlayerQueryServiceTest {
         when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L))
             .thenReturn(List.of());
 
-        List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L);
+        List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L, false);
 
         assertThat(response).hasSize(1);
         assertThat(response.get(0).tier()).isEqualTo("A");
@@ -153,11 +153,52 @@ class PlayerQueryServiceTest {
         when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L))
             .thenReturn(participants);
 
-        List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L);
+        List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L, false);
 
         assertThat(response).hasSize(1);
         assertThat(response.get(0).tier()).isEqualTo("A+");
         assertThat(response.get(0).games()).isEqualTo(4);
+    }
+
+    @Test
+    void excludesInactivePlayersByDefault() {
+        Group group = new Group();
+        group.setId(1L);
+
+        Player active = player(1L, group, "활성", "P", "A", 1500);
+        Player inactive = player(2L, group, "비활성", "T", "A", 1700);
+        inactive.setActive(false);
+
+        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
+            .thenReturn(List.of(inactive, active));
+        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L))
+            .thenReturn(List.of());
+
+        List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L, false);
+
+        assertThat(response).extracting(GroupPlayerResponse::nickname).containsExactly("활성");
+        assertThat(response.get(0).active()).isTrue();
+    }
+
+    @Test
+    void includesInactivePlayersWhenRequested() {
+        Group group = new Group();
+        group.setId(1L);
+
+        Player active = player(1L, group, "활성", "P", "A", 1500);
+        Player inactive = player(2L, group, "비활성", "T", "A", 1700);
+        inactive.setActive(false);
+
+        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
+            .thenReturn(List.of(inactive, active));
+        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L))
+            .thenReturn(List.of());
+
+        List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L, true);
+
+        assertThat(response).hasSize(2);
+        assertThat(response).extracting(GroupPlayerResponse::nickname).containsExactly("비활성", "활성");
+        assertThat(response).extracting(GroupPlayerResponse::active).containsExactly(false, true);
     }
 
     private Player player(

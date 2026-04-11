@@ -7,6 +7,7 @@ public record CaptainDraftEntryResponse(
     Long homePlayerId,
     String homePlayerNickname,
     Long awayPlayerId,
-    String awayPlayerNickname
+    String awayPlayerNickname,
+    String winnerTeam
 ) {
 }

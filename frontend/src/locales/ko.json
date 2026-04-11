@@ -420,6 +420,9 @@
       "cancel": "취소",
       "delete": "삭제",
       "deleting": "삭제 중...",
+      "deactivate": "비활성",
+      "reactivate": "복구",
+      "toggling": "처리 중...",
       "nicknameRequired": "닉네임을 입력해 주세요.",
       "mmrEdit": "MMR 수정",
       "mmrSave": "MMR 저장",
@@ -434,7 +437,14 @@
       "updateAndMmrSuccess": "선수 정보와 MMR이 수정되었습니다.",
       "updateFailure": "이름 수정에 실패했습니다. 닉네임 중복 또는 서버 상태를 확인해 주세요.",
       "updateNotFound": "선수 수정 API를 찾지 못했습니다. 백엔드를 재시작하고 최신 코드인지 확인해 주세요.",
+      "deactivateSuccess": "선수가 비활성 처리되었습니다.",
+      "deactivateFailure": "선수 비활성 처리에 실패했습니다. 서버 상태를 확인해 주세요.",
+      "deactivateConfirm": "{nickname} 선수를 비활성 처리하시겠습니까?",
+      "reactivateSuccess": "선수가 다시 활성화되었습니다.",
+      "reactivateFailure": "선수 복구에 실패했습니다. 서버 상태를 확인해 주세요.",
+      "reactivateConfirm": "{nickname} 선수를 다시 활성화하시겠습니까?",
       "deleteSuccess": "선수가 삭제되었습니다.",
+      "deleteConflict": "매치 또는 드래프트 기록이 남아 있는 선수는 삭제할 수 없습니다.",
       "deleteFailure": "선수 삭제에 실패했습니다. 서버 상태를 확인해 주세요.",
       "deleteNotFound": "선수 삭제 API를 찾지 못했습니다. 백엔드를 재시작하고 최신 코드인지 확인해 주세요.",
       "deleteConfirm": "{nickname} 선수를 삭제하시겠습니까?"
@@ -442,7 +452,8 @@
     "filters": {
       "searchLabel": "닉네임 검색",
       "searchPlaceholder": "닉네임 입력...",
-      "raceLabel": "종족 필터"
+      "raceLabel": "종족 필터",
+      "includeInactive": "비활성 선수 포함 보기"
     },
     "table": {
       "nickname": "닉네임",
@@ -454,7 +465,8 @@
       "games": "경기수",
       "actions": "관리",
       "empty": "조건에 맞는 선수가 없습니다.",
-      "unassigned": "배정 필요"
+      "unassigned": "배정 필요",
+      "inactive": "비활성"
     }
   },
   "balance": {
@@ -591,12 +603,16 @@
       "waitingPlayers": "대기 인원",
       "waitingTitle": "대기 인원",
       "noWaiting": "대기 인원이 없습니다.",
+      "matchNumberHeader": "경기",
       "matchNumber": "경기 {number}",
       "matchType": "경기 유형",
       "matchType3v3": "3:3",
       "matchType2v2": "2:2",
+      "raceComposition": "종족전",
       "homeTeam": "홈팀",
       "awayTeam": "어웨이팀",
+      "homeSheetLabel": "청팀 Home",
+      "awaySheetLabel": "백팀 Away",
       "assignedRace": "배정 종족",
       "homeMmr": "홈팀 총 MMR",
       "awayMmr": "어웨이팀 총 MMR",
@@ -671,10 +687,27 @@
       "title": "드래프트 진행 기록",
       "empty": "아직 선택된 팀원이 없습니다."
     },
+    "scoreboard": {
+      "title": "팀 현황 및 세트 승수",
+      "helper": "팀별 총 세트 승수와 선수별 세트 승수를 함께 확인합니다.",
+      "homeHeader": "청팀",
+      "awayHeader": "백팀",
+      "setWinsShort": "승"
+    },
     "entry": {
       "title": "라운드 엔트리 설정",
       "helper": "감독은 자기 팀 엔트리만 수정할 수 있고 상대 팀 엔트리는 실시간으로 확인할 수 있습니다.",
       "round": "{round} Round {code}",
+      "roundOnly": "{round}Round",
+      "roundLabel": "라운드",
+      "raceLabel": "종족",
+      "requiredTierLabel": "필수티어",
+      "homeSheetLabel": "청팀 Home",
+      "awaySheetLabel": "백팀 Away",
+      "resultLabel": "결과",
+      "finalWinLabel": "최종 승",
+      "homeWin": "청팀 승",
+      "awayWin": "백팀 승",
       "set": "{set}세트",
       "setLabel": "세트",
       "homePlayer": "홈 엔트리",
