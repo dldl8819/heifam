@@ -40,7 +40,6 @@ declare
         'captain_draft_entries',
         'captain_draft_participants',
         'captain_drafts',
-        'flyway_schema_history',
         'groups',
         'managed_admin_emails',
         'match_participants',
