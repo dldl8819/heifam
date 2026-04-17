@@ -224,7 +224,7 @@ class AccessControlServiceTest {
 
     @Test
     void rejectsUnsupportedPreferredRaceValue() {
-        assertThatThrownBy(() -> accessControlService.upsertPreferredRace("member@hei.gg", "PTZ"))
+        assertThatThrownBy(() -> accessControlService.upsertPreferredRace("member@hei.gg", "R"))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("Invalid race");
     }
