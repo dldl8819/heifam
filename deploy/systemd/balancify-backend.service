@@ -1,20 +1,28 @@
-﻿[Unit]
+[Unit]
 Description=HeiFam Backend (Spring Boot)
-After=network.target docker.service
-Wants=network.target docker.service
+After=network.target
+Wants=network.target
 
 [Service]
 Type=simple
 User=balancify
 Group=balancify
 WorkingDirectory=/opt/heifam/backend
-EnvironmentFile=/opt/heifam/.env
-ExecStart=/usr/bin/java -jar /opt/heifam/backend/build/libs/heifam-backend.jar --server.port=8080
+Environment=SPRING_PROFILES_ACTIVE=prod
+EnvironmentFile=/etc/heifam/backend.env
+ExecStart=/usr/bin/java -jar /opt/heifam/backend/build/libs/heifam-backend.jar
 SuccessExitStatus=143
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictSUIDSGID=true
+LockPersonality=true
+SystemCallArchitectures=native
+UMask=0077
 
 [Install]
 WantedBy=multi-user.target
-

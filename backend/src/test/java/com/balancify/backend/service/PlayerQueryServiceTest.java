@@ -1,6 +1,7 @@
 package com.balancify.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.balancify.backend.api.group.dto.GroupPlayerResponse;
@@ -10,9 +11,7 @@ import com.balancify.backend.domain.MatchParticipant;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.MatchParticipantRepository;
 import com.balancify.backend.repository.PlayerRepository;
-import java.time.Clock;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,6 +30,12 @@ class PlayerQueryServiceTest {
     @Mock
     private MatchParticipantRepository matchParticipantRepository;
 
+    @Mock
+    private DormancyMmrDecayService dormancyMmrDecayService;
+
+    @Mock
+    private MonthlyTierRefreshService monthlyTierRefreshService;
+
     private PlayerQueryService playerQueryService;
 
     @BeforeEach
@@ -38,10 +43,8 @@ class PlayerQueryServiceTest {
         playerQueryService = new PlayerQueryService(
             playerRepository,
             matchParticipantRepository,
-            true,
-            30,
-            1,
-            Clock.fixed(FIXED_NOW.toInstant(), ZoneOffset.UTC)
+            dormancyMmrDecayService,
+            monthlyTierRefreshService
         );
     }
 
@@ -77,14 +80,14 @@ class PlayerQueryServiceTest {
         assertThat(first.id()).isEqualTo(2L);
         assertThat(first.nickname()).isEqualTo("Bravo");
         assertThat(first.currentMmr()).isEqualTo(1700);
-        assertThat(first.tier()).isEqualTo("S");
+        assertThat(first.tier()).isEqualTo("A");
         assertThat(first.wins()).isEqualTo(1);
         assertThat(first.losses()).isEqualTo(1);
         assertThat(first.games()).isEqualTo(2);
 
         GroupPlayerResponse second = response.get(1);
         assertThat(second.id()).isEqualTo(3L);
-        assertThat(second.tier()).isEqualTo("S");
+        assertThat(second.tier()).isEqualTo("B+");
         assertThat(second.wins()).isZero();
         assertThat(second.losses()).isZero();
         assertThat(second.games()).isZero();
@@ -92,7 +95,7 @@ class PlayerQueryServiceTest {
         GroupPlayerResponse third = response.get(2);
         assertThat(third.id()).isEqualTo(1L);
         assertThat(third.currentMmr()).isEqualTo(1500);
-        assertThat(third.tier()).isEqualTo("S");
+        assertThat(third.tier()).isEqualTo("A");
         assertThat(third.wins()).isEqualTo(1);
         assertThat(third.losses()).isEqualTo(1);
         assertThat(third.games()).isEqualTo(2);
@@ -105,14 +108,15 @@ class PlayerQueryServiceTest {
 
         List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(99L, false);
         assertThat(response).isEmpty();
+        verify(dormancyMmrDecayService).applyGroupDormancyDecay(99L);
     }
 
     @Test
-    void demotesTierOneStepWhenPlayerIsDormantWithLowParticipation() {
+    void returnsPersistedMmrAfterDormancyDecayHasRun() {
         Group group = new Group();
         group.setId(1L);
 
-        Player robo = player(9L, group, "로보", "P", "A+", 930);
+        Player robo = player(9L, group, "로보", "P", "A+", 920);
         robo.setCreatedAt(OffsetDateTime.parse("2026-02-20T00:00:00Z"));
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
@@ -123,8 +127,8 @@ class PlayerQueryServiceTest {
         List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L, false);
 
         assertThat(response).hasSize(1);
-        assertThat(response.get(0).tier()).isEqualTo("A");
-        assertThat(response.get(0).currentMmr()).isEqualTo(890);
+        assertThat(response.get(0).tier()).isEqualTo("A+");
+        assertThat(response.get(0).currentMmr()).isEqualTo(920);
         assertThat(response.get(0).games()).isZero();
     }
 

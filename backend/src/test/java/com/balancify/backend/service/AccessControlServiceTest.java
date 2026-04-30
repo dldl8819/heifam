@@ -82,6 +82,89 @@ class AccessControlServiceTest {
     }
 
     @Test
+    void superAdminTakesPrecedenceWhenEmailAlsoExistsAsAdmin() {
+        AdminKeyProperties adminKeyProperties = new AdminKeyProperties();
+        adminKeyProperties.setEmails("ops@hei.gg,promoted@hei.gg");
+        adminKeyProperties.setSuperEmails("promoted@hei.gg");
+        adminKeyProperties.setAllowedEmails("");
+
+        ManagedAdminEmail managedAdminEmail = new ManagedAdminEmail();
+        managedAdminEmail.setEmail("promoted@hei.gg");
+        managedAdminEmail.setNickname("승격자");
+
+        when(managedAdminEmailRepository.findByNormalizedEmail("promoted@hei.gg"))
+            .thenReturn(Optional.of(managedAdminEmail));
+        when(allowedUserEmailRepository.findByNormalizedEmail("promoted@hei.gg"))
+            .thenReturn(Optional.empty());
+        when(userRacePreferenceRepository.findByNormalizedEmail("promoted@hei.gg"))
+            .thenReturn(Optional.empty());
+
+        AccessControlService service = new AccessControlService(
+            adminKeyProperties,
+            managedAdminEmailRepository,
+            allowedUserEmailRepository,
+            userRacePreferenceRepository,
+            60_000L
+        );
+
+        AccessControlService.AccessProfile profile = service.resolveAccessProfile("promoted@hei.gg");
+
+        assertThat(profile.superAdmin()).isTrue();
+        assertThat(profile.admin()).isTrue();
+        assertThat(profile.allowed()).isTrue();
+        assertThat(profile.role()).isEqualTo("SUPER_ADMIN");
+    }
+
+    @Test
+    void removingSuperAdminConfigFallsBackToManagedAdminWhenPresent() {
+        ManagedAdminEmail managedAdminEmail = new ManagedAdminEmail();
+        managedAdminEmail.setEmail("promoted@hei.gg");
+        managedAdminEmail.setNickname("승격자");
+
+        when(managedAdminEmailRepository.findByNormalizedEmail("promoted@hei.gg"))
+            .thenReturn(Optional.of(managedAdminEmail));
+        when(allowedUserEmailRepository.findByNormalizedEmail("promoted@hei.gg"))
+            .thenReturn(Optional.empty());
+        when(userRacePreferenceRepository.findByNormalizedEmail("promoted@hei.gg"))
+            .thenReturn(Optional.empty());
+
+        AdminKeyProperties superAdminProperties = new AdminKeyProperties();
+        superAdminProperties.setEmails("");
+        superAdminProperties.setSuperEmails("promoted@hei.gg");
+        superAdminProperties.setAllowedEmails("");
+
+        AccessControlService superAdminService = new AccessControlService(
+            superAdminProperties,
+            managedAdminEmailRepository,
+            allowedUserEmailRepository,
+            userRacePreferenceRepository,
+            60_000L
+        );
+
+        AdminKeyProperties downgradedProperties = new AdminKeyProperties();
+        downgradedProperties.setEmails("");
+        downgradedProperties.setSuperEmails("");
+        downgradedProperties.setAllowedEmails("");
+
+        AccessControlService downgradedService = new AccessControlService(
+            downgradedProperties,
+            managedAdminEmailRepository,
+            allowedUserEmailRepository,
+            userRacePreferenceRepository,
+            60_000L
+        );
+
+        AccessControlService.AccessProfile beforeRotation = superAdminService.resolveAccessProfile("promoted@hei.gg");
+        AccessControlService.AccessProfile afterRotation = downgradedService.resolveAccessProfile("promoted@hei.gg");
+
+        assertThat(beforeRotation.role()).isEqualTo("SUPER_ADMIN");
+        assertThat(afterRotation.superAdmin()).isFalse();
+        assertThat(afterRotation.admin()).isTrue();
+        assertThat(afterRotation.allowed()).isTrue();
+        assertThat(afterRotation.role()).isEqualTo("ADMIN");
+    }
+
+    @Test
     void addsManagedAdminOnlyWhenActorIsSuperAdmin() {
         when(managedAdminEmailRepository.existsByNormalizedEmail("newops@hei.gg")).thenReturn(false);
 

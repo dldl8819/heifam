@@ -1,16 +1,24 @@
 server:
   port: ${PORT:${SERVER_PORT:8080}}
   forward-headers-strategy: framework
+  error:
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+    include-exception: false
 
 spring:
   config:
-    import: optional:file:../.env[.properties],optional:file:.env[.properties]
+    import: optional:file:../.env[.properties],optional:file:../.env.local[.properties],optional:file:.env[.properties],optional:file:.env.local[.properties]
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
+      pool-name: heifam-hikari
+      maximum-pool-size: ${SPRING_DATASOURCE_MAX_POOL_SIZE:10}
+      minimum-idle: ${SPRING_DATASOURCE_MIN_IDLE:2}
       data-source-properties:
         sslmode: ${SPRING_DATASOURCE_SSLMODE:prefer}
   flyway:
@@ -21,18 +29,51 @@ spring:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: validate
-    show-sql: true
+    show-sql: false
     open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+
+logging:
+  level:
+    root: ${ROOT_LOG_LEVEL:INFO}
+    org.hibernate.SQL: WARN
+    org.hibernate.orm.jdbc.bind: OFF
+    org.springframework.security: ${SPRING_SECURITY_LOG_LEVEL:INFO}
+    org.springframework.web.filter.CommonsRequestLoggingFilter: OFF
+
+management:
+  endpoint:
+    env:
+      show-values: never
+    configprops:
+      show-values: never
 
 balancify:
+  integrations:
+    upbit:
+      enabled: ${UPBIT_ENABLED:false}
+      base-url: ${UPBIT_BASE_URL:https://api.upbit.com}
+      access-key: ${UPBIT_ACCESS_KEY:}
+      secret-key: ${UPBIT_SECRET_KEY:}
+  security:
+    jwt:
+      enabled: ${JWT_ENABLED:false}
+      issuer: ${JWT_ISSUER:heifam}
+      secret: ${JWT_SECRET:}
+      access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:15m}
   elo:
     k-factor: ${ELO_K_FACTOR:24}
     large-gap-threshold: ${ELO_LARGE_GAP_THRESHOLD:300}
     large-gap-range: ${ELO_LARGE_GAP_RANGE:900}
     large-gap-min-multiplier: ${ELO_LARGE_GAP_MIN_MULTIPLIER:0.6}
     low-tier-multiplier: ${ELO_LOW_TIER_MULTIPLIER:0.7}
+    underdog-upset-bonus-threshold: ${ELO_UNDERDOG_UPSET_BONUS_THRESHOLD:200}
+    underdog-upset-bonus-range: ${ELO_UNDERDOG_UPSET_BONUS_RANGE:800}
+    underdog-upset-max-multiplier: ${ELO_UNDERDOG_UPSET_MAX_MULTIPLIER:1.5}
   multi-balance:
-    recent-match-lookback-count: ${MULTI_BALANCE_RECENT_LOOKBACK_COUNT:10}
+    recent-lookback-count: ${MULTI_BALANCE_RECENT_LOOKBACK_COUNT:10}
     internal-mmr-diff-weight: ${MULTI_BALANCE_INTERNAL_MMR_DIFF_WEIGHT:1000.0}
     inter-match-balance-weight: ${MULTI_BALANCE_INTER_MATCH_BALANCE_WEIGHT:150.0}
     repeat-teammate-penalty-weight: ${MULTI_BALANCE_REPEAT_TEAMMATE_WEIGHT:2.0}
@@ -53,8 +94,15 @@ balancify:
   rank:
     dormancy:
       enabled: ${RANK_DORMANCY_ENABLED:true}
-      inactive-days: ${RANK_DORMANCY_INACTIVE_DAYS:30}
-      demote-steps: ${RANK_DORMANCY_DEMOTE_STEPS:1}
+      inactive-days: ${RANK_DORMANCY_INACTIVE_DAYS:15}
+      mmr-drop-per-period: ${RANK_DORMANCY_MMR_DROP_PER_PERIOD:100}
+      sweep-cron: "${RANK_DORMANCY_SWEEP_CRON:0 0 4 * * *}"
+    monthly-tier-refresh:
+      enabled: ${RANK_MONTHLY_TIER_REFRESH_ENABLED:true}
+      cron: "${RANK_MONTHLY_TIER_REFRESH_CRON:0 10 4 1 * *}"
+    return-boost:
+      games: ${RANK_RETURN_BOOST_GAMES:5}
+      multiplier: ${RANK_RETURN_BOOST_MULTIPLIER:2.0}
   match:
     confirm:
       duplicate-window-minutes: ${MATCH_CONFIRM_DUPLICATE_WINDOW_MINUTES:5}

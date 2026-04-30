@@ -6,16 +6,12 @@ import com.balancify.backend.domain.Player;
 import com.balancify.backend.domain.PlayerTierPolicy;
 import com.balancify.backend.repository.MatchParticipantRepository;
 import com.balancify.backend.repository.PlayerRepository;
-import java.time.Clock;
-import java.time.OffsetDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -23,27 +19,24 @@ public class RankingService {
 
     private final PlayerRepository playerRepository;
     private final MatchParticipantRepository matchParticipantRepository;
-    private final boolean dormancyEnabled;
-    private final int dormancyInactiveDays;
-    private final int dormancyDemoteSteps;
-    private final Clock clock;
+    private final DormancyMmrDecayService dormancyMmrDecayService;
+    private final MonthlyTierRefreshService monthlyTierRefreshService;
 
     public RankingService(
         PlayerRepository playerRepository,
         MatchParticipantRepository matchParticipantRepository,
-        @Value("${balancify.rank.dormancy.enabled:true}") boolean dormancyEnabled,
-        @Value("${balancify.rank.dormancy.inactive-days:30}") int dormancyInactiveDays,
-        @Value("${balancify.rank.dormancy.demote-steps:1}") int dormancyDemoteSteps
+        DormancyMmrDecayService dormancyMmrDecayService,
+        MonthlyTierRefreshService monthlyTierRefreshService
     ) {
         this.playerRepository = playerRepository;
         this.matchParticipantRepository = matchParticipantRepository;
-        this.dormancyEnabled = dormancyEnabled;
-        this.dormancyInactiveDays = Math.max(0, dormancyInactiveDays);
-        this.dormancyDemoteSteps = Math.max(0, dormancyDemoteSteps);
-        this.clock = Clock.systemUTC();
+        this.dormancyMmrDecayService = dormancyMmrDecayService;
+        this.monthlyTierRefreshService = monthlyTierRefreshService;
     }
 
     public List<RankingItemResponse> getGroupRanking(Long groupId) {
+        dormancyMmrDecayService.applyGroupDormancyDecay(groupId);
+        monthlyTierRefreshService.applyMonthlyTierRefreshIfDue();
         List<Player> players = playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId)
             .stream()
             .filter(Player::isActive)
@@ -57,7 +50,6 @@ public class RankingService {
             historyByPlayerId.computeIfAbsent(playerId, key -> new ArrayList<>()).add(matchParticipant);
         }
 
-        OffsetDateTime now = OffsetDateTime.now(clock);
         List<RankingCandidate> candidates = new ArrayList<>();
         for (Player player : players) {
             List<MatchParticipant> history =
@@ -65,20 +57,13 @@ public class RankingService {
             RankingStats stats = calculateStats(history);
             int currentMmr = safeInt(player.getMmr());
             String currentTier = PlayerTierPolicy.resolveTierForSnapshot(player.getTier(), currentMmr);
-            DormancyAdjustment dormancyAdjustment = applyDormancyAdjustment(
-                currentTier,
-                currentMmr,
-                resolveLastPlayedAt(history),
-                player.getCreatedAt(),
-                now
-            );
 
             candidates.add(new RankingCandidate(
                 player.getId(),
                 player.getNickname(),
                 normalizeRace(player.getRace()),
-                dormancyAdjustment.tier(),
-                dormancyAdjustment.mmr(),
+                currentTier,
+                currentMmr,
                 stats
             ));
         }
@@ -111,46 +96,6 @@ public class RankingService {
         }
 
         return ranking;
-    }
-
-    private OffsetDateTime resolveLastPlayedAt(List<MatchParticipant> history) {
-        for (MatchParticipant participant : history) {
-            if (participant.getMatch() != null && participant.getMatch().getPlayedAt() != null) {
-                return participant.getMatch().getPlayedAt();
-            }
-        }
-        return null;
-    }
-
-    private DormancyAdjustment applyDormancyAdjustment(
-        String currentTier,
-        int currentMmr,
-        OffsetDateTime lastPlayedAt,
-        OffsetDateTime createdAt,
-        OffsetDateTime now
-    ) {
-        if (!dormancyEnabled || dormancyDemoteSteps <= 0) {
-            return new DormancyAdjustment(currentTier, currentMmr);
-        }
-
-        OffsetDateTime activityReference = lastPlayedAt != null ? lastPlayedAt : createdAt;
-        if (activityReference == null) {
-            return new DormancyAdjustment(currentTier, currentMmr);
-        }
-
-        long inactiveDays = ChronoUnit.DAYS.between(activityReference.toInstant(), now.toInstant());
-        if (inactiveDays < dormancyInactiveDays) {
-            return new DormancyAdjustment(currentTier, currentMmr);
-        }
-
-        String demotedTier = PlayerTierPolicy.demoteTier(currentTier, dormancyDemoteSteps);
-        int demotedMmr = PlayerTierPolicy.resolveDormancyAdjustedMmr(
-            currentTier,
-            currentMmr,
-            dormancyDemoteSteps
-        );
-        String effectiveTier = PlayerTierPolicy.resolveTierForSnapshot(demotedTier, demotedMmr);
-        return new DormancyAdjustment(effectiveTier, demotedMmr);
     }
 
     private RankingStats calculateStats(List<MatchParticipant> history) {
@@ -246,12 +191,6 @@ public class RankingService {
         String tier,
         int mmr,
         RankingStats stats
-    ) {
-    }
-
-    private record DormancyAdjustment(
-        String tier,
-        int mmr
     ) {
     }
 

@@ -12,24 +12,24 @@ class PlayerTierPolicyTest {
         assertThat(PlayerTierPolicy.resolveTier(0)).isEqualTo("NONE");
         assertThat(PlayerTierPolicy.resolveTier(1)).isEqualTo("C-");
         assertThat(PlayerTierPolicy.resolveTier(199)).isEqualTo("C-");
-        assertThat(PlayerTierPolicy.resolveTier(200)).isEqualTo("C");
-        assertThat(PlayerTierPolicy.resolveTier(299)).isEqualTo("C");
-        assertThat(PlayerTierPolicy.resolveTier(300)).isEqualTo("C+");
-        assertThat(PlayerTierPolicy.resolveTier(399)).isEqualTo("C+");
-        assertThat(PlayerTierPolicy.resolveTier(400)).isEqualTo("B-");
-        assertThat(PlayerTierPolicy.resolveTier(499)).isEqualTo("B-");
-        assertThat(PlayerTierPolicy.resolveTier(500)).isEqualTo("B");
-        assertThat(PlayerTierPolicy.resolveTier(599)).isEqualTo("B");
-        assertThat(PlayerTierPolicy.resolveTier(600)).isEqualTo("B+");
-        assertThat(PlayerTierPolicy.resolveTier(699)).isEqualTo("B+");
-        assertThat(PlayerTierPolicy.resolveTier(700)).isEqualTo("A-");
-        assertThat(PlayerTierPolicy.resolveTier(799)).isEqualTo("A-");
-        assertThat(PlayerTierPolicy.resolveTier(800)).isEqualTo("A");
-        assertThat(PlayerTierPolicy.resolveTier(899)).isEqualTo("A");
-        assertThat(PlayerTierPolicy.resolveTier(900)).isEqualTo("A+");
-        assertThat(PlayerTierPolicy.resolveTier(999)).isEqualTo("A+");
-        assertThat(PlayerTierPolicy.resolveTier(1000)).isEqualTo("S");
-        assertThat(PlayerTierPolicy.resolveTier(1400)).isEqualTo("S");
+        assertThat(PlayerTierPolicy.resolveTier(399)).isEqualTo("C-");
+        assertThat(PlayerTierPolicy.resolveTier(400)).isEqualTo("C");
+        assertThat(PlayerTierPolicy.resolveTier(599)).isEqualTo("C");
+        assertThat(PlayerTierPolicy.resolveTier(600)).isEqualTo("C+");
+        assertThat(PlayerTierPolicy.resolveTier(799)).isEqualTo("C+");
+        assertThat(PlayerTierPolicy.resolveTier(800)).isEqualTo("B-");
+        assertThat(PlayerTierPolicy.resolveTier(999)).isEqualTo("B-");
+        assertThat(PlayerTierPolicy.resolveTier(1000)).isEqualTo("B");
+        assertThat(PlayerTierPolicy.resolveTier(1199)).isEqualTo("B");
+        assertThat(PlayerTierPolicy.resolveTier(1200)).isEqualTo("B+");
+        assertThat(PlayerTierPolicy.resolveTier(1399)).isEqualTo("B+");
+        assertThat(PlayerTierPolicy.resolveTier(1400)).isEqualTo("A-");
+        assertThat(PlayerTierPolicy.resolveTier(1599)).isEqualTo("A-");
+        assertThat(PlayerTierPolicy.resolveTier(1600)).isEqualTo("A");
+        assertThat(PlayerTierPolicy.resolveTier(1799)).isEqualTo("A");
+        assertThat(PlayerTierPolicy.resolveTier(1800)).isEqualTo("A+");
+        assertThat(PlayerTierPolicy.resolveTier(1999)).isEqualTo("A+");
+        assertThat(PlayerTierPolicy.resolveTier(2000)).isEqualTo("S");
     }
 
     @Test
@@ -38,7 +38,8 @@ class PlayerTierPolicyTest {
         assertThat(PlayerTierPolicy.isLowTier(1)).isTrue();
         assertThat(PlayerTierPolicy.isLowTier(250)).isTrue();
         assertThat(PlayerTierPolicy.isLowTier(399)).isTrue();
-        assertThat(PlayerTierPolicy.isLowTier(400)).isFalse();
+        assertThat(PlayerTierPolicy.isLowTier(799)).isTrue();
+        assertThat(PlayerTierPolicy.isLowTier(800)).isFalse();
         assertThat(PlayerTierPolicy.isLowTier(1000)).isFalse();
     }
 
@@ -50,33 +51,33 @@ class PlayerTierPolicyTest {
 
     @Test
     void demotesAfterPlacementWhenMmrFallsBelowShield() {
-        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("A", 740, 6))
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("A", 1540, 6))
             .isEqualTo("A-");
     }
 
     @Test
     void doesNotDemoteInsideDemotionShieldRange() {
-        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("A", 760, 6))
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("A", 1560, 6))
             .isEqualTo("A");
     }
 
     @Test
     void requiresPromotionBufferBeforeTierUp() {
-        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("B", 620, 6))
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("B", 1220, 6))
             .isEqualTo("B");
-        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("B", 630, 6))
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("B", 1230, 6))
             .isEqualTo("B+");
     }
 
     @Test
     void promotesOnlyOneStepPerMatchResult() {
-        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("B", 980, 10))
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("B", 1980, 10))
             .isEqualTo("B+");
     }
 
     @Test
     void snapshotTierFallsBackToMmrWhenTierIsUnknown() {
-        assertThat(PlayerTierPolicy.resolveTierForSnapshot("재배정대상", 830))
+        assertThat(PlayerTierPolicy.resolveTierForSnapshot("재배정대상", 1630))
             .isEqualTo("A");
     }
 
@@ -94,13 +95,13 @@ class PlayerTierPolicyTest {
 
     @Test
     void resolvesDormancyAdjustedMmrToNearTopOfDemotedTier() {
-        assertThat(PlayerTierPolicy.resolveDormancyAdjustedMmr("A+", 930, 1)).isEqualTo(890);
-        assertThat(PlayerTierPolicy.resolveDormancyAdjustedMmr("A", 880, 1)).isEqualTo(790);
+        assertThat(PlayerTierPolicy.resolveDormancyAdjustedMmr("A+", 1930, 1)).isEqualTo(1790);
+        assertThat(PlayerTierPolicy.resolveDormancyAdjustedMmr("A", 1680, 1)).isEqualTo(1590);
     }
 
     @Test
     void doesNotIncreaseMmrWhenDormancyTargetIsHigherThanCurrent() {
-        assertThat(PlayerTierPolicy.resolveDormancyAdjustedMmr("A+", 850, 1)).isEqualTo(850);
+        assertThat(PlayerTierPolicy.resolveDormancyAdjustedMmr("A+", 1750, 1)).isEqualTo(1750);
         assertThat(PlayerTierPolicy.resolveDormancyAdjustedMmr("NONE", 0, 1)).isEqualTo(0);
     }
 }

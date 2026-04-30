@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ../backend
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+      SERVER_PORT: 8080
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:?SPRING_DATASOURCE_URL is required}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:?SPRING_DATASOURCE_USERNAME is required}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?SPRING_DATASOURCE_PASSWORD is required}
+      SPRING_DATASOURCE_SSLMODE: ${SPRING_DATASOURCE_SSLMODE:-prefer}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      AUTH_REQUIRE_JWT: ${AUTH_REQUIRE_JWT:-true}
+      AUTH_ALLOW_EMAIL_HEADER_FALLBACK: ${AUTH_ALLOW_EMAIL_HEADER_FALLBACK:-false}
+      UPBIT_ENABLED: ${UPBIT_ENABLED:-false}
+      UPBIT_BASE_URL: ${UPBIT_BASE_URL:-https://api.upbit.com}
+      UPBIT_ACCESS_KEY: ${UPBIT_ACCESS_KEY:-}
+      UPBIT_SECRET_KEY: ${UPBIT_SECRET_KEY:-}
+      JWT_ENABLED: ${JWT_ENABLED:-false}
+      JWT_ISSUER: ${JWT_ISSUER:-heifam}
+      JWT_SECRET: ${JWT_SECRET:-}
+      JWT_ACCESS_TOKEN_TTL: ${JWT_ACCESS_TOKEN_TTL:-15m}
+      ROOT_LOG_LEVEL: ${ROOT_LOG_LEVEL:-INFO}
+      SPRING_SECURITY_LOG_LEVEL: ${SPRING_SECURITY_LOG_LEVEL:-INFO}
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+
+volumes:
+  postgres_data:

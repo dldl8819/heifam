@@ -453,7 +453,9 @@
       "searchLabel": "닉네임 검색",
       "searchPlaceholder": "닉네임 입력...",
       "raceLabel": "종족 필터",
-      "includeInactive": "비활성 선수 포함 보기"
+      "includeInactive": "비활성 선수 포함 보기",
+      "activeCount": "활성 선수 {count}명",
+      "totalCount": "전체 {count}명"
     },
     "table": {
       "nickname": "닉네임",

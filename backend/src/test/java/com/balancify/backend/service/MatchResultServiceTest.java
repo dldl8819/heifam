@@ -21,6 +21,7 @@ import com.balancify.backend.repository.MatchRepository;
 import com.balancify.backend.repository.MmrHistoryRepository;
 import com.balancify.backend.repository.PlayerRepository;
 import com.balancify.backend.service.exception.MatchConflictException;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,7 +65,12 @@ class MatchResultServiceTest {
             300,
             900,
             0.6,
-            0.7
+            0.7,
+            200,
+            800,
+            1.5,
+            5,
+            2.0
         );
     }
 
@@ -237,6 +243,46 @@ class MatchResultServiceTest {
     }
 
     @Test
+    void returnBoostMultipliesDormantReturningPlayerDeltaAndConsumesOneGame() {
+        Match match = new Match();
+        match.setId(23L);
+        match.setStatus(MatchStatus.CONFIRMED);
+        match.setTeamSize(2);
+
+        Group group = new Group();
+        group.setId(1L);
+
+        Player returningPlayer = player(33L, group, "A1", 1000);
+        returningPlayer.setDormantSince(OffsetDateTime.parse("2026-03-01T00:00:00Z"));
+        returningPlayer.setReturnBoostMultiplier(2.0);
+
+        List<MatchParticipant> participants = List.of(
+            participant(51L, match, player(31L, group, "H1", 1000), "HOME"),
+            participant(52L, match, player(32L, group, "H2", 1000), "HOME"),
+            participant(53L, match, returningPlayer, "AWAY"),
+            participant(54L, match, player(34L, group, "A2", 1000), "AWAY")
+        );
+
+        when(matchRepository.findByIdForUpdate(23L)).thenReturn(Optional.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(23L)).thenReturn(participants);
+        when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(playerRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(mmrHistoryRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MatchResultResponse response = matchResultService.processMatchResult(
+            23L,
+            new MatchResultRequest("AWAY")
+        );
+
+        assertThat(participantDelta(response, "AWAY", "A1")).isEqualTo(24);
+        assertThat(participantDelta(response, "AWAY", "A2")).isEqualTo(12);
+        assertThat(returningPlayer.getReturnedAt()).isNotNull();
+        assertThat(returningPlayer.getReturnBoostGamesRemaining()).isEqualTo(4);
+        assertThat(returningPlayer.getMmr()).isEqualTo(1024);
+    }
+
+    @Test
     void deletesMatchAndRollsBackPlayerMmr() {
         Match match = new Match();
         match.setId(99L);
@@ -305,6 +351,42 @@ class MatchResultServiceTest {
         MatchResultResponse response = matchResultService.processMatchResult(3L, new MatchResultRequest("HOME"));
 
         assertThat(response.kFactor()).isLessThan(DEFAULT_BASE_K_FACTOR);
+    }
+
+    @Test
+    void largeGapUnderdogWinAppliesBonusMultiplier() {
+        Match match = new Match();
+        match.setId(4L);
+        match.setStatus(MatchStatus.CONFIRMED);
+
+        Group group = new Group();
+        group.setId(1L);
+
+        List<MatchParticipant> participants = List.of(
+            participant(41L, match, player(41L, group, "H1", 1700, "A+"), "HOME"),
+            participant(42L, match, player(42L, group, "H2", 1700, "A+"), "HOME"),
+            participant(43L, match, player(43L, group, "H3", 1700, "A+"), "HOME"),
+            participant(44L, match, player(44L, group, "A1", 700, "B"), "AWAY"),
+            participant(45L, match, player(45L, group, "A2", 700, "B"), "AWAY"),
+            participant(46L, match, player(46L, group, "A3", 700, "B"), "AWAY")
+        );
+
+        when(matchRepository.findByIdForUpdate(4L)).thenReturn(Optional.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(4L)).thenReturn(participants);
+        when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(playerRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(mmrHistoryRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MatchResultResponse response = matchResultService.processMatchResult(4L, new MatchResultRequest("AWAY"));
+
+        double underdogExpected = 1.0 / (1.0 + Math.pow(10.0, (1700.0 - 700.0) / 400.0));
+        int deltaWithoutBonus = (int) Math.round(response.kFactor() * (1.0 - underdogExpected));
+        int underdogWinnerDelta = participantDelta(response, "AWAY", "A1");
+
+        assertThat(underdogWinnerDelta).isGreaterThan(deltaWithoutBonus);
+        assertThat(underdogWinnerDelta).isEqualTo(15);
+        assertThat(participantDelta(response, "HOME", "H1")).isEqualTo(-15);
     }
 
     @Test

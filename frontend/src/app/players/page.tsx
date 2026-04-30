@@ -586,6 +586,14 @@ export default function PlayersPage() {
       return matchesRace && matchesSearch
     })
   }, [raceFilter, rows, search])
+  const activePlayerCount = useMemo(
+    () => rows.filter((row) => row.active !== false).length,
+    [rows]
+  )
+  const inactivePlayerCount = useMemo(
+    () => rows.filter((row) => row.active === false).length,
+    [rows]
+  )
 
   const showStatusColumn = isAdmin
   const showActionsColumn = isAdmin
@@ -808,6 +816,18 @@ export default function PlayersPage() {
       )}
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        {isAdmin && (
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-800">
+              {t('players.filters.activeCount', { count: activePlayerCount })}
+            </span>
+            {showInactive && inactivePlayerCount > 0 && (
+              <span className="rounded-md border border-slate-300 bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                {t('players.filters.totalCount', { count: rows.length })}
+              </span>
+            )}
+          </div>
+        )}
         <div className="grid gap-3 md:grid-cols-3">
           <label className="space-y-1 text-xs font-medium text-slate-500 md:col-span-2">
             {t('players.filters.searchLabel')}

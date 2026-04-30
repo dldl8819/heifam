@@ -1,0 +1,36 @@
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/YOUR_DB_NAME}
+    username: ${SPRING_DATASOURCE_USERNAME:YOUR_DB_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD:YOUR_DB_PASSWORD}
+    hikari:
+      data-source-properties:
+        sslmode: ${SPRING_DATASOURCE_SSLMODE:prefer}
+
+logging:
+  level:
+    root: ${ROOT_LOG_LEVEL:INFO}
+    com.balancify: ${APP_LOG_LEVEL:DEBUG}
+
+balancify:
+  integrations:
+    upbit:
+      enabled: ${UPBIT_ENABLED:false}
+      base-url: ${UPBIT_BASE_URL:https://api.upbit.com}
+      access-key: ${UPBIT_ACCESS_KEY:YOUR_API_KEY}
+      secret-key: ${UPBIT_SECRET_KEY:YOUR_SECRET_KEY}
+  security:
+    jwt:
+      enabled: ${JWT_ENABLED:false}
+      issuer: ${JWT_ISSUER:YOUR_JWT_ISSUER}
+      secret: ${JWT_SECRET:YOUR_SECRET_KEY}
+      access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:15m}
+  auth:
+    require-jwt: ${AUTH_REQUIRE_JWT:false}
+    allow-email-header-fallback: ${AUTH_ALLOW_EMAIL_HEADER_FALLBACK:true}
+    supabase-url: ${SUPABASE_URL:https://YOUR_SUPABASE_PROJECT_URL}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}

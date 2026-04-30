@@ -6,16 +6,13 @@ import com.balancify.backend.domain.Player;
 import com.balancify.backend.domain.PlayerTierPolicy;
 import com.balancify.backend.repository.MatchParticipantRepository;
 import com.balancify.backend.repository.PlayerRepository;
-import java.time.Clock;
 import java.time.OffsetDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -23,46 +20,25 @@ public class PlayerQueryService {
 
     private final PlayerRepository playerRepository;
     private final MatchParticipantRepository matchParticipantRepository;
-    private final boolean dormancyEnabled;
-    private final int dormancyInactiveDays;
-    private final int dormancyDemoteSteps;
-    private final Clock clock;
+    private final DormancyMmrDecayService dormancyMmrDecayService;
+    private final MonthlyTierRefreshService monthlyTierRefreshService;
 
     @Autowired
     public PlayerQueryService(
         PlayerRepository playerRepository,
         MatchParticipantRepository matchParticipantRepository,
-        @Value("${balancify.rank.dormancy.enabled:true}") boolean dormancyEnabled,
-        @Value("${balancify.rank.dormancy.inactive-days:30}") int dormancyInactiveDays,
-        @Value("${balancify.rank.dormancy.demote-steps:1}") int dormancyDemoteSteps
-    ) {
-        this(
-            playerRepository,
-            matchParticipantRepository,
-            dormancyEnabled,
-            dormancyInactiveDays,
-            dormancyDemoteSteps,
-            Clock.systemUTC()
-        );
-    }
-
-    PlayerQueryService(
-        PlayerRepository playerRepository,
-        MatchParticipantRepository matchParticipantRepository,
-        boolean dormancyEnabled,
-        int dormancyInactiveDays,
-        int dormancyDemoteSteps,
-        Clock clock
+        DormancyMmrDecayService dormancyMmrDecayService,
+        MonthlyTierRefreshService monthlyTierRefreshService
     ) {
         this.playerRepository = playerRepository;
         this.matchParticipantRepository = matchParticipantRepository;
-        this.dormancyEnabled = dormancyEnabled;
-        this.dormancyInactiveDays = Math.max(0, dormancyInactiveDays);
-        this.dormancyDemoteSteps = Math.max(0, dormancyDemoteSteps);
-        this.clock = clock;
+        this.dormancyMmrDecayService = dormancyMmrDecayService;
+        this.monthlyTierRefreshService = monthlyTierRefreshService;
     }
 
     public List<GroupPlayerResponse> getGroupPlayers(Long groupId, boolean includeInactive) {
+        dormancyMmrDecayService.applyGroupDormancyDecay(groupId);
+        monthlyTierRefreshService.applyMonthlyTierRefreshIfDue();
         List<Player> players = new ArrayList<>(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId));
         if (!includeInactive) {
             players = new ArrayList<>(players.stream().filter(Player::isActive).toList());
@@ -101,7 +77,6 @@ public class PlayerQueryService {
             }
         }
 
-        OffsetDateTime now = OffsetDateTime.now(clock);
         List<GroupPlayerResponse> responses = new ArrayList<>();
         for (Player player : players) {
             StatsAccumulator stats =
@@ -111,22 +86,15 @@ public class PlayerQueryService {
             String baseTier = baseMmr == null ? null : PlayerTierPolicy.resolveTier(baseMmr);
             int currentMmr = safeInt(player.getMmr());
             String currentTier = PlayerTierPolicy.resolveTierForSnapshot(player.getTier(), currentMmr);
-            DormancyAdjustment dormancyAdjustment = applyDormancyDemotion(
-                currentTier,
-                currentMmr,
-                stats.lastPlayedAt,
-                player.getCreatedAt(),
-                now
-            );
 
             responses.add(new GroupPlayerResponse(
                 player.getId(),
                 player.getNickname(),
                 normalizeRace(player.getRace()),
-                dormancyAdjustment.tier(),
+                currentTier,
                 baseMmr,
                 baseTier,
-                dormancyAdjustment.mmr(),
+                currentMmr,
                 stats.wins,
                 stats.losses,
                 games,
@@ -158,37 +126,6 @@ public class PlayerQueryService {
         return value == null ? 0 : value;
     }
 
-    private DormancyAdjustment applyDormancyDemotion(
-        String currentTier,
-        int currentMmr,
-        OffsetDateTime lastPlayedAt,
-        OffsetDateTime createdAt,
-        OffsetDateTime now
-    ) {
-        if (!dormancyEnabled || dormancyDemoteSteps <= 0) {
-            return new DormancyAdjustment(currentTier, currentMmr);
-        }
-
-        OffsetDateTime activityReference = lastPlayedAt != null ? lastPlayedAt : createdAt;
-        if (activityReference == null) {
-            return new DormancyAdjustment(currentTier, currentMmr);
-        }
-
-        long inactiveDays = ChronoUnit.DAYS.between(activityReference.toInstant(), now.toInstant());
-        if (inactiveDays < dormancyInactiveDays) {
-            return new DormancyAdjustment(currentTier, currentMmr);
-        }
-
-        String demotedTier = PlayerTierPolicy.demoteTier(currentTier, dormancyDemoteSteps);
-        int demotedMmr = PlayerTierPolicy.resolveDormancyAdjustedMmr(
-            currentTier,
-            currentMmr,
-            dormancyDemoteSteps
-        );
-        String effectiveTier = PlayerTierPolicy.resolveTierForSnapshot(demotedTier, demotedMmr);
-        return new DormancyAdjustment(effectiveTier, demotedMmr);
-    }
-
     private enum Result {
         WIN,
         LOSS,
@@ -201,9 +138,4 @@ public class PlayerQueryService {
         private OffsetDateTime lastPlayedAt;
     }
 
-    private record DormancyAdjustment(
-        String tier,
-        int mmr
-    ) {
-    }
 }

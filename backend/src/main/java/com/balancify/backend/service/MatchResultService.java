@@ -41,6 +41,11 @@ public class MatchResultService {
     private final double largeGapRange;
     private final double largeGapMinMultiplier;
     private final double lowTierMultiplier;
+    private final double underdogUpsetBonusThreshold;
+    private final double underdogUpsetBonusRange;
+    private final double underdogUpsetMaxMultiplier;
+    private final int returnBoostGames;
+    private final double returnBoostMultiplier;
 
     public MatchResultService(
         MatchRepository matchRepository,
@@ -51,7 +56,12 @@ public class MatchResultService {
         @Value("${balancify.elo.large-gap-threshold:300}") double largeGapThreshold,
         @Value("${balancify.elo.large-gap-range:900}") double largeGapRange,
         @Value("${balancify.elo.large-gap-min-multiplier:0.6}") double largeGapMinMultiplier,
-        @Value("${balancify.elo.low-tier-multiplier:0.7}") double lowTierMultiplier
+        @Value("${balancify.elo.low-tier-multiplier:0.7}") double lowTierMultiplier,
+        @Value("${balancify.elo.underdog-upset-bonus-threshold:200}") double underdogUpsetBonusThreshold,
+        @Value("${balancify.elo.underdog-upset-bonus-range:800}") double underdogUpsetBonusRange,
+        @Value("${balancify.elo.underdog-upset-max-multiplier:1.5}") double underdogUpsetMaxMultiplier,
+        @Value("${balancify.rank.return-boost.games:5}") int returnBoostGames,
+        @Value("${balancify.rank.return-boost.multiplier:2.0}") double returnBoostMultiplier
     ) {
         this.matchRepository = matchRepository;
         this.matchParticipantRepository = matchParticipantRepository;
@@ -62,6 +72,11 @@ public class MatchResultService {
         this.largeGapRange = largeGapRange <= 0 ? 900 : largeGapRange;
         this.largeGapMinMultiplier = Math.max(0.1, Math.min(1.0, largeGapMinMultiplier));
         this.lowTierMultiplier = Math.max(0.1, Math.min(1.0, lowTierMultiplier));
+        this.underdogUpsetBonusThreshold = Math.max(0.0, underdogUpsetBonusThreshold);
+        this.underdogUpsetBonusRange = underdogUpsetBonusRange <= 0 ? 800 : underdogUpsetBonusRange;
+        this.underdogUpsetMaxMultiplier = Math.max(1.0, underdogUpsetMaxMultiplier);
+        this.returnBoostGames = Math.max(0, returnBoostGames);
+        this.returnBoostMultiplier = Math.max(1.0, returnBoostMultiplier);
     }
 
     @Transactional
@@ -145,6 +160,7 @@ public class MatchResultService {
         double homeExpectedWinRate = calculateExpectedWinRate(homeAverageMmr, awayAverageMmr);
         double awayExpectedWinRate = 1.0 - homeExpectedWinRate;
         int effectiveKFactor = calculateEffectiveKFactor(participants, homeAverageMmr, awayAverageMmr);
+        double outcomeMultiplier = calculateOutcomeMultiplier(winnerTeam, homeAverageMmr, awayAverageMmr);
 
         Map<Long, MmrHistory> existingHistoriesByPlayerId = loadHistoryMap(matchId);
 
@@ -161,8 +177,11 @@ public class MatchResultService {
             boolean homeSide = TEAM_HOME.equals(normalizeTeam(participant.getTeam()));
             double expected = homeSide ? homeExpectedWinRate : awayExpectedWinRate;
             double actual = winnerTeam.equals(normalizeTeam(participant.getTeam())) ? 1.0 : 0.0;
+            double playerReturnBoostMultiplier = resolveReturnBoostMultiplier(player, alreadyProcessed);
 
-            int mmrDelta = (int) Math.round(effectiveKFactor * (actual - expected));
+            int mmrDelta = (int) Math.round(
+                effectiveKFactor * outcomeMultiplier * playerReturnBoostMultiplier * (actual - expected)
+            );
             int mmrAfter = baseMmrBefore + mmrDelta;
             int previousDelta = safeMmr(participant.getMmrDelta());
             int currentPlayerMmr = safeMmr(player.getMmr());
@@ -183,6 +202,7 @@ public class MatchResultService {
                 completedRankedGamesByPlayerId
             );
             player.applyRankedMmr(updatedPlayerMmr, completedRankedGames);
+            applyReturnBoostStateAfterResult(player, alreadyProcessed);
             updatedPlayers.put(player.getId(), player);
 
             MmrHistory mmrHistory = existingHistoriesByPlayerId.get(player.getId());
@@ -334,6 +354,70 @@ public class MatchResultService {
 
         int effective = (int) Math.round(baseKFactor * gapMultiplier * tierMultiplier);
         return Math.max(4, effective);
+    }
+
+    private double calculateOutcomeMultiplier(
+        String winnerTeam,
+        double homeAverageMmr,
+        double awayAverageMmr
+    ) {
+        double winnerAverageMmr = TEAM_HOME.equals(winnerTeam) ? homeAverageMmr : awayAverageMmr;
+        double loserAverageMmr = TEAM_HOME.equals(winnerTeam) ? awayAverageMmr : homeAverageMmr;
+        if (winnerAverageMmr >= loserAverageMmr) {
+            return 1.0;
+        }
+
+        double upsetGap = loserAverageMmr - winnerAverageMmr;
+        if (upsetGap <= underdogUpsetBonusThreshold) {
+            return 1.0;
+        }
+
+        double progressed = Math.min(1.0, (upsetGap - underdogUpsetBonusThreshold) / underdogUpsetBonusRange);
+        return 1.0 + ((underdogUpsetMaxMultiplier - 1.0) * progressed);
+    }
+
+    private double resolveReturnBoostMultiplier(Player player, boolean alreadyProcessed) {
+        if (alreadyProcessed || player == null || player.getDormantSince() == null) {
+            return 1.0;
+        }
+        if (player.getReturnedAt() == null) {
+            return configuredReturnBoostMultiplier(player);
+        }
+        if (safeBoostGames(player) > 0) {
+            return configuredReturnBoostMultiplier(player);
+        }
+        return 1.0;
+    }
+
+    private void applyReturnBoostStateAfterResult(Player player, boolean alreadyProcessed) {
+        if (alreadyProcessed || player == null || player.getDormantSince() == null) {
+            return;
+        }
+
+        if (player.getReturnedAt() == null) {
+            player.setReturnedAt(OffsetDateTime.now());
+            player.setReturnBoostMultiplier(configuredReturnBoostMultiplier(player));
+            player.setReturnBoostGamesRemaining(Math.max(0, returnBoostGames - 1));
+            return;
+        }
+
+        int remainingGames = safeBoostGames(player);
+        if (remainingGames > 0) {
+            player.setReturnBoostGamesRemaining(remainingGames - 1);
+        }
+    }
+
+    private double configuredReturnBoostMultiplier(Player player) {
+        Double storedMultiplier = player.getReturnBoostMultiplier();
+        if (storedMultiplier != null && storedMultiplier > 1.0) {
+            return storedMultiplier;
+        }
+        return returnBoostMultiplier;
+    }
+
+    private int safeBoostGames(Player player) {
+        Integer remainingGames = player.getReturnBoostGamesRemaining();
+        return remainingGames == null ? 0 : Math.max(0, remainingGames);
     }
 
     private String resolveAssignedRace(MatchParticipant participant) {

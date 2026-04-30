@@ -1,0 +1,13 @@
+alter table if exists public.allowed_user_emails enable row level security;
+alter table if exists public.app_bootstrap enable row level security;
+alter table if exists public.captain_draft_entries enable row level security;
+alter table if exists public.captain_draft_participants enable row level security;
+alter table if exists public.captain_drafts enable row level security;
+alter table if exists public.flyway_schema_history enable row level security;
+alter table if exists public.groups enable row level security;
+alter table if exists public.managed_admin_emails enable row level security;
+alter table if exists public.match_participants enable row level security;
+alter table if exists public.matches enable row level security;
+alter table if exists public.mmr_history enable row level security;
+alter table if exists public.players enable row level security;
+alter table if exists public.user_race_preferences enable row level security;

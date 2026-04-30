@@ -217,16 +217,16 @@ public class PlayerImportService {
 
     private static Map<String, Integer> defaultBaseMmrByTier() {
         Map<String, Integer> mapping = new HashMap<>();
-        mapping.put("S", 1000);
-        mapping.put("A+", 900);
-        mapping.put("A", 800);
-        mapping.put("A-", 700);
-        mapping.put("B+", 600);
-        mapping.put("B", 500);
-        mapping.put("B-", 400);
-        mapping.put("C+", 300);
-        mapping.put("C", 200);
-        mapping.put("C-", 100);
+        mapping.put("S", 2000);
+        mapping.put("A+", 1800);
+        mapping.put("A", 1600);
+        mapping.put("A-", 1400);
+        mapping.put("B+", 1200);
+        mapping.put("B", 1000);
+        mapping.put("B-", 800);
+        mapping.put("C+", 600);
+        mapping.put("C", 400);
+        mapping.put("C-", 200);
         return Map.copyOf(mapping);
     }
 

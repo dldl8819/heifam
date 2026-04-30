@@ -25,16 +25,16 @@ public final class PlayerTierPolicy {
     );
     private static final Map<String, Integer> TIER_FLOOR_MMR = Map.ofEntries(
         Map.entry(TIER_NONE, 0),
-        Map.entry("C-", 1),
-        Map.entry("C", 200),
-        Map.entry("C+", 300),
-        Map.entry("B-", 400),
-        Map.entry("B", 500),
-        Map.entry("B+", 600),
-        Map.entry("A-", 700),
-        Map.entry("A", 800),
-        Map.entry("A+", 900),
-        Map.entry("S", 1000)
+        Map.entry("C-", 200),
+        Map.entry("C", 400),
+        Map.entry("C+", 600),
+        Map.entry("B-", 800),
+        Map.entry("B", 1000),
+        Map.entry("B+", 1200),
+        Map.entry("A-", 1400),
+        Map.entry("A", 1600),
+        Map.entry("A+", 1800),
+        Map.entry("S", 2000)
     );
     private static final int PLACEMENT_GAME_COUNT = 5;
     private static final int PROMOTION_MMR_BUFFER = 30;
@@ -49,31 +49,31 @@ public final class PlayerTierPolicy {
             return TIER_NONE;
         }
 
-        if (normalizedMmr < 200) {
+        if (normalizedMmr < 400) {
             return "C-";
         }
-        if (normalizedMmr < 300) {
+        if (normalizedMmr < 600) {
             return "C";
         }
-        if (normalizedMmr < 400) {
+        if (normalizedMmr < 800) {
             return "C+";
         }
-        if (normalizedMmr < 500) {
+        if (normalizedMmr < 1000) {
             return "B-";
         }
-        if (normalizedMmr < 600) {
+        if (normalizedMmr < 1200) {
             return "B";
         }
-        if (normalizedMmr < 700) {
+        if (normalizedMmr < 1400) {
             return "B+";
         }
-        if (normalizedMmr < 800) {
+        if (normalizedMmr < 1600) {
             return "A-";
         }
-        if (normalizedMmr < 900) {
+        if (normalizedMmr < 1800) {
             return "A";
         }
-        if (normalizedMmr < 1000) {
+        if (normalizedMmr < 2000) {
             return "A+";
         }
         return "S";
@@ -201,7 +201,7 @@ public final class PlayerTierPolicy {
             return currentFloor + 90;
         }
 
-        int nextFloor = TIER_FLOOR_MMR.getOrDefault(nextTier, currentFloor + 100);
+        int nextFloor = TIER_FLOOR_MMR.getOrDefault(nextTier, currentFloor + 200);
         int upperBound = Math.max(currentFloor, nextFloor - 1);
         return Math.max(currentFloor, upperBound - 9);
     }

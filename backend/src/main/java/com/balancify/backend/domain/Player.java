@@ -50,6 +50,24 @@ public class Player {
     @Column(nullable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
+    @Column(name = "last_dormancy_mmr_decay_at")
+    private OffsetDateTime lastDormancyMmrDecayAt;
+
+    @Column(name = "last_tier_recalculated_at")
+    private OffsetDateTime lastTierRecalculatedAt;
+
+    @Column(name = "dormant_since")
+    private OffsetDateTime dormantSince;
+
+    @Column(name = "returned_at")
+    private OffsetDateTime returnedAt;
+
+    @Column(name = "return_boost_games_remaining", nullable = false)
+    private Integer returnBoostGamesRemaining = 0;
+
+    @Column(name = "return_boost_multiplier", nullable = false)
+    private Double returnBoostMultiplier = 1.0;
+
     public Long getId() {
         return id;
     }
@@ -96,12 +114,10 @@ public class Player {
 
     public void setMmr(Integer mmr) {
         this.mmr = mmr;
-        this.tier = PlayerTierPolicy.resolveTier(mmr);
     }
 
     public void applyRankedMmr(Integer mmr, int completedRankedGames) {
         this.mmr = mmr;
-        this.tier = PlayerTierPolicy.resolveTierForRankedMatch(this.tier, mmr, completedRankedGames);
     }
 
     public Integer getBaseMmr() {
@@ -136,10 +152,64 @@ public class Player {
         this.createdAt = createdAt;
     }
 
+    public OffsetDateTime getLastDormancyMmrDecayAt() {
+        return lastDormancyMmrDecayAt;
+    }
+
+    public void setLastDormancyMmrDecayAt(OffsetDateTime lastDormancyMmrDecayAt) {
+        this.lastDormancyMmrDecayAt = lastDormancyMmrDecayAt;
+    }
+
+    public OffsetDateTime getLastTierRecalculatedAt() {
+        return lastTierRecalculatedAt;
+    }
+
+    public void setLastTierRecalculatedAt(OffsetDateTime lastTierRecalculatedAt) {
+        this.lastTierRecalculatedAt = lastTierRecalculatedAt;
+    }
+
+    public OffsetDateTime getDormantSince() {
+        return dormantSince;
+    }
+
+    public void setDormantSince(OffsetDateTime dormantSince) {
+        this.dormantSince = dormantSince;
+    }
+
+    public OffsetDateTime getReturnedAt() {
+        return returnedAt;
+    }
+
+    public void setReturnedAt(OffsetDateTime returnedAt) {
+        this.returnedAt = returnedAt;
+    }
+
+    public Integer getReturnBoostGamesRemaining() {
+        return returnBoostGamesRemaining;
+    }
+
+    public void setReturnBoostGamesRemaining(Integer returnBoostGamesRemaining) {
+        this.returnBoostGamesRemaining = returnBoostGamesRemaining == null ? 0 : Math.max(0, returnBoostGamesRemaining);
+    }
+
+    public Double getReturnBoostMultiplier() {
+        return returnBoostMultiplier;
+    }
+
+    public void setReturnBoostMultiplier(Double returnBoostMultiplier) {
+        this.returnBoostMultiplier = returnBoostMultiplier == null ? 1.0 : Math.max(1.0, returnBoostMultiplier);
+    }
+
     @PrePersist
     @PreUpdate
     private void syncTierWithMmr() {
         this.race = PlayerRacePolicy.normalizeCapabilityOrDefault(this.race, "P");
+        this.returnBoostGamesRemaining = this.returnBoostGamesRemaining == null
+            ? 0
+            : Math.max(0, this.returnBoostGamesRemaining);
+        this.returnBoostMultiplier = this.returnBoostMultiplier == null
+            ? 1.0
+            : Math.max(1.0, this.returnBoostMultiplier);
         if (this.tier == null || this.tier.isBlank()) {
             this.tier = PlayerTierPolicy.resolveTier(this.mmr);
         }

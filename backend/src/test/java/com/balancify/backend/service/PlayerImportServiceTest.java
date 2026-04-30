@@ -113,15 +113,15 @@ class PlayerImportServiceTest {
             .findFirst()
             .orElseThrow();
         assertThat(delta.getTier()).isEqualTo("B");
-        assertThat(delta.getBaseMmr()).isEqualTo(500);
-        assertThat(delta.getMmr()).isEqualTo(500);
+        assertThat(delta.getBaseMmr()).isEqualTo(1000);
+        assertThat(delta.getMmr()).isEqualTo(1000);
 
         Player echo = playerCaptor.getAllValues()
             .stream()
             .filter(player -> "Echo".equals(player.getNickname()))
             .findFirst()
             .orElseThrow();
-        assertThat(echo.getTier()).isEqualTo("NONE");
+        assertThat(echo.getTier()).isEqualTo("재배정대상");
         assertThat(echo.getBaseMmr()).isZero();
         assertThat(echo.getMmr()).isZero();
         assertThat(echo.getNote()).isEqualTo("재배정 대상");
@@ -183,8 +183,8 @@ class PlayerImportServiceTest {
         ArgumentCaptor<Player> playerCaptor = ArgumentCaptor.forClass(Player.class);
         verify(playerRepository).save(playerCaptor.capture());
         assertThat(playerCaptor.getValue().getTier()).isEqualTo("S");
-        assertThat(playerCaptor.getValue().getBaseMmr()).isEqualTo(1000);
-        assertThat(playerCaptor.getValue().getMmr()).isEqualTo(1000);
+        assertThat(playerCaptor.getValue().getBaseMmr()).isEqualTo(2000);
+        assertThat(playerCaptor.getValue().getMmr()).isEqualTo(2000);
     }
 
     @Test
@@ -209,7 +209,7 @@ class PlayerImportServiceTest {
         ArgumentCaptor<Player> playerCaptor = ArgumentCaptor.forClass(Player.class);
         verify(playerRepository).save(playerCaptor.capture());
         assertThat(playerCaptor.getValue().getRace()).isEqualTo("PT");
-        assertThat(playerCaptor.getValue().getBaseMmr()).isEqualTo(600);
-        assertThat(playerCaptor.getValue().getMmr()).isEqualTo(600);
+        assertThat(playerCaptor.getValue().getBaseMmr()).isEqualTo(1200);
+        assertThat(playerCaptor.getValue().getMmr()).isEqualTo(1200);
     }
 }
