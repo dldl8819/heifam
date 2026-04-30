@@ -8,6 +8,7 @@ import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ public class MonthlyTierRefreshService {
     private final boolean enabled;
     private final Clock clock;
 
+    @Autowired
     public MonthlyTierRefreshService(
         PlayerRepository playerRepository,
         @Value("${balancify.rank.monthly-tier-refresh.enabled:true}") boolean enabled
