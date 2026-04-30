@@ -772,7 +772,7 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void hidesMmrFieldsFromMemberForRanking() throws Exception {
+    void returnsForbiddenForMemberForRanking() throws Exception {
         when(rankingService.getGroupRanking(eq(1L)))
             .thenReturn(
                 List.of(
@@ -799,9 +799,7 @@ class AdminKeyFilterTest {
                 get("/api/groups/1/ranking")
                     .header("X-USER-EMAIL", "member@hei.gg")
             )
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].currentMmr").doesNotExist())
-            .andExpect(jsonPath("$[0].mmrDelta").doesNotExist());
+            .andExpect(status().isForbidden());
     }
 
     @Test

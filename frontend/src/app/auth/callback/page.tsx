@@ -9,6 +9,18 @@ import { supabase } from '@/lib/supabase'
 
 const CALLBACK_ACCESS_PREFETCH_GRACE_MS = 1500
 
+function getDefaultAuthenticatedPath(access: { admin: boolean; superAdmin: boolean }): string {
+  if (access.superAdmin) {
+    return '/dashboard'
+  }
+
+  if (access.admin) {
+    return '/ranking'
+  }
+
+  return '/players'
+}
+
 function resolveSessionNickname(metadata: unknown): string {
   if (!metadata || typeof metadata !== 'object') {
     return ''
@@ -138,7 +150,7 @@ export default function AuthCallbackPage() {
         ])
 
         if (!access) {
-          router.replace('/ranking')
+          router.replace('/players')
           return
         }
 
@@ -148,7 +160,7 @@ export default function AuthCallbackPage() {
           return
         }
 
-        router.replace(access.superAdmin ? '/dashboard' : '/ranking')
+        router.replace(getDefaultAuthenticatedPath(access))
       } catch (callbackError) {
         if (
           callbackError instanceof ApiRequestError &&
@@ -160,12 +172,12 @@ export default function AuthCallbackPage() {
         }
 
         if (isApiTimeoutError(callbackError)) {
-          router.replace('/ranking')
+          router.replace('/players')
           return
         }
 
         console.error('Error verifying access during auth callback:', callbackError)
-        router.replace('/ranking')
+        router.replace('/players')
       }
     }
 
