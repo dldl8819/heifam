@@ -29,7 +29,7 @@ function formatDateTime(value: string): string {
 export default function DashboardPage() {
   const { isAdmin, isSuperAdmin } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
-  const showMmr = isAdmin && mmrVisible
+  const showMmr = isSuperAdmin && mmrVisible
   const [dashboard, setDashboard] = useState<GroupDashboardResponse | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)

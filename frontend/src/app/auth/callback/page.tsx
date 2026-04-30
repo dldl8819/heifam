@@ -14,10 +14,6 @@ function getDefaultAuthenticatedPath(access: { admin: boolean; superAdmin: boole
     return '/dashboard'
   }
 
-  if (access.admin) {
-    return '/ranking'
-  }
-
   return '/players'
 }
 

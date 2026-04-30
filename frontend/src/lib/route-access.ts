@@ -16,16 +16,12 @@ type RouteRequirement = 'public' | 'member' | 'admin' | 'super_admin'
 const AUTH_PATH_PREFIX = '/auth'
 const PUBLIC_PATHS = ['/', '/results', '/privacy', '/terms']
 const MEMBER_PATHS = ['/balance', '/players']
-const ADMIN_PATHS = ['/ranking', '/balance/multi', '/captain-draft', '/import', '/admin/access']
-const SUPER_ADMIN_PATHS = ['/dashboard', '/players/import']
+const ADMIN_PATHS = ['/balance/multi', '/captain-draft', '/import']
+const SUPER_ADMIN_PATHS = ['/dashboard', '/players/import', '/ranking', '/admin/access']
 
 function getAuthenticatedDefaultPath(context: RouteAccessContext): string {
   if (context.isSuperAdmin) {
     return '/dashboard'
-  }
-
-  if (context.isAdmin) {
-    return '/ranking'
   }
 
   return '/players'

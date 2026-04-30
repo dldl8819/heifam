@@ -143,6 +143,9 @@ class AdminKeyFilterTest {
     private AdminRequestResolver adminRequestResolver;
 
     @MockBean
+    private SuperAdminRequestResolver superAdminRequestResolver;
+
+    @MockBean
     private AccessControlService accessControlService;
 
     @MockBean
@@ -197,6 +200,15 @@ class AdminKeyFilterTest {
             String nickname = request.getHeader("X-USER-NICKNAME");
             String normalizedNickname = nickname == null ? "" : nickname.trim();
             return new AuthenticatedRequestResolver.ResolvedRequestIdentity(normalizedEmail, normalizedNickname, true);
+        });
+        when(superAdminRequestResolver.isSuperAdminRequest(any())).thenAnswer(invocation -> {
+            HttpServletRequest request = invocation.getArgument(0);
+            String email = request.getHeader("X-USER-EMAIL");
+            if (email == null || email.isBlank()) {
+                return false;
+            }
+            String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
+            return superAdmins.contains(normalizedEmail);
         });
     }
 
@@ -257,8 +269,6 @@ class AdminKeyFilterTest {
                     )
                 )
             );
-        when(adminRequestResolver.isAdminRequest(any())).thenReturn(false);
-
         mockMvc
             .perform(
                 post("/api/matches/1/result")
@@ -299,8 +309,6 @@ class AdminKeyFilterTest {
             );
         when(matchResultService.processMatchResult(eq(1L), any(MatchResultRequest.class), any(), any(), anyBoolean()))
             .thenReturn(new MatchResultResponse(1L, "HOME", 32, 0.5, 0.5, List.of()));
-        when(adminRequestResolver.isAdminRequest(any())).thenReturn(false);
-
         mockMvc
             .perform(
                 post("/api/matches/1/result")
@@ -344,8 +352,6 @@ class AdminKeyFilterTest {
                     List.of()
                 )
             );
-        when(adminRequestResolver.isAdminRequest(any())).thenReturn(true);
-
         mockMvc
             .perform(
                 patch("/api/matches/1/result")
@@ -357,7 +363,7 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void returnsMmrFieldsForAdminMatchResult() throws Exception {
+    void returnsMmrFieldsForSuperAdminMatchResult() throws Exception {
         when(matchResultService.processMatchResult(eq(1L), any(MatchResultRequest.class), any(), any(), anyBoolean()))
             .thenReturn(
                 new MatchResultResponse(
@@ -378,12 +384,10 @@ class AdminKeyFilterTest {
                     )
                 )
             );
-        when(adminRequestResolver.isAdminRequest(any())).thenReturn(true);
-
         mockMvc
             .perform(
                 post("/api/matches/1/result")
-                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .header("X-USER-EMAIL", "superadmin@hei.gg")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"winnerTeam\":\"HOME\"}")
             )
@@ -436,8 +440,6 @@ class AdminKeyFilterTest {
                     )
                 )
             );
-        when(adminRequestResolver.isAdminRequest(any())).thenReturn(false);
-
         mockMvc
             .perform(
                 post("/api/matches/manual")
@@ -476,12 +478,10 @@ class AdminKeyFilterTest {
                     List.of()
                 )
             );
-        when(adminRequestResolver.isAdminRequest(any())).thenReturn(true);
-
         mockMvc
             .perform(
                 post("/api/matches/manual")
-                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .header("X-USER-EMAIL", "superadmin@hei.gg")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                         {
@@ -727,8 +727,6 @@ class AdminKeyFilterTest {
                     )
                 )
             );
-        when(adminRequestResolver.isAdminRequest(any())).thenReturn(false);
-
         mockMvc
             .perform(
                 get("/api/groups/1/players")
@@ -740,7 +738,7 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void returnsMmrFieldsForAdminForGroupPlayers() throws Exception {
+    void returnsMmrFieldsForSuperAdminForGroupPlayers() throws Exception {
         when(playerQueryService.getGroupPlayers(eq(1L), eq(false)))
             .thenReturn(
                 List.of(
@@ -759,12 +757,10 @@ class AdminKeyFilterTest {
                     )
                 )
             );
-        when(adminRequestResolver.isAdminRequest(any())).thenReturn(true);
-
         mockMvc
             .perform(
                 get("/api/groups/1/players")
-                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .header("X-USER-EMAIL", "superadmin@hei.gg")
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].currentMmr").value(1216))
@@ -792,14 +788,54 @@ class AdminKeyFilterTest {
                     )
                 )
             );
-        when(adminRequestResolver.isAdminRequest(any())).thenReturn(false);
-
         mockMvc
             .perform(
                 get("/api/groups/1/ranking")
                     .header("X-USER-EMAIL", "member@hei.gg")
             )
             .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void returnsForbiddenForAdminForRanking() throws Exception {
+        mockMvc
+            .perform(
+                get("/api/groups/1/ranking")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void allowsRankingForSuperAdmin() throws Exception {
+        when(rankingService.getGroupRanking(eq(1L)))
+            .thenReturn(
+                List.of(
+                    new RankingItemResponse(
+                        1,
+                        "alpha",
+                        "P",
+                        "A+",
+                        1216,
+                        2,
+                        1,
+                        3,
+                        66.67,
+                        "W2",
+                        "WWL",
+                        16
+                    )
+                )
+            );
+
+        mockMvc
+            .perform(
+                get("/api/groups/1/ranking")
+                    .header("X-USER-EMAIL", "superadmin@hei.gg")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].currentMmr").value(1216))
+            .andExpect(jsonPath("$[0].mmrDelta").value(16));
     }
 
     @Test
@@ -865,7 +901,7 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void hidesMmrFieldsFromMemberForRecentMatches() throws Exception {
+    void hidesMmrFieldsFromAdminForRecentMatches() throws Exception {
         when(matchQueryService.getRecentMatches(eq(1L), any()))
             .thenReturn(
                 List.of(
@@ -886,12 +922,10 @@ class AdminKeyFilterTest {
                     )
                 )
             );
-        when(adminRequestResolver.isAdminRequest(any())).thenReturn(false);
-
         mockMvc
             .perform(
                 get("/api/groups/1/matches/recent")
-                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].homeMmr").doesNotExist())
@@ -923,8 +957,6 @@ class AdminKeyFilterTest {
                     0.61
                 )
             );
-        when(adminRequestResolver.isAdminRequest(any())).thenReturn(false);
-
         mockMvc
             .perform(
                 post("/api/matches/balance")
@@ -942,7 +974,7 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void returnsMmrFieldsForAdminForBalanceResponse() throws Exception {
+    void returnsMmrFieldsForSuperAdminForBalanceResponse() throws Exception {
         when(teamBalancingService.balance(any()))
             .thenReturn(
                 new BalanceResponse(
@@ -963,12 +995,10 @@ class AdminKeyFilterTest {
                     0.61
                 )
             );
-        when(adminRequestResolver.isAdminRequest(any())).thenReturn(true);
-
         mockMvc
             .perform(
                 post("/api/matches/balance")
-                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .header("X-USER-EMAIL", "superadmin@hei.gg")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"groupId\":1,\"playerIds\":[1,2,3,4,5,6],\"teamSize\":3}")
             )
@@ -985,8 +1015,6 @@ class AdminKeyFilterTest {
     void returnsReadableMessageForBalanceBadRequest() throws Exception {
         when(teamBalancingService.balance(any()))
             .thenThrow(new IllegalArgumentException("선택한 종족 조합으로 매치를 구성할 수 없습니다"));
-        when(adminRequestResolver.isAdminRequest(any())).thenReturn(false);
-
         mockMvc
             .perform(
                 post("/api/matches/balance")
@@ -1034,8 +1062,6 @@ class AdminKeyFilterTest {
                     )
                 )
             );
-        when(adminRequestResolver.isAdminRequest(any())).thenReturn(false);
-
         mockMvc
             .perform(
                 post("/api/matches/balance/multi")
@@ -1114,8 +1140,6 @@ class AdminKeyFilterTest {
     @Test
     void allowsRecentMatchesEndpointWithoutUserEmailHeader() throws Exception {
         when(matchQueryService.getRecentMatches(eq(1L), any())).thenReturn(List.of());
-        when(adminRequestResolver.isAdminRequest(any())).thenReturn(false);
-
         mockMvc
             .perform(get("/api/groups/1/matches/recent"))
             .andExpect(status().isOk());

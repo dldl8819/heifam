@@ -19,7 +19,7 @@ function buildIdentityLabel(value?: string | null): string {
 
 export function AuthControls() {
   const { user, loading, signOut } = useAuth()
-  const { nickname, isAdmin } = useAdminAuth()
+  const { nickname, isSuperAdmin } = useAdminAuth()
   const { mmrVisible, setMmrVisible } = useMmrVisibility()
   const [warningMessage, setWarningMessage] = useState<string | null>(null)
   const [oauthInProgress, setOauthInProgress] = useState<boolean>(false)
@@ -157,7 +157,7 @@ export function AuthControls() {
             role="menu"
             className="absolute right-0 top-full z-40 mt-2 min-w-[11rem] rounded-xl border border-slate-700 bg-slate-900/95 p-2 shadow-2xl backdrop-blur"
           >
-            {isAdmin && (
+            {isSuperAdmin && (
               <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-xs text-slate-200 transition-colors hover:bg-slate-800/80">
                 <span>{t('auth.mmrToggle')}</span>
                 <input

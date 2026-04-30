@@ -59,9 +59,9 @@ function formatLast10(value: string): string {
 }
 
 export default function RankingPage() {
-  const { isAdmin, isLoading: authLoading } = useAdminAuth()
+  const { isSuperAdmin, isLoading: authLoading } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
-  const showMmr = isAdmin && mmrVisible
+  const showMmr = isSuperAdmin && mmrVisible
   const [rows, setRows] = useState<RankingItem[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
@@ -123,7 +123,7 @@ export default function RankingPage() {
     return () => {
       active = false
     }
-  }, [authLoading, isAdmin, showMmr])
+  }, [authLoading, isSuperAdmin, showMmr])
 
   const sortedRows = useMemo(
     () =>

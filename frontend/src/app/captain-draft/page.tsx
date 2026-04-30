@@ -46,9 +46,9 @@ function normalizeSelectionValue(value: string): number | null {
 }
 
 export default function CaptainDraftPage() {
-  const { isAdmin } = useAdminAuth()
+  const { isSuperAdmin } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
-  const showMmr = isAdmin && mmrVisible
+  const showMmr = isSuperAdmin && mmrVisible
   const [players, setPlayers] = useState<PlayerRosterItem[]>([])
   const [playersLoading, setPlayersLoading] = useState<boolean>(true)
   const [playersError, setPlayersError] = useState<string | null>(null)

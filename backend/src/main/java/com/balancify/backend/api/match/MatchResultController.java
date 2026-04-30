@@ -4,8 +4,8 @@ import com.balancify.backend.api.MmrMaskingMapper;
 import com.balancify.backend.api.match.dto.ManualMatchCreateRequest;
 import com.balancify.backend.api.match.dto.MatchResultRequest;
 import com.balancify.backend.api.match.dto.MatchResultResponse;
-import com.balancify.backend.security.AdminRequestResolver;
 import com.balancify.backend.security.AuthenticatedRequestResolver;
+import com.balancify.backend.security.SuperAdminRequestResolver;
 import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.ManualMatchService;
 import com.balancify.backend.service.MatchResultService;
@@ -29,20 +29,20 @@ public class MatchResultController {
 
     private final MatchResultService matchResultService;
     private final ManualMatchService manualMatchService;
-    private final AdminRequestResolver adminRequestResolver;
+    private final SuperAdminRequestResolver superAdminRequestResolver;
     private final AuthenticatedRequestResolver authenticatedRequestResolver;
     private final AccessControlService accessControlService;
 
     public MatchResultController(
         MatchResultService matchResultService,
         ManualMatchService manualMatchService,
-        AdminRequestResolver adminRequestResolver,
+        SuperAdminRequestResolver superAdminRequestResolver,
         AuthenticatedRequestResolver authenticatedRequestResolver,
         AccessControlService accessControlService
     ) {
         this.matchResultService = matchResultService;
         this.manualMatchService = manualMatchService;
-        this.adminRequestResolver = adminRequestResolver;
+        this.superAdminRequestResolver = superAdminRequestResolver;
         this.authenticatedRequestResolver = authenticatedRequestResolver;
         this.accessControlService = accessControlService;
     }
@@ -58,7 +58,7 @@ public class MatchResultController {
                 extractRequestEmail(httpRequest),
                 resolveRecordedByNickname(httpRequest)
             );
-            if (adminRequestResolver.isAdminRequest(httpRequest)) {
+            if (superAdminRequestResolver.isSuperAdminRequest(httpRequest)) {
                 return response;
             }
 
@@ -86,7 +86,7 @@ public class MatchResultController {
                 resolveRecordedByNickname(httpRequest),
                 false
             );
-            if (adminRequestResolver.isAdminRequest(httpRequest)) {
+            if (superAdminRequestResolver.isSuperAdminRequest(httpRequest)) {
                 return response;
             }
 
@@ -114,7 +114,7 @@ public class MatchResultController {
                 resolveRecordedByNickname(httpRequest),
                 true
             );
-            if (adminRequestResolver.isAdminRequest(httpRequest)) {
+            if (superAdminRequestResolver.isSuperAdminRequest(httpRequest)) {
                 return response;
             }
 

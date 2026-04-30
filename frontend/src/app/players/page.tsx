@@ -235,7 +235,7 @@ function getTierBadgeClass(tier: PlayerTierStatus): string {
 export default function PlayersPage() {
   const { isAdmin, isSuperAdmin } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
-  const showMmrColumn = isAdmin && mmrVisible
+  const showMmrColumn = isSuperAdmin && mmrVisible
   const [rows, setRows] = useState<PlayerRosterItem[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)

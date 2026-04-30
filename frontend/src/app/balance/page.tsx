@@ -181,7 +181,7 @@ export default function BalancePage() {
   const router = useRouter()
   const { isAdmin, isSuperAdmin, isLoggedIn } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
-  const showMmr = isAdmin && mmrVisible
+  const showMmr = isSuperAdmin && mmrVisible
   const [players, setPlayers] = useState<BalancePlayerOption[]>([])
   const [teamSize, setTeamSize] = useState<SupportedTeamSize>(3)
   const [raceComposition, setRaceComposition] = useState<RaceComposition | null>(null)

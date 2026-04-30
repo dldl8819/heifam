@@ -5,7 +5,7 @@ import com.balancify.backend.api.match.dto.BalanceRequest;
 import com.balancify.backend.api.match.dto.BalanceResponse;
 import com.balancify.backend.api.match.dto.MultiBalanceRequest;
 import com.balancify.backend.api.match.dto.MultiBalanceResponse;
-import com.balancify.backend.security.AdminRequestResolver;
+import com.balancify.backend.security.SuperAdminRequestResolver;
 import com.balancify.backend.service.MultiMatchBalancingService;
 import com.balancify.backend.service.TeamBalancingService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,16 +22,16 @@ public class MatchBalanceController {
 
     private final TeamBalancingService teamBalancingService;
     private final MultiMatchBalancingService multiMatchBalancingService;
-    private final AdminRequestResolver adminRequestResolver;
+    private final SuperAdminRequestResolver superAdminRequestResolver;
 
     public MatchBalanceController(
         TeamBalancingService teamBalancingService,
         MultiMatchBalancingService multiMatchBalancingService,
-        AdminRequestResolver adminRequestResolver
+        SuperAdminRequestResolver superAdminRequestResolver
     ) {
         this.teamBalancingService = teamBalancingService;
         this.multiMatchBalancingService = multiMatchBalancingService;
-        this.adminRequestResolver = adminRequestResolver;
+        this.superAdminRequestResolver = superAdminRequestResolver;
     }
 
     @PostMapping("/balance")
@@ -41,7 +41,7 @@ public class MatchBalanceController {
     ) {
         try {
             BalanceResponse response = teamBalancingService.balance(request);
-            if (adminRequestResolver.isAdminRequest(httpServletRequest)) {
+            if (superAdminRequestResolver.isSuperAdminRequest(httpServletRequest)) {
                 return response;
             }
 
@@ -58,7 +58,7 @@ public class MatchBalanceController {
     ) {
         try {
             MultiBalanceResponse response = multiMatchBalancingService.balance(request);
-            if (adminRequestResolver.isAdminRequest(httpServletRequest)) {
+            if (superAdminRequestResolver.isSuperAdminRequest(httpServletRequest)) {
                 return response;
             }
 

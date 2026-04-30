@@ -27,12 +27,12 @@ export function getVisibleNavItems(context: NavVisibilityContext): NavItem[] {
       { label: t('nav.captainDraft'), href: '/captain-draft' },
       { label: t('nav.multiBalance'), href: '/balance/multi' },
       { label: t('nav.results'), href: '/results' },
-      { label: t('nav.ranking'), href: '/ranking' },
     ]
 
     if (context.isSuperAdmin) {
       adminItems.unshift({ label: t('nav.dashboard'), href: '/dashboard' })
       adminItems.splice(5, 0, { label: t('nav.accessControl'), href: '/admin/access' })
+      adminItems.push({ label: t('nav.ranking'), href: '/ranking' })
     }
 
     return adminItems

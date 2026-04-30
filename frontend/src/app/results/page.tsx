@@ -154,7 +154,7 @@ export default function ResultsPage() {
   const searchParams = useSearchParams()
   const { canAccess, isAdmin, isSuperAdmin } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
-  const showMmr = isAdmin && mmrVisible
+  const showMmr = isSuperAdmin && mmrVisible
   const canUseManualEntry = canAccess
   const [operatorEntryMode, setOperatorEntryMode] = useState<OperatorEntryMode>('manual')
   const [manualTeamSize, setManualTeamSize] = useState<SupportedTeamSize>(3)

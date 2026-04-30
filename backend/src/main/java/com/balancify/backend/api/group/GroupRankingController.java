@@ -1,7 +1,7 @@
 package com.balancify.backend.api.group;
 
 import com.balancify.backend.api.group.dto.RankingItemResponse;
-import com.balancify.backend.security.AdminRequestResolver;
+import com.balancify.backend.security.SuperAdminRequestResolver;
 import com.balancify.backend.service.RankingService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
@@ -17,14 +17,14 @@ import org.springframework.web.server.ResponseStatusException;
 public class GroupRankingController {
 
     private final RankingService rankingService;
-    private final AdminRequestResolver adminRequestResolver;
+    private final SuperAdminRequestResolver superAdminRequestResolver;
 
     public GroupRankingController(
         RankingService rankingService,
-        AdminRequestResolver adminRequestResolver
+        SuperAdminRequestResolver superAdminRequestResolver
     ) {
         this.rankingService = rankingService;
-        this.adminRequestResolver = adminRequestResolver;
+        this.superAdminRequestResolver = superAdminRequestResolver;
     }
 
     @GetMapping("/{groupId}/ranking")
@@ -32,8 +32,8 @@ public class GroupRankingController {
         @PathVariable Long groupId,
         HttpServletRequest request
     ) {
-        if (!adminRequestResolver.isAdminRequest(request)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "랭킹은 관리자만 조회할 수 있습니다.");
+        if (!superAdminRequestResolver.isSuperAdminRequest(request)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "랭킹은 최고 관리자만 조회할 수 있습니다.");
         }
 
         return rankingService.getGroupRanking(groupId);

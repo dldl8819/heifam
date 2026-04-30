@@ -3,6 +3,7 @@ package com.balancify.backend.api.group;
 import com.balancify.backend.api.MmrMaskingMapper;
 import com.balancify.backend.api.group.dto.GroupPlayerResponse;
 import com.balancify.backend.security.AdminRequestResolver;
+import com.balancify.backend.security.SuperAdminRequestResolver;
 import com.balancify.backend.service.PlayerQueryService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
@@ -18,13 +19,16 @@ public class GroupPlayerController {
 
     private final PlayerQueryService playerQueryService;
     private final AdminRequestResolver adminRequestResolver;
+    private final SuperAdminRequestResolver superAdminRequestResolver;
 
     public GroupPlayerController(
         PlayerQueryService playerQueryService,
-        AdminRequestResolver adminRequestResolver
+        AdminRequestResolver adminRequestResolver,
+        SuperAdminRequestResolver superAdminRequestResolver
     ) {
         this.playerQueryService = playerQueryService;
         this.adminRequestResolver = adminRequestResolver;
+        this.superAdminRequestResolver = superAdminRequestResolver;
     }
 
     @GetMapping("/{groupId}/players")
@@ -34,11 +38,12 @@ public class GroupPlayerController {
         HttpServletRequest request
     ) {
         boolean adminRequest = adminRequestResolver.isAdminRequest(request);
+        boolean superAdminRequest = superAdminRequestResolver.isSuperAdminRequest(request);
         List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(
             groupId,
             adminRequest && includeInactive
         );
-        if (adminRequest) {
+        if (superAdminRequest) {
             return response;
         }
 
