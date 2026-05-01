@@ -70,6 +70,43 @@ function resolveTierBoardLabel(tier: PlayerTierStatus): string {
   return tier === 'UNASSIGNED' ? t('common.tierBoard.unassigned') : tier
 }
 
+function resolveTierFromMmr(value: number | undefined): PlayerTierStatus | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return null
+  }
+  if (value <= 0) {
+    return 'UNASSIGNED'
+  }
+  if (value < 400) {
+    return 'C-'
+  }
+  if (value < 600) {
+    return 'C'
+  }
+  if (value < 800) {
+    return 'C+'
+  }
+  if (value < 1000) {
+    return 'B-'
+  }
+  if (value < 1200) {
+    return 'B'
+  }
+  if (value < 1400) {
+    return 'B+'
+  }
+  if (value < 1600) {
+    return 'A-'
+  }
+  if (value < 1800) {
+    return 'A'
+  }
+  if (value < 2000) {
+    return 'A+'
+  }
+  return 'S'
+}
+
 function buildTierBoardBuckets(rows: PlayerRosterItem[]): Record<PlayerTierStatus, PlayerRosterItem[]> {
   const buckets = TIER_BOARD_COLUMNS.reduce<Record<PlayerTierStatus, PlayerRosterItem[]>>(
     (accumulator, tier) => ({
@@ -94,7 +131,8 @@ function buildTierBoardBuckets(rows: PlayerRosterItem[]): Record<PlayerTierStatu
   rows
     .filter((row) => row.active !== false)
     .forEach((row) => {
-      buckets[row.tier ?? 'UNASSIGNED'].push(row)
+      const liveTier = resolveTierFromMmr(row.currentMmr) ?? row.tier ?? 'UNASSIGNED'
+      buckets[liveTier].push(row)
     })
 
   TIER_BOARD_COLUMNS.forEach((tier) => {
@@ -410,18 +448,8 @@ export default function DashboardPage() {
 
       {isSuperAdmin && (
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-900">{t('dashboard.tierBoard.title')}</h3>
-              <p className="mt-1 text-xs text-slate-500">{t('dashboard.tierBoard.description')}</p>
-            </div>
-            <p className="text-xs font-medium text-slate-500">
-              {t('dashboard.tierBoard.summary', { date: tierBoardDate, count: tierBoardTotalCount })}
-            </p>
-          </div>
-
           {tierBoardError && (
-            <Alert variant="destructive" appearance="light" className="mt-4">
+            <Alert variant="destructive" appearance="light">
               <AlertIcon icon="destructive">!</AlertIcon>
               <AlertContent>
                 <AlertTitle>{t('common.errorPrefix')}</AlertTitle>
