@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -828,28 +829,37 @@ class AdminKeyFilterTest {
     }
 
     @Test
+    void returnsForbiddenForTierChangeAcknowledgementWithoutMmrAccess() throws Exception {
+        mockMvc
+            .perform(
+                patch("/api/groups/1/players/10")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"tierChangeAcknowledgedTier\":\"A+\"}")
+            )
+            .andExpect(status().isForbidden());
+
+        verify(playerAdminService, never()).updatePlayer(any(), any(), any());
+    }
+
+    @Test
+    void allowsTierChangeAcknowledgementWithMmrAccess() throws Exception {
+        mockMvc
+            .perform(
+                patch("/api/groups/1/players/10")
+                    .header("X-USER-EMAIL", "ops@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"tierChangeAcknowledgedTier\":\"A+\"}")
+            )
+            .andExpect(status().isOk());
+
+        verify(playerAdminService).updatePlayer(any(), any(), any());
+    }
+
+    @Test
     void hidesMmrFieldsFromMemberForGroupPlayers() throws Exception {
         when(playerQueryService.getGroupPlayers(eq(1L), eq(false)))
-            .thenReturn(
-                List.of(
-                    new GroupPlayerResponse(
-                        10L,
-                        "alpha",
-                        "P",
-                        "A",
-                        1200,
-                        "A",
-                        1216,
-                        2,
-                        1,
-                        3,
-                        true,
-                        null,
-                        null,
-                        null
-                    )
-                )
-            );
+            .thenReturn(List.of(groupPlayerResponseWithOperationalMetadata()));
         mockMvc
             .perform(
                 get("/api/groups/1/players")
@@ -857,32 +867,23 @@ class AdminKeyFilterTest {
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].currentMmr").doesNotExist())
-            .andExpect(jsonPath("$[0].baseMmr").doesNotExist());
+            .andExpect(jsonPath("$[0].baseMmr").doesNotExist())
+            .andExpect(jsonPath("$[0].baseTier").doesNotExist())
+            .andExpect(jsonPath("$[0].lastTierSnapshotAt").doesNotExist())
+            .andExpect(jsonPath("$[0].lastTierSnapshotMmr").doesNotExist())
+            .andExpect(jsonPath("$[0].lastTierSnapshotTier").doesNotExist())
+            .andExpect(jsonPath("$[0].liveTier").doesNotExist())
+            .andExpect(jsonPath("$[0].chatLeftAt").doesNotExist())
+            .andExpect(jsonPath("$[0].chatLeftReason").doesNotExist())
+            .andExpect(jsonPath("$[0].chatRejoinedAt").doesNotExist())
+            .andExpect(jsonPath("$[0].tierChangeAcknowledgedTier").doesNotExist())
+            .andExpect(jsonPath("$[0].tierChangeAcknowledgedAt").doesNotExist());
     }
 
     @Test
-    void hidesMmrFieldsFromAdminWithoutMmrAccessForGroupPlayers() throws Exception {
+    void hidesOnlyMmrFieldsFromAdminWithoutMmrAccessForGroupPlayers() throws Exception {
         when(playerQueryService.getGroupPlayers(eq(1L), eq(false)))
-            .thenReturn(
-                List.of(
-                    new GroupPlayerResponse(
-                        10L,
-                        "alpha",
-                        "P",
-                        "A",
-                        1200,
-                        "A",
-                        1216,
-                        2,
-                        1,
-                        3,
-                        true,
-                        null,
-                        null,
-                        null
-                    )
-                )
-            );
+            .thenReturn(List.of(groupPlayerResponseWithOperationalMetadata()));
         mockMvc
             .perform(
                 get("/api/groups/1/players")
@@ -890,32 +891,23 @@ class AdminKeyFilterTest {
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].currentMmr").doesNotExist())
-            .andExpect(jsonPath("$[0].baseMmr").doesNotExist());
+            .andExpect(jsonPath("$[0].baseMmr").doesNotExist())
+            .andExpect(jsonPath("$[0].baseTier").doesNotExist())
+            .andExpect(jsonPath("$[0].lastTierSnapshotAt").doesNotExist())
+            .andExpect(jsonPath("$[0].lastTierSnapshotMmr").doesNotExist())
+            .andExpect(jsonPath("$[0].lastTierSnapshotTier").doesNotExist())
+            .andExpect(jsonPath("$[0].liveTier").doesNotExist())
+            .andExpect(jsonPath("$[0].chatLeftAt").exists())
+            .andExpect(jsonPath("$[0].chatLeftReason").value("Synthetic note"))
+            .andExpect(jsonPath("$[0].chatRejoinedAt").exists())
+            .andExpect(jsonPath("$[0].tierChangeAcknowledgedTier").value("A"))
+            .andExpect(jsonPath("$[0].tierChangeAcknowledgedAt").exists());
     }
 
     @Test
     void returnsMmrFieldsForMmrAllowedAdminForGroupPlayers() throws Exception {
         when(playerQueryService.getGroupPlayers(eq(1L), eq(false)))
-            .thenReturn(
-                List.of(
-                    new GroupPlayerResponse(
-                        10L,
-                        "alpha",
-                        "P",
-                        "A",
-                        1200,
-                        "A",
-                        1216,
-                        2,
-                        1,
-                        3,
-                        true,
-                        null,
-                        null,
-                        null
-                    )
-                )
-            );
+            .thenReturn(List.of(groupPlayerResponseWithOperationalMetadata()));
         mockMvc
             .perform(
                 get("/api/groups/1/players")
@@ -923,7 +915,45 @@ class AdminKeyFilterTest {
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].currentMmr").value(1216))
-            .andExpect(jsonPath("$[0].baseMmr").value(1200));
+            .andExpect(jsonPath("$[0].baseMmr").value(1200))
+            .andExpect(jsonPath("$[0].baseTier").value("A"))
+            .andExpect(jsonPath("$[0].lastTierSnapshotAt").exists())
+            .andExpect(jsonPath("$[0].lastTierSnapshotMmr").value(1200))
+            .andExpect(jsonPath("$[0].lastTierSnapshotTier").value("A"))
+            .andExpect(jsonPath("$[0].liveTier").value("B+"))
+            .andExpect(jsonPath("$[0].chatLeftAt").exists())
+            .andExpect(jsonPath("$[0].chatLeftReason").value("Synthetic note"))
+            .andExpect(jsonPath("$[0].chatRejoinedAt").exists())
+            .andExpect(jsonPath("$[0].tierChangeAcknowledgedTier").value("A"))
+            .andExpect(jsonPath("$[0].tierChangeAcknowledgedAt").exists());
+    }
+
+    @Test
+    void ignoresIncludeInactiveForMemberGroupPlayersRequest() throws Exception {
+        when(playerQueryService.getGroupPlayers(eq(1L), eq(false))).thenReturn(List.of());
+
+        mockMvc
+            .perform(
+                get("/api/groups/1/players?includeInactive=true")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+            )
+            .andExpect(status().isOk());
+
+        verify(playerQueryService).getGroupPlayers(eq(1L), eq(false));
+    }
+
+    @Test
+    void allowsIncludeInactiveForAdminGroupPlayersRequest() throws Exception {
+        when(playerQueryService.getGroupPlayers(eq(1L), eq(true))).thenReturn(List.of());
+
+        mockMvc
+            .perform(
+                get("/api/groups/1/players?includeInactive=true")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+            )
+            .andExpect(status().isOk());
+
+        verify(playerQueryService).getGroupPlayers(eq(1L), eq(true));
     }
 
     @Test
@@ -1479,5 +1509,33 @@ class AdminKeyFilterTest {
         mockMvc
             .perform(get("/api/groups/1/matches/recent"))
             .andExpect(status().isOk());
+    }
+
+    private GroupPlayerResponse groupPlayerResponseWithOperationalMetadata() {
+        OffsetDateTime chatLeftAt = OffsetDateTime.parse("2026-05-02T03:41:00Z");
+        OffsetDateTime chatRejoinedAt = OffsetDateTime.parse("2026-05-03T04:42:00Z");
+        OffsetDateTime snapshotAt = OffsetDateTime.parse("2026-04-30T14:59:59Z");
+        return new GroupPlayerResponse(
+            10L,
+            "PlayerAlpha",
+            "P",
+            "A",
+            1200,
+            "A",
+            1216,
+            snapshotAt,
+            1200,
+            "A",
+            "B+",
+            2,
+            1,
+            3,
+            true,
+            chatLeftAt,
+            "Synthetic note",
+            chatRejoinedAt,
+            "A",
+            chatRejoinedAt
+        );
     }
 }

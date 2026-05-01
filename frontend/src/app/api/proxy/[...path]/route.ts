@@ -19,6 +19,10 @@ const HOP_BY_HOP_HEADERS = new Set([
   'x-forwarded-port',
   'x-forwarded-proto',
 ])
+const BLOCKED_IDENTITY_HEADERS = new Set([
+  'x-user-email',
+  'x-user-nickname',
+])
 const UPSTREAM_RESPONSE_HEADER_ALLOWLIST = new Set([
   'cache-control',
   'content-type',
@@ -126,6 +130,9 @@ function buildForwardHeaders(request: NextRequest): Headers {
   request.headers.forEach((value, key) => {
     const normalizedKey = key.toLowerCase()
     if (HOP_BY_HOP_HEADERS.has(normalizedKey)) {
+      return
+    }
+    if (BLOCKED_IDENTITY_HEADERS.has(normalizedKey)) {
       return
     }
     if (normalizedKey === 'cookie') {

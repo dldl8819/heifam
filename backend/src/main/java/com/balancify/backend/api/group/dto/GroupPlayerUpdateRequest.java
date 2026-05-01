@@ -8,6 +8,7 @@ public record GroupPlayerUpdateRequest(
     Boolean active,
     OffsetDateTime chatLeftAt,
     String chatLeftReason,
-    OffsetDateTime chatRejoinedAt
+    OffsetDateTime chatRejoinedAt,
+    String tierChangeAcknowledgedTier
 ) {
 }

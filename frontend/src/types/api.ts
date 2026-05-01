@@ -218,6 +218,10 @@ export type PlayerRosterItem = {
   baseMmr?: number
   baseTier?: PlayerTierStatus
   currentMmr?: number
+  lastTierSnapshotAt?: string
+  lastTierSnapshotMmr?: number
+  lastTierSnapshotTier?: PlayerTierStatus
+  liveTier?: PlayerTierStatus
   wins: number
   losses: number
   games: number
@@ -225,6 +229,8 @@ export type PlayerRosterItem = {
   chatLeftAt?: string
   chatLeftReason?: string
   chatRejoinedAt?: string
+  tierChangeAcknowledgedTier?: PlayerTierStatus
+  tierChangeAcknowledgedAt?: string
 }
 
 export type GroupPlayerMmrUpdateRequest = {

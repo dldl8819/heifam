@@ -416,12 +416,17 @@
     },
     "tierChange": {
       "title": "티어 변경 안내 대상",
-      "description": "초기 MMR 기준 티어와 현재 MMR 기준 티어가 달라진 선수입니다. 단톡 안내용으로 확인해 주세요.",
+      "description": "직전 월말 MMR 기준 티어와 현재 MMR 기준 티어가 달라진 선수입니다. 단톡 안내용으로 확인해 주세요.",
+      "descriptionWithDate": "{date} MMR 기준 티어와 현재 MMR 기준 티어가 달라진 선수입니다. 단톡 안내용으로 확인해 주세요.",
       "count": "총 {count}명",
       "empty": "현재 티어 변경 안내 대상이 없습니다.",
       "fromTo": "{from} -> {to}",
       "mmrFlow": "MMR {from} -> {to}",
-      "badge": "변경 안내"
+      "badge": "변경 안내",
+      "acknowledge": "안내 완료",
+      "acknowledging": "처리 중...",
+      "acknowledgeSuccess": "{nickname} 티어 변경 안내를 완료 처리했습니다.",
+      "acknowledgeFailure": "티어 변경 안내 완료 처리에 실패했습니다. 서버 상태를 확인해 주세요."
     },
     "actions": {
       "edit": "수정",

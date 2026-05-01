@@ -45,9 +45,6 @@ type PersistedBalanceState = {
   raceComposition: RaceComposition | null
   slots: Array<number | null>
   slotInputs: string[]
-  result: BalanceResponse | null
-  resultMatchId: string
-  winnerTeam: WinnerTeamSelection
 }
 
 function formatPercent(value: number): string {
@@ -160,17 +157,6 @@ function readPersistedBalanceState(): PersistedBalanceState | null {
       ),
       slots: sanitizePersistedSlots(parsed.slots),
       slotInputs: sanitizePersistedSlotInputs(parsed.slotInputs),
-      result:
-        parsed.result !== null &&
-        typeof parsed.result === 'object' &&
-        parsed.result !== undefined
-          ? (parsed.result as BalanceResponse)
-          : null,
-      resultMatchId: typeof parsed.resultMatchId === 'string' ? parsed.resultMatchId : '',
-      winnerTeam:
-        parsed.winnerTeam === 'HOME' || parsed.winnerTeam === 'AWAY'
-          ? parsed.winnerTeam
-          : '',
     }
   } catch {
     return null
@@ -276,9 +262,6 @@ export default function BalancePage() {
       setSlots(persisted.slots)
       setSlotInputs(persisted.slotInputs)
       setRaceComposition(persisted.raceComposition)
-      setResult(persisted.result)
-      setResultMatchId(persisted.resultMatchId)
-      setResultWinnerTeam(persisted.winnerTeam)
     }
     setPersistedReady(true)
   }, [])
@@ -293,9 +276,6 @@ export default function BalancePage() {
       raceComposition,
       slots,
       slotInputs,
-      result,
-      resultMatchId,
-      winnerTeam: resultWinnerTeam,
     }
 
     try {
@@ -303,7 +283,7 @@ export default function BalancePage() {
     } catch {
       return
     }
-  }, [teamSize, raceComposition, slots, slotInputs, result, resultMatchId, resultWinnerTeam, persistedReady])
+  }, [teamSize, raceComposition, slots, slotInputs, persistedReady])
 
   const activeSlotIndexes = useMemo(
     () => Array.from({ length: requiredPlayerCount }, (_, index) => index),

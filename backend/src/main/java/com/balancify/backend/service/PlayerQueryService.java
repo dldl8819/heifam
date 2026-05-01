@@ -86,6 +86,11 @@ public class PlayerQueryService {
             String baseTier = baseMmr == null ? null : PlayerTierPolicy.resolveTier(baseMmr);
             int currentMmr = safeInt(player.getMmr());
             String currentTier = PlayerTierPolicy.resolveTierForSnapshot(player.getTier(), currentMmr);
+            Integer lastTierSnapshotMmr = player.getLastTierSnapshotMmr();
+            String lastTierSnapshotTier = lastTierSnapshotMmr == null
+                ? null
+                : PlayerTierPolicy.resolveTier(lastTierSnapshotMmr);
+            String liveTier = PlayerTierPolicy.resolveTier(currentMmr);
 
             responses.add(new GroupPlayerResponse(
                 player.getId(),
@@ -95,13 +100,19 @@ public class PlayerQueryService {
                 baseMmr,
                 baseTier,
                 currentMmr,
+                player.getLastTierSnapshotAt(),
+                lastTierSnapshotMmr,
+                lastTierSnapshotTier,
+                liveTier,
                 stats.wins,
                 stats.losses,
                 games,
                 player.isActive(),
                 player.getChatLeftAt(),
                 player.getChatLeftReason(),
-                player.getChatRejoinedAt()
+                player.getChatRejoinedAt(),
+                player.getTierChangeAcknowledgedTier(),
+                player.getTierChangeAcknowledgedAt()
             ));
         }
 

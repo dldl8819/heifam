@@ -49,7 +49,7 @@ class PlayerAdminServiceTest {
         playerAdminService.updatePlayer(
             1L,
             10L,
-            new GroupPlayerUpdateRequest(" 새닉네임 ", "tz", null, null, null, null)
+            new GroupPlayerUpdateRequest(" 새닉네임 ", "tz", null, null, null, null, null)
         );
 
         verify(playerRepository).findByGroup_IdAndNicknameIgnoreCase(1L, "새닉네임");
@@ -65,7 +65,7 @@ class PlayerAdminServiceTest {
         playerAdminService.updatePlayer(
             1L,
             10L,
-            new GroupPlayerUpdateRequest(null, "PTZ", null, null, null, null)
+            new GroupPlayerUpdateRequest(null, "PTZ", null, null, null, null, null)
         );
 
         verify(playerRepository, never()).findByGroup_IdAndNicknameIgnoreCase(anyLong(), anyString());
@@ -81,7 +81,7 @@ class PlayerAdminServiceTest {
             playerAdminService.updatePlayer(
                 1L,
                 10L,
-                new GroupPlayerUpdateRequest("   ", " ", null, null, null, null)
+                new GroupPlayerUpdateRequest("   ", " ", null, null, null, null, null)
             )
         )
             .isInstanceOf(IllegalArgumentException.class)
@@ -103,7 +103,7 @@ class PlayerAdminServiceTest {
             playerAdminService.updatePlayer(
                 1L,
                 10L,
-                new GroupPlayerUpdateRequest("새닉네임", null, null, null, null, null)
+                new GroupPlayerUpdateRequest("새닉네임", null, null, null, null, null, null)
             )
         )
             .isInstanceOf(IllegalArgumentException.class)
@@ -119,7 +119,7 @@ class PlayerAdminServiceTest {
             playerAdminService.updatePlayer(
                 1L,
                 10L,
-                new GroupPlayerUpdateRequest(null, "X", null, null, null, null)
+                new GroupPlayerUpdateRequest(null, "X", null, null, null, null, null)
             )
         )
             .isInstanceOf(IllegalArgumentException.class)
@@ -136,7 +136,7 @@ class PlayerAdminServiceTest {
         playerAdminService.updatePlayer(
             1L,
             10L,
-            new GroupPlayerUpdateRequest(null, null, false, chatLeftAt, " 개인 사정 ", null)
+            new GroupPlayerUpdateRequest(null, null, false, chatLeftAt, " 개인 사정 ", null, null)
         );
 
         assertThat(player.isActive()).isFalse();
@@ -156,7 +156,7 @@ class PlayerAdminServiceTest {
             playerAdminService.updatePlayer(
                 1L,
                 10L,
-                new GroupPlayerUpdateRequest(null, null, false, null, "개인 사정", null)
+                new GroupPlayerUpdateRequest(null, null, false, null, "개인 사정", null, null)
             )
         )
             .isInstanceOf(IllegalArgumentException.class)
@@ -175,7 +175,7 @@ class PlayerAdminServiceTest {
             playerAdminService.updatePlayer(
                 1L,
                 10L,
-                new GroupPlayerUpdateRequest(null, null, false, chatLeftAt, "   ", null)
+                new GroupPlayerUpdateRequest(null, null, false, chatLeftAt, "   ", null, null)
             )
         )
             .isInstanceOf(IllegalArgumentException.class)
@@ -194,7 +194,7 @@ class PlayerAdminServiceTest {
             playerAdminService.updatePlayer(
                 1L,
                 10L,
-                new GroupPlayerUpdateRequest(null, null, false, chatLeftAt, "a".repeat(501), null)
+                new GroupPlayerUpdateRequest(null, null, false, chatLeftAt, "a".repeat(501), null, null)
             )
         )
             .isInstanceOf(IllegalArgumentException.class)
@@ -215,7 +215,7 @@ class PlayerAdminServiceTest {
             playerAdminService.updatePlayer(
                 1L,
                 10L,
-                new GroupPlayerUpdateRequest(null, null, true, null, null, null)
+                new GroupPlayerUpdateRequest(null, null, true, null, null, null, null)
             )
         )
             .isInstanceOf(IllegalArgumentException.class)
@@ -238,7 +238,7 @@ class PlayerAdminServiceTest {
         playerAdminService.updatePlayer(
             1L,
             10L,
-            new GroupPlayerUpdateRequest(null, null, true, null, null, chatRejoinedAt)
+            new GroupPlayerUpdateRequest(null, null, true, null, null, chatRejoinedAt, null)
         );
 
         assertThat(player.isActive()).isTrue();
@@ -246,6 +246,41 @@ class PlayerAdminServiceTest {
         assertThat(player.getChatLeftReason()).isEqualTo("개인 사정");
         assertThat(player.getChatRejoinedAt()).isEqualTo(chatRejoinedAt);
         verify(playerRepository).save(player);
+    }
+
+    @Test
+    void storesTierChangeAcknowledgementWithoutActiveStatusChange() {
+        Player player = player(10L, 1L, "기존닉");
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+        when(playerRepository.save(any(Player.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        playerAdminService.updatePlayer(
+            1L,
+            10L,
+            new GroupPlayerUpdateRequest(null, null, null, null, null, null, "a+")
+        );
+
+        assertThat(player.getTierChangeAcknowledgedTier()).isEqualTo("A+");
+        assertThat(player.getTierChangeAcknowledgedAt()).isNotNull();
+        verify(playerRepository).save(player);
+    }
+
+    @Test
+    void throwsWhenTierChangeAcknowledgementTierIsInvalid() {
+        Player player = player(10L, 1L, "기존닉");
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+
+        assertThatThrownBy(() ->
+            playerAdminService.updatePlayer(
+                1L,
+                10L,
+                new GroupPlayerUpdateRequest(null, null, null, null, null, null, "diamond")
+            )
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Tier change acknowledgement tier is invalid");
+
+        verify(playerRepository, never()).save(any(Player.class));
     }
 
     @Test

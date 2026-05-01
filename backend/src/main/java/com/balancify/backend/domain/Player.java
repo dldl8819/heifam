@@ -56,6 +56,12 @@ public class Player {
     @Column(name = "chat_rejoined_at")
     private OffsetDateTime chatRejoinedAt;
 
+    @Column(name = "tier_change_acknowledged_tier", length = 20)
+    private String tierChangeAcknowledgedTier;
+
+    @Column(name = "tier_change_acknowledged_at")
+    private OffsetDateTime tierChangeAcknowledgedAt;
+
     @Column(nullable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
@@ -181,6 +187,22 @@ public class Player {
 
     public void setChatRejoinedAt(OffsetDateTime chatRejoinedAt) {
         this.chatRejoinedAt = chatRejoinedAt;
+    }
+
+    public String getTierChangeAcknowledgedTier() {
+        return tierChangeAcknowledgedTier;
+    }
+
+    public void setTierChangeAcknowledgedTier(String tierChangeAcknowledgedTier) {
+        this.tierChangeAcknowledgedTier = tierChangeAcknowledgedTier;
+    }
+
+    public OffsetDateTime getTierChangeAcknowledgedAt() {
+        return tierChangeAcknowledgedAt;
+    }
+
+    public void setTierChangeAcknowledgedAt(OffsetDateTime tierChangeAcknowledgedAt) {
+        this.tierChangeAcknowledgedAt = tierChangeAcknowledgedAt;
     }
 
     public OffsetDateTime getCreatedAt() {

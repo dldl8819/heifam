@@ -2,6 +2,7 @@ package com.balancify.backend.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.balancify.backend.api.group.dto.GroupPlayerResponse;
 import com.balancify.backend.api.match.dto.BalancePlayerDto;
 import com.balancify.backend.api.match.dto.BalanceResponse;
 import com.balancify.backend.api.match.dto.MatchResultParticipantResponse;
@@ -11,10 +12,99 @@ import com.balancify.backend.api.match.dto.MultiBalancePenaltySummaryResponse;
 import com.balancify.backend.api.match.dto.MultiBalanceRaceSummaryResponse;
 import com.balancify.backend.api.match.dto.MultiBalanceResponse;
 import com.balancify.backend.api.match.dto.MultiBalanceWaitingPlayerResponse;
+import java.time.OffsetDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class MmrMaskingMapperTest {
+
+    @Test
+    void maskGroupPlayersForMemberRemovesMmrAndOperationalMetadata() {
+        OffsetDateTime chatLeftAt = OffsetDateTime.parse("2026-05-02T12:41:00+09:00");
+        OffsetDateTime chatRejoinedAt = OffsetDateTime.parse("2026-05-03T13:42:00+09:00");
+        OffsetDateTime snapshotAt = OffsetDateTime.parse("2026-04-30T23:59:59+09:00");
+        GroupPlayerResponse source = new GroupPlayerResponse(
+            1L,
+            "PlayerAlpha",
+            "P",
+            "A",
+            1500,
+            "A",
+            1520,
+            snapshotAt,
+            1500,
+            "A",
+            "A+",
+            10,
+            5,
+            15,
+            false,
+            chatLeftAt,
+            "Synthetic note",
+            chatRejoinedAt,
+            "A",
+            chatRejoinedAt
+        );
+
+        GroupPlayerResponse masked = MmrMaskingMapper.maskGroupPlayersForMember(List.of(source)).getFirst();
+
+        assertThat(masked.baseMmr()).isNull();
+        assertThat(masked.baseTier()).isNull();
+        assertThat(masked.currentMmr()).isNull();
+        assertThat(masked.lastTierSnapshotAt()).isNull();
+        assertThat(masked.lastTierSnapshotMmr()).isNull();
+        assertThat(masked.lastTierSnapshotTier()).isNull();
+        assertThat(masked.liveTier()).isNull();
+        assertThat(masked.chatLeftAt()).isNull();
+        assertThat(masked.chatLeftReason()).isNull();
+        assertThat(masked.chatRejoinedAt()).isNull();
+        assertThat(masked.tierChangeAcknowledgedTier()).isNull();
+        assertThat(masked.tierChangeAcknowledgedAt()).isNull();
+    }
+
+    @Test
+    void maskGroupPlayersForAdminKeepsOperationalMetadataButRemovesMmr() {
+        OffsetDateTime chatLeftAt = OffsetDateTime.parse("2026-05-02T12:41:00+09:00");
+        OffsetDateTime chatRejoinedAt = OffsetDateTime.parse("2026-05-03T13:42:00+09:00");
+        OffsetDateTime snapshotAt = OffsetDateTime.parse("2026-04-30T23:59:59+09:00");
+        GroupPlayerResponse source = new GroupPlayerResponse(
+            1L,
+            "PlayerAlpha",
+            "P",
+            "A",
+            1500,
+            "A",
+            1520,
+            snapshotAt,
+            1500,
+            "A",
+            "A+",
+            10,
+            5,
+            15,
+            false,
+            chatLeftAt,
+            "Synthetic note",
+            chatRejoinedAt,
+            "A",
+            chatRejoinedAt
+        );
+
+        GroupPlayerResponse masked = MmrMaskingMapper.maskGroupPlayersForAdmin(List.of(source)).getFirst();
+
+        assertThat(masked.baseMmr()).isNull();
+        assertThat(masked.baseTier()).isNull();
+        assertThat(masked.currentMmr()).isNull();
+        assertThat(masked.lastTierSnapshotAt()).isNull();
+        assertThat(masked.lastTierSnapshotMmr()).isNull();
+        assertThat(masked.lastTierSnapshotTier()).isNull();
+        assertThat(masked.liveTier()).isNull();
+        assertThat(masked.chatLeftAt()).isEqualTo(chatLeftAt);
+        assertThat(masked.chatLeftReason()).isEqualTo("Synthetic note");
+        assertThat(masked.chatRejoinedAt()).isEqualTo(chatRejoinedAt);
+        assertThat(masked.tierChangeAcknowledgedTier()).isEqualTo("A");
+        assertThat(masked.tierChangeAcknowledgedAt()).isEqualTo(chatRejoinedAt);
+    }
 
     @Test
     void maskBalanceRemovesMmrFields() {

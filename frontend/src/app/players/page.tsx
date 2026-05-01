@@ -7,6 +7,13 @@ import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
+import {
+  buildTierChangeTargets,
+  formatTierChangeDescription,
+  resolveTierChangeSnapshotDateLabel,
+  toTierOrder,
+  type TierChangeTarget,
+} from '@/lib/player-tier-change'
 import type { PlayerRace, PlayerRosterItem, PlayerTierStatus } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
@@ -23,14 +30,6 @@ type PlayerImportRow = {
 type PlayerImportPayload = {
   players: PlayerImportRow[]
 }
-type TierChangeTarget = {
-  playerId: number
-  nickname: string
-  baseTier: PlayerTierStatus
-  currentTier: PlayerTierStatus
-  baseMmr: number
-  currentMmr: number
-}
 type ActivityFormMode = 'deactivate' | 'reactivate'
 type ActivityFormState = {
   mode: ActivityFormMode
@@ -40,23 +39,6 @@ type ActivityFormState = {
   chatRejoinedAt: string
 }
 const PLAYER_RACE_OPTIONS: PlayerRace[] = ['P', 'T', 'Z', 'PT', 'PZ', 'TZ', 'PTZ']
-const TIER_DOWNLOAD_ORDER: Record<PlayerTierStatus, number> = {
-  S: 0,
-  'A+': 1,
-  A: 2,
-  'A-': 3,
-  'B+': 4,
-  B: 5,
-  'B-': 6,
-  'C+': 7,
-  C: 8,
-  'C-': 9,
-  UNASSIGNED: 10,
-}
-
-function toTierOrder(tier: PlayerTierStatus): number {
-  return TIER_DOWNLOAD_ORDER[tier] ?? Number.MAX_SAFE_INTEGER
-}
 
 function comparePlayersByTierThenNickname(a: PlayerRosterItem, b: PlayerRosterItem): number {
   const tierDiff = toTierOrder(a.tier) - toTierOrder(b.tier)
@@ -320,6 +302,7 @@ export default function PlayersPage() {
   const [savingMmrPlayerId, setSavingMmrPlayerId] = useState<number | null>(null)
   const [deletingPlayerId, setDeletingPlayerId] = useState<number | null>(null)
   const [togglingPlayerId, setTogglingPlayerId] = useState<number | null>(null)
+  const [acknowledgingTierChangePlayerId, setAcknowledgingTierChangePlayerId] = useState<number | null>(null)
   const [activityForm, setActivityForm] = useState<ActivityFormState | null>(null)
   const [showInactive, setShowInactive] = useState<boolean>(false)
   const [playerActionError, setPlayerActionError] = useState<string | null>(null)
@@ -709,6 +692,46 @@ export default function PlayersPage() {
     }
   }
 
+  const handleAcknowledgeTierChange = async (target: TierChangeTarget) => {
+    if (!isAdmin || !canViewMmr) {
+      setPlayerActionError(t('common.adminOnlyAction'))
+      return
+    }
+
+    setAcknowledgingTierChangePlayerId(target.playerId)
+    setPlayerActionError(null)
+    setPlayerActionSuccess(null)
+
+    try {
+      await apiClient.updateGroupPlayer(TEMP_GROUP_ID, target.playerId, {
+        tierChangeAcknowledgedTier: target.currentTier,
+      })
+      const acknowledgedAt = new Date().toISOString()
+      setRows((currentRows) =>
+        currentRows.map((row) =>
+          row.id === target.playerId
+            ? {
+                ...row,
+                tierChangeAcknowledgedTier: target.currentTier,
+                tierChangeAcknowledgedAt: acknowledgedAt,
+              }
+            : row
+        )
+      )
+      setPlayerActionSuccess(t('players.tierChange.acknowledgeSuccess', { nickname: target.nickname }))
+    } catch (actionError) {
+      if (isApiForbiddenError(actionError)) {
+        setPlayerActionError(t('common.permissionDenied'))
+      } else if (isApiNotFoundError(actionError)) {
+        setPlayerActionError(t('players.actions.updateNotFound'))
+      } else {
+        setPlayerActionError(t('players.tierChange.acknowledgeFailure'))
+      }
+    } finally {
+      setAcknowledgingTierChangePlayerId(null)
+    }
+  }
+
   const filteredRows = useMemo(() => {
     const searchText = search.trim().toLowerCase()
     return rows.filter((row) => {
@@ -733,42 +756,16 @@ export default function PlayersPage() {
   const tableColumnCount =
     6 + (showStatusColumn ? 1 : 0) + (showMmrColumn ? 1 : 0) + (showActionsColumn ? 1 : 0)
   const tierChangeTargets = useMemo<TierChangeTarget[]>(
-    () =>
-      rows
-        .flatMap((row) => {
-          if (row.baseTier === undefined || row.baseMmr === undefined) {
-            return []
-          }
-          if (row.baseTier === row.tier) {
-            return []
-          }
-
-          return [{
-            playerId: row.id,
-            nickname: row.nickname,
-            baseTier: row.baseTier,
-            currentTier: row.tier,
-            baseMmr: row.baseMmr,
-            currentMmr: row.currentMmr ?? 0,
-          }]
-        })
-        .sort((a, b) => {
-          const currentTierDiff = toTierOrder(a.currentTier) - toTierOrder(b.currentTier)
-          if (currentTierDiff !== 0) {
-            return currentTierDiff
-          }
-
-          if (b.currentMmr !== a.currentMmr) {
-            return b.currentMmr - a.currentMmr
-          }
-
-          return a.nickname.localeCompare(b.nickname, 'ko-KR')
-        }),
+    () => buildTierChangeTargets(rows),
     [rows]
   )
   const tierChangeTargetById = useMemo(
     () => new Map(tierChangeTargets.map((target) => [target.playerId, target])),
     [tierChangeTargets]
+  )
+  const tierChangeSnapshotDateLabel = useMemo(
+    () => resolveTierChangeSnapshotDateLabel(rows, tierChangeTargets),
+    [rows, tierChangeTargets]
   )
   const downloadableRows = useMemo(
     () => [...rows].sort(comparePlayersByTierThenNickname),
@@ -1003,7 +1000,9 @@ export default function PlayersPage() {
               {t('players.tierChange.count', { count: tierChangeTargets.length })}
             </span>
           </div>
-          <p className="mt-1 text-xs text-amber-900">{t('players.tierChange.description')}</p>
+          <p className="mt-1 text-xs text-amber-900">
+            {formatTierChangeDescription(tierChangeSnapshotDateLabel, t)}
+          </p>
           {tierChangeTargets.length === 0 ? (
             <p className="mt-3 rounded-md border border-amber-200 bg-white/70 px-3 py-2 text-xs text-amber-800">
               {t('players.tierChange.empty')}
@@ -1012,7 +1011,7 @@ export default function PlayersPage() {
             <ul className="mt-3 space-y-2">
               {tierChangeTargets.map((target) => {
                 const fromTierLabel =
-                  target.baseTier === 'UNASSIGNED' ? t('players.table.unassigned') : target.baseTier
+                  target.snapshotTier === 'UNASSIGNED' ? t('players.table.unassigned') : target.snapshotTier
                 const toTierLabel =
                   target.currentTier === 'UNASSIGNED'
                     ? t('players.table.unassigned')
@@ -1030,10 +1029,26 @@ export default function PlayersPage() {
                     {showMmrColumn && (
                       <div className="mt-0.5 text-xs text-slate-600">
                         {t('players.tierChange.mmrFlow', {
-                          from: formatMmrValue(target.baseMmr),
+                          from: formatMmrValue(target.snapshotMmr),
                           to: formatMmrValue(target.currentMmr),
                         })}
                       </div>
+                    )}
+                    {isAdmin && (
+                      <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100">
+                        <input
+                          type="checkbox"
+                          checked={acknowledgingTierChangePlayerId === target.playerId}
+                          disabled={acknowledgingTierChangePlayerId !== null}
+                          onChange={() => void handleAcknowledgeTierChange(target)}
+                          className="h-3.5 w-3.5 rounded border-amber-300 text-amber-700 focus:ring-amber-500 disabled:cursor-not-allowed"
+                        />
+                        <span>
+                          {acknowledgingTierChangePlayerId === target.playerId
+                            ? t('players.tierChange.acknowledging')
+                            : t('players.tierChange.acknowledge')}
+                        </span>
+                      </label>
                     )}
                   </li>
                 )

@@ -2,8 +2,8 @@ package com.balancify.backend.api.group;
 
 import com.balancify.backend.api.MmrMaskingMapper;
 import com.balancify.backend.api.group.dto.GroupPlayerResponse;
-import com.balancify.backend.security.AdminRequestResolver;
-import com.balancify.backend.security.MmrAccessRequestResolver;
+import com.balancify.backend.security.AuthenticatedRequestResolver;
+import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.PlayerQueryService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
@@ -18,17 +18,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class GroupPlayerController {
 
     private final PlayerQueryService playerQueryService;
-    private final AdminRequestResolver adminRequestResolver;
-    private final MmrAccessRequestResolver mmrAccessRequestResolver;
+    private final AccessControlService accessControlService;
+    private final AuthenticatedRequestResolver authenticatedRequestResolver;
 
     public GroupPlayerController(
         PlayerQueryService playerQueryService,
-        AdminRequestResolver adminRequestResolver,
-        MmrAccessRequestResolver mmrAccessRequestResolver
+        AccessControlService accessControlService,
+        AuthenticatedRequestResolver authenticatedRequestResolver
     ) {
         this.playerQueryService = playerQueryService;
-        this.adminRequestResolver = adminRequestResolver;
-        this.mmrAccessRequestResolver = mmrAccessRequestResolver;
+        this.accessControlService = accessControlService;
+        this.authenticatedRequestResolver = authenticatedRequestResolver;
     }
 
     @GetMapping("/{groupId}/players")
@@ -37,15 +37,20 @@ public class GroupPlayerController {
         @RequestParam(name = "includeInactive", defaultValue = "false") boolean includeInactive,
         HttpServletRequest request
     ) {
-        boolean adminRequest = adminRequestResolver.isAdminRequest(request);
+        AccessControlService.AccessProfile accessProfile = accessControlService.resolveAccessProfile(
+            authenticatedRequestResolver.resolve(request).email()
+        );
         List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(
             groupId,
-            adminRequest && includeInactive
+            accessProfile.admin() && includeInactive
         );
-        if (mmrAccessRequestResolver.canViewMmr(request)) {
+        if (accessProfile.canViewMmr()) {
             return response;
         }
+        if (accessProfile.admin()) {
+            return MmrMaskingMapper.maskGroupPlayersForAdmin(response);
+        }
 
-        return MmrMaskingMapper.maskGroupPlayers(response);
+        return MmrMaskingMapper.maskGroupPlayersForMember(response);
     }
 }

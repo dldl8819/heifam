@@ -8,6 +8,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.NoSuchElementException;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class PlayerAdminService {
 
     private static final int CHAT_LEFT_REASON_MAX_LENGTH = 500;
+    private static final Set<String> ACKNOWLEDGEABLE_TIERS = Set.of(
+        "S", "A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "UNASSIGNED"
+    );
 
     private final PlayerRepository playerRepository;
 
@@ -38,6 +42,8 @@ public class PlayerAdminService {
         OffsetDateTime chatLeftAt = request == null ? null : request.chatLeftAt();
         String chatLeftReason = safeTrim(request == null ? null : request.chatLeftReason());
         OffsetDateTime chatRejoinedAt = request == null ? null : request.chatRejoinedAt();
+        String tierChangeAcknowledgedTier =
+            normalizeTierChangeAcknowledgement(request == null ? null : request.tierChangeAcknowledgedTier());
         String normalizedRace = race.isEmpty() ? "" : race.toUpperCase(Locale.ROOT);
 
         if (
@@ -47,6 +53,7 @@ public class PlayerAdminService {
                 && chatLeftAt == null
                 && chatLeftReason.isEmpty()
                 && chatRejoinedAt == null
+                && tierChangeAcknowledgedTier.isEmpty()
         ) {
             throw new IllegalArgumentException("At least one field is required");
         }
@@ -101,6 +108,11 @@ public class PlayerAdminService {
             }
         }
 
+        if (!tierChangeAcknowledgedTier.isEmpty()) {
+            player.setTierChangeAcknowledgedTier(tierChangeAcknowledgedTier);
+            player.setTierChangeAcknowledgedAt(OffsetDateTime.now());
+        }
+
         playerRepository.save(player);
     }
 
@@ -142,5 +154,19 @@ public class PlayerAdminService {
 
     private String safeTrim(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private String normalizeTierChangeAcknowledgement(String value) {
+        String normalized = safeTrim(value).toUpperCase(Locale.ROOT);
+        if (normalized.isEmpty()) {
+            return "";
+        }
+        if ("NONE".equals(normalized) || "PENDING".equals(normalized) || "TBD".equals(normalized)) {
+            return "UNASSIGNED";
+        }
+        if (!ACKNOWLEDGEABLE_TIERS.contains(normalized)) {
+            throw new IllegalArgumentException("Tier change acknowledgement tier is invalid");
+        }
+        return normalized;
     }
 }

@@ -12,12 +12,18 @@ public record GroupPlayerResponse(
     Integer baseMmr,
     String baseTier,
     Integer currentMmr,
+    OffsetDateTime lastTierSnapshotAt,
+    Integer lastTierSnapshotMmr,
+    String lastTierSnapshotTier,
+    String liveTier,
     int wins,
     int losses,
     int games,
     boolean active,
     OffsetDateTime chatLeftAt,
     String chatLeftReason,
-    OffsetDateTime chatRejoinedAt
+    OffsetDateTime chatRejoinedAt,
+    String tierChangeAcknowledgedTier,
+    OffsetDateTime tierChangeAcknowledgedAt
 ) {
 }

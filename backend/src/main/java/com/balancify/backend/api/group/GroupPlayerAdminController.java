@@ -2,7 +2,9 @@ package com.balancify.backend.api.group;
 
 import com.balancify.backend.api.group.dto.GroupPlayerUpdateRequest;
 import com.balancify.backend.api.group.dto.GroupPlayerMmrUpdateRequest;
+import com.balancify.backend.security.MmrAccessRequestResolver;
 import com.balancify.backend.service.PlayerAdminService;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.NoSuchElementException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -18,17 +20,30 @@ import org.springframework.web.server.ResponseStatusException;
 public class GroupPlayerAdminController {
 
     private final PlayerAdminService playerAdminService;
+    private final MmrAccessRequestResolver mmrAccessRequestResolver;
 
-    public GroupPlayerAdminController(PlayerAdminService playerAdminService) {
+    public GroupPlayerAdminController(
+        PlayerAdminService playerAdminService,
+        MmrAccessRequestResolver mmrAccessRequestResolver
+    ) {
         this.playerAdminService = playerAdminService;
+        this.mmrAccessRequestResolver = mmrAccessRequestResolver;
     }
 
     @PatchMapping("/{groupId}/players/{playerId}")
     public void updatePlayer(
         @PathVariable Long groupId,
         @PathVariable Long playerId,
-        @RequestBody GroupPlayerUpdateRequest request
+        @RequestBody GroupPlayerUpdateRequest request,
+        HttpServletRequest httpRequest
     ) {
+        if (hasTierChangeAcknowledgement(request) && !mmrAccessRequestResolver.canViewMmr(httpRequest)) {
+            throw new ResponseStatusException(
+                HttpStatus.FORBIDDEN,
+                "MMR access is required to acknowledge tier change"
+            );
+        }
+
         try {
             playerAdminService.updatePlayer(groupId, playerId, request);
         } catch (IllegalArgumentException illegalArgumentException) {
@@ -89,5 +104,11 @@ public class GroupPlayerAdminController {
                 noSuchElementException
             );
         }
+    }
+
+    private boolean hasTierChangeAcknowledgement(GroupPlayerUpdateRequest request) {
+        return request != null
+            && request.tierChangeAcknowledgedTier() != null
+            && !request.tierChangeAcknowledgedTier().isBlank();
     }
 }

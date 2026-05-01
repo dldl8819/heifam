@@ -34,7 +34,7 @@ export default function RootLayout({
           <AppShell>{children}</AppShell>
         </AuthProvider>
         <Analytics />
-        <SpeedInsights />
+        <SpeedInsights sampleRate={0.5} />
       </body>
     </html>
   )

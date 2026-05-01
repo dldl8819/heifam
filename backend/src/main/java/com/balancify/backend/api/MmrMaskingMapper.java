@@ -22,7 +22,7 @@ public final class MmrMaskingMapper {
     private MmrMaskingMapper() {
     }
 
-    public static List<GroupPlayerResponse> maskGroupPlayers(List<GroupPlayerResponse> responses) {
+    public static List<GroupPlayerResponse> maskGroupPlayersForMember(List<GroupPlayerResponse> responses) {
         return responses
             .stream()
             .map(response ->
@@ -32,7 +32,41 @@ public final class MmrMaskingMapper {
                     response.race(),
                     response.tier(),
                     null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    response.wins(),
+                    response.losses(),
+                    response.games(),
+                    response.active(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null
+                )
+            )
+            .toList();
+    }
+
+    public static List<GroupPlayerResponse> maskGroupPlayersForAdmin(List<GroupPlayerResponse> responses) {
+        return responses
+            .stream()
+            .map(response ->
+                new GroupPlayerResponse(
+                    response.id(),
+                    response.nickname(),
+                    response.race(),
                     response.tier(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
                     null,
                     response.wins(),
                     response.losses(),
@@ -40,7 +74,9 @@ public final class MmrMaskingMapper {
                     response.active(),
                     response.chatLeftAt(),
                     response.chatLeftReason(),
-                    response.chatRejoinedAt()
+                    response.chatRejoinedAt(),
+                    response.tierChangeAcknowledgedTier(),
+                    response.tierChangeAcknowledgedAt()
                 )
             )
             .toList();

@@ -136,6 +136,55 @@ class PlayerQueryServiceTest {
     }
 
     @Test
+    void returnsMonthlySnapshotAndLiveTierFieldsForTierChangeNotice() {
+        Group group = new Group();
+        group.setId(1L);
+
+        OffsetDateTime snapshotAt = OffsetDateTime.parse("2026-04-30T23:59:59+09:00");
+        Player player = player(1L, group, "스냅샷", "P", "B", 1220);
+        player.setLastTierSnapshotAt(snapshotAt);
+        player.setLastTierSnapshotMmr(980);
+
+        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
+            .thenReturn(List.of(player));
+        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L))
+            .thenReturn(List.of());
+
+        List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L, false);
+
+        assertThat(response).hasSize(1);
+        GroupPlayerResponse item = response.get(0);
+        assertThat(item.tier()).isEqualTo("B");
+        assertThat(item.lastTierSnapshotAt()).isEqualTo(snapshotAt);
+        assertThat(item.lastTierSnapshotMmr()).isEqualTo(980);
+        assertThat(item.lastTierSnapshotTier()).isEqualTo("B-");
+        assertThat(item.liveTier()).isEqualTo("B+");
+        assertThat(item.currentMmr()).isEqualTo(1220);
+    }
+
+    @Test
+    void omitsMonthlySnapshotFieldsWhenSnapshotMmrIsMissing() {
+        Group group = new Group();
+        group.setId(1L);
+
+        Player player = player(1L, group, "스냅샷없음", "P", "B", 1220);
+
+        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
+            .thenReturn(List.of(player));
+        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L))
+            .thenReturn(List.of());
+
+        List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L, false);
+
+        assertThat(response).hasSize(1);
+        GroupPlayerResponse item = response.get(0);
+        assertThat(item.lastTierSnapshotAt()).isNull();
+        assertThat(item.lastTierSnapshotMmr()).isNull();
+        assertThat(item.lastTierSnapshotTier()).isNull();
+        assertThat(item.liveTier()).isEqualTo("B+");
+    }
+
+    @Test
     void doesNotDemoteDormantTierWhenParticipationIsAboveThreshold() {
         Group group = new Group();
         group.setId(1L);
@@ -227,6 +276,8 @@ class PlayerQueryServiceTest {
         reactivated.setChatLeftAt(chatLeftAt);
         reactivated.setChatLeftReason("톡방 퇴장");
         reactivated.setChatRejoinedAt(chatRejoinedAt);
+        reactivated.setTierChangeAcknowledgedTier("A+");
+        reactivated.setTierChangeAcknowledgedAt(chatRejoinedAt);
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
             .thenReturn(List.of(reactivated));
@@ -240,6 +291,8 @@ class PlayerQueryServiceTest {
         assertThat(response.get(0).chatLeftAt()).isEqualTo(chatLeftAt);
         assertThat(response.get(0).chatLeftReason()).isEqualTo("톡방 퇴장");
         assertThat(response.get(0).chatRejoinedAt()).isEqualTo(chatRejoinedAt);
+        assertThat(response.get(0).tierChangeAcknowledgedTier()).isEqualTo("A+");
+        assertThat(response.get(0).tierChangeAcknowledgedAt()).isEqualTo(chatRejoinedAt);
     }
 
     private Player player(
