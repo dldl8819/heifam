@@ -25,8 +25,8 @@ class MonthlyTierRefreshServiceTest {
     private PlayerRepository playerRepository;
 
     @Test
-    void refreshesTierFromCurrentMmrOnFirstDayOfMonth() {
-        OffsetDateTime now = OffsetDateTime.parse("2026-05-01T04:10:00Z");
+    void refreshesTierFromPreviousMonthEndMmrOnFirstDayOfKstMonth() {
+        OffsetDateTime now = OffsetDateTime.parse("2026-04-30T15:01:00Z");
         MonthlyTierRefreshService service = service(now);
         Player player = player(1L, "S", 890);
 
@@ -36,12 +36,15 @@ class MonthlyTierRefreshServiceTest {
 
         assertThat(player.getTier()).isEqualTo("B-");
         assertThat(player.getLastTierRecalculatedAt()).isEqualTo(now);
+        assertThat(player.getLastTierSnapshotAt())
+            .isEqualTo(OffsetDateTime.parse("2026-04-30T23:59:59+09:00"));
+        assertThat(player.getLastTierSnapshotMmr()).isEqualTo(890);
         verify(playerRepository).saveAll(List.of(player));
     }
 
     @Test
-    void doesNotRefreshTierOutsideFirstDayOfMonth() {
-        MonthlyTierRefreshService service = service(OffsetDateTime.parse("2026-05-02T04:10:00Z"));
+    void doesNotRefreshTierOutsideFirstDayOfKstMonth() {
+        MonthlyTierRefreshService service = service(OffsetDateTime.parse("2026-05-01T15:01:00Z"));
         Player player = player(1L, "S", 890);
 
         service.applyMonthlyTierRefreshIfDue();
@@ -52,11 +55,11 @@ class MonthlyTierRefreshServiceTest {
     }
 
     @Test
-    void refreshesOnlyOncePerMonth() {
-        OffsetDateTime now = OffsetDateTime.parse("2026-05-01T04:10:00Z");
+    void refreshesOnlyOncePerKstMonth() {
+        OffsetDateTime now = OffsetDateTime.parse("2026-04-30T15:01:00Z");
         MonthlyTierRefreshService service = service(now);
         Player player = player(1L, "A", 930);
-        player.setLastTierRecalculatedAt(OffsetDateTime.parse("2026-05-01T00:05:00Z"));
+        player.setLastTierRecalculatedAt(OffsetDateTime.parse("2026-04-30T15:05:00Z"));
 
         when(playerRepository.findAll()).thenReturn(List.of(player));
 
@@ -70,6 +73,7 @@ class MonthlyTierRefreshServiceTest {
         return new MonthlyTierRefreshService(
             playerRepository,
             true,
+            "Asia/Seoul",
             Clock.fixed(now.toInstant(), ZoneOffset.UTC)
         );
     }

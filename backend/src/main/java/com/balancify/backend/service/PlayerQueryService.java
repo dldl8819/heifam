@@ -37,8 +37,8 @@ public class PlayerQueryService {
     }
 
     public List<GroupPlayerResponse> getGroupPlayers(Long groupId, boolean includeInactive) {
-        dormancyMmrDecayService.applyGroupDormancyDecay(groupId);
         monthlyTierRefreshService.applyMonthlyTierRefreshIfDue();
+        dormancyMmrDecayService.applyGroupDormancyDecay(groupId);
         List<Player> players = new ArrayList<>(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId));
         if (!includeInactive) {
             players = new ArrayList<>(players.stream().filter(Player::isActive).toList());

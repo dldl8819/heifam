@@ -56,6 +56,12 @@ public class Player {
     @Column(name = "last_tier_recalculated_at")
     private OffsetDateTime lastTierRecalculatedAt;
 
+    @Column(name = "last_tier_snapshot_at")
+    private OffsetDateTime lastTierSnapshotAt;
+
+    @Column(name = "last_tier_snapshot_mmr")
+    private Integer lastTierSnapshotMmr;
+
     @Column(name = "dormant_since")
     private OffsetDateTime dormantSince;
 
@@ -166,6 +172,22 @@ public class Player {
 
     public void setLastTierRecalculatedAt(OffsetDateTime lastTierRecalculatedAt) {
         this.lastTierRecalculatedAt = lastTierRecalculatedAt;
+    }
+
+    public OffsetDateTime getLastTierSnapshotAt() {
+        return lastTierSnapshotAt;
+    }
+
+    public void setLastTierSnapshotAt(OffsetDateTime lastTierSnapshotAt) {
+        this.lastTierSnapshotAt = lastTierSnapshotAt;
+    }
+
+    public Integer getLastTierSnapshotMmr() {
+        return lastTierSnapshotMmr;
+    }
+
+    public void setLastTierSnapshotMmr(Integer lastTierSnapshotMmr) {
+        this.lastTierSnapshotMmr = lastTierSnapshotMmr;
     }
 
     public OffsetDateTime getDormantSince() {

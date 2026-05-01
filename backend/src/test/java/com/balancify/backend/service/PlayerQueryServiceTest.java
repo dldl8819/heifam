@@ -1,7 +1,7 @@
 package com.balancify.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.when;
 
 import com.balancify.backend.api.group.dto.GroupPlayerResponse;
@@ -16,6 +16,7 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -108,7 +109,9 @@ class PlayerQueryServiceTest {
 
         List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(99L, false);
         assertThat(response).isEmpty();
-        verify(dormancyMmrDecayService).applyGroupDormancyDecay(99L);
+        InOrder ordered = inOrder(monthlyTierRefreshService, dormancyMmrDecayService);
+        ordered.verify(monthlyTierRefreshService).applyMonthlyTierRefreshIfDue();
+        ordered.verify(dormancyMmrDecayService).applyGroupDormancyDecay(99L);
     }
 
     @Test

@@ -35,8 +35,8 @@ public class RankingService {
     }
 
     public List<RankingItemResponse> getGroupRanking(Long groupId) {
-        dormancyMmrDecayService.applyGroupDormancyDecay(groupId);
         monthlyTierRefreshService.applyMonthlyTierRefreshIfDue();
+        dormancyMmrDecayService.applyGroupDormancyDecay(groupId);
         List<Player> players = playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId)
             .stream()
             .filter(Player::isActive)

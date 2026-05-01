@@ -99,7 +99,8 @@ balancify:
       sweep-cron: "${RANK_DORMANCY_SWEEP_CRON:0 0 4 * * *}"
     monthly-tier-refresh:
       enabled: ${RANK_MONTHLY_TIER_REFRESH_ENABLED:true}
-      cron: "${RANK_MONTHLY_TIER_REFRESH_CRON:0 10 4 1 * *}"
+      cron: "${RANK_MONTHLY_TIER_REFRESH_CRON:0 1 0 1 * *}"
+      zone: ${RANK_MONTHLY_TIER_REFRESH_ZONE:Asia/Seoul}
     return-boost:
       games: ${RANK_RETURN_BOOST_GAMES:5}
       multiplier: ${RANK_RETURN_BOOST_MULTIPLIER:2.0}
