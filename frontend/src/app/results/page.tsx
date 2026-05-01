@@ -152,9 +152,9 @@ function findManualPlayerByInput(
 
 export default function ResultsPage() {
   const searchParams = useSearchParams()
-  const { canAccess, isAdmin, isSuperAdmin } = useAdminAuth()
+  const { canAccess, isAdmin, isSuperAdmin, canViewMmr } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
-  const showMmr = isSuperAdmin && mmrVisible
+  const showMmr = canViewMmr && mmrVisible
   const canUseManualEntry = canAccess
   const [operatorEntryMode, setOperatorEntryMode] = useState<OperatorEntryMode>('manual')
   const [manualTeamSize, setManualTeamSize] = useState<SupportedTeamSize>(3)

@@ -179,9 +179,9 @@ function readPersistedBalanceState(): PersistedBalanceState | null {
 
 export default function BalancePage() {
   const router = useRouter()
-  const { isAdmin, isSuperAdmin, isLoggedIn } = useAdminAuth()
+  const { isSuperAdmin, isLoggedIn, canViewMmr } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
-  const showMmr = isSuperAdmin && mmrVisible
+  const showMmr = canViewMmr && mmrVisible
   const [players, setPlayers] = useState<BalancePlayerOption[]>([])
   const [teamSize, setTeamSize] = useState<SupportedTeamSize>(3)
   const [raceComposition, setRaceComposition] = useState<RaceComposition | null>(null)

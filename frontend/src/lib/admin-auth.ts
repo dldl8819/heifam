@@ -25,6 +25,7 @@ export type AdminAuthState = {
   isLoggedIn: boolean
   isAdmin: boolean
   isSuperAdmin: boolean
+  canViewMmr: boolean
   canAccess: boolean
   role: AccessRole
   accessError: boolean
@@ -85,6 +86,7 @@ export function useAdminAuth(): AdminAuthState {
               admin: false,
               superAdmin: false,
               allowed: false,
+              canViewMmr: false,
               preferredRace: null,
             }
             cachedAccessEmail = email
@@ -114,6 +116,7 @@ export function useAdminAuth(): AdminAuthState {
           admin: false,
           superAdmin: false,
           allowed: false,
+          canViewMmr: false,
           preferredRace: null,
         })
       }
@@ -164,6 +167,7 @@ export function useAdminAuth(): AdminAuthState {
     isLoggedIn,
     isAdmin: Boolean(accessProfile?.admin),
     isSuperAdmin: Boolean(accessProfile?.superAdmin),
+    canViewMmr: Boolean(accessProfile?.canViewMmr),
     canAccess: Boolean(accessProfile?.allowed),
     role: resolveRole(accessProfile),
     accessError,

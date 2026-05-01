@@ -384,12 +384,14 @@ export type AccessMeResponse = {
   admin: boolean
   superAdmin: boolean
   allowed: boolean
+  canViewMmr: boolean
   preferredRace: PlayerRace | null
 }
 
 export type AccessEmailEntry = {
   email: string
   nickname: string | null
+  canViewMmr: boolean
 }
 
 export type AccessAdminListResponse = {

@@ -5,11 +5,14 @@ import com.balancify.backend.api.access.dto.AccessAllowedEmailListResponse;
 import com.balancify.backend.api.access.dto.AccessEmailEntryResponse;
 import com.balancify.backend.api.access.dto.AccessEmailUpsertRequest;
 import com.balancify.backend.api.access.dto.AccessMeResponse;
+import com.balancify.backend.api.access.dto.AccessMmrPermissionUpdateRequest;
 import com.balancify.backend.api.access.dto.AccessRaceUpdateRequest;
 import com.balancify.backend.security.AuthenticatedRequestResolver;
 import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.AccessControlService.AccessProfile;
 import jakarta.servlet.http.HttpServletRequest;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -48,6 +51,7 @@ public class AccessControlController {
             profile.admin(),
             profile.superAdmin(),
             profile.allowed(),
+            profile.canViewMmr(),
             profile.preferredRace()
         );
     }
@@ -72,6 +76,7 @@ public class AccessControlController {
                 profile.admin(),
                 profile.superAdmin(),
                 profile.allowed(),
+                profile.canViewMmr(),
                 profile.preferredRace()
             );
         } catch (IllegalArgumentException illegalArgumentException) {
@@ -135,7 +140,35 @@ public class AccessControlController {
         try {
             AccessControlService.AdminEmailSnapshot snapshot = accessControlService.removeManagedAdminEmail(
                 requestEmail,
-                email
+                decodePathValue(email)
+            );
+            return new AccessAdminListResponse(
+                toEntryResponses(snapshot.superAdmins()),
+                toEntryResponses(snapshot.admins())
+            );
+        } catch (IllegalArgumentException illegalArgumentException) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                illegalArgumentException.getMessage(),
+                illegalArgumentException
+            );
+        }
+    }
+
+    @PutMapping("/admins/{email}/mmr-access")
+    public AccessAdminListResponse updateAdminMmrAccess(
+        @PathVariable String email,
+        @RequestBody AccessMmrPermissionUpdateRequest requestBody,
+        HttpServletRequest request
+    ) {
+        String requestEmail = requireRequestEmail(request);
+        requireSuperAdmin(requestEmail);
+
+        try {
+            AccessControlService.AdminEmailSnapshot snapshot = accessControlService.updateManagedAdminMmrAccess(
+                requestEmail,
+                decodePathValue(email),
+                requestBody != null && requestBody.canViewMmr()
             );
             return new AccessAdminListResponse(
                 toEntryResponses(snapshot.superAdmins()),
@@ -196,7 +229,7 @@ public class AccessControlController {
         try {
             AccessControlService.AllowedEmailSnapshot snapshot = accessControlService.removeAllowedUserEmail(
                 requestEmail,
-                email
+                decodePathValue(email)
             );
             return new AccessAllowedEmailListResponse(toEntryResponses(snapshot.allowedUsers()));
         } catch (IllegalArgumentException illegalArgumentException) {
@@ -251,11 +284,23 @@ public class AccessControlController {
         List<AccessControlService.AccessEmailEntry> entries
     ) {
         return entries.stream()
-            .map(entry -> new AccessEmailEntryResponse(entry.email(), entry.nickname()))
+            .map(entry -> new AccessEmailEntryResponse(entry.email(), entry.nickname(), entry.canViewMmr()))
             .toList();
     }
 
     private String safeTrim(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private String decodePathValue(String value) {
+        String trimmed = safeTrim(value);
+        if (trimmed.isEmpty() || !trimmed.contains("%")) {
+            return trimmed;
+        }
+        try {
+            return URLDecoder.decode(trimmed, StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException ignored) {
+            return trimmed;
+        }
     }
 }

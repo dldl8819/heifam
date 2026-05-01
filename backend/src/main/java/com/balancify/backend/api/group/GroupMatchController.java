@@ -2,7 +2,7 @@ package com.balancify.backend.api.group;
 
 import com.balancify.backend.api.MmrMaskingMapper;
 import com.balancify.backend.api.group.dto.GroupRecentMatchResponse;
-import com.balancify.backend.security.SuperAdminRequestResolver;
+import com.balancify.backend.security.MmrAccessRequestResolver;
 import com.balancify.backend.service.MatchQueryService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
@@ -17,14 +17,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class GroupMatchController {
 
     private final MatchQueryService matchQueryService;
-    private final SuperAdminRequestResolver superAdminRequestResolver;
+    private final MmrAccessRequestResolver mmrAccessRequestResolver;
 
     public GroupMatchController(
         MatchQueryService matchQueryService,
-        SuperAdminRequestResolver superAdminRequestResolver
+        MmrAccessRequestResolver mmrAccessRequestResolver
     ) {
         this.matchQueryService = matchQueryService;
-        this.superAdminRequestResolver = superAdminRequestResolver;
+        this.mmrAccessRequestResolver = mmrAccessRequestResolver;
     }
 
     @GetMapping("/{groupId}/matches/recent")
@@ -34,7 +34,7 @@ public class GroupMatchController {
         HttpServletRequest request
     ) {
         List<GroupRecentMatchResponse> response = matchQueryService.getRecentMatches(groupId, limit);
-        if (superAdminRequestResolver.isSuperAdminRequest(request)) {
+        if (mmrAccessRequestResolver.canViewMmr(request)) {
             return response;
         }
 

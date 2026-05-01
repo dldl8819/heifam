@@ -701,6 +701,20 @@ export const apiClient = {
         baseUrlOverride: ACCESS_API_BASE_URL,
       }
     ),
+  updateAdminMmrAccess: (email: string, canViewMmr: boolean) =>
+    apiRequest<AccessAdminListResponse>(
+      `/api/access/admins/${encodeURIComponent(email)}/mmr-access`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ canViewMmr }),
+      },
+      {
+        requireUserEmail: true,
+        includeUserEmail: true,
+        timeoutMs: ACCESS_API_REQUEST_TIMEOUT_MS,
+        baseUrlOverride: ACCESS_API_BASE_URL,
+      }
+    ),
   getAllowedEmailList: () =>
     apiRequest<AccessAllowedEmailListResponse>('/api/access/allowed-users', undefined, {
       requireUserEmail: true,

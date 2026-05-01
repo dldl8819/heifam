@@ -3,7 +3,7 @@ package com.balancify.backend.api.group;
 import com.balancify.backend.api.MmrMaskingMapper;
 import com.balancify.backend.api.group.dto.GroupPlayerResponse;
 import com.balancify.backend.security.AdminRequestResolver;
-import com.balancify.backend.security.SuperAdminRequestResolver;
+import com.balancify.backend.security.MmrAccessRequestResolver;
 import com.balancify.backend.service.PlayerQueryService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
@@ -19,16 +19,16 @@ public class GroupPlayerController {
 
     private final PlayerQueryService playerQueryService;
     private final AdminRequestResolver adminRequestResolver;
-    private final SuperAdminRequestResolver superAdminRequestResolver;
+    private final MmrAccessRequestResolver mmrAccessRequestResolver;
 
     public GroupPlayerController(
         PlayerQueryService playerQueryService,
         AdminRequestResolver adminRequestResolver,
-        SuperAdminRequestResolver superAdminRequestResolver
+        MmrAccessRequestResolver mmrAccessRequestResolver
     ) {
         this.playerQueryService = playerQueryService;
         this.adminRequestResolver = adminRequestResolver;
-        this.superAdminRequestResolver = superAdminRequestResolver;
+        this.mmrAccessRequestResolver = mmrAccessRequestResolver;
     }
 
     @GetMapping("/{groupId}/players")
@@ -38,12 +38,11 @@ public class GroupPlayerController {
         HttpServletRequest request
     ) {
         boolean adminRequest = adminRequestResolver.isAdminRequest(request);
-        boolean superAdminRequest = superAdminRequestResolver.isSuperAdminRequest(request);
         List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(
             groupId,
             adminRequest && includeInactive
         );
-        if (superAdminRequest) {
+        if (mmrAccessRequestResolver.canViewMmr(request)) {
             return response;
         }
 

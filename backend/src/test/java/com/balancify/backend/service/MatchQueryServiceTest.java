@@ -73,6 +73,7 @@ class MatchQueryServiceTest {
                     false,
                     false,
                     true,
+                    false,
                     null
                 )
             );
@@ -131,6 +132,7 @@ class MatchQueryServiceTest {
                     false,
                     false,
                     true,
+                    false,
                     null
                 )
             );
@@ -180,6 +182,7 @@ class MatchQueryServiceTest {
                     false,
                     false,
                     true,
+                    false,
                     null
                 )
             );
@@ -219,6 +222,7 @@ class MatchQueryServiceTest {
                     "legacy@hei.gg",
                     null,
                     "BLOCKED",
+                    false,
                     false,
                     false,
                     false,

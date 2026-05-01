@@ -10,10 +10,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.balancify.backend.api.HealthController;
+import com.balancify.backend.api.access.AccessControlController;
 import com.balancify.backend.api.admin.AdminRatingController;
 import com.balancify.backend.api.group.GroupMatchAdminController;
 import com.balancify.backend.api.group.GroupMatchController;
@@ -76,6 +78,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(controllers = {
     MatchResultController.class,
+    AccessControlController.class,
     MatchImportController.class,
     MatchBalanceController.class,
     AdminRatingController.class,
@@ -146,6 +149,9 @@ class AdminKeyFilterTest {
     private SuperAdminRequestResolver superAdminRequestResolver;
 
     @MockBean
+    private MmrAccessRequestResolver mmrAccessRequestResolver;
+
+    @MockBean
     private AccessControlService accessControlService;
 
     @MockBean
@@ -172,12 +178,18 @@ class AdminKeyFilterTest {
             String email = argument == null ? "" : argument.toString().trim().toLowerCase(Locale.ROOT);
             return allowed.contains(email);
         });
+        when(accessControlService.canViewMmr(any())).thenAnswer(invocation -> {
+            Object argument = invocation.getArgument(0);
+            String email = argument == null ? "" : argument.toString().trim().toLowerCase(Locale.ROOT);
+            return superAdmins.contains(email) || "ops@hei.gg".equals(email);
+        });
         when(accessControlService.resolveAccessProfile(any())).thenAnswer(invocation -> {
             Object argument = invocation.getArgument(0);
             String email = argument == null ? "" : argument.toString().trim().toLowerCase(Locale.ROOT);
             boolean isSuperAdmin = superAdmins.contains(email);
             boolean isAdmin = admins.contains(email) || isSuperAdmin;
             boolean isAllowed = allowed.contains(email);
+            boolean canViewMmr = isSuperAdmin || "ops@hei.gg".equals(email);
             String nickname = email.contains("@") ? email.substring(0, email.indexOf('@')) : null;
             String role = isSuperAdmin ? "SUPER_ADMIN" : isAdmin ? "ADMIN" : isAllowed ? "MEMBER" : "BLOCKED";
             return new AccessControlService.AccessProfile(
@@ -187,6 +199,7 @@ class AdminKeyFilterTest {
                 isAdmin,
                 isSuperAdmin,
                 isAllowed,
+                canViewMmr,
                 null
             );
         });
@@ -201,6 +214,18 @@ class AdminKeyFilterTest {
             String normalizedNickname = nickname == null ? "" : nickname.trim();
             return new AuthenticatedRequestResolver.ResolvedRequestIdentity(normalizedEmail, normalizedNickname, true);
         });
+        when(adminRequestResolver.isAdminRequest(any())).thenAnswer(invocation -> {
+            HttpServletRequest request = invocation.getArgument(0);
+            if (request == null) {
+                return false;
+            }
+            String email = request.getHeader("X-USER-EMAIL");
+            if (email == null || email.isBlank()) {
+                return false;
+            }
+            String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
+            return admins.contains(normalizedEmail) || superAdmins.contains(normalizedEmail);
+        });
         when(superAdminRequestResolver.isSuperAdminRequest(any())).thenAnswer(invocation -> {
             HttpServletRequest request = invocation.getArgument(0);
             String email = request.getHeader("X-USER-EMAIL");
@@ -209,6 +234,18 @@ class AdminKeyFilterTest {
             }
             String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
             return superAdmins.contains(normalizedEmail);
+        });
+        when(mmrAccessRequestResolver.canViewMmr(any())).thenAnswer(invocation -> {
+            HttpServletRequest request = invocation.getArgument(0);
+            if (request == null) {
+                return false;
+            }
+            String email = request.getHeader("X-USER-EMAIL");
+            if (email == null || email.isBlank()) {
+                return false;
+            }
+            String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
+            return superAdmins.contains(normalizedEmail) || "ops@hei.gg".equals(normalizedEmail);
         });
     }
 
@@ -246,6 +283,7 @@ class AdminKeyFilterTest {
                     false,
                     false,
                     true,
+                    false,
                     null
                 )
             );
@@ -304,6 +342,7 @@ class AdminKeyFilterTest {
                     false,
                     false,
                     true,
+                    false,
                     null
                 )
             );
@@ -363,7 +402,7 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void returnsMmrFieldsForSuperAdminMatchResult() throws Exception {
+    void returnsMmrFieldsForMmrAllowedAdminMatchResult() throws Exception {
         when(matchResultService.processMatchResult(eq(1L), any(MatchResultRequest.class), any(), any(), anyBoolean()))
             .thenReturn(
                 new MatchResultResponse(
@@ -387,7 +426,7 @@ class AdminKeyFilterTest {
         mockMvc
             .perform(
                 post("/api/matches/1/result")
-                    .header("X-USER-EMAIL", "superadmin@hei.gg")
+                    .header("X-USER-EMAIL", "ops@hei.gg")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"winnerTeam\":\"HOME\"}")
             )
@@ -397,6 +436,43 @@ class AdminKeyFilterTest {
             .andExpect(jsonPath("$.participants[0].mmrBefore").value(1200))
             .andExpect(jsonPath("$.participants[0].mmrAfter").value(1216))
             .andExpect(jsonPath("$.participants[0].mmrDelta").value(16));
+    }
+
+    @Test
+    void hidesMmrFieldsFromAdminWithoutMmrAccessForMatchResult() throws Exception {
+        when(matchResultService.processMatchResult(eq(1L), any(MatchResultRequest.class), any(), any(), anyBoolean()))
+            .thenReturn(
+                new MatchResultResponse(
+                    1L,
+                    "HOME",
+                    32,
+                    0.67,
+                    0.33,
+                    List.of(
+                        new MatchResultParticipantResponse(
+                            10L,
+                            "alpha",
+                            "HOME",
+                            1200,
+                            1216,
+                            16
+                        )
+                    )
+                )
+            );
+        mockMvc
+            .perform(
+                post("/api/matches/1/result")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"winnerTeam\":\"HOME\"}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.homeExpectedWinRate").doesNotExist())
+            .andExpect(jsonPath("$.awayExpectedWinRate").doesNotExist())
+            .andExpect(jsonPath("$.participants[0].mmrBefore").doesNotExist())
+            .andExpect(jsonPath("$.participants[0].mmrAfter").doesNotExist())
+            .andExpect(jsonPath("$.participants[0].mmrDelta").doesNotExist());
     }
 
     @Test
@@ -647,6 +723,50 @@ class AdminKeyFilterTest {
     }
 
     @Test
+    void returnsForbiddenForAdminMmrAccessUpdateWithoutSuperAdminEmail() throws Exception {
+        mockMvc
+            .perform(
+                put("/api/access/admins/ops%40hei.gg/mmr-access")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"canViewMmr\":true}")
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void allowsAdminMmrAccessUpdateWithSuperAdminEmail() throws Exception {
+        when(accessControlService.updateManagedAdminMmrAccess(
+            eq("superadmin@hei.gg"),
+            eq("ops@hei.gg"),
+            eq(true)
+        ))
+            .thenReturn(
+                new AccessControlService.AdminEmailSnapshot(
+                    List.of(new AccessControlService.AccessEmailEntry("superadmin@hei.gg", "superadmin", true)),
+                    List.of(new AccessControlService.AccessEmailEntry("ops@hei.gg", "ops", true))
+                )
+            );
+
+        mockMvc
+            .perform(
+                put("/api/access/admins/ops%40hei.gg/mmr-access")
+                    .header("X-USER-EMAIL", "superadmin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"canViewMmr\":true}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.admins[0].email").value("ops@hei.gg"))
+            .andExpect(jsonPath("$.admins[0].canViewMmr").value(true));
+
+        verify(accessControlService).updateManagedAdminMmrAccess(
+            eq("superadmin@hei.gg"),
+            eq("ops@hei.gg"),
+            eq(true)
+        );
+    }
+
+    @Test
     void returnsForbiddenForGroupMatchCreateWithoutAllowedEmail() throws Exception {
         mockMvc
             .perform(
@@ -738,7 +858,7 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void returnsMmrFieldsForSuperAdminForGroupPlayers() throws Exception {
+    void hidesMmrFieldsFromAdminWithoutMmrAccessForGroupPlayers() throws Exception {
         when(playerQueryService.getGroupPlayers(eq(1L), eq(false)))
             .thenReturn(
                 List.of(
@@ -760,7 +880,37 @@ class AdminKeyFilterTest {
         mockMvc
             .perform(
                 get("/api/groups/1/players")
-                    .header("X-USER-EMAIL", "superadmin@hei.gg")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].currentMmr").doesNotExist())
+            .andExpect(jsonPath("$[0].baseMmr").doesNotExist());
+    }
+
+    @Test
+    void returnsMmrFieldsForMmrAllowedAdminForGroupPlayers() throws Exception {
+        when(playerQueryService.getGroupPlayers(eq(1L), eq(false)))
+            .thenReturn(
+                List.of(
+                    new GroupPlayerResponse(
+                        10L,
+                        "alpha",
+                        "P",
+                        "A",
+                        1200,
+                        "A",
+                        1216,
+                        2,
+                        1,
+                        3,
+                        true
+                    )
+                )
+            );
+        mockMvc
+            .perform(
+                get("/api/groups/1/players")
+                    .header("X-USER-EMAIL", "ops@hei.gg")
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].currentMmr").value(1216))
@@ -849,6 +999,7 @@ class AdminKeyFilterTest {
                     false,
                     false,
                     true,
+                    false,
                     null
                 )
             );
@@ -870,6 +1021,7 @@ class AdminKeyFilterTest {
                     "superadmin@hei.gg",
                     "superadmin",
                     "SUPER_ADMIN",
+                    true,
                     true,
                     true,
                     true,
@@ -901,7 +1053,42 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void hidesMmrFieldsFromAdminForRecentMatches() throws Exception {
+    void returnsMmrFieldsForMmrAllowedAdminForRecentMatches() throws Exception {
+        when(matchQueryService.getRecentMatches(eq(1L), any()))
+            .thenReturn(
+                List.of(
+                    new GroupRecentMatchResponse(
+                        77L,
+                        OffsetDateTime.parse("2026-04-01T12:00:00Z"),
+                        "COMPLETED",
+                        "HOME",
+                        OffsetDateTime.parse("2026-04-01T12:40:00Z"),
+                        "운영진",
+                        "PTZ",
+                        "PTZ",
+                        List.of(new GroupRecentMatchPlayerResponse(10L, "alpha", "HOME", 1200)),
+                        List.of(new GroupRecentMatchPlayerResponse(20L, "bravo", "AWAY", 1184)),
+                        3600,
+                        3552,
+                        48
+                    )
+                )
+            );
+        mockMvc
+            .perform(
+                get("/api/groups/1/matches/recent")
+                    .header("X-USER-EMAIL", "ops@hei.gg")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].homeMmr").value(3600))
+            .andExpect(jsonPath("$[0].awayMmr").value(3552))
+            .andExpect(jsonPath("$[0].mmrDiff").value(48))
+            .andExpect(jsonPath("$[0].homeTeam[0].mmr").value(1200))
+            .andExpect(jsonPath("$[0].awayTeam[0].mmr").value(1184));
+    }
+
+    @Test
+    void hidesMmrFieldsFromAdminWithoutMmrAccessForRecentMatches() throws Exception {
         when(matchQueryService.getRecentMatches(eq(1L), any()))
             .thenReturn(
                 List.of(
@@ -974,7 +1161,7 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void returnsMmrFieldsForSuperAdminForBalanceResponse() throws Exception {
+    void hidesMmrFieldsFromAdminWithoutMmrAccessForBalanceResponse() throws Exception {
         when(teamBalancingService.balance(any()))
             .thenReturn(
                 new BalanceResponse(
@@ -998,7 +1185,45 @@ class AdminKeyFilterTest {
         mockMvc
             .perform(
                 post("/api/matches/balance")
-                    .header("X-USER-EMAIL", "superadmin@hei.gg")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"groupId\":1,\"playerIds\":[1,2,3,4,5,6],\"teamSize\":3}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.homeMmr").doesNotExist())
+            .andExpect(jsonPath("$.awayMmr").doesNotExist())
+            .andExpect(jsonPath("$.mmrDiff").doesNotExist())
+            .andExpect(jsonPath("$.expectedHomeWinRate").value(0.61))
+            .andExpect(jsonPath("$.homeTeam[0].mmr").doesNotExist())
+            .andExpect(jsonPath("$.awayTeam[0].mmr").doesNotExist());
+    }
+
+    @Test
+    void returnsMmrFieldsForMmrAllowedAdminForBalanceResponse() throws Exception {
+        when(teamBalancingService.balance(any()))
+            .thenReturn(
+                new BalanceResponse(
+                    3,
+                    List.of(
+                        new BalancePlayerDto(1L, "alpha", 1200),
+                        new BalancePlayerDto(2L, "bravo", 1190),
+                        new BalancePlayerDto(3L, "charlie", 1180)
+                    ),
+                    List.of(
+                        new BalancePlayerDto(4L, "delta", 1170),
+                        new BalancePlayerDto(5L, "echo", 1160),
+                        new BalancePlayerDto(6L, "foxtrot", 1150)
+                    ),
+                    3570,
+                    3480,
+                    90,
+                    0.61
+                )
+            );
+        mockMvc
+            .perform(
+                post("/api/matches/balance")
+                    .header("X-USER-EMAIL", "ops@hei.gg")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"groupId\":1,\"playerIds\":[1,2,3,4,5,6],\"teamSize\":3}")
             )
@@ -1076,6 +1301,108 @@ class AdminKeyFilterTest {
             .andExpect(jsonPath("$.matches[0].expectedHomeWinRate").value(0.61))
             .andExpect(jsonPath("$.matches[0].homeTeam[0].mmr").doesNotExist())
             .andExpect(jsonPath("$.matches[0].awayTeam[0].mmr").doesNotExist());
+    }
+
+    @Test
+    void hidesMmrFieldsFromAdminWithoutMmrAccessForMultiBalanceResponse() throws Exception {
+        when(multiMatchBalancingService.balance(any()))
+            .thenReturn(
+                new MultiBalanceResponse(
+                    "MMR_FIRST",
+                    6,
+                    6,
+                    List.of(new MultiBalanceWaitingPlayerResponse(7L, "대기")),
+                    1,
+                    List.of(
+                        new MultiBalanceMatchResponse(
+                            1,
+                            "3v3",
+                            3,
+                            List.of(
+                                new BalancePlayerDto(1L, "alpha", 1200),
+                                new BalancePlayerDto(2L, "bravo", 1190),
+                                new BalancePlayerDto(3L, "charlie", 1180)
+                            ),
+                            List.of(
+                                new BalancePlayerDto(4L, "delta", 1170),
+                                new BalancePlayerDto(5L, "echo", 1160),
+                                new BalancePlayerDto(6L, "foxtrot", 1150)
+                            ),
+                            3570,
+                            3480,
+                            90,
+                            0.61,
+                            new MultiBalanceRaceSummaryResponse("PPT", "PTZ"),
+                            new MultiBalancePenaltySummaryResponse(0, 0, 0)
+                        )
+                    )
+                )
+            );
+        mockMvc
+            .perform(
+                post("/api/matches/balance/multi")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"groupId\":1,\"playerIds\":[1,2,3,4,5,6],\"balanceMode\":\"MMR_FIRST\"}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.matches[0].homeMmr").doesNotExist())
+            .andExpect(jsonPath("$.matches[0].awayMmr").doesNotExist())
+            .andExpect(jsonPath("$.matches[0].mmrDiff").doesNotExist())
+            .andExpect(jsonPath("$.matches[0].expectedHomeWinRate").value(0.61))
+            .andExpect(jsonPath("$.matches[0].homeTeam[0].mmr").doesNotExist())
+            .andExpect(jsonPath("$.matches[0].awayTeam[0].mmr").doesNotExist());
+    }
+
+    @Test
+    void returnsMmrFieldsForMmrAllowedAdminForMultiBalanceResponse() throws Exception {
+        when(multiMatchBalancingService.balance(any()))
+            .thenReturn(
+                new MultiBalanceResponse(
+                    "MMR_FIRST",
+                    6,
+                    6,
+                    List.of(new MultiBalanceWaitingPlayerResponse(7L, "대기")),
+                    1,
+                    List.of(
+                        new MultiBalanceMatchResponse(
+                            1,
+                            "3v3",
+                            3,
+                            List.of(
+                                new BalancePlayerDto(1L, "alpha", 1200),
+                                new BalancePlayerDto(2L, "bravo", 1190),
+                                new BalancePlayerDto(3L, "charlie", 1180)
+                            ),
+                            List.of(
+                                new BalancePlayerDto(4L, "delta", 1170),
+                                new BalancePlayerDto(5L, "echo", 1160),
+                                new BalancePlayerDto(6L, "foxtrot", 1150)
+                            ),
+                            3570,
+                            3480,
+                            90,
+                            0.61,
+                            new MultiBalanceRaceSummaryResponse("PPT", "PTZ"),
+                            new MultiBalancePenaltySummaryResponse(0, 0, 0)
+                        )
+                    )
+                )
+            );
+        mockMvc
+            .perform(
+                post("/api/matches/balance/multi")
+                    .header("X-USER-EMAIL", "ops@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"groupId\":1,\"playerIds\":[1,2,3,4,5,6],\"balanceMode\":\"MMR_FIRST\"}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.matches[0].homeMmr").value(3570))
+            .andExpect(jsonPath("$.matches[0].awayMmr").value(3480))
+            .andExpect(jsonPath("$.matches[0].mmrDiff").value(90))
+            .andExpect(jsonPath("$.matches[0].expectedHomeWinRate").value(0.61))
+            .andExpect(jsonPath("$.matches[0].homeTeam[0].mmr").value(1200))
+            .andExpect(jsonPath("$.matches[0].awayTeam[0].mmr").value(1170));
     }
 
     @Test

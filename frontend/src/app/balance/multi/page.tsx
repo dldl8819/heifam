@@ -95,9 +95,9 @@ function deriveRaceCompositionTeamSize(totalPlayers: number): 2 | 3 | null {
 }
 
 export default function MultiBalancePage() {
-  const { isSuperAdmin } = useAdminAuth()
+  const { canViewMmr } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
-  const showMmr = isSuperAdmin && mmrVisible
+  const showMmr = canViewMmr && mmrVisible
   const [players, setPlayers] = useState<BalancePlayerOption[]>([])
   const [playersLoading, setPlayersLoading] = useState<boolean>(true)
   const [playersError, setPlayersError] = useState<string | null>(null)

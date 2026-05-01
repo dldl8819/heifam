@@ -1,8 +1,10 @@
 package com.balancify.backend.service;
 
+import com.balancify.backend.domain.AdminMmrAccessEmail;
 import com.balancify.backend.domain.AllowedUserEmail;
 import com.balancify.backend.domain.ManagedAdminEmail;
 import com.balancify.backend.domain.UserRacePreference;
+import com.balancify.backend.repository.AdminMmrAccessEmailRepository;
 import com.balancify.backend.repository.AllowedUserEmailRepository;
 import com.balancify.backend.repository.ManagedAdminEmailRepository;
 import com.balancify.backend.repository.UserRacePreferenceRepository;
@@ -25,6 +27,7 @@ public class AccessControlService {
 
     private final AdminKeyProperties adminKeyProperties;
     private final ManagedAdminEmailRepository managedAdminEmailRepository;
+    private final AdminMmrAccessEmailRepository adminMmrAccessEmailRepository;
     private final AllowedUserEmailRepository allowedUserEmailRepository;
     private final UserRacePreferenceRepository userRacePreferenceRepository;
     private final ConcurrentMap<String, CachedAccessState> accessStateCache = new ConcurrentHashMap<>();
@@ -36,12 +39,14 @@ public class AccessControlService {
     public AccessControlService(
         AdminKeyProperties adminKeyProperties,
         ManagedAdminEmailRepository managedAdminEmailRepository,
+        AdminMmrAccessEmailRepository adminMmrAccessEmailRepository,
         AllowedUserEmailRepository allowedUserEmailRepository,
         UserRacePreferenceRepository userRacePreferenceRepository
     ) {
         this(
             adminKeyProperties,
             managedAdminEmailRepository,
+            adminMmrAccessEmailRepository,
             allowedUserEmailRepository,
             userRacePreferenceRepository,
             DEFAULT_ACCESS_STATE_CACHE_TTL_MS
@@ -51,12 +56,14 @@ public class AccessControlService {
     AccessControlService(
         AdminKeyProperties adminKeyProperties,
         ManagedAdminEmailRepository managedAdminEmailRepository,
+        AdminMmrAccessEmailRepository adminMmrAccessEmailRepository,
         AllowedUserEmailRepository allowedUserEmailRepository,
         UserRacePreferenceRepository userRacePreferenceRepository,
         long accessStateCacheTtlMs
     ) {
         this.adminKeyProperties = adminKeyProperties;
         this.managedAdminEmailRepository = managedAdminEmailRepository;
+        this.adminMmrAccessEmailRepository = adminMmrAccessEmailRepository;
         this.allowedUserEmailRepository = allowedUserEmailRepository;
         this.userRacePreferenceRepository = userRacePreferenceRepository;
         this.accessStateCacheTtlMs = Math.max(0L, accessStateCacheTtlMs);
@@ -66,7 +73,7 @@ public class AccessControlService {
     public AccessProfile resolveAccessProfile(String email) {
         String normalizedEmail = normalizeEmail(email);
         if (normalizedEmail.isEmpty()) {
-            return new AccessProfile("", null, "BLOCKED", false, false, false, null);
+            return new AccessProfile("", null, "BLOCKED", false, false, false, false, null);
         }
 
         AccessState accessState = resolveAccessState(normalizedEmail);
@@ -82,6 +89,7 @@ public class AccessControlService {
             admin,
             superAdmin,
             allowed,
+            accessState.canViewMmr(),
             accessState.preferredRace()
         );
     }
@@ -122,6 +130,12 @@ public class AccessControlService {
     }
 
     @Transactional(readOnly = true)
+    public boolean canViewMmr(String email) {
+        String normalizedEmail = normalizeEmail(email);
+        return !normalizedEmail.isEmpty() && resolveAccessState(normalizedEmail).canViewMmr();
+    }
+
+    @Transactional(readOnly = true)
     public boolean isServiceAccessAllowed(String email) {
         String normalizedEmail = normalizeEmail(email);
         return !normalizedEmail.isEmpty() && resolveAccessState(normalizedEmail).allowed();
@@ -136,7 +150,7 @@ public class AccessControlService {
             .toList();
 
         List<AccessEmailEntry> superAdmins = superAdminEmails.stream()
-            .map(superAdminEmail -> new AccessEmailEntry(superAdminEmail, resolveNickname(superAdminEmail)))
+            .map(superAdminEmail -> new AccessEmailEntry(superAdminEmail, resolveNickname(superAdminEmail), true))
             .toList();
 
         Set<String> adminSet = new LinkedHashSet<>(adminKeyProperties.getNormalizedAdminEmails());
@@ -150,7 +164,7 @@ public class AccessControlService {
 
         List<AccessEmailEntry> admins = adminSet.stream()
             .sorted()
-            .map(adminEmail -> new AccessEmailEntry(adminEmail, resolveNickname(adminEmail)))
+            .map(adminEmail -> new AccessEmailEntry(adminEmail, resolveNickname(adminEmail), canViewMmr(adminEmail)))
             .toList();
 
         return new AdminEmailSnapshot(superAdmins, admins);
@@ -168,7 +182,7 @@ public class AccessControlService {
 
         List<AccessEmailEntry> allowedUsers = new ArrayList<>(allowedSet).stream()
             .sorted()
-            .map(allowedEmail -> new AccessEmailEntry(allowedEmail, resolveNickname(allowedEmail)))
+            .map(allowedEmail -> new AccessEmailEntry(allowedEmail, resolveNickname(allowedEmail), false))
             .toList();
 
         return new AllowedEmailSnapshot(allowedUsers);
@@ -213,6 +227,48 @@ public class AccessControlService {
         managedAdminEmailRepository
             .findByNormalizedEmail(normalizedTargetEmail)
             .ifPresent(managedAdminEmailRepository::delete);
+        adminMmrAccessEmailRepository
+            .findByNormalizedEmail(normalizedTargetEmail)
+            .ifPresent(adminMmrAccessEmailRepository::delete);
+        invalidateAccessState(normalizedTargetEmail);
+
+        return getAdminEmailSnapshot();
+    }
+
+    @Transactional
+    public AdminEmailSnapshot updateManagedAdminMmrAccess(
+        String actorEmail,
+        String targetEmail,
+        boolean canViewMmr
+    ) {
+        String normalizedActorEmail = normalizeEmail(actorEmail);
+        String normalizedTargetEmail = normalizeEmail(targetEmail);
+        validateEmail(normalizedTargetEmail);
+
+        if (!isSuperAdminEmail(normalizedActorEmail)) {
+            throw new IllegalArgumentException("Only super admins can update operator MMR access");
+        }
+        if (adminKeyProperties.isConfiguredSuperAdminEmail(normalizedTargetEmail)) {
+            throw new IllegalArgumentException("Super admins always have MMR access");
+        }
+        if (!isAdminEmail(normalizedTargetEmail)) {
+            throw new IllegalArgumentException("Target email is not an operator");
+        }
+
+        if (canViewMmr) {
+            AdminMmrAccessEmail adminMmrAccessEmail = adminMmrAccessEmailRepository
+                .findByNormalizedEmail(normalizedTargetEmail)
+                .orElseGet(AdminMmrAccessEmail::new);
+            adminMmrAccessEmail.setEmail(normalizedTargetEmail);
+            if (adminMmrAccessEmail.getCreatedByEmail() == null || adminMmrAccessEmail.getCreatedByEmail().isBlank()) {
+                adminMmrAccessEmail.setCreatedByEmail(normalizedActorEmail);
+            }
+            adminMmrAccessEmailRepository.save(adminMmrAccessEmail);
+        } else {
+            adminMmrAccessEmailRepository
+                .findByNormalizedEmail(normalizedTargetEmail)
+                .ifPresent(adminMmrAccessEmailRepository::delete);
+        }
         invalidateAccessState(normalizedTargetEmail);
 
         return getAdminEmailSnapshot();
@@ -286,6 +342,9 @@ public class AccessControlService {
         ManagedAdminEmail managedAdminEmail = managedAdminEmailRepository
             .findByNormalizedEmail(normalizedEmail)
             .orElse(null);
+        AdminMmrAccessEmail adminMmrAccessEmail = adminMmrAccessEmailRepository
+            .findByNormalizedEmail(normalizedEmail)
+            .orElse(null);
         AllowedUserEmail allowedUserEmail = allowedUserEmailRepository
             .findByNormalizedEmail(normalizedEmail)
             .orElse(null);
@@ -295,6 +354,7 @@ public class AccessControlService {
 
         boolean admin = superAdmin || configuredAdmin || managedAdminEmail != null;
         boolean allowed = admin || configuredAllowed || allowedUserEmail != null;
+        boolean canViewMmr = superAdmin || (admin && adminMmrAccessEmail != null);
         String nickname = managedAdminEmail != null
             ? normalizeNickname(managedAdminEmail.getNickname())
             : allowedUserEmail != null
@@ -305,7 +365,7 @@ public class AccessControlService {
         }
         String preferredRace = userRacePreference == null ? null : userRacePreference.getPreferredRace();
 
-        return new AccessState(superAdmin, admin, allowed, nickname, preferredRace);
+        return new AccessState(superAdmin, admin, allowed, canViewMmr, nickname, preferredRace);
     }
 
     private void invalidateAccessState(String normalizedEmail) {
@@ -394,6 +454,7 @@ public class AccessControlService {
         boolean superAdmin,
         boolean admin,
         boolean allowed,
+        boolean canViewMmr,
         String nickname,
         String preferredRace
     ) {
@@ -412,13 +473,15 @@ public class AccessControlService {
         boolean admin,
         boolean superAdmin,
         boolean allowed,
+        boolean canViewMmr,
         String preferredRace
     ) {
     }
 
     public record AccessEmailEntry(
         String email,
-        String nickname
+        String nickname,
+        boolean canViewMmr
     ) {
     }
 

@@ -149,7 +149,7 @@
     "loading": "불러오는 중...",
     "errorPrefix": "오류:",
     "readOnly": "읽기 전용",
-    "mmrHidden": "MMR 정보는 관리자만 확인할 수 있습니다.",
+    "mmrHidden": "MMR 정보는 열람 권한이 있는 관리자만 확인할 수 있습니다.",
     "save": "저장",
     "clear": "초기화",
     "notSet": "설정되지 않음",
@@ -187,6 +187,7 @@
       "nickname": "닉네임",
       "role": "권한",
       "access": "접속 가능 여부",
+      "mmrAccess": "MMR 열람 권한",
       "yes": "허용",
       "no": "차단"
     },
@@ -202,10 +203,15 @@
     "actions": {
       "remove": "삭제",
       "fixed": "고정",
+      "mmrAccess": "MMR 열람",
+      "mmrAllowed": "MMR 허용",
+      "mmrDenied": "MMR 차단",
+      "mmrAlwaysAllowed": "MMR 항상 허용",
       "saving": "처리 중..."
     },
     "messages": {
       "adminSaved": "운영진 관리자 목록이 업데이트되었습니다.",
+      "mmrAccessSaved": "운영진 MMR 열람 권한이 업데이트되었습니다.",
       "allowedSaved": "접속 허용 이메일 목록이 업데이트되었습니다.",
       "removeSaved": "삭제가 완료되었습니다.",
       "invalidEmail": "올바른 이메일 형식을 입력해 주세요.",

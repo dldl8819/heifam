@@ -9,9 +9,11 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.balancify.backend.domain.AdminMmrAccessEmail;
 import com.balancify.backend.domain.AllowedUserEmail;
 import com.balancify.backend.domain.ManagedAdminEmail;
 import com.balancify.backend.domain.UserRacePreference;
+import com.balancify.backend.repository.AdminMmrAccessEmailRepository;
 import com.balancify.backend.repository.AllowedUserEmailRepository;
 import com.balancify.backend.repository.ManagedAdminEmailRepository;
 import com.balancify.backend.repository.UserRacePreferenceRepository;
@@ -35,6 +37,9 @@ class AccessControlServiceTest {
     private ManagedAdminEmailRepository managedAdminEmailRepository;
 
     @Mock
+    private AdminMmrAccessEmailRepository adminMmrAccessEmailRepository;
+
+    @Mock
     private AllowedUserEmailRepository allowedUserEmailRepository;
 
     @Mock
@@ -55,6 +60,8 @@ class AccessControlServiceTest {
             .thenReturn(List.of());
         when(managedAdminEmailRepository.findByNormalizedEmail(anyString()))
             .thenReturn(Optional.empty());
+        when(adminMmrAccessEmailRepository.findByNormalizedEmail(anyString()))
+            .thenReturn(Optional.empty());
         when(allowedUserEmailRepository.findByNormalizedEmail(anyString()))
             .thenReturn(Optional.empty());
         when(userRacePreferenceRepository.findByNormalizedEmail(anyString()))
@@ -63,6 +70,7 @@ class AccessControlServiceTest {
         accessControlService = new AccessControlService(
             adminKeyProperties,
             managedAdminEmailRepository,
+            adminMmrAccessEmailRepository,
             allowedUserEmailRepository,
             userRacePreferenceRepository,
             60_000L
@@ -78,7 +86,16 @@ class AccessControlServiceTest {
         assertThat(profile.superAdmin()).isTrue();
         assertThat(profile.admin()).isTrue();
         assertThat(profile.allowed()).isTrue();
+        assertThat(profile.canViewMmr()).isTrue();
         assertThat(profile.role()).isEqualTo("SUPER_ADMIN");
+    }
+
+    @Test
+    void configuredAdminDoesNotViewMmrByDefault() {
+        AccessControlService.AccessProfile profile = accessControlService.resolveAccessProfile("ops@hei.gg");
+
+        assertThat(profile.admin()).isTrue();
+        assertThat(profile.canViewMmr()).isFalse();
     }
 
     @Test
@@ -102,6 +119,7 @@ class AccessControlServiceTest {
         AccessControlService service = new AccessControlService(
             adminKeyProperties,
             managedAdminEmailRepository,
+            adminMmrAccessEmailRepository,
             allowedUserEmailRepository,
             userRacePreferenceRepository,
             60_000L
@@ -136,6 +154,7 @@ class AccessControlServiceTest {
         AccessControlService superAdminService = new AccessControlService(
             superAdminProperties,
             managedAdminEmailRepository,
+            adminMmrAccessEmailRepository,
             allowedUserEmailRepository,
             userRacePreferenceRepository,
             60_000L
@@ -149,6 +168,7 @@ class AccessControlServiceTest {
         AccessControlService downgradedService = new AccessControlService(
             downgradedProperties,
             managedAdminEmailRepository,
+            adminMmrAccessEmailRepository,
             allowedUserEmailRepository,
             userRacePreferenceRepository,
             60_000L
@@ -161,6 +181,7 @@ class AccessControlServiceTest {
         assertThat(afterRotation.superAdmin()).isFalse();
         assertThat(afterRotation.admin()).isTrue();
         assertThat(afterRotation.allowed()).isTrue();
+        assertThat(afterRotation.canViewMmr()).isFalse();
         assertThat(afterRotation.role()).isEqualTo("ADMIN");
     }
 
@@ -171,6 +192,36 @@ class AccessControlServiceTest {
         accessControlService.addManagedAdminEmail("superadmin@hei.gg", "newops@hei.gg", "운영진");
 
         verify(managedAdminEmailRepository).save(any(ManagedAdminEmail.class));
+    }
+
+    @Test
+    void superAdminCanToggleManagedAdminMmrAccess() {
+        ManagedAdminEmail managedAdminEmail = new ManagedAdminEmail();
+        managedAdminEmail.setEmail("newops@hei.gg");
+        managedAdminEmail.setNickname("운영진");
+        when(managedAdminEmailRepository.findByNormalizedEmail("newops@hei.gg"))
+            .thenReturn(Optional.of(managedAdminEmail));
+
+        accessControlService.updateManagedAdminMmrAccess("superadmin@hei.gg", "newops@hei.gg", true);
+
+        verify(adminMmrAccessEmailRepository).save(any(AdminMmrAccessEmail.class));
+        verify(managedAdminEmailRepository, never()).save(managedAdminEmail);
+    }
+
+    @Test
+    void superAdminCanRevokeManagedAdminMmrAccess() {
+        ManagedAdminEmail managedAdminEmail = new ManagedAdminEmail();
+        managedAdminEmail.setEmail("newops@hei.gg");
+        AdminMmrAccessEmail adminMmrAccessEmail = new AdminMmrAccessEmail();
+        adminMmrAccessEmail.setEmail("newops@hei.gg");
+        when(managedAdminEmailRepository.findByNormalizedEmail("newops@hei.gg"))
+            .thenReturn(Optional.of(managedAdminEmail));
+        when(adminMmrAccessEmailRepository.findByNormalizedEmail("newops@hei.gg"))
+            .thenReturn(Optional.of(adminMmrAccessEmail));
+
+        accessControlService.updateManagedAdminMmrAccess("superadmin@hei.gg", "newops@hei.gg", false);
+
+        verify(adminMmrAccessEmailRepository).delete(adminMmrAccessEmail);
     }
 
     @Test
@@ -262,6 +313,7 @@ class AccessControlServiceTest {
         AccessControlService serviceWithShortCache = new AccessControlService(
             adminKeyProperties,
             managedAdminEmailRepository,
+            adminMmrAccessEmailRepository,
             allowedUserEmailRepository,
             userRacePreferenceRepository,
             5L

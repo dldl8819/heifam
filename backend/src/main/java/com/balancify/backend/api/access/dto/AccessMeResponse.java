@@ -7,6 +7,7 @@ public record AccessMeResponse(
     boolean admin,
     boolean superAdmin,
     boolean allowed,
+    boolean canViewMmr,
     String preferredRace
 ) {
 }
