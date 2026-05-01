@@ -654,22 +654,18 @@ export default function PlayersPage() {
     }
 
     const header = [
+      t('players.download.headers.index'),
       t('players.download.headers.tier'),
       t('players.download.headers.nickname'),
-      t('players.download.headers.race'),
-      t('players.download.headers.currentMmr'),
-      t('players.download.headers.games'),
     ]
 
     const lines = [
       header.map(escapeCsvCell).join(','),
-      ...downloadableRows.map((row) =>
+      ...downloadableRows.map((row, index) =>
         [
+          String(index + 1),
           row.tier === 'UNASSIGNED' ? t('players.table.unassigned') : row.tier,
           row.nickname,
-          row.race,
-          formatMmrValue(row.currentMmr),
-          String(row.games),
         ]
           .map(escapeCsvCell)
           .join(',')

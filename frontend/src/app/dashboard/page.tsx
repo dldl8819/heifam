@@ -1,16 +1,43 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAdminAuth } from '@/lib/admin-auth'
 import { apiClient } from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
-import type { GroupDashboardResponse, RatingRecalculationResponse } from '@/types/api'
+import type { GroupDashboardResponse, PlayerRosterItem, PlayerTierStatus, RatingRecalculationResponse } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
+const TIER_BOARD_COLUMNS: PlayerTierStatus[] = [
+  'S',
+  'A+',
+  'A',
+  'A-',
+  'B+',
+  'B',
+  'B-',
+  'C+',
+  'C',
+  'C-',
+  'UNASSIGNED',
+]
+const TIER_BOARD_MIN_ROWS = 5
+const TIER_BOARD_HEADER_CLASS: Record<PlayerTierStatus, string> = {
+  S: 'bg-white text-slate-950',
+  'A+': 'bg-[#bdd7ee] text-slate-950',
+  A: 'bg-[#bdd7ee] text-slate-950',
+  'A-': 'bg-[#bdd7ee] text-slate-950',
+  'B+': 'bg-[#fff2cc] text-slate-950',
+  B: 'bg-[#fff2cc] text-slate-950',
+  'B-': 'bg-[#fff2cc] text-slate-950',
+  'C+': 'bg-[#c6e0b4] text-slate-950',
+  C: 'bg-[#c6e0b4] text-slate-950',
+  'C-': 'bg-[#c6e0b4] text-slate-950',
+  UNASSIGNED: 'bg-[#f4b183] text-slate-950',
+}
 
 function formatWinRate(value: number): string {
   const percentage = value <= 1 ? value * 100 : value
@@ -26,6 +53,57 @@ function formatDateTime(value: string): string {
   return new Date(parsed).toLocaleString()
 }
 
+function formatKstDate(value = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(value)
+  const year = parts.find((part) => part.type === 'year')?.value ?? '0000'
+  const month = parts.find((part) => part.type === 'month')?.value ?? '00'
+  const day = parts.find((part) => part.type === 'day')?.value ?? '00'
+  return `${year}-${month}-${day}`
+}
+
+function resolveTierBoardLabel(tier: PlayerTierStatus): string {
+  return tier === 'UNASSIGNED' ? t('common.tierBoard.unassigned') : tier
+}
+
+function buildTierBoardBuckets(rows: PlayerRosterItem[]): Record<PlayerTierStatus, PlayerRosterItem[]> {
+  const buckets = TIER_BOARD_COLUMNS.reduce<Record<PlayerTierStatus, PlayerRosterItem[]>>(
+    (accumulator, tier) => ({
+      ...accumulator,
+      [tier]: [],
+    }),
+    {
+      S: [],
+      'A+': [],
+      A: [],
+      'A-': [],
+      'B+': [],
+      B: [],
+      'B-': [],
+      'C+': [],
+      C: [],
+      'C-': [],
+      UNASSIGNED: [],
+    }
+  )
+
+  rows
+    .filter((row) => row.active !== false)
+    .forEach((row) => {
+      buckets[row.tier ?? 'UNASSIGNED'].push(row)
+    })
+
+  TIER_BOARD_COLUMNS.forEach((tier) => {
+    buckets[tier].sort((a, b) => a.nickname.localeCompare(b.nickname, 'ko-KR'))
+  })
+
+  return buckets
+}
+
 export default function DashboardPage() {
   const { isAdmin, isSuperAdmin } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
@@ -37,9 +115,25 @@ export default function DashboardPage() {
   const [ratingRecalculationError, setRatingRecalculationError] = useState<string | null>(null)
   const [ratingRecalculationMessage, setRatingRecalculationMessage] = useState<string | null>(null)
   const [ratingRecalculationResult, setRatingRecalculationResult] = useState<RatingRecalculationResponse | null>(null)
+  const [tierBoardRows, setTierBoardRows] = useState<PlayerRosterItem[]>([])
+  const [tierBoardLoading, setTierBoardLoading] = useState<boolean>(false)
+  const [tierBoardError, setTierBoardError] = useState<string | null>(null)
   const myRaceSummary = dashboard?.myRaceSummary
   const myGameTypeSummary = dashboard?.myGameTypeSummary
   const currentKFactor = dashboard?.currentKFactor ?? 24
+  const tierBoardBuckets = useMemo(() => buildTierBoardBuckets(tierBoardRows), [tierBoardRows])
+  const tierBoardRowCount = useMemo(
+    () => Math.max(
+      TIER_BOARD_MIN_ROWS,
+      ...TIER_BOARD_COLUMNS.map((tier) => tierBoardBuckets[tier].length)
+    ),
+    [tierBoardBuckets]
+  )
+  const tierBoardTotalCount = useMemo(
+    () => TIER_BOARD_COLUMNS.reduce((total, tier) => total + tierBoardBuckets[tier].length, 0),
+    [tierBoardBuckets]
+  )
+  const tierBoardDate = useMemo(() => formatKstDate(), [])
   const canExecuteRatingRecalculation =
     ratingRecalculationLoading === null &&
     ratingRecalculationResult?.dryRun === true &&
@@ -92,6 +186,48 @@ export default function DashboardPage() {
       active = false
     }
   }, [])
+
+  useEffect(() => {
+    let active = true
+
+    if (!isSuperAdmin) {
+      setTierBoardRows([])
+      setTierBoardLoading(false)
+      setTierBoardError(null)
+      return () => {
+        active = false
+      }
+    }
+
+    const run = async () => {
+      setTierBoardLoading(true)
+      setTierBoardError(null)
+
+      try {
+        const response = await apiClient.getGroupPlayers(TEMP_GROUP_ID)
+        if (!active) {
+          return
+        }
+        setTierBoardRows(response)
+      } catch {
+        if (!active) {
+          return
+        }
+        setTierBoardRows([])
+        setTierBoardError(t('dashboard.tierBoard.loadError'))
+      } finally {
+        if (active) {
+          setTierBoardLoading(false)
+        }
+      }
+    }
+
+    void run()
+
+    return () => {
+      active = false
+    }
+  }, [isSuperAdmin])
 
   const handleRatingRecalculation = useCallback(async (dryRun: boolean) => {
     setRatingRecalculationLoading(dryRun ? 'dryRun' : 'execute')
@@ -265,6 +401,97 @@ export default function DashboardPage() {
                       </tr>
                     )}
                   </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {isSuperAdmin && (
+        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900">{t('dashboard.tierBoard.title')}</h3>
+              <p className="mt-1 text-xs text-slate-500">{t('dashboard.tierBoard.description')}</p>
+            </div>
+            <p className="text-xs font-medium text-slate-500">
+              {t('dashboard.tierBoard.summary', { date: tierBoardDate, count: tierBoardTotalCount })}
+            </p>
+          </div>
+
+          {tierBoardError && (
+            <Alert variant="destructive" appearance="light" className="mt-4">
+              <AlertIcon icon="destructive">!</AlertIcon>
+              <AlertContent>
+                <AlertTitle>{t('common.errorPrefix')}</AlertTitle>
+                <AlertDescription>{tierBoardError}</AlertDescription>
+              </AlertContent>
+            </Alert>
+          )}
+
+          {tierBoardLoading ? (
+            <div className="mt-4 rounded-lg border border-dashed border-slate-200 px-4 py-10">
+              <LoadingIndicator label={t('common.loading')} />
+            </div>
+          ) : (
+            <div className="mt-4 overflow-x-auto rounded-lg border border-[#7b6d5b] bg-[#ded8cc] p-3">
+              <div className="min-w-[980px]">
+                <div className="border-y-2 border-[#4f4636] py-4 text-center">
+                  <h4 className="text-4xl font-semibold tracking-normal text-[#4f4636]">
+                    {t('common.tierBoard.title')}
+                  </h4>
+                </div>
+
+                <table className="mt-4 w-full border-collapse bg-white text-center text-sm">
+                  <thead>
+                    <tr>
+                      <th className="w-12 border border-slate-900 bg-white px-2 py-3 text-base font-semibold">
+                        {t('common.tierBoard.index')}
+                      </th>
+                      {TIER_BOARD_COLUMNS.map((tier) => (
+                        <th
+                          key={`tier-board-head-${tier}`}
+                          className={`min-w-20 border border-slate-900 px-3 py-3 text-xl font-bold ${TIER_BOARD_HEADER_CLASS[tier]}`}
+                        >
+                          {resolveTierBoardLabel(tier)}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.from({ length: tierBoardRowCount }, (_, rowIndex) => (
+                      <tr key={`tier-board-row-${rowIndex}`}>
+                        <th className="border border-slate-900 bg-white px-2 py-2 font-normal text-slate-900">
+                          {rowIndex + 1}
+                        </th>
+                        {TIER_BOARD_COLUMNS.map((tier) => {
+                          const player = tierBoardBuckets[tier][rowIndex] ?? null
+                          return (
+                            <td
+                              key={`tier-board-cell-${tier}-${rowIndex}`}
+                              className="h-9 border border-dotted border-slate-500 bg-white px-2 py-1 align-middle font-semibold text-slate-950"
+                            >
+                              {player?.nickname ?? ''}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td
+                        className="border border-slate-900 bg-white px-2 py-2 text-right text-xs font-semibold text-slate-900"
+                        colSpan={TIER_BOARD_COLUMNS.length}
+                      >
+                        {tierBoardDate}
+                      </td>
+                      <td className="border border-slate-900 bg-[#c6e0b4] px-2 py-2 text-xs font-semibold text-slate-900">
+                        {t('dashboard.tierBoard.total', { count: tierBoardTotalCount })}
+                      </td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             </div>
