@@ -15,6 +15,7 @@ import com.balancify.backend.api.group.dto.GroupPlayerMmrUpdateRequest;
 import com.balancify.backend.domain.Group;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.PlayerRepository;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,7 +49,7 @@ class PlayerAdminServiceTest {
         playerAdminService.updatePlayer(
             1L,
             10L,
-            new GroupPlayerUpdateRequest(" 새닉네임 ", "tz", null)
+            new GroupPlayerUpdateRequest(" 새닉네임 ", "tz", null, null, null, null)
         );
 
         verify(playerRepository).findByGroup_IdAndNicknameIgnoreCase(1L, "새닉네임");
@@ -64,7 +65,7 @@ class PlayerAdminServiceTest {
         playerAdminService.updatePlayer(
             1L,
             10L,
-            new GroupPlayerUpdateRequest(null, "PTZ", null)
+            new GroupPlayerUpdateRequest(null, "PTZ", null, null, null, null)
         );
 
         verify(playerRepository, never()).findByGroup_IdAndNicknameIgnoreCase(anyLong(), anyString());
@@ -80,7 +81,7 @@ class PlayerAdminServiceTest {
             playerAdminService.updatePlayer(
                 1L,
                 10L,
-                new GroupPlayerUpdateRequest("   ", " ", null)
+                new GroupPlayerUpdateRequest("   ", " ", null, null, null, null)
             )
         )
             .isInstanceOf(IllegalArgumentException.class)
@@ -102,7 +103,7 @@ class PlayerAdminServiceTest {
             playerAdminService.updatePlayer(
                 1L,
                 10L,
-                new GroupPlayerUpdateRequest("새닉네임", null, null)
+                new GroupPlayerUpdateRequest("새닉네임", null, null, null, null, null)
             )
         )
             .isInstanceOf(IllegalArgumentException.class)
@@ -118,7 +119,7 @@ class PlayerAdminServiceTest {
             playerAdminService.updatePlayer(
                 1L,
                 10L,
-                new GroupPlayerUpdateRequest(null, "X", null)
+                new GroupPlayerUpdateRequest(null, "X", null, null, null, null)
             )
         )
             .isInstanceOf(IllegalArgumentException.class)
@@ -126,19 +127,124 @@ class PlayerAdminServiceTest {
     }
 
     @Test
-    void updatesOnlyActiveFlagWhenRequested() {
+    void storesChatLeaveMetadataWhenDeactivating() {
         Player player = player(10L, 1L, "기존닉");
+        OffsetDateTime chatLeftAt = OffsetDateTime.parse("2026-05-02T12:41:00+09:00");
         when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
         when(playerRepository.save(any(Player.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         playerAdminService.updatePlayer(
             1L,
             10L,
-            new GroupPlayerUpdateRequest(null, null, false)
+            new GroupPlayerUpdateRequest(null, null, false, chatLeftAt, " 개인 사정 ", null)
         );
 
         assertThat(player.isActive()).isFalse();
+        assertThat(player.getChatLeftAt()).isEqualTo(chatLeftAt);
+        assertThat(player.getChatLeftReason()).isEqualTo("개인 사정");
+        assertThat(player.getChatRejoinedAt()).isNull();
         verify(playerRepository, never()).findByGroup_IdAndNicknameIgnoreCase(anyLong(), anyString());
+        verify(playerRepository).save(player);
+    }
+
+    @Test
+    void throwsWhenDeactivatingWithoutChatLeftAt() {
+        Player player = player(10L, 1L, "기존닉");
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+
+        assertThatThrownBy(() ->
+            playerAdminService.updatePlayer(
+                1L,
+                10L,
+                new GroupPlayerUpdateRequest(null, null, false, null, "개인 사정", null)
+            )
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Chat left time is required when deactivating player");
+
+        verify(playerRepository, never()).save(any(Player.class));
+    }
+
+    @Test
+    void throwsWhenDeactivatingWithoutChatLeftReason() {
+        Player player = player(10L, 1L, "기존닉");
+        OffsetDateTime chatLeftAt = OffsetDateTime.parse("2026-05-02T12:41:00+09:00");
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+
+        assertThatThrownBy(() ->
+            playerAdminService.updatePlayer(
+                1L,
+                10L,
+                new GroupPlayerUpdateRequest(null, null, false, chatLeftAt, "   ", null)
+            )
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Chat left reason is required when deactivating player");
+
+        verify(playerRepository, never()).save(any(Player.class));
+    }
+
+    @Test
+    void throwsWhenChatLeftReasonIsTooLong() {
+        Player player = player(10L, 1L, "기존닉");
+        OffsetDateTime chatLeftAt = OffsetDateTime.parse("2026-05-02T12:41:00+09:00");
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+
+        assertThatThrownBy(() ->
+            playerAdminService.updatePlayer(
+                1L,
+                10L,
+                new GroupPlayerUpdateRequest(null, null, false, chatLeftAt, "a".repeat(501), null)
+            )
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Chat left reason must be 500 characters or fewer");
+
+        verify(playerRepository, never()).save(any(Player.class));
+    }
+
+    @Test
+    void throwsWhenReactivatingWithoutChatRejoinedAt() {
+        Player player = player(10L, 1L, "기존닉");
+        player.setActive(false);
+        player.setChatLeftAt(OffsetDateTime.parse("2026-05-02T12:41:00+09:00"));
+        player.setChatLeftReason("개인 사정");
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+
+        assertThatThrownBy(() ->
+            playerAdminService.updatePlayer(
+                1L,
+                10L,
+                new GroupPlayerUpdateRequest(null, null, true, null, null, null)
+            )
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Chat rejoined time is required when reactivating player");
+
+        verify(playerRepository, never()).save(any(Player.class));
+    }
+
+    @Test
+    void storesChatRejoinedAtWhenReactivatingWithoutClearingLeaveMetadata() {
+        Player player = player(10L, 1L, "기존닉");
+        OffsetDateTime chatLeftAt = OffsetDateTime.parse("2026-05-02T12:41:00+09:00");
+        OffsetDateTime chatRejoinedAt = OffsetDateTime.parse("2026-05-03T13:42:00+09:00");
+        player.setActive(false);
+        player.setChatLeftAt(chatLeftAt);
+        player.setChatLeftReason("개인 사정");
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+        when(playerRepository.save(any(Player.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        playerAdminService.updatePlayer(
+            1L,
+            10L,
+            new GroupPlayerUpdateRequest(null, null, true, null, null, chatRejoinedAt)
+        );
+
+        assertThat(player.isActive()).isTrue();
+        assertThat(player.getChatLeftAt()).isEqualTo(chatLeftAt);
+        assertThat(player.getChatLeftReason()).isEqualTo("개인 사정");
+        assertThat(player.getChatRejoinedAt()).isEqualTo(chatRejoinedAt);
         verify(playerRepository).save(player);
     }
 

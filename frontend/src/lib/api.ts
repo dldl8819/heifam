@@ -481,6 +481,9 @@ function normalizePlayerRosterItem(value: unknown): PlayerRosterItem | null {
     losses,
     games,
     active: typeof source.active === 'boolean' ? source.active : true,
+    chatLeftAt: typeof source.chatLeftAt === 'string' ? source.chatLeftAt : undefined,
+    chatLeftReason: typeof source.chatLeftReason === 'string' ? source.chatLeftReason : undefined,
+    chatRejoinedAt: typeof source.chatRejoinedAt === 'string' ? source.chatRejoinedAt : undefined,
   }
 }
 
@@ -539,7 +542,14 @@ export const apiClient = {
   updateGroupPlayer: (
     groupId: number,
     playerId: number,
-    payload: { nickname?: string; race?: string; active?: boolean }
+    payload: {
+      nickname?: string
+      race?: string
+      active?: boolean
+      chatLeftAt?: string | null
+      chatLeftReason?: string | null
+      chatRejoinedAt?: string | null
+    }
   ) =>
     apiRequest<void>(
       `/api/groups/${groupId}/players/${playerId}`,

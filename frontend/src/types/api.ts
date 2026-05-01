@@ -222,6 +222,9 @@ export type PlayerRosterItem = {
   losses: number
   games: number
   active?: boolean
+  chatLeftAt?: string
+  chatLeftReason?: string
+  chatRejoinedAt?: string
 }
 
 export type GroupPlayerMmrUpdateRequest = {

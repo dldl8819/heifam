@@ -31,6 +31,14 @@ type TierChangeTarget = {
   baseMmr: number
   currentMmr: number
 }
+type ActivityFormMode = 'deactivate' | 'reactivate'
+type ActivityFormState = {
+  mode: ActivityFormMode
+  player: PlayerRosterItem
+  chatLeftAt: string
+  chatLeftReason: string
+  chatRejoinedAt: string
+}
 const PLAYER_RACE_OPTIONS: PlayerRace[] = ['P', 'T', 'Z', 'PT', 'PZ', 'TZ', 'PTZ']
 const TIER_DOWNLOAD_ORDER: Record<PlayerTierStatus, number> = {
   S: 0,
@@ -89,6 +97,62 @@ function formatMmrValue(value: number | undefined): string {
     return '-'
   }
   return value === 0 ? 'None' : String(value)
+}
+
+function formatDateTimeLocalInputValue(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hour = String(date.getHours()).padStart(2, '0')
+  const minute = String(date.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hour}:${minute}`
+}
+
+function parseDateTimeLocalInput(value: string): string | null {
+  const match = value
+    .trim()
+    .match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/)
+  if (!match) {
+    return null
+  }
+
+  const [, yearValue, monthValue, dayValue, hourValue, minuteValue] = match
+  const year = Number(yearValue)
+  const month = Number(monthValue)
+  const day = Number(dayValue)
+  const hour = Number(hourValue)
+  const minute = Number(minuteValue)
+  const date = new Date(year, month - 1, day, hour, minute, 0, 0)
+
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day ||
+    date.getHours() !== hour ||
+    date.getMinutes() !== minute
+  ) {
+    return null
+  }
+
+  return date.toISOString()
+}
+
+function formatChatRecordDisplay(value: string | undefined): string {
+  if (!value) {
+    return '-'
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hour = String(date.getHours()).padStart(2, '0')
+  const minute = String(date.getMinutes()).padStart(2, '0')
+  return `${year}.${month}.${day} ${hour}:${minute}`
 }
 
 function normalizeImportPayload(payload: unknown): PlayerImportPayload | null {
@@ -236,6 +300,7 @@ export default function PlayersPage() {
   const { isAdmin, isSuperAdmin, canViewMmr } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
   const showMmrColumn = canViewMmr && mmrVisible
+  const showTierChangeNotice = canViewMmr
   const [rows, setRows] = useState<PlayerRosterItem[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
@@ -255,6 +320,7 @@ export default function PlayersPage() {
   const [savingMmrPlayerId, setSavingMmrPlayerId] = useState<number | null>(null)
   const [deletingPlayerId, setDeletingPlayerId] = useState<number | null>(null)
   const [togglingPlayerId, setTogglingPlayerId] = useState<number | null>(null)
+  const [activityForm, setActivityForm] = useState<ActivityFormState | null>(null)
   const [showInactive, setShowInactive] = useState<boolean>(false)
   const [playerActionError, setPlayerActionError] = useState<string | null>(null)
   const [playerActionSuccess, setPlayerActionSuccess] = useState<string | null>(null)
@@ -330,6 +396,7 @@ export default function PlayersPage() {
     setEditingInlineMmrValue(
       typeof player.currentMmr === 'number' ? String(player.currentMmr) : ''
     )
+    setActivityForm(null)
     setPlayerActionError(null)
     setPlayerActionSuccess(null)
   }
@@ -422,6 +489,7 @@ export default function PlayersPage() {
     setEditingRace('P')
     setEditingMmrPlayerId(player.id)
     setEditingMmrValue(typeof player.currentMmr === 'number' ? String(player.currentMmr) : '')
+    setActivityForm(null)
     setPlayerActionError(null)
     setPlayerActionSuccess(null)
   }
@@ -498,6 +566,9 @@ export default function PlayersPage() {
         setEditingMmrPlayerId(null)
         setEditingMmrValue('')
       }
+      if (activityForm?.player.id === player.id) {
+        setActivityForm(null)
+      }
       setPlayerActionSuccess(t('players.actions.deleteSuccess'))
       await fetchRoster()
     } catch (actionError) {
@@ -519,29 +590,89 @@ export default function PlayersPage() {
     }
   }
 
-  const handleTogglePlayerActive = async (player: PlayerRosterItem) => {
+  const handleTogglePlayerActive = (player: PlayerRosterItem) => {
     if (!isAdmin) {
       setPlayerActionError(t('common.adminOnlyAction'))
       return
     }
 
     const nextActive = player.active === false
-    const confirmMessage = nextActive
-      ? t('players.actions.reactivateConfirm', { nickname: player.nickname })
-      : t('players.actions.deactivateConfirm', { nickname: player.nickname })
+    setActivityForm({
+      mode: nextActive ? 'reactivate' : 'deactivate',
+      player,
+      chatLeftAt: formatDateTimeLocalInputValue(new Date()),
+      chatLeftReason: '',
+      chatRejoinedAt: formatDateTimeLocalInputValue(new Date()),
+    })
+    setPlayerActionError(null)
+    setPlayerActionSuccess(null)
+  }
 
-    if (!window.confirm(confirmMessage)) {
+  const handleCancelActivityForm = () => {
+    setActivityForm(null)
+  }
+
+  const handleSubmitActivityForm = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!isAdmin || activityForm === null) {
+      setPlayerActionError(t('common.adminOnlyAction'))
       return
+    }
+
+    const { mode, player } = activityForm
+    const nextActive = mode === 'reactivate'
+    let chatLeftAt: string | null = null
+    let chatLeftReason: string | null = null
+    let chatRejoinedAt: string | null = null
+
+    if (mode === 'deactivate') {
+      chatLeftAt = parseDateTimeLocalInput(activityForm.chatLeftAt)
+      chatLeftReason = activityForm.chatLeftReason.trim()
+      if (chatLeftAt === null) {
+        setPlayerActionError(t('players.actions.chatLeftAtRequired'))
+        setPlayerActionSuccess(null)
+        return
+      }
+      if (chatLeftReason.length === 0) {
+        setPlayerActionError(t('players.actions.chatLeftReasonRequired'))
+        setPlayerActionSuccess(null)
+        return
+      }
+      if (chatLeftReason.length > 500) {
+        setPlayerActionError(t('players.actions.chatLeftReasonTooLong'))
+        setPlayerActionSuccess(null)
+        return
+      }
+    } else {
+      chatRejoinedAt = parseDateTimeLocalInput(activityForm.chatRejoinedAt)
+      if (chatRejoinedAt === null) {
+        setPlayerActionError(t('players.actions.chatRejoinedAtRequired'))
+        setPlayerActionSuccess(null)
+        return
+      }
     }
 
     setTogglingPlayerId(player.id)
     setPlayerActionError(null)
     setPlayerActionSuccess(null)
     try {
-      await apiClient.updateGroupPlayer(TEMP_GROUP_ID, player.id, { active: nextActive })
+      await apiClient.updateGroupPlayer(TEMP_GROUP_ID, player.id, {
+        active: nextActive,
+        chatLeftAt,
+        chatLeftReason,
+        chatRejoinedAt,
+      })
       setRows((currentRows) => {
         const nextRows = currentRows.map((row) =>
-          row.id === player.id ? { ...row, active: nextActive } : row
+          row.id === player.id
+            ? {
+                ...row,
+                active: nextActive,
+                chatLeftAt: nextActive ? row.chatLeftAt : chatLeftAt ?? undefined,
+                chatLeftReason: nextActive ? row.chatLeftReason : chatLeftReason ?? undefined,
+                chatRejoinedAt: nextActive ? chatRejoinedAt ?? undefined : undefined,
+              }
+            : row
         )
         if (!showInactive && !nextActive) {
           return nextRows.filter((row) => row.id !== player.id)
@@ -562,6 +693,7 @@ export default function PlayersPage() {
       setPlayerActionSuccess(
         nextActive ? t('players.actions.reactivateSuccess') : t('players.actions.deactivateSuccess')
       )
+      setActivityForm(null)
     } catch (actionError) {
       if (isApiForbiddenError(actionError)) {
         setPlayerActionError(t('common.permissionDenied'))
@@ -580,12 +712,13 @@ export default function PlayersPage() {
   const filteredRows = useMemo(() => {
     const searchText = search.trim().toLowerCase()
     return rows.filter((row) => {
+      const matchesActivity = !showInactive || row.active === false
       const matchesRace = raceFilter === 'ALL' || row.race === raceFilter
       const matchesSearch =
         searchText.length === 0 || row.nickname.toLowerCase().includes(searchText)
-      return matchesRace && matchesSearch
+      return matchesActivity && matchesRace && matchesSearch
     })
-  }, [raceFilter, rows, search])
+  }, [raceFilter, rows, search, showInactive])
   const activePlayerCount = useMemo(
     () => rows.filter((row) => row.active !== false).length,
     [rows]
@@ -763,7 +896,106 @@ export default function PlayersPage() {
         </div>
       )}
 
-      {isAdmin && (
+      {activityForm !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 px-4">
+          <form
+            className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-xl"
+            onSubmit={handleSubmitActivityForm}
+          >
+            <div className="space-y-1">
+              <h3 className="text-base font-semibold text-slate-900">
+                {activityForm.mode === 'deactivate'
+                  ? t('players.activityForm.deactivateTitle')
+                  : t('players.activityForm.reactivateTitle')}
+              </h3>
+              <p className="text-xs text-slate-500">
+                {t('players.activityForm.target', { nickname: activityForm.player.nickname })}
+              </p>
+            </div>
+
+            {playerActionError && (
+              <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                {playerActionError}
+              </p>
+            )}
+
+            <div className="mt-4 space-y-3">
+              {activityForm.mode === 'deactivate' ? (
+                <>
+                  <label className="block space-y-1 text-xs font-medium text-slate-600">
+                    {t('players.activityForm.chatLeftAtLabel')}
+                    <input
+                      type="datetime-local"
+                      required
+                      value={activityForm.chatLeftAt}
+                      onChange={(event) =>
+                        setActivityForm((current) =>
+                          current === null ? current : { ...current, chatLeftAt: event.target.value }
+                        )
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                    />
+                  </label>
+                  <label className="block space-y-1 text-xs font-medium text-slate-600">
+                    {t('players.activityForm.chatLeftReasonLabel')}
+                    <textarea
+                      required
+                      maxLength={500}
+                      value={activityForm.chatLeftReason}
+                      onChange={(event) =>
+                        setActivityForm((current) =>
+                          current === null ? current : { ...current, chatLeftReason: event.target.value }
+                        )
+                      }
+                      className="mt-1 h-24 w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                    />
+                    <span className="block text-right text-[11px] text-slate-400">
+                      {activityForm.chatLeftReason.length}/500
+                    </span>
+                  </label>
+                </>
+              ) : (
+                <label className="block space-y-1 text-xs font-medium text-slate-600">
+                  {t('players.activityForm.chatRejoinedAtLabel')}
+                  <input
+                    type="datetime-local"
+                    required
+                    value={activityForm.chatRejoinedAt}
+                    onChange={(event) =>
+                      setActivityForm((current) =>
+                        current === null ? current : { ...current, chatRejoinedAt: event.target.value }
+                      )
+                    }
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                  />
+                </label>
+              )}
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={togglingPlayerId !== null}
+                onClick={handleCancelActivityForm}
+                className="rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {t('players.actions.cancel')}
+              </button>
+              <button
+                type="submit"
+                disabled={togglingPlayerId !== null}
+                className="rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                {togglingPlayerId !== null
+                  ? t('players.actions.toggling')
+                  : t('players.activityForm.save')}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {showTierChangeNotice && (
         <article className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-semibold text-amber-950">{t('players.tierChange.title')}</h3>
@@ -814,12 +1046,13 @@ export default function PlayersPage() {
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         {isAdmin && (
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-800">
-              {t('players.filters.activeCount', { count: activePlayerCount })}
-            </span>
-            {showInactive && inactivePlayerCount > 0 && (
+            {showInactive ? (
               <span className="rounded-md border border-slate-300 bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                {t('players.filters.totalCount', { count: rows.length })}
+                {t('players.filters.inactiveCount', { count: inactivePlayerCount })}
+              </span>
+            ) : (
+              <span className="rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-800">
+                {t('players.filters.activeCount', { count: activePlayerCount })}
               </span>
             )}
           </div>
@@ -952,7 +1185,7 @@ export default function PlayersPage() {
                               {t('players.table.inactive')}
                             </span>
                           )}
-                          {isAdmin && tierChangeTarget && (
+                          {showTierChangeNotice && tierChangeTarget && (
                             <span className="rounded-md border border-amber-300 bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
                               {t('players.tierChange.badge')}
                             </span>
@@ -988,15 +1221,36 @@ export default function PlayersPage() {
                     </td>
                     {showStatusColumn && (
                       <td className="px-4 py-3">
-                        <span
-                          className={`rounded-md px-2 py-1 text-xs font-semibold ${
-                            isActive
-                              ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
-                              : 'border border-slate-300 bg-slate-200 text-slate-700'
-                          }`}
-                        >
-                          {isActive ? t('players.table.active') : t('players.table.inactive')}
-                        </span>
+                        <div className="space-y-1">
+                          <span
+                            className={`rounded-md px-2 py-1 text-xs font-semibold ${
+                              isActive
+                                ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
+                                : 'border border-slate-300 bg-slate-200 text-slate-700'
+                            }`}
+                          >
+                            {isActive ? t('players.table.active') : t('players.table.inactive')}
+                          </span>
+                          {!isActive && row.chatLeftAt && (
+                            <div className="text-[11px] text-slate-500">
+                              {t('players.table.chatLeftAt', {
+                                value: formatChatRecordDisplay(row.chatLeftAt),
+                              })}
+                            </div>
+                          )}
+                          {!isActive && row.chatLeftReason && (
+                            <div className="max-w-52 text-[11px] leading-4 text-slate-500">
+                              {t('players.table.chatLeftReason', { value: row.chatLeftReason })}
+                            </div>
+                          )}
+                          {isActive && row.chatRejoinedAt && (
+                            <div className="text-[11px] text-emerald-700">
+                              {t('players.table.chatRejoinedAt', {
+                                value: formatChatRecordDisplay(row.chatRejoinedAt),
+                              })}
+                            </div>
+                          )}
+                        </div>
                       </td>
                     )}
                     {showMmrColumn && (
@@ -1044,7 +1298,12 @@ export default function PlayersPage() {
                           ) : (
                             <button
                               type="button"
-                              disabled={editingPlayerId !== null || editingMmrPlayerId !== null || deletingPlayerId !== null}
+                              disabled={
+                                editingPlayerId !== null ||
+                                editingMmrPlayerId !== null ||
+                                deletingPlayerId !== null ||
+                                activityForm !== null
+                              }
                               onClick={() => handleStartEdit(row)}
                               className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-indigo-600 hover:bg-indigo-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
                             >
@@ -1086,7 +1345,12 @@ export default function PlayersPage() {
                             ) : (
                               <button
                                 type="button"
-                                disabled={editingPlayerId !== null || editingMmrPlayerId !== null || deletingPlayerId !== null}
+                                disabled={
+                                  editingPlayerId !== null ||
+                                  editingMmrPlayerId !== null ||
+                                  deletingPlayerId !== null ||
+                                  activityForm !== null
+                                }
                                 onClick={() => handleStartMmrEdit(row)}
                                 className="rounded-md border border-indigo-300 px-2.5 py-1 text-xs font-medium text-indigo-700 transition-colors hover:border-indigo-600 hover:bg-indigo-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
                               >
@@ -1096,7 +1360,7 @@ export default function PlayersPage() {
 
                           <button
                             type="button"
-                            disabled={busy || editingPlayerId !== null || editingMmrPlayerId !== null}
+                            disabled={busy || editingPlayerId !== null || editingMmrPlayerId !== null || activityForm !== null}
                             onClick={() => handleTogglePlayerActive(row)}
                             className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                               isActive
@@ -1113,7 +1377,7 @@ export default function PlayersPage() {
 
                           <button
                             type="button"
-                            disabled={busy || editingPlayerId !== null || editingMmrPlayerId !== null}
+                            disabled={busy || editingPlayerId !== null || editingMmrPlayerId !== null || activityForm !== null}
                             onClick={() => handleDeletePlayer(row)}
                             className="rounded-md border border-rose-300 px-2.5 py-1 text-xs font-medium text-rose-700 transition-colors hover:border-rose-600 hover:bg-rose-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
                           >

@@ -175,6 +175,9 @@ class PlayerQueryServiceTest {
         Player active = player(1L, group, "활성", "P", "A", 1500);
         Player inactive = player(2L, group, "비활성", "T", "A", 1700);
         inactive.setActive(false);
+        OffsetDateTime chatLeftAt = OffsetDateTime.parse("2026-05-02T12:41:00+09:00");
+        inactive.setChatLeftAt(chatLeftAt);
+        inactive.setChatLeftReason("톡방 퇴장");
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
             .thenReturn(List.of(inactive, active));
@@ -195,6 +198,9 @@ class PlayerQueryServiceTest {
         Player active = player(1L, group, "활성", "P", "A", 1500);
         Player inactive = player(2L, group, "비활성", "T", "A", 1700);
         inactive.setActive(false);
+        OffsetDateTime chatLeftAt = OffsetDateTime.parse("2026-05-02T12:41:00+09:00");
+        inactive.setChatLeftAt(chatLeftAt);
+        inactive.setChatLeftReason("톡방 퇴장");
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
             .thenReturn(List.of(inactive, active));
@@ -206,6 +212,34 @@ class PlayerQueryServiceTest {
         assertThat(response).hasSize(2);
         assertThat(response).extracting(GroupPlayerResponse::nickname).containsExactly("비활성", "활성");
         assertThat(response).extracting(GroupPlayerResponse::active).containsExactly(false, true);
+        assertThat(response.get(0).chatLeftAt()).isEqualTo(chatLeftAt);
+        assertThat(response.get(0).chatLeftReason()).isEqualTo("톡방 퇴장");
+    }
+
+    @Test
+    void includesChatRejoinedAtForReactivatedPlayers() {
+        Group group = new Group();
+        group.setId(1L);
+
+        OffsetDateTime chatLeftAt = OffsetDateTime.parse("2026-05-02T12:41:00+09:00");
+        OffsetDateTime chatRejoinedAt = OffsetDateTime.parse("2026-05-03T13:42:00+09:00");
+        Player reactivated = player(1L, group, "복귀", "P", "A", 1500);
+        reactivated.setChatLeftAt(chatLeftAt);
+        reactivated.setChatLeftReason("톡방 퇴장");
+        reactivated.setChatRejoinedAt(chatRejoinedAt);
+
+        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
+            .thenReturn(List.of(reactivated));
+        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L))
+            .thenReturn(List.of());
+
+        List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L, false);
+
+        assertThat(response).hasSize(1);
+        assertThat(response.get(0).active()).isTrue();
+        assertThat(response.get(0).chatLeftAt()).isEqualTo(chatLeftAt);
+        assertThat(response.get(0).chatLeftReason()).isEqualTo("톡방 퇴장");
+        assertThat(response.get(0).chatRejoinedAt()).isEqualTo(chatRejoinedAt);
     }
 
     private Player player(

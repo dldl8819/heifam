@@ -47,6 +47,15 @@ public class Player {
     @Column(nullable = false)
     private boolean active = true;
 
+    @Column(name = "chat_left_at")
+    private OffsetDateTime chatLeftAt;
+
+    @Column(name = "chat_left_reason", length = 500)
+    private String chatLeftReason;
+
+    @Column(name = "chat_rejoined_at")
+    private OffsetDateTime chatRejoinedAt;
+
     @Column(nullable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
@@ -148,6 +157,30 @@ public class Player {
 
     public void setActive(boolean active) {
         this.active = active;
+    }
+
+    public OffsetDateTime getChatLeftAt() {
+        return chatLeftAt;
+    }
+
+    public void setChatLeftAt(OffsetDateTime chatLeftAt) {
+        this.chatLeftAt = chatLeftAt;
+    }
+
+    public String getChatLeftReason() {
+        return chatLeftReason;
+    }
+
+    public void setChatLeftReason(String chatLeftReason) {
+        this.chatLeftReason = chatLeftReason;
+    }
+
+    public OffsetDateTime getChatRejoinedAt() {
+        return chatRejoinedAt;
+    }
+
+    public void setChatRejoinedAt(OffsetDateTime chatRejoinedAt) {
+        this.chatRejoinedAt = chatRejoinedAt;
     }
 
     public OffsetDateTime getCreatedAt() {

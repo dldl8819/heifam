@@ -98,7 +98,10 @@ public class PlayerQueryService {
                 stats.wins,
                 stats.losses,
                 games,
-                player.isActive()
+                player.isActive(),
+                player.getChatLeftAt(),
+                player.getChatLeftReason(),
+                player.getChatRejoinedAt()
             ));
         }
 

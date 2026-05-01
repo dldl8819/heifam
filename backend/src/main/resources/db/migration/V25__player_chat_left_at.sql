@@ -1,0 +1,2 @@
+ALTER TABLE players
+    ADD COLUMN IF NOT EXISTS chat_left_at TIMESTAMPTZ;

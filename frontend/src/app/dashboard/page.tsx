@@ -107,6 +107,19 @@ function resolveTierFromMmr(value: number | undefined): PlayerTierStatus | null 
   return 'S'
 }
 
+function resolveInitialTier(row: PlayerRosterItem): PlayerTierStatus | null {
+  return row.baseTier ?? resolveTierFromMmr(row.baseMmr)
+}
+
+function formatTierBoardChangeLabel(row: PlayerRosterItem, currentTier: PlayerTierStatus): string | null {
+  const initialTier = resolveInitialTier(row)
+  if (initialTier === null || initialTier === currentTier) {
+    return null
+  }
+
+  return `${resolveTierBoardLabel(initialTier)} -> ${resolveTierBoardLabel(currentTier)}`
+}
+
 function buildTierBoardBuckets(rows: PlayerRosterItem[]): Record<PlayerTierStatus, PlayerRosterItem[]> {
   const buckets = TIER_BOARD_COLUMNS.reduce<Record<PlayerTierStatus, PlayerRosterItem[]>>(
     (accumulator, tier) => ({
@@ -495,12 +508,31 @@ export default function DashboardPage() {
                         </th>
                         {TIER_BOARD_COLUMNS.map((tier) => {
                           const player = tierBoardBuckets[tier][rowIndex] ?? null
+                          const tierChangeLabel = player ? formatTierBoardChangeLabel(player, tier) : null
                           return (
                             <td
                               key={`tier-board-cell-${tier}-${rowIndex}`}
-                              className="h-9 border border-dotted border-slate-500 bg-white px-2 py-1 align-middle font-semibold text-slate-950"
+                              title={
+                                tierChangeLabel
+                                  ? t('dashboard.tierBoard.changeTooltip', { change: tierChangeLabel })
+                                  : undefined
+                              }
+                              className={`h-9 border px-2 py-1 align-middle font-semibold ${
+                                tierChangeLabel
+                                  ? 'border-solid border-amber-600 bg-amber-100 text-amber-950 shadow-[inset_0_0_0_2px_rgba(217,119,6,0.45)]'
+                                  : 'border-dotted border-slate-500 bg-white text-slate-950'
+                              }`}
                             >
-                              {player?.nickname ?? ''}
+                              {player ? (
+                                <div className="flex items-center justify-center gap-1">
+                                  <span>{player.nickname}</span>
+                                  {tierChangeLabel && (
+                                    <span className="rounded-sm border border-amber-600 bg-amber-200 px-1 text-[10px] leading-4 text-amber-950">
+                                      {t('dashboard.tierBoard.changeBadge')}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : ''}
                             </td>
                           )
                         })}

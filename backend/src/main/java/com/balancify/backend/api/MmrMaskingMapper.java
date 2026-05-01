@@ -37,7 +37,10 @@ public final class MmrMaskingMapper {
                     response.wins(),
                     response.losses(),
                     response.games(),
-                    response.active()
+                    response.active(),
+                    response.chatLeftAt(),
+                    response.chatLeftReason(),
+                    response.chatRejoinedAt()
                 )
             )
             .toList();

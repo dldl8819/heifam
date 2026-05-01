@@ -4,6 +4,7 @@ import com.balancify.backend.api.group.dto.GroupPlayerUpdateRequest;
 import com.balancify.backend.api.group.dto.GroupPlayerMmrUpdateRequest;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.PlayerRepository;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.NoSuchElementException;
@@ -13,6 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class PlayerAdminService {
+
+    private static final int CHAT_LEFT_REASON_MAX_LENGTH = 500;
 
     private final PlayerRepository playerRepository;
 
@@ -32,10 +35,25 @@ public class PlayerAdminService {
         String nickname = safeTrim(request == null ? null : request.nickname());
         String race = safeTrim(request == null ? null : request.race());
         Boolean active = request == null ? null : request.active();
+        OffsetDateTime chatLeftAt = request == null ? null : request.chatLeftAt();
+        String chatLeftReason = safeTrim(request == null ? null : request.chatLeftReason());
+        OffsetDateTime chatRejoinedAt = request == null ? null : request.chatRejoinedAt();
         String normalizedRace = race.isEmpty() ? "" : race.toUpperCase(Locale.ROOT);
 
-        if (nickname.isEmpty() && normalizedRace.isEmpty() && active == null) {
+        if (
+            nickname.isEmpty()
+                && normalizedRace.isEmpty()
+                && active == null
+                && chatLeftAt == null
+                && chatLeftReason.isEmpty()
+                && chatRejoinedAt == null
+        ) {
             throw new IllegalArgumentException("At least one field is required");
+        }
+
+        boolean hasChatMetadata = chatLeftAt != null || !chatLeftReason.isEmpty() || chatRejoinedAt != null;
+        if (active == null && hasChatMetadata) {
+            throw new IllegalArgumentException("Chat activity metadata requires active status change");
         }
 
         if (!nickname.isEmpty()) {
@@ -60,7 +78,27 @@ public class PlayerAdminService {
         }
 
         if (active != null) {
-            player.setActive(active);
+            if (active) {
+                if (chatRejoinedAt == null) {
+                    throw new IllegalArgumentException("Chat rejoined time is required when reactivating player");
+                }
+                player.setActive(true);
+                player.setChatRejoinedAt(chatRejoinedAt);
+            } else {
+                if (chatLeftAt == null) {
+                    throw new IllegalArgumentException("Chat left time is required when deactivating player");
+                }
+                if (chatLeftReason.isEmpty()) {
+                    throw new IllegalArgumentException("Chat left reason is required when deactivating player");
+                }
+                if (chatLeftReason.length() > CHAT_LEFT_REASON_MAX_LENGTH) {
+                    throw new IllegalArgumentException("Chat left reason must be 500 characters or fewer");
+                }
+                player.setActive(false);
+                player.setChatLeftAt(chatLeftAt);
+                player.setChatLeftReason(chatLeftReason);
+                player.setChatRejoinedAt(null);
+            }
         }
 
         playerRepository.save(player);

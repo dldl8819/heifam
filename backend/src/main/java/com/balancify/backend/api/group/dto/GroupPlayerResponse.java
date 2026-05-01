@@ -1,6 +1,7 @@
 package com.balancify.backend.api.group.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import java.time.OffsetDateTime;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record GroupPlayerResponse(
@@ -14,6 +15,9 @@ public record GroupPlayerResponse(
     int wins,
     int losses,
     int games,
-    boolean active
+    boolean active,
+    OffsetDateTime chatLeftAt,
+    String chatLeftReason,
+    OffsetDateTime chatRejoinedAt
 ) {
 }

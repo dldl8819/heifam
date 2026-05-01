@@ -303,6 +303,8 @@
     },
     "tierBoard": {
       "total": "{count} 명",
+      "changeBadge": "변경",
+      "changeTooltip": "티어 변경 대상: {change}",
       "loadError": "티어표 데이터를 불러오지 못했습니다."
     },
     "recentBalance": {
@@ -447,22 +449,34 @@
       "updateNotFound": "선수 수정 API를 찾지 못했습니다. 백엔드를 재시작하고 최신 코드인지 확인해 주세요.",
       "deactivateSuccess": "선수가 비활성 처리되었습니다.",
       "deactivateFailure": "선수 비활성 처리에 실패했습니다. 서버 상태를 확인해 주세요.",
-      "deactivateConfirm": "{nickname} 선수를 비활성 처리하시겠습니까?",
+      "chatLeftAtRequired": "톡방 나간 시각을 입력해 주세요.",
+      "chatLeftReasonRequired": "톡방 나간 사유를 입력해 주세요.",
+      "chatLeftReasonTooLong": "톡방 나간 사유는 500자 이하로 입력해 주세요.",
+      "chatRejoinedAtRequired": "톡방 다시 들어온 시각을 입력해 주세요.",
       "reactivateSuccess": "선수가 다시 활성화되었습니다.",
       "reactivateFailure": "선수 복구에 실패했습니다. 서버 상태를 확인해 주세요.",
-      "reactivateConfirm": "{nickname} 선수를 다시 활성화하시겠습니까?",
       "deleteSuccess": "선수가 삭제되었습니다.",
       "deleteConflict": "매치 또는 드래프트 기록이 남아 있는 선수는 삭제할 수 없습니다.",
       "deleteFailure": "선수 삭제에 실패했습니다. 서버 상태를 확인해 주세요.",
       "deleteNotFound": "선수 삭제 API를 찾지 못했습니다. 백엔드를 재시작하고 최신 코드인지 확인해 주세요.",
       "deleteConfirm": "{nickname} 선수를 삭제하시겠습니까?"
     },
+    "activityForm": {
+      "deactivateTitle": "비활성 처리",
+      "reactivateTitle": "복구 처리",
+      "target": "대상: {nickname}",
+      "chatLeftAtLabel": "톡방 나간 시각",
+      "chatLeftReasonLabel": "톡방 나간 사유",
+      "chatRejoinedAtLabel": "톡방 다시 들어온 시각",
+      "save": "저장"
+    },
     "filters": {
       "searchLabel": "닉네임 검색",
       "searchPlaceholder": "닉네임 입력...",
       "raceLabel": "종족 필터",
-      "includeInactive": "비활성 선수 포함 보기",
+      "includeInactive": "비활성 선수 보기",
       "activeCount": "활성 선수 {count}명",
+      "inactiveCount": "비활성 선수 {count}명",
       "totalCount": "전체 {count}명"
     },
     "table": {
@@ -478,7 +492,10 @@
       "actions": "관리",
       "empty": "조건에 맞는 선수가 없습니다.",
       "unassigned": "배정 필요",
-      "inactive": "비활성"
+      "inactive": "비활성",
+      "chatLeftAt": "나간 일시 {value}",
+      "chatLeftReason": "나간 사유 {value}",
+      "chatRejoinedAt": "복귀 일시 {value}"
     }
   },
   "balance": {

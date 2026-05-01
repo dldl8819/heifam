@@ -1,0 +1,3 @@
+ALTER TABLE players
+    ADD COLUMN IF NOT EXISTS chat_left_reason VARCHAR(500),
+    ADD COLUMN IF NOT EXISTS chat_rejoined_at TIMESTAMPTZ;
