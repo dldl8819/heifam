@@ -8,6 +8,7 @@ import { useAdminAuth } from '@/lib/admin-auth'
 import { apiClient, isApiForbiddenError } from '@/lib/api'
 import { t } from '@/lib/i18n'
 import type {
+  AccessEmailEntry,
   AccessAdminListResponse,
   AccessAllowedEmailListResponse,
 } from '@/types/api'
@@ -28,6 +29,11 @@ function isEmailFormatValid(value: string): boolean {
 function isNicknameFormatValid(value: string): boolean {
   const normalized = normalizeNickname(value)
   return normalized.length > 0 && normalized.length <= 100
+}
+
+function formatAccessEntryTarget(entry: AccessEmailEntry): string {
+  const normalizedNickname = normalizeNickname(entry.nickname ?? '')
+  return normalizedNickname.length > 0 ? `${normalizedNickname} (${entry.email})` : entry.email
 }
 
 export default function AccessControlPage() {
@@ -111,7 +117,7 @@ export default function AccessControlPage() {
     }
   }
 
-  const handleRemoveAdmin = async (targetEmail: string) => {
+  const handleRemoveAdmin = async (target: AccessEmailEntry) => {
     setError(null)
     setMessage(null)
     if (!isSuperAdmin) {
@@ -119,11 +125,16 @@ export default function AccessControlPage() {
       return
     }
 
+    const targetLabel = formatAccessEntryTarget(target)
+    if (!window.confirm(t('access.messages.removeConfirm', { target: targetLabel }))) {
+      return
+    }
+
     setSaving(true)
     try {
-      const response = await apiClient.removeAdminEmail(targetEmail)
+      const response = await apiClient.removeAdminEmail(target.email)
       setAdminList(response)
-      setMessage(t('access.messages.removeSaved'))
+      setMessage(t('access.messages.removeSavedTarget', { target: targetLabel }))
       await refreshAccess()
     } catch (requestError) {
       if (isApiForbiddenError(requestError)) {
@@ -191,15 +202,20 @@ export default function AccessControlPage() {
     }
   }
 
-  const handleRemoveAllowed = async (targetEmail: string) => {
+  const handleRemoveAllowed = async (target: AccessEmailEntry) => {
     setError(null)
     setMessage(null)
 
+    const targetLabel = formatAccessEntryTarget(target)
+    if (!window.confirm(t('access.messages.removeConfirm', { target: targetLabel }))) {
+      return
+    }
+
     setSaving(true)
     try {
-      const response = await apiClient.removeAllowedEmail(targetEmail)
+      const response = await apiClient.removeAllowedEmail(target.email)
       setAllowedList(response)
-      setMessage(t('access.messages.removeSaved'))
+      setMessage(t('access.messages.removeSavedTarget', { target: targetLabel }))
     } catch {
       setError(t('access.loadError'))
     } finally {
@@ -346,7 +362,7 @@ export default function AccessControlPage() {
                       <button
                         type="button"
                         disabled={saving}
-                        onClick={() => handleRemoveAdmin(adminUser.email)}
+                        onClick={() => handleRemoveAdmin(adminUser)}
                         className="rounded-md border border-rose-300 bg-white px-2 py-1 text-xs font-medium text-rose-700 transition-colors hover:border-rose-500 hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
                       >
                         {t('access.actions.remove')}
@@ -413,7 +429,7 @@ export default function AccessControlPage() {
                 <button
                   type="button"
                   disabled={saving}
-                  onClick={() => handleRemoveAllowed(allowedUser.email)}
+                  onClick={() => handleRemoveAllowed(allowedUser)}
                   className="rounded-md border border-rose-300 bg-white px-2 py-1 text-xs font-medium text-rose-700 transition-colors hover:border-rose-500 hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
                 >
                   {t('access.actions.remove')}
