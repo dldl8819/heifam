@@ -42,7 +42,7 @@ class MultiMatchBalancingServiceTest {
     @Mock
     private MatchParticipantRepository matchParticipantRepository;
 
-    private final TeamBalancingService teamBalancingService = new TeamBalancingService(null);
+    private final TeamBalancingService teamBalancingService = new TeamBalancingService(null, 800);
 
     @BeforeEach
     void setUp() {

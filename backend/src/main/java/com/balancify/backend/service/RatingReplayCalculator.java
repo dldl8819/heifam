@@ -24,19 +24,22 @@ class RatingReplayCalculator {
     private static final String TEAM_AWAY = "AWAY";
 
     private final int baseKFactor;
+    private final double winRateDenominator;
     private final double largeGapThreshold;
     private final double largeGapRange;
     private final double largeGapMinMultiplier;
     private final double lowTierMultiplier;
 
     RatingReplayCalculator(
-        @Value("${balancify.elo.k-factor:24}") int baseKFactor,
+        @Value("${balancify.elo.k-factor:36}") int baseKFactor,
+        @Value("${balancify.elo.win-rate-denominator:800}") double winRateDenominator,
         @Value("${balancify.elo.large-gap-threshold:300}") double largeGapThreshold,
         @Value("${balancify.elo.large-gap-range:900}") double largeGapRange,
         @Value("${balancify.elo.large-gap-min-multiplier:0.6}") double largeGapMinMultiplier,
         @Value("${balancify.elo.low-tier-multiplier:0.7}") double lowTierMultiplier
     ) {
         this.baseKFactor = baseKFactor;
+        this.winRateDenominator = winRateDenominator <= 0 ? 800 : winRateDenominator;
         this.largeGapThreshold = largeGapThreshold;
         this.largeGapRange = largeGapRange <= 0 ? 900 : largeGapRange;
         this.largeGapMinMultiplier = Math.max(0.1, Math.min(1.0, largeGapMinMultiplier));
@@ -283,7 +286,7 @@ class RatingReplayCalculator {
     }
 
     private double calculateExpectedWinRate(double homeAverageMmr, double awayAverageMmr) {
-        double ratingGap = (awayAverageMmr - homeAverageMmr) / 400.0;
+        double ratingGap = (awayAverageMmr - homeAverageMmr) / winRateDenominator;
         return 1.0 / (1.0 + Math.pow(10.0, ratingGap));
     }
 

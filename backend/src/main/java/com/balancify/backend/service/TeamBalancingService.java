@@ -12,15 +12,21 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
 public class TeamBalancingService {
 
     private final PlayerRepository playerRepository;
+    private final double winRateDenominator;
 
-    public TeamBalancingService(PlayerRepository playerRepository) {
+    public TeamBalancingService(
+        PlayerRepository playerRepository,
+        @Value("${balancify.elo.win-rate-denominator:800}") double winRateDenominator
+    ) {
         this.playerRepository = playerRepository;
+        this.winRateDenominator = winRateDenominator <= 0 ? 800 : winRateDenominator;
     }
 
     public BalanceResponse balance(BalanceRequest request) {
@@ -273,7 +279,7 @@ public class TeamBalancingService {
     }
 
     private double calculateExpectedWinRate(int homeMmr, int awayMmr) {
-        double ratingGap = (awayMmr - homeMmr) / 400.0;
+        double ratingGap = (awayMmr - homeMmr) / winRateDenominator;
         double winRate = 1.0 / (1.0 + Math.pow(10.0, ratingGap));
         return Math.round(winRate * 10000.0) / 10000.0;
     }

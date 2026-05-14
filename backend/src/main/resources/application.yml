@@ -64,7 +64,8 @@ balancify:
       secret: ${JWT_SECRET:}
       access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:15m}
   elo:
-    k-factor: ${ELO_K_FACTOR:24}
+    k-factor: ${ELO_K_FACTOR:36}
+    win-rate-denominator: ${ELO_WIN_RATE_DENOMINATOR:800}
     large-gap-threshold: ${ELO_LARGE_GAP_THRESHOLD:300}
     large-gap-range: ${ELO_LARGE_GAP_RANGE:900}
     large-gap-min-multiplier: ${ELO_LARGE_GAP_MIN_MULTIPLIER:0.6}

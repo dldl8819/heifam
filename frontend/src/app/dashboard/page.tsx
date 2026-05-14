@@ -171,7 +171,7 @@ export default function DashboardPage() {
   const [tierBoardError, setTierBoardError] = useState<string | null>(null)
   const myRaceSummary = dashboard?.myRaceSummary
   const myGameTypeSummary = dashboard?.myGameTypeSummary
-  const currentKFactor = dashboard?.currentKFactor ?? 24
+  const currentKFactor = dashboard?.currentKFactor ?? 36
   const tierBoardBuckets = useMemo(() => buildTierBoardBuckets(tierBoardRows), [tierBoardRows])
   const tierBoardRowCount = useMemo(
     () => Math.max(

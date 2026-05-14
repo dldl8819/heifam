@@ -18,7 +18,7 @@ class RatingReplayCalculatorTest {
 
     @Test
     void replayIsDeterministicAndUsesChronologicalOrder() {
-        RatingReplayCalculator calculator = new RatingReplayCalculator(24, 300, 900, 0.6, 0.7);
+        RatingReplayCalculator calculator = new RatingReplayCalculator(36, 800, 300, 900, 0.6, 0.7);
         ReplayFixture fixture = standardFixture();
 
         RatingReplayPlan chronologicalPlan = calculator.calculate(
@@ -45,8 +45,8 @@ class RatingReplayCalculatorTest {
     void loweringKFactorChangesReplayDeltas() {
         ReplayFixture fixture = standardFixture();
 
-        RatingReplayCalculator legacyCalculator = new RatingReplayCalculator(32, 300, 900, 0.6, 0.7);
-        RatingReplayCalculator loweredCalculator = new RatingReplayCalculator(24, 300, 900, 0.6, 0.7);
+        RatingReplayCalculator legacyCalculator = new RatingReplayCalculator(48, 800, 300, 900, 0.6, 0.7);
+        RatingReplayCalculator loweredCalculator = new RatingReplayCalculator(36, 800, 300, 900, 0.6, 0.7);
 
         RatingReplayPlan legacyPlan = legacyCalculator.calculate(
             fixture.players(),
@@ -67,7 +67,7 @@ class RatingReplayCalculatorTest {
 
     @Test
     void usesBaseMmrAsReplaySeed() {
-        RatingReplayCalculator calculator = new RatingReplayCalculator(24, 300, 900, 0.6, 0.7);
+        RatingReplayCalculator calculator = new RatingReplayCalculator(36, 800, 300, 900, 0.6, 0.7);
         ReplayFixture fixture = standardFixture();
 
         fixture.players().stream()

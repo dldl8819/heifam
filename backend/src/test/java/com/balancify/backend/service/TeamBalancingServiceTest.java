@@ -28,7 +28,7 @@ class TeamBalancingServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new TeamBalancingService(playerRepository);
+        service = new TeamBalancingService(playerRepository, 800);
     }
 
     @Test

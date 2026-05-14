@@ -43,7 +43,7 @@ public class DashboardQueryService {
         PlayerRepository playerRepository,
         MatchParticipantRepository matchParticipantRepository,
         MatchRepository matchRepository,
-        @Value("${balancify.elo.k-factor:24}") int currentKFactor
+        @Value("${balancify.elo.k-factor:36}") int currentKFactor
     ) {
         this.playerRepository = playerRepository;
         this.matchParticipantRepository = matchParticipantRepository;

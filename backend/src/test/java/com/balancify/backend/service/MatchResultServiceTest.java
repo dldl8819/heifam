@@ -34,7 +34,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class MatchResultServiceTest {
 
-    private static final int DEFAULT_BASE_K_FACTOR = 24;
+    private static final int DEFAULT_BASE_K_FACTOR = 36;
 
     @Mock
     private MatchRepository matchRepository;
@@ -62,6 +62,7 @@ class MatchResultServiceTest {
             playerRepository,
             mmrHistoryRepository,
             baseKFactor,
+            800,
             300,
             900,
             0.6,
@@ -100,7 +101,7 @@ class MatchResultServiceTest {
             new MatchResultRequest("HOME")
         );
 
-        double homeExpected = 1.0 / (1.0 + Math.pow(10.0, (950.0 - 1100.0) / 400.0));
+        double homeExpected = 1.0 / (1.0 + Math.pow(10.0, (950.0 - 1100.0) / 800.0));
         int homeDelta = (int) Math.round(DEFAULT_BASE_K_FACTOR * (1.0 - homeExpected));
         int awayDelta = (int) Math.round(DEFAULT_BASE_K_FACTOR * (0.0 - (1.0 - homeExpected)));
 
@@ -204,7 +205,7 @@ class MatchResultServiceTest {
 
         MatchResultResponse response = matchResultService.processMatchResult(2L, new MatchResultRequest("HOME"));
 
-        assertThat(response.kFactor()).isEqualTo(17);
+        assertThat(response.kFactor()).isEqualTo(25);
     }
 
     @Test
@@ -275,11 +276,11 @@ class MatchResultServiceTest {
             new MatchResultRequest("AWAY")
         );
 
-        assertThat(participantDelta(response, "AWAY", "A1")).isEqualTo(24);
-        assertThat(participantDelta(response, "AWAY", "A2")).isEqualTo(12);
+        assertThat(participantDelta(response, "AWAY", "A1")).isEqualTo(36);
+        assertThat(participantDelta(response, "AWAY", "A2")).isEqualTo(18);
         assertThat(returningPlayer.getReturnedAt()).isNotNull();
         assertThat(returningPlayer.getReturnBoostGamesRemaining()).isEqualTo(4);
-        assertThat(returningPlayer.getMmr()).isEqualTo(1024);
+        assertThat(returningPlayer.getMmr()).isEqualTo(1036);
     }
 
     @Test
@@ -380,13 +381,13 @@ class MatchResultServiceTest {
 
         MatchResultResponse response = matchResultService.processMatchResult(4L, new MatchResultRequest("AWAY"));
 
-        double underdogExpected = 1.0 / (1.0 + Math.pow(10.0, (1700.0 - 700.0) / 400.0));
+        double underdogExpected = 1.0 / (1.0 + Math.pow(10.0, (1700.0 - 700.0) / 800.0));
         int deltaWithoutBonus = (int) Math.round(response.kFactor() * (1.0 - underdogExpected));
         int underdogWinnerDelta = participantDelta(response, "AWAY", "A1");
 
         assertThat(underdogWinnerDelta).isGreaterThan(deltaWithoutBonus);
-        assertThat(underdogWinnerDelta).isEqualTo(15);
-        assertThat(participantDelta(response, "HOME", "H1")).isEqualTo(-15);
+        assertThat(underdogWinnerDelta).isEqualTo(21);
+        assertThat(participantDelta(response, "HOME", "H1")).isEqualTo(-21);
     }
 
     @Test
@@ -417,7 +418,7 @@ class MatchResultServiceTest {
 
     @Test
     void loweringBaseKFactorReducesAbsoluteDeltaSizes() {
-        MatchResultService legacyVolatilityService = createService(32);
+        MatchResultService legacyVolatilityService = createService(48);
 
         MatchResultResponse legacyResponse = processStandardResult(14L, "AWAY", legacyVolatilityService);
         MatchResultResponse loweredResponse = processStandardResult(15L, "AWAY", matchResultService);
