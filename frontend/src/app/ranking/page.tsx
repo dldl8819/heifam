@@ -163,11 +163,6 @@ export default function RankingPage() {
 
   return (
     <section className="space-y-6">
-      <header className="space-y-1 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-        <h2 className="text-2xl font-semibold tracking-tight">{t('ranking.title')}</h2>
-        <p className="text-sm text-slate-600">{t('ranking.description')}</p>
-      </header>
-
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="min-w-full text-left text-sm">
           <thead className="bg-slate-50 text-xs tracking-wide text-slate-500">

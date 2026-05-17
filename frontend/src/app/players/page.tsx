@@ -823,11 +823,6 @@ export default function PlayersPage() {
 
   return (
     <section className="space-y-6">
-      <header className="space-y-1 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-        <h2 className="text-2xl font-semibold tracking-tight">{t('players.title')}</h2>
-        <p className="text-sm text-slate-600">{t('players.description')}</p>
-      </header>
-
       {error && (
         <Alert variant="destructive" appearance="light">
           <AlertIcon icon="destructive">!</AlertIcon>

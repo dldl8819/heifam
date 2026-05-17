@@ -620,14 +620,6 @@ export default function BalancePage() {
 
   return (
     <section className="space-y-6">
-      <header className="space-y-2 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-        <h2 className="text-2xl font-semibold tracking-tight">{t('balance.title')}</h2>
-        <p className="text-sm text-slate-600">{t('balance.description')}</p>
-        <p className="text-xs text-slate-500">
-          {teamSize === 2 ? t('balance.mode.helperTwoVsTwo') : t('balance.mode.helperThreeVsThree')}
-        </p>
-      </header>
-
       {playersError && (
         <Alert variant="destructive" appearance="light">
           <AlertIcon icon="destructive">!</AlertIcon>

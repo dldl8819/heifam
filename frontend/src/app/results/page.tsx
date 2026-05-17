@@ -156,6 +156,7 @@ export default function ResultsPage() {
   const { mmrVisible } = useMmrVisibility()
   const showMmr = canViewMmr && mmrVisible
   const canUseManualEntry = canAccess
+  const [manualEntryOpen, setManualEntryOpen] = useState<boolean>(false)
   const [operatorEntryMode, setOperatorEntryMode] = useState<OperatorEntryMode>('manual')
   const [manualTeamSize, setManualTeamSize] = useState<SupportedTeamSize>(3)
   const [manualRaceComposition, setManualRaceComposition] = useState<RaceComposition | null>(null)
@@ -359,7 +360,7 @@ export default function ResultsPage() {
   }, [manualTeamSize])
 
   useEffect(() => {
-    if (!canUseManualEntry) {
+    if (!canUseManualEntry || !manualEntryOpen || (isAdmin && operatorEntryMode === 'existing')) {
       setManualPlayers([])
       setManualPlayersError(null)
       setManualPlayersLoading(false)
@@ -419,7 +420,7 @@ export default function ResultsPage() {
     return () => {
       active = false
     }
-  }, [canUseManualEntry, showMmr])
+  }, [canUseManualEntry, isAdmin, manualEntryOpen, operatorEntryMode, showMmr])
 
   const selectedManualPlayerIds = useMemo(
     () =>
@@ -737,57 +738,61 @@ export default function ResultsPage() {
     }
   }
 
-  const resultsHeaderDescription = isAdmin
-    ? t('results.descriptionAdmin')
-    : canUseManualEntry
-      ? t('results.descriptionMember')
-      : t('results.descriptionViewer')
-
   return (
     <section className="space-y-6">
-      <header className="space-y-1 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-        <h2 className="text-2xl font-semibold tracking-tight">{t('results.title')}</h2>
-        <p className="text-sm text-slate-600">{resultsHeaderDescription}</p>
-      </header>
-
       {canUseManualEntry && (
         <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <button
+            type="button"
+            onClick={() => setManualEntryOpen((previous) => !previous)}
+            aria-expanded={manualEntryOpen}
+            aria-controls="manual-match-entry-panel"
+            className="flex w-full items-center justify-between gap-4 text-left"
+          >
             <div className="space-y-1">
-              <h3 className="text-sm font-semibold text-slate-900">{t('results.operator.title')}</h3>
+              <span className="block text-sm font-semibold text-slate-900">{t('results.operator.title')}</span>
               <p className="text-xs text-slate-500">{t('results.operator.description')}</p>
             </div>
-            {isAdmin && (
-              <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
-                {(['existing', 'manual'] as const).map((mode) => {
-                  const selected = operatorEntryMode === mode
-                  return (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => setOperatorEntryMode(mode)}
-                      className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                        selected
-                          ? 'bg-slate-900 text-white'
-                          : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                      }`}
-                    >
-                      {mode === 'existing'
-                        ? t('results.operator.mode.existing')
-                        : t('results.operator.mode.manual')}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </div>
+            <span
+              aria-hidden="true"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-base font-semibold text-slate-700"
+            >
+              {manualEntryOpen ? '-' : '+'}
+            </span>
+          </button>
 
-          {isAdmin && operatorEntryMode === 'existing' ? (
-            <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
-              {t('results.operator.existingHelper')}
-            </p>
-          ) : (
-            <form className="mt-4 space-y-4" onSubmit={handleManualSubmit}>
+          {manualEntryOpen && (
+            <div id="manual-match-entry-panel" className="mt-4 space-y-4">
+              {isAdmin && (
+                <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+                  {(['existing', 'manual'] as const).map((mode) => {
+                    const selected = operatorEntryMode === mode
+                    return (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setOperatorEntryMode(mode)}
+                        className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                          selected
+                            ? 'bg-slate-900 text-white'
+                            : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                        }`}
+                      >
+                        {mode === 'existing'
+                          ? t('results.operator.mode.existing')
+                          : t('results.operator.mode.manual')}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+
+              {isAdmin && operatorEntryMode === 'existing' ? (
+                <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                  {t('results.operator.existingHelper')}
+                </p>
+              ) : (
+                <form className="space-y-4" onSubmit={handleManualSubmit}>
               <div className="grid gap-4 lg:grid-cols-2">
                 <label className="space-y-1 text-sm">
                   <span className="font-medium text-slate-700">{t('results.manual.teamSizeLabel')}</span>
@@ -946,7 +951,9 @@ export default function ResultsPage() {
                   {t('results.manual.validation.raceCompositionRequired')}
                 </p>
               )}
-            </form>
+                </form>
+              )}
+            </div>
           )}
         </article>
       )}
