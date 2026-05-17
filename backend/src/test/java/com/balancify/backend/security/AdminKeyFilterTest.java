@@ -957,7 +957,7 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void returnsForbiddenForMemberForRanking() throws Exception {
+    void returnsMaskedRankingForMember() throws Exception {
         when(rankingService.getGroupRanking(eq(1L)))
             .thenReturn(
                 List.of(
@@ -982,17 +982,81 @@ class AdminKeyFilterTest {
                 get("/api/groups/1/ranking")
                     .header("X-USER-EMAIL", "member@hei.gg")
             )
-            .andExpect(status().isForbidden());
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].rank").value(1))
+            .andExpect(jsonPath("$[0].nickname").value("alpha"))
+            .andExpect(jsonPath("$[0].tier").value("A+"))
+            .andExpect(jsonPath("$[0].wins").value(2))
+            .andExpect(jsonPath("$[0].currentMmr").doesNotExist())
+            .andExpect(jsonPath("$[0].mmrDelta").doesNotExist());
     }
 
     @Test
-    void returnsForbiddenForAdminForRanking() throws Exception {
+    void returnsMaskedRankingForAdminWithoutMmrAccess() throws Exception {
+        when(rankingService.getGroupRanking(eq(1L)))
+            .thenReturn(
+                List.of(
+                    new RankingItemResponse(
+                        1,
+                        "alpha",
+                        "P",
+                        "A+",
+                        1216,
+                        2,
+                        1,
+                        3,
+                        66.67,
+                        "W2",
+                        "WWL",
+                        16
+                    )
+                )
+            );
+
         mockMvc
             .perform(
                 get("/api/groups/1/ranking")
                     .header("X-USER-EMAIL", "admin@hei.gg")
             )
-            .andExpect(status().isForbidden());
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].rank").value(1))
+            .andExpect(jsonPath("$[0].nickname").value("alpha"))
+            .andExpect(jsonPath("$[0].currentMmr").doesNotExist())
+            .andExpect(jsonPath("$[0].mmrDelta").doesNotExist());
+    }
+
+    @Test
+    void returnsMaskedRankingForAdminWithMmrAccess() throws Exception {
+        when(rankingService.getGroupRanking(eq(1L)))
+            .thenReturn(
+                List.of(
+                    new RankingItemResponse(
+                        1,
+                        "alpha",
+                        "P",
+                        "A+",
+                        1216,
+                        2,
+                        1,
+                        3,
+                        66.67,
+                        "W2",
+                        "WWL",
+                        16
+                    )
+                )
+            );
+
+        mockMvc
+            .perform(
+                get("/api/groups/1/ranking")
+                    .header("X-USER-EMAIL", "ops@hei.gg")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].rank").value(1))
+            .andExpect(jsonPath("$[0].nickname").value("alpha"))
+            .andExpect(jsonPath("$[0].currentMmr").doesNotExist())
+            .andExpect(jsonPath("$[0].mmrDelta").doesNotExist());
     }
 
     @Test
