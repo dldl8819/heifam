@@ -27,6 +27,8 @@ import com.balancify.backend.api.group.GroupPlayerImportController;
 import com.balancify.backend.api.group.GroupRankingController;
 import com.balancify.backend.api.group.dto.CreateGroupMatchResponse;
 import com.balancify.backend.api.group.dto.DashboardKpiSummaryResponse;
+import com.balancify.backend.api.group.dto.DashboardRecentBalancePreviewResponse;
+import com.balancify.backend.api.group.dto.DashboardRecentBalanceTeamPlayerResponse;
 import com.balancify.backend.api.group.dto.DashboardTopRankingPreviewItemResponse;
 import com.balancify.backend.api.group.dto.GroupPlayerResponse;
 import com.balancify.backend.api.group.dto.GroupPlayerImportResponse;
@@ -1114,6 +1116,45 @@ class AdminKeyFilterTest {
                     .header("X-USER-NICKNAME", "member")
             )
             .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void allowsDashboardForAdminWithMaskedMmrSummary() throws Exception {
+        when(dashboardQueryService.getGroupDashboard(eq(1L), eq("admin")))
+            .thenReturn(
+                new GroupDashboardResponse(
+                    24,
+                    new DashboardKpiSummaryResponse(10, 1400, 1320.5, 12),
+                    List.of(new DashboardTopRankingPreviewItemResponse(1, "alpha", "P", 1400, 75.0)),
+                    new DashboardRecentBalancePreviewResponse(
+                        77L,
+                        List.of(new DashboardRecentBalanceTeamPlayerResponse("alpha", 1200)),
+                        List.of(new DashboardRecentBalanceTeamPlayerResponse("bravo", 1184)),
+                        3600,
+                        3552,
+                        48,
+                        OffsetDateTime.parse("2026-04-01T12:00:00Z")
+                    ),
+                    null,
+                    null
+                )
+            );
+
+        mockMvc
+            .perform(
+                get("/api/groups/1/dashboard")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .header("X-USER-NICKNAME", "admin")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.kpiSummary.topMmr").value(0))
+            .andExpect(jsonPath("$.kpiSummary.averageMmr").value(0.0))
+            .andExpect(jsonPath("$.topRankingPreview[0].currentMmr").value(0))
+            .andExpect(jsonPath("$.recentBalancePreview.homeMmr").value(0))
+            .andExpect(jsonPath("$.recentBalancePreview.awayMmr").value(0))
+            .andExpect(jsonPath("$.recentBalancePreview.mmrDiff").value(0))
+            .andExpect(jsonPath("$.recentBalancePreview.homeTeam[0].mmr").value(0))
+            .andExpect(jsonPath("$.recentBalancePreview.awayTeam[0].mmr").value(0));
     }
 
     @Test

@@ -1,14 +1,14 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAdminAuth } from '@/lib/admin-auth'
 import { apiClient } from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
-import type { GroupDashboardResponse, PlayerRosterItem, PlayerTierStatus, RatingRecalculationResponse } from '@/types/api'
+import type { GroupDashboardResponse, PlayerRosterItem, PlayerTierStatus } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
 const TIER_BOARD_COLUMNS: PlayerTierStatus[] = [
@@ -107,19 +107,6 @@ function resolveTierFromMmr(value: number | undefined): PlayerTierStatus | null 
   return 'S'
 }
 
-function resolveInitialTier(row: PlayerRosterItem): PlayerTierStatus | null {
-  return row.baseTier ?? resolveTierFromMmr(row.baseMmr)
-}
-
-function formatTierBoardChangeLabel(row: PlayerRosterItem, currentTier: PlayerTierStatus): string | null {
-  const initialTier = resolveInitialTier(row)
-  if (initialTier === null || initialTier === currentTier) {
-    return null
-  }
-
-  return `${resolveTierBoardLabel(initialTier)} -> ${resolveTierBoardLabel(currentTier)}`
-}
-
 function buildTierBoardBuckets(rows: PlayerRosterItem[]): Record<PlayerTierStatus, PlayerRosterItem[]> {
   const buckets = TIER_BOARD_COLUMNS.reduce<Record<PlayerTierStatus, PlayerRosterItem[]>>(
     (accumulator, tier) => ({
@@ -162,16 +149,11 @@ export default function DashboardPage() {
   const [dashboard, setDashboard] = useState<GroupDashboardResponse | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
-  const [ratingRecalculationLoading, setRatingRecalculationLoading] = useState<'dryRun' | 'execute' | null>(null)
-  const [ratingRecalculationError, setRatingRecalculationError] = useState<string | null>(null)
-  const [ratingRecalculationMessage, setRatingRecalculationMessage] = useState<string | null>(null)
-  const [ratingRecalculationResult, setRatingRecalculationResult] = useState<RatingRecalculationResponse | null>(null)
   const [tierBoardRows, setTierBoardRows] = useState<PlayerRosterItem[]>([])
   const [tierBoardLoading, setTierBoardLoading] = useState<boolean>(false)
   const [tierBoardError, setTierBoardError] = useState<string | null>(null)
   const myRaceSummary = dashboard?.myRaceSummary
   const myGameTypeSummary = dashboard?.myGameTypeSummary
-  const currentKFactor = dashboard?.currentKFactor ?? 36
   const tierBoardBuckets = useMemo(() => buildTierBoardBuckets(tierBoardRows), [tierBoardRows])
   const tierBoardRowCount = useMemo(
     () => Math.max(
@@ -185,25 +167,6 @@ export default function DashboardPage() {
     [tierBoardBuckets]
   )
   const tierBoardDate = useMemo(() => formatKstDate(), [])
-  const canExecuteRatingRecalculation =
-    ratingRecalculationLoading === null &&
-    ratingRecalculationResult?.dryRun === true &&
-    ratingRecalculationResult.averageAbsoluteDeltaDifference > 0
-
-  const fetchDashboard = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const response = await apiClient.getGroupDashboard(TEMP_GROUP_ID)
-      setDashboard(response)
-    } catch {
-      setDashboard(null)
-      setError(t('dashboard.loadError'))
-    } finally {
-      setLoading(false)
-    }
-  }, [])
 
   useEffect(() => {
     let active = true
@@ -280,42 +243,6 @@ export default function DashboardPage() {
     }
   }, [isSuperAdmin])
 
-  const handleRatingRecalculation = useCallback(async (dryRun: boolean) => {
-    setRatingRecalculationLoading(dryRun ? 'dryRun' : 'execute')
-    setRatingRecalculationError(null)
-    setRatingRecalculationMessage(null)
-
-    try {
-      const response = await apiClient.recalculateRatings({
-        dryRun,
-        confirm: dryRun ? false : true,
-      })
-      setRatingRecalculationResult(response)
-      setRatingRecalculationMessage(
-        dryRun
-          ? response.averageAbsoluteDeltaDifference > 0
-            ? t('dashboard.ratingRecalculation.messages.dryRunSuccess')
-            : t('dashboard.ratingRecalculation.messages.noChanges')
-          : t('dashboard.ratingRecalculation.messages.executeSuccess')
-      )
-
-      if (!dryRun) {
-        await fetchDashboard()
-      }
-    } catch (requestError) {
-      const fallbackMessage = dryRun
-        ? t('dashboard.ratingRecalculation.messages.dryRunFailure')
-        : t('dashboard.ratingRecalculation.messages.executeFailure')
-      if (requestError instanceof Error && requestError.message.trim().length > 0) {
-        setRatingRecalculationError(requestError.message)
-      } else {
-        setRatingRecalculationError(fallbackMessage)
-      }
-    } finally {
-      setRatingRecalculationLoading(null)
-    }
-  }, [fetchDashboard])
-
   return (
     <section className="space-y-6">
       <header className="space-y-1 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
@@ -331,132 +258,6 @@ export default function DashboardPage() {
             <AlertDescription>{error}</AlertDescription>
           </AlertContent>
         </Alert>
-      )}
-
-      {isSuperAdmin && (
-        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-1">
-              <h3 className="text-sm font-semibold text-slate-900">{t('dashboard.ratingRecalculation.title')}</h3>
-              <p className="text-sm text-slate-600">{t('dashboard.ratingRecalculation.description')}</p>
-              <p className="text-xs font-medium text-slate-500">
-                {t('dashboard.ratingRecalculation.currentKFactor', { value: currentKFactor })}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => void handleRatingRecalculation(true)}
-                disabled={ratingRecalculationLoading !== null}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {ratingRecalculationLoading === 'dryRun'
-                  ? t('dashboard.ratingRecalculation.actions.dryRunLoading')
-                  : t('dashboard.ratingRecalculation.actions.dryRun')}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!window.confirm(t('dashboard.ratingRecalculation.messages.executeConfirm'))) {
-                    return
-                  }
-                  void handleRatingRecalculation(false)
-                }}
-                disabled={!canExecuteRatingRecalculation}
-                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {ratingRecalculationLoading === 'execute'
-                  ? t('dashboard.ratingRecalculation.actions.executeLoading')
-                  : t('dashboard.ratingRecalculation.actions.execute')}
-              </button>
-            </div>
-          </div>
-
-          {ratingRecalculationResult?.dryRun === true
-            && ratingRecalculationResult.averageAbsoluteDeltaDifference <= 0 && (
-              <p className="mt-3 text-xs font-medium text-slate-500">
-                {t('dashboard.ratingRecalculation.messages.executeDisabledNoChanges')}
-              </p>
-            )}
-
-          {ratingRecalculationMessage && (
-            <Alert appearance="light" className="mt-4 border-emerald-200 bg-emerald-50 text-emerald-900">
-              <AlertIcon icon="success">✓</AlertIcon>
-              <AlertContent>
-                <AlertTitle>{t('dashboard.ratingRecalculation.messages.title')}</AlertTitle>
-                <AlertDescription>{ratingRecalculationMessage}</AlertDescription>
-              </AlertContent>
-            </Alert>
-          )}
-
-          {ratingRecalculationError && (
-            <Alert variant="destructive" appearance="light" className="mt-4">
-              <AlertIcon icon="destructive">!</AlertIcon>
-              <AlertContent>
-                <AlertTitle>{t('dashboard.ratingRecalculation.messages.errorTitle')}</AlertTitle>
-                <AlertDescription>{ratingRecalculationError}</AlertDescription>
-              </AlertContent>
-            </Alert>
-          )}
-
-          {ratingRecalculationResult && (
-            <div className="mt-4 space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  {t('dashboard.ratingRecalculation.summary.status')}:{' '}
-                  <span className="font-semibold text-slate-900">{ratingRecalculationResult.status}</span>
-                </div>
-                <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  {t('dashboard.ratingRecalculation.summary.processedMatches')}:{' '}
-                  <span className="font-semibold text-slate-900">{ratingRecalculationResult.processedMatches}</span>
-                </div>
-                <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  {t('dashboard.ratingRecalculation.summary.updatedPlayers')}:{' '}
-                  <span className="font-semibold text-slate-900">{ratingRecalculationResult.updatedPlayers}</span>
-                </div>
-                <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  {t('dashboard.ratingRecalculation.summary.durationMs')}:{' '}
-                  <span className="font-semibold text-slate-900">{ratingRecalculationResult.durationMs}</span>
-                </div>
-              </div>
-
-              <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                {t('dashboard.ratingRecalculation.summary.averageAbsoluteDeltaDifference')}:{' '}
-                <span className="font-semibold text-slate-900">
-                  {ratingRecalculationResult.averageAbsoluteDeltaDifference.toFixed(2)}
-                </span>
-              </div>
-
-              <div className="overflow-x-auto rounded-lg border border-slate-200">
-                <table className="min-w-full text-left text-sm">
-                  <thead className="bg-slate-50 text-xs tracking-wide text-slate-500">
-                    <tr>
-                      <th className="px-3 py-2">{t('dashboard.ratingRecalculation.samples.nickname')}</th>
-                      <th className="px-3 py-2">{t('dashboard.ratingRecalculation.samples.beforeMmr')}</th>
-                      <th className="px-3 py-2">{t('dashboard.ratingRecalculation.samples.afterMmr')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ratingRecalculationResult.samplePlayerChanges.map((player) => (
-                      <tr key={`rating-replay-${player.playerId}`} className="border-t border-slate-100">
-                        <td className="px-3 py-2 font-medium text-slate-900">{player.nickname}</td>
-                        <td className="px-3 py-2 text-slate-700">{player.beforeMmr}</td>
-                        <td className="px-3 py-2 text-slate-700">{player.afterMmr}</td>
-                      </tr>
-                    ))}
-                    {ratingRecalculationResult.samplePlayerChanges.length === 0 && (
-                      <tr className="border-t border-slate-100">
-                        <td className="px-3 py-4 text-center text-sm text-slate-500" colSpan={3}>
-                          {t('dashboard.ratingRecalculation.samples.empty')}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </section>
       )}
 
       {isSuperAdmin && (
@@ -508,30 +309,13 @@ export default function DashboardPage() {
                         </th>
                         {TIER_BOARD_COLUMNS.map((tier) => {
                           const player = tierBoardBuckets[tier][rowIndex] ?? null
-                          const tierChangeLabel = player ? formatTierBoardChangeLabel(player, tier) : null
                           return (
                             <td
                               key={`tier-board-cell-${tier}-${rowIndex}`}
-                              title={
-                                tierChangeLabel
-                                  ? t('dashboard.tierBoard.changeTooltip', { change: tierChangeLabel })
-                                  : undefined
-                              }
-                              className={`h-9 border px-2 py-1 align-middle font-semibold ${
-                                tierChangeLabel
-                                  ? 'border-solid border-amber-600 bg-amber-100 text-amber-950 shadow-[inset_0_0_0_2px_rgba(217,119,6,0.45)]'
-                                  : 'border-dotted border-slate-500 bg-white text-slate-950'
-                              }`}
+                              className="h-9 border border-dotted border-slate-500 bg-white px-2 py-1 align-middle font-semibold text-slate-950"
                             >
                               {player ? (
-                                <div className="flex items-center justify-center gap-1">
-                                  <span>{player.nickname}</span>
-                                  {tierChangeLabel && (
-                                    <span className="rounded-sm border border-amber-600 bg-amber-200 px-1 text-[10px] leading-4 text-amber-950">
-                                      {t('dashboard.tierBoard.changeBadge')}
-                                    </span>
-                                  )}
-                                </div>
+                                <span>{player.nickname}</span>
                               ) : ''}
                             </td>
                           )
