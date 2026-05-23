@@ -19,6 +19,7 @@ import type { PlayerRace, PlayerRosterItem, PlayerTierStatus } from '@/types/api
 const TEMP_GROUP_ID = 1
 
 type RaceFilter = PlayerRace | 'ALL'
+type PlayerRegistrationTier = Exclude<PlayerTierStatus, 'S'>
 type PlayerImportRow = {
   nickname: string
   tier: string
@@ -30,6 +31,15 @@ type PlayerImportRow = {
 type PlayerImportPayload = {
   players: PlayerImportRow[]
 }
+type PlayerImportResult = {
+  createdCount: number
+  updatedCount: number
+  failedCount: number
+  failedRows: PlayerImportFailedRow[]
+}
+type PlayerImportFailedRow = {
+  reason?: string
+}
 type ActivityFormMode = 'deactivate' | 'reactivate'
 type ActivityFormState = {
   mode: ActivityFormMode
@@ -39,6 +49,19 @@ type ActivityFormState = {
   chatRejoinedAt: string
 }
 const PLAYER_RACE_OPTIONS: PlayerRace[] = ['P', 'T', 'Z', 'PT', 'PZ', 'TZ', 'PTZ']
+const PLAYER_REGISTRATION_TIER_OPTIONS: PlayerRegistrationTier[] = [
+  'A+',
+  'A',
+  'A-',
+  'B+',
+  'B',
+  'B-',
+  'C+',
+  'C',
+  'C-',
+  'UNASSIGNED',
+]
+const REASSIGNMENT_IMPORT_TIER = '\uC7AC\uBC30\uC815\uB300\uC0C1'
 
 function comparePlayersByTierThenNickname(a: PlayerRosterItem, b: PlayerRosterItem): number {
   const tierDiff = toTierOrder(a.tier) - toTierOrder(b.tier)
@@ -137,122 +160,51 @@ function formatChatRecordDisplay(value: string | undefined): string {
   return `${year}.${month}.${day} ${hour}:${minute}`
 }
 
-function normalizeImportPayload(payload: unknown): PlayerImportPayload | null {
-  if (Array.isArray(payload)) {
-    const rows = payload
-      .map((row) => normalizeImportRow(row))
-      .filter((row): row is PlayerImportRow => row !== null)
-    return rows.length > 0 ? { players: rows } : null
-  }
-
-  if (payload !== null && typeof payload === 'object') {
-    const source = payload as Record<string, unknown>
-    if (!Array.isArray(source.players)) {
-      return null
-    }
-
-    const rows = source.players
-      .map((row) => normalizeImportRow(row))
-      .filter((row): row is PlayerImportRow => row !== null)
-    return rows.length > 0 ? { players: rows } : null
-  }
-
-  return null
+function toImportResultNumber(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
 }
 
-function normalizeImportRow(value: unknown): PlayerImportRow | null {
+function normalizeImportResult(value: unknown): PlayerImportResult {
   if (value === null || typeof value !== 'object') {
-    return null
+    return {
+      createdCount: 0,
+      updatedCount: 0,
+      failedCount: 0,
+      failedRows: [],
+    }
   }
 
   const source = value as Record<string, unknown>
-  const nickname = typeof source.nickname === 'string' ? source.nickname.trim() : ''
-  const tier = typeof source.tier === 'string' ? source.tier.trim() : ''
+  const failedRows = Array.isArray(source.failedRows)
+    ? source.failedRows
+        .flatMap((row): PlayerImportFailedRow[] => {
+          if (row === null || typeof row !== 'object') {
+            return []
+          }
+          const rowSource = row as Record<string, unknown>
+          const reason = typeof rowSource.reason === 'string' ? rowSource.reason : undefined
+          return reason ? [{ reason }] : [{}]
+        })
+    : []
 
-  if (nickname.length === 0 || tier.length === 0) {
-    return null
+  return {
+    createdCount: toImportResultNumber(source.createdCount),
+    updatedCount: toImportResultNumber(source.updatedCount),
+    failedCount: toImportResultNumber(source.failedCount) || failedRows.length,
+    failedRows,
   }
-
-  const row: PlayerImportRow = { nickname, tier }
-  if (typeof source.race === 'string') {
-    const normalizedRace = source.race.trim().toUpperCase()
-    if (PLAYER_RACE_OPTIONS.includes(normalizedRace as PlayerRace)) {
-      row.race = normalizedRace as PlayerRace
-    }
-  }
-
-  if (typeof source.baseMmr === 'number' && Number.isFinite(source.baseMmr)) {
-    row.baseMmr = source.baseMmr
-  }
-  if (typeof source.currentMmr === 'number' && Number.isFinite(source.currentMmr)) {
-    row.currentMmr = source.currentMmr
-  }
-  if (typeof source.note === 'string') {
-    row.note = source.note
-  }
-
-  return row
 }
 
-function parseTextImportPayload(raw: string): PlayerImportPayload | null {
-  const lines = raw
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
+function formatImportFailureMessage(result: PlayerImportResult): string {
+  const firstReason = result.failedRows
+    .map((row) => row.reason?.trim() ?? '')
+    .find((reason) => reason.length > 0)
 
-  if (lines.length === 0) {
-    return null
+  if (firstReason) {
+    return t('players.import.failureWithReason', { reason: firstReason })
   }
 
-  const rows: PlayerImportRow[] = []
-  for (const line of lines) {
-    let parts = line.split('\t').map((part) => part.trim()).filter((part) => part.length > 0)
-    if (parts.length < 2) {
-      parts = line.split(',').map((part) => part.trim()).filter((part) => part.length > 0)
-    }
-    if (parts.length < 2) {
-      parts = line.split(/\s+/).map((part) => part.trim()).filter((part) => part.length > 0)
-    }
-
-    if (parts.length < 2) {
-      return null
-    }
-
-    const nickname = parts[0]
-    const tier = parts[1]
-    const race =
-      parts.length >= 3 ? parts[2].toUpperCase() : undefined
-    if (nickname.length === 0 || tier.length === 0) {
-      return null
-    }
-
-    if (race && !PLAYER_RACE_OPTIONS.includes(race as PlayerRace)) {
-      return null
-    }
-
-    rows.push({ nickname, tier, race: race as PlayerRace | undefined })
-  }
-
-  return rows.length > 0 ? { players: rows } : null
-}
-
-function parseImportPayload(raw: string): PlayerImportPayload | null {
-  const trimmed = raw.trim()
-  if (trimmed.length === 0) {
-    return null
-  }
-
-  try {
-    const parsedJson = JSON.parse(trimmed) as unknown
-    const normalizedJsonPayload = normalizeImportPayload(parsedJson)
-    if (normalizedJsonPayload) {
-      return normalizedJsonPayload
-    }
-  } catch {
-    // no-op
-  }
-
-  return parseTextImportPayload(trimmed)
+  return t('players.import.failure')
 }
 
 function getTierBadgeClass(tier: PlayerTierStatus): string {
@@ -288,7 +240,9 @@ export default function PlayersPage() {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState<string>('')
   const [raceFilter, setRaceFilter] = useState<RaceFilter>('ALL')
-  const [importPayload, setImportPayload] = useState<string>('')
+  const [registrationNickname, setRegistrationNickname] = useState<string>('')
+  const [registrationTier, setRegistrationTier] = useState<PlayerRegistrationTier | ''>('')
+  const [registrationRace, setRegistrationRace] = useState<PlayerRace | ''>('')
   const [importing, setImporting] = useState<boolean>(false)
   const [importError, setImportError] = useState<string | null>(null)
   const [importSuccess, setImportSuccess] = useState<string | null>(null)
@@ -329,29 +283,63 @@ export default function PlayersPage() {
     void fetchRoster()
   }, [fetchRoster])
 
-  const handleImportPlayers = async (event: FormEvent<HTMLFormElement>) => {
+  const handleRegisterPlayer = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setImportError(null)
     setImportSuccess(null)
     setPlayerActionError(null)
     setPlayerActionSuccess(null)
 
-    if (!isSuperAdmin) {
+    if (!isAdmin) {
       setImportError(t('common.adminOnlyAction'))
       return
     }
 
-    const normalizedPayload = parseImportPayload(importPayload)
-    if (!normalizedPayload) {
-      setImportError(t('players.import.invalidFormat'))
+    const nickname = registrationNickname.trim()
+    if (nickname.length === 0) {
+      setImportError(t('players.import.nicknameRequired'))
       return
+    }
+
+    if (!registrationTier) {
+      setImportError(t('players.import.tierRequired'))
+      return
+    }
+
+    if (!registrationRace) {
+      setImportError(t('players.import.raceRequired'))
+      return
+    }
+
+    const payload: PlayerImportPayload = {
+      players: [
+        {
+          nickname,
+          tier: registrationTier === 'UNASSIGNED' ? REASSIGNMENT_IMPORT_TIER : registrationTier,
+          race: registrationRace,
+        },
+      ],
     }
 
     setImporting(true)
     try {
-      await apiClient.importGroupPlayers(TEMP_GROUP_ID, normalizedPayload)
+      const response = await apiClient.importGroupPlayers(TEMP_GROUP_ID, payload)
+      const importResult = normalizeImportResult(response)
+      if (
+        importResult.failedCount > 0 ||
+        importResult.createdCount + importResult.updatedCount === 0
+      ) {
+        setImportError(formatImportFailureMessage(importResult))
+        return
+      }
+
       setImportSuccess(t('players.import.success'))
-      setImportPayload('')
+      setRegistrationNickname('')
+      setRegistrationTier('')
+      setRegistrationRace('')
+      setSearch('')
+      setRaceFilter('ALL')
+      setShowInactive(false)
       await fetchRoster()
     } catch (importRequestError) {
       if (isApiUnauthorizedError(importRequestError)) {
@@ -833,17 +821,59 @@ export default function PlayersPage() {
         </Alert>
       )}
 
-      {isSuperAdmin && (
+      {isAdmin && (
         <article id="player-import" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <h3 className="text-sm font-semibold text-slate-900">{t('players.import.title')}</h3>
           <p className="mt-1 text-xs text-slate-500">{t('players.import.description')}</p>
-          <form className="mt-3 space-y-3" onSubmit={handleImportPlayers}>
-            <textarea
-              value={importPayload}
-              onChange={(event) => setImportPayload(event.target.value)}
-              className="h-32 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-              placeholder={t('players.import.placeholder')}
-            />
+          <form className="mt-3 space-y-3" onSubmit={handleRegisterPlayer}>
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1.5fr)_minmax(9rem,0.75fr)_minmax(9rem,0.75fr)]">
+              <label className="space-y-1 text-xs font-medium text-slate-500">
+                {t('players.import.nicknameLabel')}
+                <input
+                  type="text"
+                  value={registrationNickname}
+                  onChange={(event) => setRegistrationNickname(event.target.value)}
+                  placeholder={t('players.import.nicknamePlaceholder')}
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                />
+              </label>
+
+              <label className="space-y-1 text-xs font-medium text-slate-500">
+                {t('players.import.tierLabel')}
+                <select
+                  value={registrationTier}
+                  onChange={(event) =>
+                    setRegistrationTier(event.target.value as PlayerRegistrationTier | '')
+                  }
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                >
+                  <option value="">{t('players.import.tierPlaceholder')}</option>
+                  {PLAYER_REGISTRATION_TIER_OPTIONS.map((tierOption) => (
+                    <option key={tierOption} value={tierOption}>
+                      {tierOption === 'UNASSIGNED'
+                        ? t('players.import.unassignedTierOption')
+                        : tierOption}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="space-y-1 text-xs font-medium text-slate-500">
+                {t('players.import.raceLabel')}
+                <select
+                  value={registrationRace}
+                  onChange={(event) => setRegistrationRace(event.target.value as PlayerRace | '')}
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                >
+                  <option value="">{t('players.import.racePlaceholder')}</option>
+                  {PLAYER_RACE_OPTIONS.map((raceOption) => (
+                    <option key={raceOption} value={raceOption}>
+                      {raceOption}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
 
             {importError && (
               <Alert variant="destructive" appearance="light" size="sm">

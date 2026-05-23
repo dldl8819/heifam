@@ -477,9 +477,11 @@ public class MatchResultService {
     }
 
     @Transactional
-    public void deleteMatch(Long matchId) {
+    public DeletedMatchAuditSnapshot deleteMatch(Long matchId) {
         Match match = matchRepository.findById(matchId)
             .orElseThrow(() -> new NoSuchElementException("Match not found: " + matchId));
+        Long groupId = match.getGroup() == null ? null : match.getGroup().getId();
+        OffsetDateTime playedAt = match.getPlayedAt();
 
         List<MatchParticipant> participants =
             matchParticipantRepository.findByMatchIdWithPlayerAndMatch(matchId);
@@ -511,6 +513,16 @@ public class MatchResultService {
         mmrHistoryRepository.deleteByMatch_Id(matchId);
         matchParticipantRepository.deleteByMatch_Id(matchId);
         matchRepository.delete(match);
+
+        return new DeletedMatchAuditSnapshot(matchId, groupId, playedAt, matchHadResult);
+    }
+
+    public record DeletedMatchAuditSnapshot(
+        Long matchId,
+        Long groupId,
+        OffsetDateTime playedAt,
+        boolean hadResult
+    ) {
     }
 
     private int resolveCompletedRankedGamesAfterDelete(

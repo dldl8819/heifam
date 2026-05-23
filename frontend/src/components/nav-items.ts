@@ -33,6 +33,7 @@ export function getVisibleNavItems(context: NavVisibilityContext): NavItem[] {
 
     if (context.isSuperAdmin) {
       adminItems.splice(adminItems.length - 1, 0, { label: t('nav.accessControl'), href: '/admin/access' })
+      adminItems.splice(adminItems.length - 1, 0, { label: t('nav.auditLogs'), href: '/admin/audit' })
     }
 
     return adminItems

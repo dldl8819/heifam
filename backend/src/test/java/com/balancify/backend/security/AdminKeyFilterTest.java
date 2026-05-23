@@ -2,6 +2,7 @@ package com.balancify.backend.security;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
@@ -18,6 +19,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.balancify.backend.api.HealthController;
 import com.balancify.backend.api.access.AccessControlController;
 import com.balancify.backend.api.admin.AdminRatingController;
+import com.balancify.backend.api.admin.OperationAuditLogController;
 import com.balancify.backend.api.group.GroupMatchAdminController;
 import com.balancify.backend.api.group.GroupMatchController;
 import com.balancify.backend.api.group.GroupDashboardController;
@@ -58,6 +60,7 @@ import com.balancify.backend.service.ManualMatchService;
 import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.DashboardQueryService;
 import com.balancify.backend.service.MultiMatchBalancingService;
+import com.balancify.backend.service.OperationAuditLogService;
 import com.balancify.backend.service.PlayerAdminService;
 import com.balancify.backend.service.PlayerQueryService;
 import com.balancify.backend.service.PlayerImportService;
@@ -92,7 +95,8 @@ import org.springframework.test.web.servlet.MockMvc;
     GroupRankingController.class,
     GroupPlayerImportController.class,
     GroupPlayerAdminController.class,
-    GroupMatchAdminController.class
+    GroupMatchAdminController.class,
+    OperationAuditLogController.class
 })
 @Import({ AdminKeyFilter.class, ServiceAccessFilter.class, AdminKeyProperties.class })
 @TestPropertySource(properties = {
@@ -144,6 +148,9 @@ class AdminKeyFilterTest {
 
     @MockBean
     private RatingRecalculationService ratingRecalculationService;
+
+    @MockBean
+    private OperationAuditLogService operationAuditLogService;
 
     @MockBean
     private AdminRequestResolver adminRequestResolver;
@@ -638,7 +645,7 @@ class AdminKeyFilterTest {
 
     @Test
     void allowsPlayersImportPathWithAdminEmail() throws Exception {
-        when(playerImportService.importPlayers(eq(1L), any()))
+        when(playerImportService.importPlayers(eq(1L), any(), eq("ops@hei.gg"), any()))
             .thenReturn(new GroupPlayerImportResponse(1, 1, 0, 0, List.of()));
 
         mockMvc
@@ -647,6 +654,28 @@ class AdminKeyFilterTest {
                     .header("X-USER-EMAIL", "ops@hei.gg")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"players\":[]}")
+            )
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void returnsForbiddenForAuditLogsWithAdminEmail() throws Exception {
+        mockMvc
+            .perform(
+                get("/api/admin/audit-logs")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void allowsAuditLogsWithSuperAdminEmail() throws Exception {
+        when(operationAuditLogService.getRecentLogs(anyInt())).thenReturn(List.of());
+
+        mockMvc
+            .perform(
+                get("/api/admin/audit-logs")
+                    .header("X-USER-EMAIL", "superadmin@hei.gg")
             )
             .andExpect(status().isOk());
     }

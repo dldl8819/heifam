@@ -8,6 +8,7 @@ import com.balancify.backend.domain.Group;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.GroupRepository;
 import com.balancify.backend.repository.PlayerRepository;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -26,17 +27,30 @@ public class PlayerImportService {
 
     private final PlayerRepository playerRepository;
     private final GroupRepository groupRepository;
+    private final OperationAuditLogService operationAuditLogService;
 
     public PlayerImportService(
         PlayerRepository playerRepository,
-        GroupRepository groupRepository
+        GroupRepository groupRepository,
+        OperationAuditLogService operationAuditLogService
     ) {
         this.playerRepository = playerRepository;
         this.groupRepository = groupRepository;
+        this.operationAuditLogService = operationAuditLogService;
     }
 
     @Transactional
     public GroupPlayerImportResponse importPlayers(Long groupId, GroupPlayerImportRequest request) {
+        return importPlayers(groupId, request, null, null);
+    }
+
+    @Transactional
+    public GroupPlayerImportResponse importPlayers(
+        Long groupId,
+        GroupPlayerImportRequest request,
+        String actorEmail,
+        String actorNickname
+    ) {
         List<GroupPlayerImportRowRequest> rows =
             request == null || request.players() == null ? List.of() : request.players();
 
@@ -63,9 +77,13 @@ public class PlayerImportService {
                 playerRepository.findByGroup_IdAndNicknameIgnoreCase(groupId, validationResult.nickname());
             Player player = matchedPlayers.isEmpty() ? new Player() : matchedPlayers.get(0);
             boolean isCreate = matchedPlayers.isEmpty();
+            boolean reactivated = !isCreate && !player.isActive();
 
             if (isCreate) {
                 player.setGroup(group);
+            } else if (reactivated) {
+                player.setActive(true);
+                player.setChatRejoinedAt(OffsetDateTime.now());
             }
 
             player.setNickname(validationResult.nickname());
@@ -79,7 +97,15 @@ public class PlayerImportService {
                 player.setRace("P");
             }
 
-            playerRepository.save(player);
+            Player savedPlayer = playerRepository.save(player);
+            operationAuditLogService.recordPlayerRegistration(
+                actorEmail,
+                actorNickname,
+                groupId,
+                savedPlayer,
+                isCreate,
+                reactivated
+            );
 
             if (isCreate) {
                 createdCount++;

@@ -18,6 +18,7 @@ import type {
   MatchResultRequest,
   MatchResultResponse,
   ManualMatchCreateRequest,
+  OperationAuditLogItem,
   PlayerRosterItem,
   PlayerRace,
   PlayerTierStatus,
@@ -498,6 +499,39 @@ function normalizePlayerRosterItem(value: unknown): PlayerRosterItem | null {
   }
 }
 
+function normalizeOperationAuditLogItem(value: unknown): OperationAuditLogItem | null {
+  if (value === null || typeof value !== 'object') {
+    return null
+  }
+
+  const source = value as Record<string, unknown>
+  const id = toNumber(source.id)
+  const targetId = toNumber(source.targetId)
+  const groupId = toNumber(source.groupId)
+  const action = typeof source.action === 'string' ? source.action : null
+  const targetType = typeof source.targetType === 'string' ? source.targetType : null
+  const summary = typeof source.summary === 'string' ? source.summary : null
+  const createdAt = typeof source.createdAt === 'string' ? source.createdAt : null
+
+  if (id === null || action === null || targetType === null || summary === null || createdAt === null) {
+    return null
+  }
+
+  return {
+    id,
+    action,
+    actorEmail: typeof source.actorEmail === 'string' ? source.actorEmail : undefined,
+    actorNickname: typeof source.actorNickname === 'string' ? source.actorNickname : undefined,
+    targetType,
+    targetId: targetId ?? undefined,
+    targetLabel: typeof source.targetLabel === 'string' ? source.targetLabel : undefined,
+    groupId: groupId ?? undefined,
+    summary,
+    details: typeof source.details === 'string' ? source.details : undefined,
+    createdAt,
+  }
+}
+
 export const apiClient = {
   getHealth: () => apiRequest<HealthResponse>('/api/health'),
   balanceMatch: (payload: BalanceRequest) =>
@@ -785,6 +819,25 @@ export const apiClient = {
         baseUrlOverride: ACCESS_API_BASE_URL,
       }
     ),
+  getOperationAuditLogs: async (limit = 100): Promise<OperationAuditLogItem[]> => {
+    const requestedLimit = Number.isFinite(limit) ? Math.floor(limit) : 100
+    const safeLimit = Math.max(1, Math.min(200, requestedLimit))
+    const payload = await apiRequest<unknown>(
+      `/api/admin/audit-logs?limit=${safeLimit}`,
+      undefined,
+      {
+        requireUserEmail: true,
+        includeUserEmail: true,
+      }
+    )
+    if (!Array.isArray(payload)) {
+      throw new Error('Invalid audit logs response format')
+    }
+
+    return payload
+      .map(normalizeOperationAuditLogItem)
+      .filter((item): item is OperationAuditLogItem => item !== null)
+  },
   recalculateRatings: (payload: RatingRecalculationRequest) =>
     apiRequest<RatingRecalculationResponse>(
       '/api/admin/rating/recalculate',

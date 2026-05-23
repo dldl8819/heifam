@@ -9,6 +9,7 @@ import com.balancify.backend.security.MmrAccessRequestResolver;
 import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.ManualMatchService;
 import com.balancify.backend.service.MatchResultService;
+import com.balancify.backend.service.OperationAuditLogService;
 import com.balancify.backend.service.exception.MatchConflictException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.NoSuchElementException;
@@ -32,19 +33,22 @@ public class MatchResultController {
     private final MmrAccessRequestResolver mmrAccessRequestResolver;
     private final AuthenticatedRequestResolver authenticatedRequestResolver;
     private final AccessControlService accessControlService;
+    private final OperationAuditLogService operationAuditLogService;
 
     public MatchResultController(
         MatchResultService matchResultService,
         ManualMatchService manualMatchService,
         MmrAccessRequestResolver mmrAccessRequestResolver,
         AuthenticatedRequestResolver authenticatedRequestResolver,
-        AccessControlService accessControlService
+        AccessControlService accessControlService,
+        OperationAuditLogService operationAuditLogService
     ) {
         this.matchResultService = matchResultService;
         this.manualMatchService = manualMatchService;
         this.mmrAccessRequestResolver = mmrAccessRequestResolver;
         this.authenticatedRequestResolver = authenticatedRequestResolver;
         this.accessControlService = accessControlService;
+        this.operationAuditLogService = operationAuditLogService;
     }
 
     @PostMapping("/manual")
@@ -129,9 +133,17 @@ public class MatchResultController {
     }
 
     @DeleteMapping("/{id}")
-    public void deleteMatch(@PathVariable("id") Long matchId) {
+    public void deleteMatch(
+        @PathVariable("id") Long matchId,
+        HttpServletRequest httpRequest
+    ) {
         try {
-            matchResultService.deleteMatch(matchId);
+            MatchResultService.DeletedMatchAuditSnapshot snapshot = matchResultService.deleteMatch(matchId);
+            operationAuditLogService.recordMatchDeletion(
+                extractRequestEmail(httpRequest),
+                resolveRecordedByNickname(httpRequest),
+                snapshot
+            );
         } catch (NoSuchElementException exception) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, exception.getMessage());
         }

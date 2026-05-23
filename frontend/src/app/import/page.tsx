@@ -6,7 +6,7 @@ import { useAdminAuth } from '@/lib/admin-auth'
 import { t } from '@/lib/i18n'
 
 export default function ImportPage() {
-  const { isSuperAdmin } = useAdminAuth()
+  const { isAdmin, isSuperAdmin } = useAdminAuth()
 
   return (
     <section className="space-y-6">
@@ -17,7 +17,7 @@ export default function ImportPage() {
 
       <AdminOnlyContent>
         <div className="grid gap-4 md:grid-cols-2">
-          {isSuperAdmin && (
+          {isAdmin && (
             <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <h3 className="text-sm font-semibold text-slate-900">{t('players.import.title')}</h3>
               <p className="mt-1 text-xs text-slate-600">{t('adminGuard.playersImportGuide')}</p>

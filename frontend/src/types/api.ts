@@ -411,3 +411,17 @@ export type AccessAdminListResponse = {
 export type AccessAllowedEmailListResponse = {
   allowedUsers: AccessEmailEntry[]
 }
+
+export type OperationAuditLogItem = {
+  id: number
+  action: string
+  actorEmail?: string
+  actorNickname?: string
+  targetType: string
+  targetId?: number
+  targetLabel?: string
+  groupId?: number
+  summary: string
+  details?: string
+  createdAt: string
+}

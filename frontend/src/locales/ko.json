@@ -15,6 +15,7 @@
     "captainDraft": "정기 감전",
     "multiBalance": "다중 밸런스",
     "accessControl": "권한 관리",
+    "auditLogs": "운영 로그",
     "results": "경기 결과",
     "ranking": "랭킹"
   },
@@ -225,12 +226,40 @@
     "loginDescription": "관리자 기능을 사용하려면 Google 계정으로 로그인해 주세요.",
     "forbiddenTitle": "403 권한 없음",
     "forbiddenDescription": "이 계정은 관리자 목록에 없어 해당 기능을 사용할 수 없습니다.",
-    "importCenterTitle": "일괄 등록 센터",
-    "importCenterDescription": "선수/경기 일괄 등록은 관리자 계정에서만 사용할 수 있습니다.",
-    "playersImportGuide": "선수 일괄 등록은 선수 관리 화면의 등록 영역에서 진행합니다.",
+    "importCenterTitle": "등록 센터",
+    "importCenterDescription": "선수 등록과 경기 일괄 등록은 관리자 계정에서만 사용할 수 있습니다.",
+    "playersImportGuide": "선수 등록은 선수 관리 화면의 등록 영역에서 진행합니다.",
     "matchesImportGuide": "경기 일괄 등록은 경기 결과 화면의 등록 영역에서 진행합니다.",
-    "goPlayersImport": "선수 일괄 등록으로 이동",
+    "goPlayersImport": "선수 등록으로 이동",
     "goMatchesImport": "경기 일괄 등록으로 이동"
+  },
+  "audit": {
+    "title": "운영 로그",
+    "description": "운영진이 처리한 선수 등록, 경기 삭제 등 주요 운영 작업을 확인합니다.",
+    "superOnly": "최상위 관리자만 운영 로그를 볼 수 있습니다.",
+    "loadError": "운영 로그를 불러오지 못했습니다. 백엔드 상태를 확인해 주세요.",
+    "recentTitle": "최근 운영 작업",
+    "recentDescription": "최신 100건 기준으로 표시됩니다.",
+    "count": "총 {count}건",
+    "empty": "표시할 운영 로그가 없습니다.",
+    "actions": {
+      "playerRegistered": "선수 등록",
+      "playerRegistrationUpdated": "선수 정보 갱신",
+      "playerReactivatedByRegistration": "선수 재등록",
+      "matchDeleted": "경기 삭제"
+    },
+    "targetTypes": {
+      "player": "선수",
+      "match": "경기"
+    },
+    "table": {
+      "createdAt": "처리 시각",
+      "action": "작업",
+      "actor": "처리자",
+      "target": "대상",
+      "summary": "내용",
+      "details": "상세"
+    }
   },
   "auth": {
     "loginGoogle": "Google 로그인",
@@ -397,14 +426,25 @@
     "description": "Hei`Fam 로스터를 검색하고 종족/티어 상태를 빠르게 점검합니다.",
     "loadError": "선수 목록을 불러오지 못했습니다. 백엔드 상태를 확인해 주세요.",
     "import": {
-      "title": "관리자 전용: 선수 일괄 등록",
-      "description": "`닉네임 티어 주종` 형식으로 예) 민식 B+ P 입력하면 티어 기본 MMR이 자동 적용됩니다.",
-      "button": "선수 일괄 등록",
+      "title": "관리자 전용: 선수 등록",
+      "description": "닉네임, 티어, 종족을 선택해 등록하면 티어 기본 MMR이 자동 적용됩니다.",
+      "button": "선수 등록",
       "loading": "등록 중...",
-      "success": "선수 일괄 등록이 완료되었습니다.",
-      "failure": "선수 일괄 등록에 실패했습니다. 요청 형식과 서버 상태를 확인해 주세요.",
-      "invalidFormat": "형식을 확인해 주세요. 예: `민식 B+ P` 또는 JSON.",
-      "placeholder": "민식 B+ P\n테란고수 A+ T\n유니버 재배정대상 PTZ"
+      "success": "선수 등록이 완료되었습니다.",
+      "failure": "선수 등록에 실패했습니다. 입력값과 서버 상태를 확인해 주세요.",
+      "failureWithReason": "선수 등록에 실패했습니다. 사유: {reason}",
+      "invalidFormat": "형식을 확인해 주세요. 예: `닉네임 B+ P` 또는 JSON.",
+      "nicknameLabel": "닉네임",
+      "nicknamePlaceholder": "닉네임 입력",
+      "nicknameRequired": "닉네임을 입력해 주세요.",
+      "tierLabel": "티어",
+      "tierPlaceholder": "티어 선택",
+      "tierRequired": "티어를 선택해 주세요.",
+      "raceLabel": "종족",
+      "racePlaceholder": "종족 선택",
+      "raceRequired": "종족을 선택해 주세요.",
+      "unassignedTierOption": "배정 필요",
+      "placeholder": "닉네임 B+ P"
     },
     "download": {
       "button": "티어/이름 정렬 명단 다운로드",

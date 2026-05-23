@@ -13,6 +13,7 @@ import com.balancify.backend.domain.Group;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.GroupRepository;
 import com.balancify.backend.repository.PlayerRepository;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,11 +32,18 @@ class PlayerImportServiceTest {
     @Mock
     private GroupRepository groupRepository;
 
+    @Mock
+    private OperationAuditLogService operationAuditLogService;
+
     private PlayerImportService playerImportService;
 
     @BeforeEach
     void setUp() {
-        playerImportService = new PlayerImportService(playerRepository, groupRepository);
+        playerImportService = new PlayerImportService(
+            playerRepository,
+            groupRepository,
+            operationAuditLogService
+        );
     }
 
     @Test
@@ -211,5 +219,50 @@ class PlayerImportServiceTest {
         assertThat(playerCaptor.getValue().getRace()).isEqualTo("PT");
         assertThat(playerCaptor.getValue().getBaseMmr()).isEqualTo(1200);
         assertThat(playerCaptor.getValue().getMmr()).isEqualTo(1200);
+    }
+
+    @Test
+    void reactivatesInactivePlayerWhenImportingExistingNickname() {
+        Group group = new Group();
+        group.setId(9L);
+        group.setName("Group 9");
+
+        Player existing = new Player();
+        existing.setId(77L);
+        existing.setGroup(group);
+        existing.setNickname("ReturningPlayer");
+        existing.setActive(false);
+        existing.setChatLeftAt(OffsetDateTime.parse("2026-01-01T00:00:00Z"));
+        existing.setChatLeftReason("left");
+
+        when(groupRepository.findById(9L)).thenReturn(Optional.of(group));
+        when(playerRepository.findByGroup_IdAndNicknameIgnoreCase(9L, "ReturningPlayer"))
+            .thenReturn(List.of(existing));
+        when(playerRepository.save(any(Player.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        GroupPlayerImportRequest request = new GroupPlayerImportRequest(List.of(
+            new GroupPlayerImportRowRequest("ReturningPlayer", "B", null, null, "", "T")
+        ));
+
+        GroupPlayerImportResponse response = playerImportService.importPlayers(9L, request);
+
+        assertThat(response.failedCount()).isZero();
+        assertThat(response.updatedCount()).isEqualTo(1);
+
+        ArgumentCaptor<Player> playerCaptor = ArgumentCaptor.forClass(Player.class);
+        verify(playerRepository).save(playerCaptor.capture());
+        Player savedPlayer = playerCaptor.getValue();
+        assertThat(savedPlayer.isActive()).isTrue();
+        assertThat(savedPlayer.getChatRejoinedAt()).isNotNull();
+        assertThat(savedPlayer.getTier()).isEqualTo("B");
+        assertThat(savedPlayer.getRace()).isEqualTo("T");
+        verify(operationAuditLogService).recordPlayerRegistration(
+            null,
+            null,
+            9L,
+            savedPlayer,
+            false,
+            true
+        );
     }
 }
