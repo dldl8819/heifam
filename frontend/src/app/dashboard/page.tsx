@@ -131,7 +131,7 @@ function buildTierBoardBuckets(rows: PlayerRosterItem[]): Record<PlayerTierStatu
   rows
     .filter((row) => row.active !== false)
     .forEach((row) => {
-      const liveTier = resolveTierFromMmr(row.currentMmr) ?? row.tier ?? 'UNASSIGNED'
+      const liveTier = row.liveTier ?? resolveTierFromMmr(row.currentMmr) ?? row.tier ?? 'UNASSIGNED'
       buckets[liveTier].push(row)
     })
 
@@ -204,7 +204,7 @@ export default function DashboardPage() {
   useEffect(() => {
     let active = true
 
-    if (!isSuperAdmin) {
+    if (!isAdmin) {
       setTierBoardRows([])
       setTierBoardLoading(false)
       setTierBoardError(null)
@@ -241,7 +241,7 @@ export default function DashboardPage() {
     return () => {
       active = false
     }
-  }, [isSuperAdmin])
+  }, [isAdmin])
 
   return (
     <section className="space-y-6">
@@ -260,7 +260,7 @@ export default function DashboardPage() {
         </Alert>
       )}
 
-      {isSuperAdmin && (
+      {isAdmin && (
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           {tierBoardError && (
             <Alert variant="destructive" appearance="light">

@@ -98,7 +98,7 @@ class MmrMaskingMapperTest {
         assertThat(masked.lastTierSnapshotAt()).isNull();
         assertThat(masked.lastTierSnapshotMmr()).isNull();
         assertThat(masked.lastTierSnapshotTier()).isNull();
-        assertThat(masked.liveTier()).isNull();
+        assertThat(masked.liveTier()).isEqualTo("A+");
         assertThat(masked.chatLeftAt()).isEqualTo(chatLeftAt);
         assertThat(masked.chatLeftReason()).isEqualTo("Synthetic note");
         assertThat(masked.chatRejoinedAt()).isEqualTo(chatRejoinedAt);

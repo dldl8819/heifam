@@ -67,7 +67,7 @@ public final class MmrMaskingMapper {
                     null,
                     null,
                     null,
-                    null,
+                    response.liveTier(),
                     response.wins(),
                     response.losses(),
                     response.games(),

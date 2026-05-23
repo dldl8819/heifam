@@ -927,7 +927,7 @@ class AdminKeyFilterTest {
             .andExpect(jsonPath("$[0].lastTierSnapshotAt").doesNotExist())
             .andExpect(jsonPath("$[0].lastTierSnapshotMmr").doesNotExist())
             .andExpect(jsonPath("$[0].lastTierSnapshotTier").doesNotExist())
-            .andExpect(jsonPath("$[0].liveTier").doesNotExist())
+            .andExpect(jsonPath("$[0].liveTier").value("B+"))
             .andExpect(jsonPath("$[0].chatLeftAt").exists())
             .andExpect(jsonPath("$[0].chatLeftReason").value("Synthetic note"))
             .andExpect(jsonPath("$[0].chatRejoinedAt").exists())
