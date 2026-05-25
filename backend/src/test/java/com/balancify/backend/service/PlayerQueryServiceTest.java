@@ -2,9 +2,11 @@ package com.balancify.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.balancify.backend.api.group.dto.GroupPlayerResponse;
+import com.balancify.backend.api.group.dto.GroupPlayerTierBoardResponse;
 import com.balancify.backend.domain.Group;
 import com.balancify.backend.domain.Match;
 import com.balancify.backend.domain.MatchParticipant;
@@ -160,6 +162,31 @@ class PlayerQueryServiceTest {
         assertThat(item.lastTierSnapshotTier()).isEqualTo("B-");
         assertThat(item.liveTier()).isEqualTo("B+");
         assertThat(item.currentMmr()).isEqualTo(1220);
+    }
+
+    @Test
+    void returnsTierBoardWithoutLoadingMatchHistory() {
+        Group group = new Group();
+        group.setId(1L);
+
+        Player first = player(1L, group, "Alpha", "P", "B", 1220);
+        Player second = player(2L, group, "Bravo", "T", "A", 1810);
+        Player inactive = player(3L, group, "Charlie", "Z", "A", 1900);
+        inactive.setActive(false);
+
+        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
+            .thenReturn(List.of(inactive, first, second));
+
+        List<GroupPlayerTierBoardResponse> response = playerQueryService.getGroupPlayerTierBoard(1L);
+
+        assertThat(response).hasSize(2);
+        assertThat(response).extracting(GroupPlayerTierBoardResponse::nickname)
+            .containsExactly("Bravo", "Alpha");
+        assertThat(response.get(0).tier()).isEqualTo("A");
+        assertThat(response.get(0).liveTier()).isEqualTo("A+");
+        assertThat(response.get(1).tier()).isEqualTo("B");
+        assertThat(response.get(1).liveTier()).isEqualTo("B+");
+        verifyNoInteractions(matchParticipantRepository, monthlyTierRefreshService, dormancyMmrDecayService);
     }
 
     @Test

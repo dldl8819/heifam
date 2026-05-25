@@ -33,6 +33,7 @@ import com.balancify.backend.api.group.dto.DashboardRecentBalancePreviewResponse
 import com.balancify.backend.api.group.dto.DashboardRecentBalanceTeamPlayerResponse;
 import com.balancify.backend.api.group.dto.DashboardTopRankingPreviewItemResponse;
 import com.balancify.backend.api.group.dto.GroupPlayerResponse;
+import com.balancify.backend.api.group.dto.GroupPlayerTierBoardResponse;
 import com.balancify.backend.api.group.dto.GroupPlayerImportResponse;
 import com.balancify.backend.api.group.dto.GroupRecentMatchPlayerResponse;
 import com.balancify.backend.api.group.dto.GroupRecentMatchResponse;
@@ -988,6 +989,40 @@ class AdminKeyFilterTest {
     }
 
     @Test
+    void returnsTierBoardForAdminWithoutLoadingFullPlayerStats() throws Exception {
+        when(playerQueryService.getGroupPlayerTierBoard(eq(1L)))
+            .thenReturn(List.of(new GroupPlayerTierBoardResponse(1L, "alpha", "P", "A", "A+", true)));
+
+        mockMvc
+            .perform(
+                get("/api/groups/1/players/tier-board")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].id").value(1))
+            .andExpect(jsonPath("$[0].nickname").value("alpha"))
+            .andExpect(jsonPath("$[0].tier").value("A"))
+            .andExpect(jsonPath("$[0].liveTier").value("A+"))
+            .andExpect(jsonPath("$[0].currentMmr").doesNotExist())
+            .andExpect(jsonPath("$[0].wins").doesNotExist());
+
+        verify(playerQueryService).getGroupPlayerTierBoard(eq(1L));
+        verify(playerQueryService, never()).getGroupPlayers(eq(1L), anyBoolean());
+    }
+
+    @Test
+    void rejectsTierBoardForMember() throws Exception {
+        mockMvc
+            .perform(
+                get("/api/groups/1/players/tier-board")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+            )
+            .andExpect(status().isForbidden());
+
+        verify(playerQueryService, never()).getGroupPlayerTierBoard(any());
+    }
+
+    @Test
     void returnsMaskedRankingForMember() throws Exception {
         when(rankingService.getGroupRanking(eq(1L)))
             .thenReturn(
@@ -1148,42 +1183,16 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void allowsDashboardForAdminWithMaskedMmrSummary() throws Exception {
-        when(dashboardQueryService.getGroupDashboard(eq(1L), eq("admin")))
-            .thenReturn(
-                new GroupDashboardResponse(
-                    24,
-                    new DashboardKpiSummaryResponse(10, 1400, 1320.5, 12),
-                    List.of(new DashboardTopRankingPreviewItemResponse(1, "alpha", "P", 1400, 75.0)),
-                    new DashboardRecentBalancePreviewResponse(
-                        77L,
-                        List.of(new DashboardRecentBalanceTeamPlayerResponse("alpha", 1200)),
-                        List.of(new DashboardRecentBalanceTeamPlayerResponse("bravo", 1184)),
-                        3600,
-                        3552,
-                        48,
-                        OffsetDateTime.parse("2026-04-01T12:00:00Z")
-                    ),
-                    null,
-                    null
-                )
-            );
-
+    void rejectsDashboardForAdminBeforeLoadingDashboardData() throws Exception {
         mockMvc
             .perform(
                 get("/api/groups/1/dashboard")
                     .header("X-USER-EMAIL", "admin@hei.gg")
                     .header("X-USER-NICKNAME", "admin")
             )
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.kpiSummary.topMmr").value(0))
-            .andExpect(jsonPath("$.kpiSummary.averageMmr").value(0.0))
-            .andExpect(jsonPath("$.topRankingPreview[0].currentMmr").value(0))
-            .andExpect(jsonPath("$.recentBalancePreview.homeMmr").value(0))
-            .andExpect(jsonPath("$.recentBalancePreview.awayMmr").value(0))
-            .andExpect(jsonPath("$.recentBalancePreview.mmrDiff").value(0))
-            .andExpect(jsonPath("$.recentBalancePreview.homeTeam[0].mmr").value(0))
-            .andExpect(jsonPath("$.recentBalancePreview.awayTeam[0].mmr").value(0));
+            .andExpect(status().isForbidden());
+
+        verify(dashboardQueryService, never()).getGroupDashboard(eq(1L), any());
     }
 
     @Test

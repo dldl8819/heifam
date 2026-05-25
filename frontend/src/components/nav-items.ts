@@ -22,7 +22,6 @@ export function getVisibleNavItems(context: NavVisibilityContext): NavItem[] {
 
   if (context.isAdmin) {
     const adminItems: NavItem[] = [
-      { label: t('nav.dashboard'), href: '/dashboard' },
       { label: t('nav.players'), href: '/players' },
       { label: t('nav.ranking'), href: '/ranking' },
       { label: t('nav.balance'), href: '/balance' },
@@ -32,6 +31,7 @@ export function getVisibleNavItems(context: NavVisibilityContext): NavItem[] {
     ]
 
     if (context.isSuperAdmin) {
+      adminItems.unshift({ label: t('nav.dashboard'), href: '/dashboard' })
       adminItems.splice(adminItems.length - 1, 0, { label: t('nav.accessControl'), href: '/admin/access' })
       adminItems.splice(adminItems.length - 1, 0, { label: t('nav.auditLogs'), href: '/admin/audit' })
     }

@@ -20,7 +20,7 @@ export default function AuthPage() {
     }
 
     if (user) {
-      router.replace('/dashboard')
+      router.replace('/players')
       return
     }
 

@@ -1,6 +1,5 @@
 package com.balancify.backend.api.group;
 
-import com.balancify.backend.api.MmrMaskingMapper;
 import com.balancify.backend.api.group.dto.GroupDashboardResponse;
 import com.balancify.backend.security.AdminRequestResolver;
 import com.balancify.backend.security.AuthenticatedRequestResolver;
@@ -46,8 +45,8 @@ public class GroupDashboardController {
         String requestEmail = safeTrim(identity.email());
         String requestNickname = safeTrim(identity.nickname());
         AccessControlService.AccessProfile accessProfile = accessControlService.resolveAccessProfile(requestEmail);
-        if (!accessProfile.admin()) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only admins can access dashboard data");
+        if (!accessProfile.superAdmin()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only super admins can access dashboard data");
         }
         if (!adminRequestResolver.isAdminRequest(request)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin key is required for dashboard data");
@@ -55,11 +54,7 @@ public class GroupDashboardController {
 
         String resolvedNickname = safeTrim(accessProfile.nickname());
         String effectiveNickname = resolvedNickname.isEmpty() ? requestNickname : resolvedNickname;
-        GroupDashboardResponse response = dashboardQueryService.getGroupDashboard(groupId, effectiveNickname);
-        if (accessProfile.superAdmin()) {
-            return response;
-        }
-        return MmrMaskingMapper.maskDashboard(response);
+        return dashboardQueryService.getGroupDashboard(groupId, effectiveNickname);
     }
 
     private String safeTrim(String value) {

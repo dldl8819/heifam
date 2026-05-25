@@ -233,6 +233,11 @@ export type PlayerRosterItem = {
   tierChangeAcknowledgedAt?: string
 }
 
+export type GroupPlayerTierBoardItem = Pick<
+  PlayerRosterItem,
+  'id' | 'nickname' | 'race' | 'tier' | 'liveTier' | 'active'
+>
+
 export type GroupPlayerMmrUpdateRequest = {
   mmr: number
 }

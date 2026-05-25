@@ -11,6 +11,7 @@ import type {
   CaptainDraftResponse,
   GroupDashboardResponse,
   GroupPlayerMmrUpdateRequest,
+  GroupPlayerTierBoardItem,
   HealthResponse,
   MatchTeamSide,
   MultiBalanceRequest,
@@ -499,6 +500,36 @@ function normalizePlayerRosterItem(value: unknown): PlayerRosterItem | null {
   }
 }
 
+function normalizePlayerTierBoardItem(value: unknown): GroupPlayerTierBoardItem | null {
+  if (value === null || typeof value !== 'object') {
+    return null
+  }
+
+  const source = value as Record<string, unknown>
+  const id = toNumber(source.id)
+  const nickname =
+    typeof source.nickname === 'string'
+      ? source.nickname
+      : typeof source.name === 'string'
+        ? source.name
+        : null
+  const tier = normalizeTier(source.tier) ?? 'UNASSIGNED'
+  const liveTier = normalizeTier(source.liveTier) ?? tier
+
+  if (id === null || nickname === null) {
+    return null
+  }
+
+  return {
+    id,
+    nickname,
+    race: normalizeRace(source.race),
+    tier,
+    liveTier,
+    active: typeof source.active === 'boolean' ? source.active : true,
+  }
+}
+
 function normalizeOperationAuditLogItem(value: unknown): OperationAuditLogItem | null {
   if (value === null || typeof value !== 'object') {
     return null
@@ -650,6 +681,18 @@ export const apiClient = {
     return payload
       .map(normalizePlayerRosterItem)
       .filter((item): item is PlayerRosterItem => item !== null)
+  },
+  getGroupPlayerTierBoard: async (groupId: number): Promise<GroupPlayerTierBoardItem[]> => {
+    const payload = await apiRequest<unknown>(`/api/groups/${groupId}/players/tier-board`, undefined, {
+      includeUserEmail: true,
+    })
+    if (!Array.isArray(payload)) {
+      throw new Error('Invalid tier board response format')
+    }
+
+    return payload
+      .map(normalizePlayerTierBoardItem)
+      .filter((item): item is GroupPlayerTierBoardItem => item !== null)
   },
   getGroupDashboard: (groupId: number) =>
     apiRequest<GroupDashboardResponse>(`/api/groups/${groupId}/dashboard`, undefined, {

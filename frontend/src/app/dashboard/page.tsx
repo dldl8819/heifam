@@ -8,7 +8,7 @@ import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
-import type { GroupDashboardResponse, PlayerRosterItem, PlayerTierStatus } from '@/types/api'
+import type { GroupDashboardResponse, GroupPlayerTierBoardItem, PlayerTierStatus } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
 const TIER_BOARD_COLUMNS: PlayerTierStatus[] = [
@@ -70,45 +70,10 @@ function resolveTierBoardLabel(tier: PlayerTierStatus): string {
   return tier === 'UNASSIGNED' ? t('common.tierBoard.unassigned') : tier
 }
 
-function resolveTierFromMmr(value: number | undefined): PlayerTierStatus | null {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    return null
-  }
-  if (value <= 0) {
-    return 'UNASSIGNED'
-  }
-  if (value < 400) {
-    return 'C-'
-  }
-  if (value < 600) {
-    return 'C'
-  }
-  if (value < 800) {
-    return 'C+'
-  }
-  if (value < 1000) {
-    return 'B-'
-  }
-  if (value < 1200) {
-    return 'B'
-  }
-  if (value < 1400) {
-    return 'B+'
-  }
-  if (value < 1600) {
-    return 'A-'
-  }
-  if (value < 1800) {
-    return 'A'
-  }
-  if (value < 2000) {
-    return 'A+'
-  }
-  return 'S'
-}
-
-function buildTierBoardBuckets(rows: PlayerRosterItem[]): Record<PlayerTierStatus, PlayerRosterItem[]> {
-  const buckets = TIER_BOARD_COLUMNS.reduce<Record<PlayerTierStatus, PlayerRosterItem[]>>(
+function buildTierBoardBuckets(
+  rows: GroupPlayerTierBoardItem[]
+): Record<PlayerTierStatus, GroupPlayerTierBoardItem[]> {
+  const buckets = TIER_BOARD_COLUMNS.reduce<Record<PlayerTierStatus, GroupPlayerTierBoardItem[]>>(
     (accumulator, tier) => ({
       ...accumulator,
       [tier]: [],
@@ -131,7 +96,7 @@ function buildTierBoardBuckets(rows: PlayerRosterItem[]): Record<PlayerTierStatu
   rows
     .filter((row) => row.active !== false)
     .forEach((row) => {
-      const liveTier = row.liveTier ?? resolveTierFromMmr(row.currentMmr) ?? row.tier ?? 'UNASSIGNED'
+      const liveTier = row.liveTier ?? row.tier ?? 'UNASSIGNED'
       buckets[liveTier].push(row)
     })
 
@@ -149,7 +114,7 @@ export default function DashboardPage() {
   const [dashboard, setDashboard] = useState<GroupDashboardResponse | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
-  const [tierBoardRows, setTierBoardRows] = useState<PlayerRosterItem[]>([])
+  const [tierBoardRows, setTierBoardRows] = useState<GroupPlayerTierBoardItem[]>([])
   const [tierBoardLoading, setTierBoardLoading] = useState<boolean>(false)
   const [tierBoardError, setTierBoardError] = useState<string | null>(null)
   const myRaceSummary = dashboard?.myRaceSummary
@@ -218,7 +183,7 @@ export default function DashboardPage() {
       setTierBoardError(null)
 
       try {
-        const response = await apiClient.getGroupPlayers(TEMP_GROUP_ID)
+        const response = await apiClient.getGroupPlayerTierBoard(TEMP_GROUP_ID)
         if (!active) {
           return
         }

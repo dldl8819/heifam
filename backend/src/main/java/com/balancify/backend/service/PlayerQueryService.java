@@ -1,6 +1,7 @@
 package com.balancify.backend.service;
 
 import com.balancify.backend.api.group.dto.GroupPlayerResponse;
+import com.balancify.backend.api.group.dto.GroupPlayerTierBoardResponse;
 import com.balancify.backend.domain.MatchParticipant;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.domain.PlayerTierPolicy;
@@ -117,6 +118,38 @@ public class PlayerQueryService {
         }
 
         return responses;
+    }
+
+    public List<GroupPlayerTierBoardResponse> getGroupPlayerTierBoard(Long groupId) {
+        List<Player> players = new ArrayList<>(
+            playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId)
+                .stream()
+                .filter(Player::isActive)
+                .toList()
+        );
+        players.sort(
+            Comparator
+                .comparingInt((Player player) -> safeInt(player.getMmr()))
+                .reversed()
+                .thenComparing(Player::getId, Comparator.nullsLast(Long::compareTo))
+        );
+
+        return players
+            .stream()
+            .map(player -> {
+                int currentMmr = safeInt(player.getMmr());
+                String currentTier = PlayerTierPolicy.resolveTierForSnapshot(player.getTier(), currentMmr);
+                String liveTier = PlayerTierPolicy.resolveTier(currentMmr);
+                return new GroupPlayerTierBoardResponse(
+                    player.getId(),
+                    player.getNickname(),
+                    normalizeRace(player.getRace()),
+                    currentTier,
+                    liveTier,
+                    player.isActive()
+                );
+            })
+            .toList();
     }
 
     private Result resolveResult(MatchParticipant participant) {
