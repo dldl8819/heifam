@@ -335,8 +335,6 @@
     },
     "tierBoard": {
       "total": "{count} 명",
-      "changeBadge": "변경",
-      "changeTooltip": "티어 변경 대상: {change}",
       "loadError": "티어표 데이터를 불러오지 못했습니다."
     },
     "recentBalance": {
