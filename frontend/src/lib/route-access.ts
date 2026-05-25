@@ -59,6 +59,10 @@ function resolveRouteRequirement(pathname: string): RouteRequirement {
   return 'member'
 }
 
+export function isPublicRoute(pathname: string): boolean {
+  return resolveRouteRequirement(pathname) === 'public'
+}
+
 export function getRouteAccessDecision(
   pathname: string,
   context: RouteAccessContext

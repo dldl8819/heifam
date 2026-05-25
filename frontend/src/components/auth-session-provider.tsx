@@ -1,8 +1,10 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { User } from '@supabase/supabase-js'
+import { usePathname } from 'next/navigation'
+import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { isPublicRoute } from '@/lib/route-access'
 
 export type AuthUser = {
   email: string | null
@@ -20,6 +22,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 const ENABLE_SUPABASE_PROFILE_SYNC =
   process.env.NEXT_PUBLIC_ENABLE_SUPABASE_PROFILE_SYNC === 'true'
 const INITIAL_SESSION_TIMEOUT_MS = 7000
+const SUPABASE_AUTH_STORAGE_KEY_PREFIX = 'sb-'
+const SUPABASE_AUTH_STORAGE_KEY_SUFFIX = '-auth-token'
 
 function toSafeNickname(value: unknown): string | null {
   if (typeof value !== 'string') {
@@ -54,6 +58,41 @@ function isSupabaseLockContentionError(error: unknown): boolean {
   return /lock .* was released because another request stole it/i.test(error.message)
 }
 
+function hasStoredSupabaseSession(): boolean {
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  try {
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index)
+      if (
+        key?.startsWith(SUPABASE_AUTH_STORAGE_KEY_PREFIX) &&
+        key.endsWith(SUPABASE_AUTH_STORAGE_KEY_SUFFIX)
+      ) {
+        return true
+      }
+    }
+  } catch {
+    return true
+  }
+
+  return false
+}
+
+function shouldHydrateAuthSession(pathname: string | null): boolean {
+  const currentPath = pathname ?? '/'
+  if (currentPath === '/auth' || currentPath.startsWith('/auth/')) {
+    return true
+  }
+
+  if (!isPublicRoute(currentPath)) {
+    return true
+  }
+
+  return hasStoredSupabaseSession()
+}
+
 export function useAuth() {
   const context = useContext(AuthContext)
   if (context === undefined) {
@@ -67,27 +106,46 @@ type AuthProviderProps = {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
+  const pathname = usePathname()
   const [user, setUser] = useState<AuthUser | null>(null)
   const [accessToken, setAccessToken] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
+    let subscription: { unsubscribe: () => void } | null = null
+
+    if (!shouldHydrateAuthSession(pathname)) {
+      setAccessToken(null)
+      setUser(null)
+      setLoading(false)
+      return () => {
+        cancelled = true
+      }
+    }
+
+    setLoading(true)
+
     const initialSessionTimeout = window.setTimeout(() => {
       if (!cancelled) {
         setLoading(false)
       }
     }, INITIAL_SESSION_TIMEOUT_MS)
 
+    const applySession = (session: Session | null) => {
+      if (cancelled) {
+        return
+      }
+      setAccessToken(session?.access_token ?? null)
+      setUser(resolveAuthUser(session?.user ?? null))
+      setLoading(false)
+    }
+
     // Get initial session
     void supabase.auth
       .getSession()
       .then(({ data: { session } }) => {
-        if (cancelled) {
-          return
-        }
-        setAccessToken(session?.access_token ?? null)
-        setUser(resolveAuthUser(session?.user ?? null))
+        applySession(session)
       })
       .catch((error) => {
         if (cancelled) {
@@ -108,27 +166,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     // Listen for auth changes
     const {
-      data: { subscription },
+      data: { subscription: authSubscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      if (cancelled) {
-        return
-      }
-      setAccessToken(session?.access_token ?? null)
-      setUser(resolveAuthUser(session?.user ?? null))
-      setLoading(false)
+      applySession(session)
 
       // If user signed in, save to users table
       if (event === 'SIGNED_IN' && session?.user && ENABLE_SUPABASE_PROFILE_SYNC) {
         void saveUserToDatabase(session.user)
       }
     })
+    subscription = authSubscription
 
     return () => {
       cancelled = true
       window.clearTimeout(initialSessionTimeout)
-      subscription.unsubscribe()
+      subscription?.unsubscribe()
     }
-  }, [])
+  }, [pathname])
 
   const signOut = async () => {
     await supabase.auth.signOut()
