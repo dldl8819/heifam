@@ -214,6 +214,7 @@
       "adminSaved": "운영진 관리자 목록이 업데이트되었습니다.",
       "mmrAccessSaved": "운영진 MMR 열람 권한이 업데이트되었습니다.",
       "allowedSaved": "접속 허용 이메일 목록이 업데이트되었습니다.",
+      "allowedSavedTarget": "{nickname}님의 이메일 {email}이 접속 허용 되었습니다.",
       "removeSaved": "삭제가 완료되었습니다.",
       "removeSavedTarget": "{target} 권한을 삭제했습니다.",
       "removeConfirm": "{target} 권한을 삭제하시겠습니까?",

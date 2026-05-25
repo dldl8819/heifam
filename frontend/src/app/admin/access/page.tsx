@@ -194,7 +194,7 @@ export default function AccessControlPage() {
       setAllowedList(response)
       setNewAllowedEmail('')
       setNewAllowedNickname('')
-      setMessage(t('access.messages.allowedSaved'))
+      setMessage(t('access.messages.allowedSavedTarget', { nickname: normalizedNickname, email: normalized }))
     } catch {
       setError(t('access.loadError'))
     } finally {
