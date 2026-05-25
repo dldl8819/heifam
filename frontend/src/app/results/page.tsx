@@ -749,10 +749,10 @@ export default function ResultsPage() {
             aria-controls="manual-match-entry-panel"
             className="flex w-full items-center justify-between gap-4 text-left"
           >
-            <div className="space-y-1">
+            <span className="block space-y-1">
               <span className="block text-sm font-semibold text-slate-900">{t('results.operator.title')}</span>
-              <p className="text-xs text-slate-500">{t('results.operator.description')}</p>
-            </div>
+              <span className="block text-xs text-slate-500">{t('results.operator.description')}</span>
+            </span>
             <span
               aria-hidden="true"
               className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-base font-semibold text-slate-700"
