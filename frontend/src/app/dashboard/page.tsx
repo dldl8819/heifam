@@ -107,6 +107,18 @@ function buildTierBoardBuckets(
   return buckets
 }
 
+async function loadTierBoardRows(): Promise<GroupPlayerTierBoardItem[]> {
+  const players = await apiClient.getGroupPlayers(TEMP_GROUP_ID)
+  return players.map((player) => ({
+    id: player.id,
+    nickname: player.nickname,
+    race: player.race,
+    tier: player.tier,
+    liveTier: player.liveTier,
+    active: player.active,
+  }))
+}
+
 export default function DashboardPage() {
   const { isAdmin, isSuperAdmin } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
@@ -183,7 +195,7 @@ export default function DashboardPage() {
       setTierBoardError(null)
 
       try {
-        const response = await apiClient.getGroupPlayerTierBoard(TEMP_GROUP_ID)
+        const response = await loadTierBoardRows()
         if (!active) {
           return
         }
