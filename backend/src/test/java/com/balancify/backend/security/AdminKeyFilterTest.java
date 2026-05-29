@@ -3,6 +3,7 @@ package com.balancify.backend.security;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
@@ -858,6 +859,24 @@ class AdminKeyFilterTest {
                     .content("{\"nickname\":\"새닉네임\"}")
             )
             .andExpect(status().isOk());
+    }
+
+    @Test
+    void allowsPlayerTierUpdateWithAdminEmailWithoutMmrAccess() throws Exception {
+        mockMvc
+            .perform(
+                patch("/api/groups/1/players/10")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"tier\":\"B+\"}")
+            )
+            .andExpect(status().isOk());
+
+        verify(playerAdminService).updatePlayer(
+            eq(1L),
+            eq(10L),
+            argThat(request -> request != null && "B+".equals(request.tier()))
+        );
     }
 
     @Test

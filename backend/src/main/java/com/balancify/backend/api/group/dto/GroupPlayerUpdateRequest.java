@@ -5,10 +5,22 @@ import java.time.OffsetDateTime;
 public record GroupPlayerUpdateRequest(
     String nickname,
     String race,
+    String tier,
     Boolean active,
     OffsetDateTime chatLeftAt,
     String chatLeftReason,
     OffsetDateTime chatRejoinedAt,
     String tierChangeAcknowledgedTier
 ) {
+    public GroupPlayerUpdateRequest(
+        String nickname,
+        String race,
+        Boolean active,
+        OffsetDateTime chatLeftAt,
+        String chatLeftReason,
+        OffsetDateTime chatRejoinedAt,
+        String tierChangeAcknowledgedTier
+    ) {
+        this(nickname, race, null, active, chatLeftAt, chatLeftReason, chatRejoinedAt, tierChangeAcknowledgedTier);
+    }
 }

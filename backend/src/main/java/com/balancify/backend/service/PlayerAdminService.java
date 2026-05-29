@@ -20,6 +20,7 @@ public class PlayerAdminService {
     private static final Set<String> ACKNOWLEDGEABLE_TIERS = Set.of(
         "S", "A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "UNASSIGNED"
     );
+    private static final Set<String> EDITABLE_TIERS = ACKNOWLEDGEABLE_TIERS;
 
     private final PlayerRepository playerRepository;
 
@@ -38,6 +39,7 @@ public class PlayerAdminService {
 
         String nickname = safeTrim(request == null ? null : request.nickname());
         String race = safeTrim(request == null ? null : request.race());
+        String tier = normalizeEditableTier(request == null ? null : request.tier());
         Boolean active = request == null ? null : request.active();
         OffsetDateTime chatLeftAt = request == null ? null : request.chatLeftAt();
         String chatLeftReason = safeTrim(request == null ? null : request.chatLeftReason());
@@ -49,6 +51,7 @@ public class PlayerAdminService {
         if (
             nickname.isEmpty()
                 && normalizedRace.isEmpty()
+                && tier.isEmpty()
                 && active == null
                 && chatLeftAt == null
                 && chatLeftReason.isEmpty()
@@ -82,6 +85,10 @@ public class PlayerAdminService {
             } catch (IllegalArgumentException exception) {
                 throw new IllegalArgumentException("Race must be one of P,T,Z,PT,PZ,TZ,PTZ");
             }
+        }
+
+        if (!tier.isEmpty()) {
+            player.setTier(tier);
         }
 
         if (active != null) {
@@ -166,6 +173,20 @@ public class PlayerAdminService {
         }
         if (!ACKNOWLEDGEABLE_TIERS.contains(normalized)) {
             throw new IllegalArgumentException("Tier change acknowledgement tier is invalid");
+        }
+        return normalized;
+    }
+
+    private String normalizeEditableTier(String value) {
+        String normalized = safeTrim(value).toUpperCase(Locale.ROOT);
+        if (normalized.isEmpty()) {
+            return "";
+        }
+        if ("NONE".equals(normalized) || "PENDING".equals(normalized) || "TBD".equals(normalized)) {
+            return "UNASSIGNED";
+        }
+        if (!EDITABLE_TIERS.contains(normalized)) {
+            throw new IllegalArgumentException("Tier is invalid");
         }
         return normalized;
     }

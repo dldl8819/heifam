@@ -621,6 +621,7 @@ export const apiClient = {
     payload: {
       nickname?: string
       race?: string
+      tier?: PlayerTierStatus
       active?: boolean
       chatLeftAt?: string | null
       chatLeftReason?: string | null

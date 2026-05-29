@@ -73,6 +73,23 @@ class PlayerAdminServiceTest {
     }
 
     @Test
+    void updatesOnlyTierWhenTierIsValid() {
+        Player player = player(10L, 1L, "PlayerAlpha");
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+        when(playerRepository.save(any(Player.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        playerAdminService.updatePlayer(
+            1L,
+            10L,
+            new GroupPlayerUpdateRequest(null, null, "b+", null, null, null, null, null)
+        );
+
+        assertThat(player.getTier()).isEqualTo("B+");
+        verify(playerRepository, never()).findByGroup_IdAndNicknameIgnoreCase(anyLong(), anyString());
+        verify(playerRepository).save(player);
+    }
+
+    @Test
     void throwsWhenNicknameAndRaceAreBothMissing() {
         Player player = player(10L, 1L, "기존닉");
         when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
@@ -124,6 +141,24 @@ class PlayerAdminServiceTest {
         )
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Race must be one of P,T,Z,PT,PZ,TZ,PTZ");
+    }
+
+    @Test
+    void throwsWhenTierIsInvalid() {
+        Player player = player(10L, 1L, "PlayerAlpha");
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+
+        assertThatThrownBy(() ->
+            playerAdminService.updatePlayer(
+                1L,
+                10L,
+                new GroupPlayerUpdateRequest(null, null, "diamond", null, null, null, null, null)
+            )
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Tier is invalid");
+
+        verify(playerRepository, never()).save(any(Player.class));
     }
 
     @Test

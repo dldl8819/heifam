@@ -49,6 +49,19 @@ type ActivityFormState = {
   chatRejoinedAt: string
 }
 const PLAYER_RACE_OPTIONS: PlayerRace[] = ['P', 'T', 'Z', 'PT', 'PZ', 'TZ', 'PTZ']
+const PLAYER_EDIT_TIER_OPTIONS: PlayerTierStatus[] = [
+  'S',
+  'A+',
+  'A',
+  'A-',
+  'B+',
+  'B',
+  'B-',
+  'C+',
+  'C',
+  'C-',
+  'UNASSIGNED',
+]
 const PLAYER_REGISTRATION_TIER_OPTIONS: PlayerRegistrationTier[] = [
   'A+',
   'A',
@@ -249,6 +262,7 @@ export default function PlayersPage() {
   const [editingPlayerId, setEditingPlayerId] = useState<number | null>(null)
   const [editingNickname, setEditingNickname] = useState<string>('')
   const [editingRace, setEditingRace] = useState<PlayerRace>('P')
+  const [editingTier, setEditingTier] = useState<PlayerTierStatus>('UNASSIGNED')
   const [editingInlineMmrValue, setEditingInlineMmrValue] = useState<string>('')
   const [savingPlayerId, setSavingPlayerId] = useState<number | null>(null)
   const [editingMmrPlayerId, setEditingMmrPlayerId] = useState<number | null>(null)
@@ -364,6 +378,7 @@ export default function PlayersPage() {
     setEditingPlayerId(player.id)
     setEditingNickname(player.nickname)
     setEditingRace(player.race)
+    setEditingTier(player.tier)
     setEditingInlineMmrValue(
       typeof player.currentMmr === 'number' ? String(player.currentMmr) : ''
     )
@@ -376,6 +391,7 @@ export default function PlayersPage() {
     setEditingPlayerId(null)
     setEditingNickname('')
     setEditingRace('P')
+    setEditingTier('UNASSIGNED')
     setEditingInlineMmrValue('')
   }
 
@@ -420,6 +436,7 @@ export default function PlayersPage() {
       await apiClient.updateGroupPlayer(TEMP_GROUP_ID, playerId, {
         nickname: nextNickname,
         race: editingRace,
+        tier: editingTier,
       })
 
       const targetMmr = typeof targetRow.currentMmr === 'number' ? targetRow.currentMmr : null
@@ -432,6 +449,7 @@ export default function PlayersPage() {
       setEditingPlayerId(null)
       setEditingNickname('')
       setEditingRace('P')
+      setEditingTier('UNASSIGNED')
       setEditingInlineMmrValue('')
       setPlayerActionSuccess(
         isSuperAdmin ? t('players.actions.updateAndMmrSuccess') : t('players.actions.updateSuccess')
@@ -458,6 +476,7 @@ export default function PlayersPage() {
     setEditingPlayerId(null)
     setEditingNickname('')
     setEditingRace('P')
+    setEditingTier('UNASSIGNED')
     setEditingMmrPlayerId(player.id)
     setEditingMmrValue(typeof player.currentMmr === 'number' ? String(player.currentMmr) : '')
     setActivityForm(null)
@@ -531,6 +550,7 @@ export default function PlayersPage() {
         setEditingPlayerId(null)
         setEditingNickname('')
         setEditingRace('P')
+        setEditingTier('UNASSIGNED')
         setEditingInlineMmrValue('')
       }
       if (editingMmrPlayerId === player.id) {
@@ -655,6 +675,7 @@ export default function PlayersPage() {
         setEditingPlayerId(null)
         setEditingNickname('')
         setEditingRace('P')
+        setEditingTier('UNASSIGNED')
         setEditingInlineMmrValue('')
       }
       if (editingMmrPlayerId === player.id) {
@@ -1251,13 +1272,27 @@ export default function PlayersPage() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <span
-                        className={`rounded-md px-2 py-1 text-xs font-semibold ${getTierBadgeClass(
-                          row.tier
-                        )}`}
-                      >
-                        {row.tier === 'UNASSIGNED' ? t('players.table.unassigned') : row.tier}
-                      </span>
+                      {isEditing ? (
+                        <select
+                          value={editingTier}
+                          onChange={(event) => setEditingTier(event.target.value as PlayerTierStatus)}
+                          className="w-full rounded-md border border-slate-200 px-2 py-1 text-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                        >
+                          {PLAYER_EDIT_TIER_OPTIONS.map((tierOption) => (
+                            <option key={tierOption} value={tierOption}>
+                              {tierOption === 'UNASSIGNED' ? t('players.table.unassigned') : tierOption}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span
+                          className={`rounded-md px-2 py-1 text-xs font-semibold ${getTierBadgeClass(
+                            row.tier
+                          )}`}
+                        >
+                          {row.tier === 'UNASSIGNED' ? t('players.table.unassigned') : row.tier}
+                        </span>
+                      )}
                     </td>
                     {showStatusColumn && (
                       <td className="px-4 py-3">
