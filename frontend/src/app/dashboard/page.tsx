@@ -96,8 +96,8 @@ function buildTierBoardBuckets(
   rows
     .filter((row) => row.active !== false)
     .forEach((row) => {
-      const liveTier = row.liveTier ?? row.tier ?? 'UNASSIGNED'
-      buckets[liveTier].push(row)
+      const assignedTier = row.tier ?? 'UNASSIGNED'
+      buckets[assignedTier].push(row)
     })
 
   TIER_BOARD_COLUMNS.forEach((tier) => {
@@ -114,7 +114,6 @@ async function loadTierBoardRows(): Promise<GroupPlayerTierBoardItem[]> {
     nickname: player.nickname,
     race: player.race,
     tier: player.tier,
-    liveTier: player.liveTier,
     active: player.active,
   }))
 }
