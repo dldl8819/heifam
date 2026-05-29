@@ -113,6 +113,11 @@ public final class PlayerTierPolicy {
         return canonicalTier(tier, resolveTier(mmr));
     }
 
+    public static int resolveDefaultMmrForTier(String tier) {
+        String normalizedTier = canonicalTier(tier, TIER_NONE);
+        return TIER_FLOOR_MMR.getOrDefault(normalizedTier, 0);
+    }
+
     public static String demoteTier(String tier, int steps) {
         if (steps <= 0) {
             return canonicalTier(tier, TIER_NONE);
