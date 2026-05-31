@@ -1,11 +1,13 @@
 package com.balancify.backend.service;
 
+import com.balancify.backend.api.admin.dto.OperationAuditLogPageResponse;
 import com.balancify.backend.api.admin.dto.OperationAuditLogResponse;
 import com.balancify.backend.domain.OperationAuditLog;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.OperationAuditLogRepository;
 import java.util.List;
 import java.util.Locale;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -17,9 +19,10 @@ public class OperationAuditLogService {
     public static final String ACTION_PLAYER_REGISTERED = "PLAYER_REGISTERED";
     public static final String ACTION_PLAYER_REGISTRATION_UPDATED = "PLAYER_REGISTRATION_UPDATED";
     public static final String ACTION_PLAYER_REACTIVATED_BY_REGISTRATION = "PLAYER_REACTIVATED_BY_REGISTRATION";
+    public static final String ACTION_PLAYER_TIER_UPDATED = "PLAYER_TIER_UPDATED";
     public static final String ACTION_MATCH_DELETED = "MATCH_DELETED";
 
-    private static final int MAX_LIMIT = 200;
+    private static final int MAX_PAGE_SIZE = 200;
 
     private final OperationAuditLogRepository operationAuditLogRepository;
 
@@ -29,16 +32,32 @@ public class OperationAuditLogService {
 
     @Transactional(readOnly = true)
     public List<OperationAuditLogResponse> getRecentLogs(int limit) {
-        int normalizedLimit = Math.max(1, Math.min(MAX_LIMIT, limit));
+        return getLogs(0, limit).items();
+    }
+
+    @Transactional(readOnly = true)
+    public OperationAuditLogPageResponse getLogs(int page, int size) {
+        int normalizedPage = Math.max(0, page);
+        int normalizedLimit = Math.max(1, Math.min(MAX_PAGE_SIZE, size));
         PageRequest pageRequest = PageRequest.of(
-            0,
+            normalizedPage,
             normalizedLimit,
             Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))
         );
-        return operationAuditLogRepository.findAllByOrderByCreatedAtDescIdDesc(pageRequest)
+        Page<OperationAuditLog> logs = operationAuditLogRepository.findAllByOrderByCreatedAtDescIdDesc(pageRequest);
+        List<OperationAuditLogResponse> items = logs
             .stream()
             .map(this::toResponse)
             .toList();
+        return new OperationAuditLogPageResponse(
+            items,
+            logs.getNumber(),
+            logs.getSize(),
+            logs.getTotalElements(),
+            logs.getTotalPages(),
+            logs.isFirst(),
+            logs.isLast()
+        );
     }
 
     @Transactional
@@ -72,6 +91,33 @@ public class OperationAuditLogService {
     }
 
     @Transactional
+    public void recordPlayerTierUpdate(
+        String actorEmail,
+        String actorNickname,
+        Long groupId,
+        Player player,
+        String previousTier,
+        String nextTier
+    ) {
+        if (player == null) {
+            return;
+        }
+
+        OperationAuditLog log = baseLog(
+            actorEmail,
+            actorNickname,
+            ACTION_PLAYER_TIER_UPDATED,
+            "PLAYER",
+            player.getId(),
+            player.getNickname(),
+            groupId
+        );
+        log.setSummary("티어 수정");
+        log.setDetails("tier=" + formatTierForAudit(previousTier) + " -> " + formatTierForAudit(nextTier));
+        operationAuditLogRepository.save(log);
+    }
+
+    @Transactional
     public void recordMatchDeletion(
         String actorEmail,
         String actorNickname,
@@ -90,8 +136,8 @@ public class OperationAuditLogService {
             snapshot.matchId() == null ? null : "#" + snapshot.matchId(),
             snapshot.groupId()
         );
-        log.setSummary(snapshot.hadResult() ? "결과 등록 경기 삭제" : "경기 삭제");
-        log.setDetails(snapshot.playedAt() == null ? null : "playedAt=" + snapshot.playedAt());
+        log.setSummary("경기 삭제");
+        log.setDetails("matchId=" + snapshot.matchId() + ", deletedAt=" + log.getCreatedAt());
         operationAuditLogRepository.save(log);
     }
 
@@ -128,6 +174,11 @@ public class OperationAuditLogService {
             return "tier=" + tier;
         }
         return "tier=" + tier + ", race=" + race;
+    }
+
+    private String formatTierForAudit(String value) {
+        String normalized = trimToNull(value);
+        return normalized == null ? "UNASSIGNED" : normalized.toUpperCase(Locale.ROOT);
     }
 
     private OperationAuditLogResponse toResponse(OperationAuditLog log) {

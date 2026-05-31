@@ -24,9 +24,14 @@ public class PlayerAdminService {
     private static final Set<String> EDITABLE_TIERS = ACKNOWLEDGEABLE_TIERS;
 
     private final PlayerRepository playerRepository;
+    private final OperationAuditLogService operationAuditLogService;
 
-    public PlayerAdminService(PlayerRepository playerRepository) {
+    public PlayerAdminService(
+        PlayerRepository playerRepository,
+        OperationAuditLogService operationAuditLogService
+    ) {
         this.playerRepository = playerRepository;
+        this.operationAuditLogService = operationAuditLogService;
     }
 
     @Transactional
@@ -35,9 +40,21 @@ public class PlayerAdminService {
         Long playerId,
         GroupPlayerUpdateRequest request
     ) {
+        updatePlayer(groupId, playerId, request, null, null);
+    }
+
+    @Transactional
+    public void updatePlayer(
+        Long groupId,
+        Long playerId,
+        GroupPlayerUpdateRequest request,
+        String actorEmail,
+        String actorNickname
+    ) {
         Player player = playerRepository.findByIdAndGroup_Id(playerId, groupId)
             .orElseThrow(() -> new NoSuchElementException("Player not found"));
 
+        String previousTier = normalizeAuditTier(player.getTier());
         String nickname = safeTrim(request == null ? null : request.nickname());
         String race = safeTrim(request == null ? null : request.race());
         String tier = normalizeEditableTier(request == null ? null : request.tier());
@@ -125,6 +142,16 @@ public class PlayerAdminService {
         }
 
         playerRepository.save(player);
+        if (!tier.isEmpty()) {
+            operationAuditLogService.recordPlayerTierUpdate(
+                actorEmail,
+                actorNickname,
+                groupId,
+                player,
+                previousTier,
+                tier
+            );
+        }
     }
 
     @Transactional
@@ -191,6 +218,14 @@ public class PlayerAdminService {
         }
         if (!EDITABLE_TIERS.contains(normalized)) {
             throw new IllegalArgumentException("Tier is invalid");
+        }
+        return normalized;
+    }
+
+    private String normalizeAuditTier(String value) {
+        String normalized = safeTrim(value).toUpperCase(Locale.ROOT);
+        if (normalized.isEmpty() || "NONE".equals(normalized) || "PENDING".equals(normalized) || "TBD".equals(normalized)) {
+            return "UNASSIGNED";
         }
         return normalized;
     }

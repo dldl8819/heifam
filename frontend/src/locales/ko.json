@@ -240,14 +240,20 @@
     "superOnly": "최상위 관리자만 운영 로그를 볼 수 있습니다.",
     "loadError": "운영 로그를 불러오지 못했습니다. 백엔드 상태를 확인해 주세요.",
     "recentTitle": "최근 운영 작업",
-    "recentDescription": "최신 100건 기준으로 표시됩니다.",
+    "recentDescription": "최신순으로 페이지당 20건씩 표시됩니다.",
     "count": "총 {count}건",
     "empty": "표시할 운영 로그가 없습니다.",
     "actions": {
       "playerRegistered": "선수 등록",
       "playerRegistrationUpdated": "선수 정보 갱신",
       "playerReactivatedByRegistration": "선수 재등록",
+      "playerTierUpdated": "선수 티어 수정",
       "matchDeleted": "경기 삭제"
+    },
+    "pagination": {
+      "status": "{page} / {totalPages} 페이지",
+      "previous": "이전",
+      "next": "다음"
     },
     "targetTypes": {
       "player": "선수",

@@ -123,9 +123,9 @@ async function loadTierBoardRows(): Promise<GroupPlayerTierBoardItem[]> {
 }
 
 export default function DashboardPage() {
-  const { isAdmin, isSuperAdmin } = useAdminAuth()
+  const { isAdmin, canViewMmr } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
-  const showMmr = isSuperAdmin && mmrVisible
+  const showMmr = canViewMmr && mmrVisible
   const [dashboard, setDashboard] = useState<GroupDashboardResponse | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)

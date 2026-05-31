@@ -20,6 +20,7 @@ import type {
   MatchResultResponse,
   ManualMatchCreateRequest,
   OperationAuditLogItem,
+  OperationAuditLogPage,
   PlayerRosterItem,
   PlayerRace,
   PlayerTierStatus,
@@ -563,6 +564,48 @@ function normalizeOperationAuditLogItem(value: unknown): OperationAuditLogItem |
   }
 }
 
+function normalizeOperationAuditLogPage(value: unknown): OperationAuditLogPage {
+  if (Array.isArray(value)) {
+    const items = value
+      .map(normalizeOperationAuditLogItem)
+      .filter((item): item is OperationAuditLogItem => item !== null)
+    return {
+      items,
+      page: 0,
+      size: items.length,
+      totalElements: items.length,
+      totalPages: items.length > 0 ? 1 : 0,
+      first: true,
+      last: true,
+    }
+  }
+
+  if (value === null || typeof value !== 'object') {
+    throw new Error('Invalid audit logs response format')
+  }
+
+  const source = value as Record<string, unknown>
+  const rawItems = Array.isArray(source.items) ? source.items : []
+  const items = rawItems
+    .map(normalizeOperationAuditLogItem)
+    .filter((item): item is OperationAuditLogItem => item !== null)
+  const page = Math.max(0, Math.floor(toNumber(source.page) ?? 0))
+  const fallbackSize = items.length > 0 ? items.length : 1
+  const size = Math.max(1, Math.floor(toNumber(source.size) ?? fallbackSize))
+  const totalElements = Math.max(0, Math.floor(toNumber(source.totalElements) ?? items.length))
+  const totalPages = Math.max(0, Math.floor(toNumber(source.totalPages) ?? (totalElements === 0 ? 0 : Math.ceil(totalElements / size))))
+
+  return {
+    items,
+    page,
+    size,
+    totalElements,
+    totalPages,
+    first: typeof source.first === 'boolean' ? source.first : page <= 0,
+    last: typeof source.last === 'boolean' ? source.last : totalPages === 0 || page >= totalPages - 1,
+  }
+}
+
 export const apiClient = {
   getHealth: () => apiRequest<HealthResponse>('/api/health'),
   balanceMatch: (payload: BalanceRequest) =>
@@ -863,24 +906,28 @@ export const apiClient = {
         baseUrlOverride: ACCESS_API_BASE_URL,
       }
     ),
-  getOperationAuditLogs: async (limit = 100): Promise<OperationAuditLogItem[]> => {
-    const requestedLimit = Number.isFinite(limit) ? Math.floor(limit) : 100
-    const safeLimit = Math.max(1, Math.min(200, requestedLimit))
+  getOperationAuditLogPage: async (
+    options: { page?: number; size?: number } = {}
+  ): Promise<OperationAuditLogPage> => {
+    const requestedPage = Number.isFinite(options.page) ? Math.floor(options.page ?? 0) : 0
+    const requestedSize = Number.isFinite(options.size) ? Math.floor(options.size ?? 20) : 20
+    const safePage = Math.max(0, requestedPage)
+    const safeSize = Math.max(1, Math.min(100, requestedSize))
     const payload = await apiRequest<unknown>(
-      `/api/admin/audit-logs?limit=${safeLimit}`,
+      `/api/admin/audit-logs?page=${safePage}&size=${safeSize}`,
       undefined,
       {
         requireUserEmail: true,
         includeUserEmail: true,
       }
     )
-    if (!Array.isArray(payload)) {
-      throw new Error('Invalid audit logs response format')
-    }
-
-    return payload
-      .map(normalizeOperationAuditLogItem)
-      .filter((item): item is OperationAuditLogItem => item !== null)
+    return normalizeOperationAuditLogPage(payload)
+  },
+  getOperationAuditLogs: async (limit = 100): Promise<OperationAuditLogItem[]> => {
+    const requestedLimit = Number.isFinite(limit) ? Math.floor(limit) : 100
+    const safeLimit = Math.max(1, Math.min(100, requestedLimit))
+    const response = await apiClient.getOperationAuditLogPage({ page: 0, size: safeLimit })
+    return response.items
   },
   recalculateRatings: (payload: RatingRecalculationRequest) =>
     apiRequest<RatingRecalculationResponse>(

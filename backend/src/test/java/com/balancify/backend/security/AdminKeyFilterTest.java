@@ -21,6 +21,7 @@ import com.balancify.backend.api.HealthController;
 import com.balancify.backend.api.access.AccessControlController;
 import com.balancify.backend.api.admin.AdminRatingController;
 import com.balancify.backend.api.admin.OperationAuditLogController;
+import com.balancify.backend.api.admin.dto.OperationAuditLogPageResponse;
 import com.balancify.backend.api.group.GroupMatchAdminController;
 import com.balancify.backend.api.group.GroupMatchController;
 import com.balancify.backend.api.group.GroupDashboardController;
@@ -672,7 +673,8 @@ class AdminKeyFilterTest {
 
     @Test
     void allowsAuditLogsWithSuperAdminEmail() throws Exception {
-        when(operationAuditLogService.getRecentLogs(anyInt())).thenReturn(List.of());
+        when(operationAuditLogService.getLogs(anyInt(), anyInt()))
+            .thenReturn(new OperationAuditLogPageResponse(List.of(), 0, 20, 0, 0, true, true));
 
         mockMvc
             .perform(
@@ -875,7 +877,9 @@ class AdminKeyFilterTest {
         verify(playerAdminService).updatePlayer(
             eq(1L),
             eq(10L),
-            argThat(request -> request != null && "B+".equals(request.tier()))
+            argThat(request -> request != null && "B+".equals(request.tier())),
+            eq("admin@hei.gg"),
+            eq("")
         );
     }
 
@@ -890,7 +894,7 @@ class AdminKeyFilterTest {
             )
             .andExpect(status().isForbidden());
 
-        verify(playerAdminService, never()).updatePlayer(any(), any(), any());
+        verify(playerAdminService, never()).updatePlayer(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -904,7 +908,7 @@ class AdminKeyFilterTest {
             )
             .andExpect(status().isOk());
 
-        verify(playerAdminService).updatePlayer(any(), any(), any());
+        verify(playerAdminService).updatePlayer(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -1202,16 +1206,68 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void rejectsDashboardForAdminBeforeLoadingDashboardData() throws Exception {
+    void returnsMaskedDashboardForAdminWithoutMmrAccess() throws Exception {
+        when(dashboardQueryService.getGroupDashboard(eq(1L), eq("admin")))
+            .thenReturn(
+                new GroupDashboardResponse(
+                    24,
+                    new DashboardKpiSummaryResponse(10, 1400, 1320.5, 12),
+                    List.of(new DashboardTopRankingPreviewItemResponse(1, "alpha", "P", 1400, 75.0)),
+                    new DashboardRecentBalancePreviewResponse(
+                        7L,
+                        List.of(new DashboardRecentBalanceTeamPlayerResponse("alpha", 1400)),
+                        List.of(new DashboardRecentBalanceTeamPlayerResponse("bravo", 1320)),
+                        1400,
+                        1320,
+                        80,
+                        OffsetDateTime.parse("2026-05-31T12:00:00Z")
+                    ),
+                    null,
+                    null
+                )
+            );
+
         mockMvc
             .perform(
                 get("/api/groups/1/dashboard")
                     .header("X-USER-EMAIL", "admin@hei.gg")
                     .header("X-USER-NICKNAME", "admin")
             )
-            .andExpect(status().isForbidden());
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.kpiSummary.totalPlayers").value(10))
+            .andExpect(jsonPath("$.kpiSummary.topMmr").value(0))
+            .andExpect(jsonPath("$.kpiSummary.averageMmr").value(0.0))
+            .andExpect(jsonPath("$.topRankingPreview[0].currentMmr").value(0))
+            .andExpect(jsonPath("$.recentBalancePreview.homeMmr").value(0))
+            .andExpect(jsonPath("$.recentBalancePreview.awayMmr").value(0))
+            .andExpect(jsonPath("$.recentBalancePreview.mmrDiff").value(0));
 
-        verify(dashboardQueryService, never()).getGroupDashboard(eq(1L), any());
+        verify(dashboardQueryService).getGroupDashboard(eq(1L), eq("admin"));
+    }
+
+    @Test
+    void returnsDashboardMmrFieldsForMmrAllowedAdmin() throws Exception {
+        when(dashboardQueryService.getGroupDashboard(eq(1L), eq("ops")))
+            .thenReturn(
+                new GroupDashboardResponse(
+                    24,
+                    new DashboardKpiSummaryResponse(10, 1400, 1320.5, 12),
+                    List.of(new DashboardTopRankingPreviewItemResponse(1, "alpha", "P", 1400, 75.0)),
+                    null,
+                    null,
+                    null
+                )
+            );
+
+        mockMvc
+            .perform(
+                get("/api/groups/1/dashboard")
+                    .header("X-USER-EMAIL", "ops@hei.gg")
+                    .header("X-USER-NICKNAME", "ops")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.kpiSummary.topMmr").value(1400))
+            .andExpect(jsonPath("$.topRankingPreview[0].currentMmr").value(1400));
     }
 
     @Test

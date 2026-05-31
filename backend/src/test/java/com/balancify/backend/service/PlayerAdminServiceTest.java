@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -31,11 +32,14 @@ class PlayerAdminServiceTest {
     @Mock
     private PlayerRepository playerRepository;
 
+    @Mock
+    private OperationAuditLogService operationAuditLogService;
+
     private PlayerAdminService playerAdminService;
 
     @BeforeEach
     void setUp() {
-        playerAdminService = new PlayerAdminService(playerRepository);
+        playerAdminService = new PlayerAdminService(playerRepository, operationAuditLogService);
     }
 
     @Test
@@ -89,6 +93,31 @@ class PlayerAdminServiceTest {
         assertThat(player.getMmr()).isEqualTo(1200);
         verify(playerRepository, never()).findByGroup_IdAndNicknameIgnoreCase(anyLong(), anyString());
         verify(playerRepository).save(player);
+    }
+
+    @Test
+    void recordsTierChangeAuditLogWhenTierIsUpdated() {
+        Player player = player(10L, 1L, "PlayerAlpha");
+        player.setTier("C");
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+        when(playerRepository.save(any(Player.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        playerAdminService.updatePlayer(
+            1L,
+            10L,
+            new GroupPlayerUpdateRequest(null, null, "b+", null, null, null, null, null),
+            "ops@example.com",
+            "OpsUser"
+        );
+
+        verify(operationAuditLogService).recordPlayerTierUpdate(
+            eq("ops@example.com"),
+            eq("OpsUser"),
+            eq(1L),
+            eq(player),
+            eq("C"),
+            eq("B+")
+        );
     }
 
     @Test

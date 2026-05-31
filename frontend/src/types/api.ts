@@ -430,3 +430,13 @@ export type OperationAuditLogItem = {
   details?: string
   createdAt: string
 }
+
+export type OperationAuditLogPage = {
+  items: OperationAuditLogItem[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+  first: boolean
+  last: boolean
+}

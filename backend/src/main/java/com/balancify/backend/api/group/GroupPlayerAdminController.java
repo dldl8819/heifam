@@ -2,6 +2,7 @@ package com.balancify.backend.api.group;
 
 import com.balancify.backend.api.group.dto.GroupPlayerUpdateRequest;
 import com.balancify.backend.api.group.dto.GroupPlayerMmrUpdateRequest;
+import com.balancify.backend.security.AuthenticatedRequestResolver;
 import com.balancify.backend.security.MmrAccessRequestResolver;
 import com.balancify.backend.service.PlayerAdminService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,13 +22,16 @@ public class GroupPlayerAdminController {
 
     private final PlayerAdminService playerAdminService;
     private final MmrAccessRequestResolver mmrAccessRequestResolver;
+    private final AuthenticatedRequestResolver authenticatedRequestResolver;
 
     public GroupPlayerAdminController(
         PlayerAdminService playerAdminService,
-        MmrAccessRequestResolver mmrAccessRequestResolver
+        MmrAccessRequestResolver mmrAccessRequestResolver,
+        AuthenticatedRequestResolver authenticatedRequestResolver
     ) {
         this.playerAdminService = playerAdminService;
         this.mmrAccessRequestResolver = mmrAccessRequestResolver;
+        this.authenticatedRequestResolver = authenticatedRequestResolver;
     }
 
     @PatchMapping("/{groupId}/players/{playerId}")
@@ -45,7 +49,15 @@ public class GroupPlayerAdminController {
         }
 
         try {
-            playerAdminService.updatePlayer(groupId, playerId, request);
+            AuthenticatedRequestResolver.ResolvedRequestIdentity identity =
+                authenticatedRequestResolver.resolve(httpRequest);
+            playerAdminService.updatePlayer(
+                groupId,
+                playerId,
+                request,
+                identity.email(),
+                identity.nickname()
+            );
         } catch (IllegalArgumentException illegalArgumentException) {
             throw new ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
