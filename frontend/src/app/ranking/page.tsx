@@ -58,6 +58,10 @@ function formatLast10(value: string): string {
     .replace(/L/g, t('ranking.last10.loss'))
 }
 
+function formatTier(value: string): string {
+  return value === 'UNASSIGNED' ? t('common.tierBoard.unassigned') : value
+}
+
 export default function RankingPage() {
   const { isSuperAdmin, isLoading: authLoading } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
@@ -80,31 +84,13 @@ export default function RankingPage() {
       setError(null)
 
       try {
-        const [response, players] = await Promise.all([
-          apiClient.getRanking(TEMP_GROUP_ID),
-          apiClient.getGroupPlayers(TEMP_GROUP_ID),
-        ])
+        const response = await apiClient.getRanking(TEMP_GROUP_ID)
 
         if (!active) {
           return
         }
 
-        const tierByNickname = new Map(
-          players.map((player) => [player.nickname.trim().toLowerCase(), player.tier])
-        )
-
-        setRows(
-          response.map((row) => {
-            const fallbackTier = tierByNickname.get(row.nickname.trim().toLowerCase())
-            return {
-              ...row,
-              tier:
-                typeof row.tier === 'string' && row.tier.trim().length > 0 && row.tier !== 'UNASSIGNED'
-                  ? row.tier
-                  : fallbackTier ?? row.tier,
-            }
-          })
-        )
+        setRows(response)
       } catch {
         if (!active) {
           return
@@ -228,7 +214,7 @@ export default function RankingPage() {
                     <td className="px-4 py-3 font-semibold text-slate-900">{row.rank}</td>
                     <td className="px-4 py-3 font-medium text-slate-900">{row.nickname}</td>
                     <td className="px-4 py-3 text-slate-700">{row.race}</td>
-                    <td className="px-4 py-3 text-slate-700">{row.tier}</td>
+                    <td className="px-4 py-3 text-slate-700">{formatTier(row.tier)}</td>
                     {showMmr && (
                       <td className="px-4 py-3 text-slate-700">
                         {typeof row.currentMmr === 'number' ? row.currentMmr : '-'}

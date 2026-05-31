@@ -56,7 +56,7 @@ public class RankingService {
                 historyByPlayerId.getOrDefault(player.getId(), Collections.emptyList());
             RankingStats stats = calculateStats(history);
             int currentMmr = safeInt(player.getMmr());
-            String currentTier = PlayerTierPolicy.resolveTierForSnapshot(player.getTier(), currentMmr);
+            String currentTier = normalizeTier(PlayerTierPolicy.resolveTier(currentMmr));
 
             candidates.add(new RankingCandidate(
                 player.getId(),
@@ -163,6 +163,10 @@ public class RankingService {
 
     private String normalizeRace(String race) {
         return PlayerRacePolicy.toDisplayRace(race);
+    }
+
+    private String normalizeTier(String tier) {
+        return "NONE".equals(tier) ? "UNASSIGNED" : tier;
     }
 
     private int safeInt(Integer value) {
