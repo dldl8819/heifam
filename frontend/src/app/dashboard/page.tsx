@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { useAdminAuth } from '@/lib/admin-auth'
 import { apiClient } from '@/lib/api'
@@ -8,7 +7,12 @@ import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
-import type { GroupDashboardResponse, GroupPlayerTierBoardItem, PlayerTierStatus } from '@/types/api'
+import type {
+  GroupDashboardMyTeammateStat,
+  GroupDashboardResponse,
+  GroupPlayerTierBoardItem,
+  PlayerTierStatus,
+} from '@/types/api'
 
 const TEMP_GROUP_ID = 1
 const TIER_BOARD_COLUMNS: PlayerTierStatus[] = [
@@ -42,15 +46,6 @@ const TIER_BOARD_HEADER_CLASS: Record<PlayerTierStatus, string> = {
 function formatWinRate(value: number): string {
   const percentage = value <= 1 ? value * 100 : value
   return `${percentage.toFixed(2)}%`
-}
-
-function formatDateTime(value: string): string {
-  const parsed = Date.parse(value)
-  if (Number.isNaN(parsed)) {
-    return value
-  }
-
-  return new Date(parsed).toLocaleString()
 }
 
 function resolveKstDateParts(value = new Date()): { year: number; month: number; day: number } {
@@ -122,6 +117,53 @@ async function loadTierBoardRows(): Promise<GroupPlayerTierBoardItem[]> {
   return apiClient.getGroupPlayerTierBoard(TEMP_GROUP_ID)
 }
 
+function TeammateList({
+  items,
+  emptyText,
+  showStreak = false,
+}: {
+  items: GroupDashboardMyTeammateStat[]
+  emptyText: string
+  showStreak?: boolean
+}) {
+  if (items.length === 0) {
+    return (
+      <p className="rounded-lg border border-dashed border-slate-200 px-3 py-6 text-center text-sm text-slate-500">
+        {emptyText}
+      </p>
+    )
+  }
+
+  return (
+    <ul className="space-y-2">
+      {items.map((item) => (
+        <li
+          key={`${item.nickname}-${item.games}-${item.currentWinStreak}`}
+          className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <span className="font-semibold text-slate-900">{item.nickname}</span>
+            <span className="text-xs font-medium text-slate-500">
+              {item.wins}W {item.losses}L
+            </span>
+          </div>
+          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+            <span>{t('dashboard.myTeammates.metrics.games', { count: item.games })}</span>
+            <span>{t('dashboard.myTeammates.metrics.winRate', { value: formatWinRate(item.winRate) })}</span>
+            {showStreak && (
+              <span>
+                {t('dashboard.myTeammates.metrics.currentWinStreak', {
+                  count: item.currentWinStreak,
+                })}
+              </span>
+            )}
+          </div>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 export default function DashboardPage() {
   const { isAdmin, canViewMmr } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
@@ -134,6 +176,7 @@ export default function DashboardPage() {
   const [tierBoardError, setTierBoardError] = useState<string | null>(null)
   const myRaceSummary = dashboard?.myRaceSummary
   const myGameTypeSummary = dashboard?.myGameTypeSummary
+  const myTeammateSummary = dashboard?.myTeammateSummary
   const tierBoardBuckets = useMemo(() => buildTierBoardBuckets(tierBoardRows), [tierBoardRows])
   const tierBoardRowCount = useMemo(
     () => Math.max(
@@ -359,181 +402,63 @@ export default function DashboardPage() {
 
       <section className="grid gap-4 xl:grid-cols-3">
         <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm xl:col-span-2">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-900">{t('dashboard.topPreview.title')}</h3>
-            <Link
-              href="/ranking"
-              className="text-xs font-medium text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline"
-            >
-              {t('dashboard.topPreview.openFull')}
-            </Link>
-          </div>
-
-          <div className="mt-3 overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs tracking-wide text-slate-500">
-                <tr>
-                  <th className="px-3 py-2">{t('dashboard.topPreview.headers.rank')}</th>
-                  <th className="px-3 py-2">{t('dashboard.topPreview.headers.nickname')}</th>
-                  <th className="px-3 py-2">{t('dashboard.topPreview.headers.race')}</th>
-                  {showMmr && <th className="px-3 py-2">{t('dashboard.topPreview.headers.mmr')}</th>}
-                  <th className="px-3 py-2">{t('dashboard.topPreview.headers.winRate')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading &&
-                  (
-                    <tr className="border-t border-slate-100">
-                      <td className="px-3 py-3" colSpan={showMmr ? 5 : 4}>
-                        <LoadingIndicator label={t('common.loading')} />
-                      </td>
-                    </tr>
-                  )}
-
-                {!loading &&
-                  (dashboard?.topRankingPreview ?? []).map((row) => (
-                    <tr key={`${row.rank}-${row.nickname}`} className="border-t border-slate-100">
-                      <td className="px-3 py-2 font-semibold text-slate-900">{row.rank}</td>
-                      <td className="px-3 py-2 text-slate-800">{row.nickname}</td>
-                      <td className="px-3 py-2 text-slate-700">{row.race}</td>
-                      {showMmr && <td className="px-3 py-2 text-slate-700">{row.currentMmr}</td>}
-                      <td className="px-3 py-2 text-slate-700">{formatWinRate(row.winRate)}</td>
-                    </tr>
-                  ))}
-
-                {!loading && (dashboard?.topRankingPreview.length ?? 0) === 0 && (
-                  <tr className="border-t border-slate-100">
-                    <td className="px-3 py-8 text-center text-sm text-slate-500" colSpan={showMmr ? 5 : 4}>
-                      {t('dashboard.topPreview.empty')}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </article>
-
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-900">{t('dashboard.quickActions.title')}</h3>
-          <div className="mt-3 grid gap-2">
-            {isAdmin && (
-              <Link
-                href="/balance"
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900"
-              >
-                {t('dashboard.quickActions.toBalance')}
-              </Link>
-            )}
-            <Link
-              href="/results"
-              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900"
-            >
-              {t('dashboard.quickActions.toResults')}
-            </Link>
-            <Link
-              href="/ranking"
-              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900"
-            >
-              {t('dashboard.quickActions.toRanking')}
-            </Link>
-          </div>
-        </article>
-      </section>
-
-      <section className="grid gap-4 xl:grid-cols-3">
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm xl:col-span-2">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-900">{t('dashboard.recentBalance.title')}</h3>
-            <span className="text-xs text-slate-500">
-              {dashboard?.recentBalancePreview?.createdAt
-                ? formatDateTime(dashboard.recentBalancePreview.createdAt)
-                : t('dashboard.recentBalance.none')}
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900">{t('dashboard.myTeammates.title')}</h3>
+              <p className="mt-1 text-xs text-slate-500">{t('dashboard.myTeammates.description')}</p>
+            </div>
+            <span className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600">
+              {t('dashboard.myTeammates.minGames', {
+                count: myTeammateSummary?.minGames ?? 10,
+              })}
             </span>
           </div>
 
-          {!loading && !dashboard?.recentBalancePreview && (
-            <div className="mt-3 rounded-lg border border-dashed border-slate-200 px-3 py-8 text-center text-sm text-slate-500">
-              {t('dashboard.recentBalance.empty')}
+          {loading && (
+            <div className="mt-4">
+              <LoadingIndicator label={t('common.loading')} />
             </div>
           )}
 
-          {dashboard?.recentBalancePreview && (
-            <>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-lg border border-slate-200 p-3">
-                  <h4 className="text-xs font-semibold tracking-wide text-slate-500">
-                    {t('dashboard.recentBalance.homeTeam')}
-                  </h4>
-                  <ul className="mt-2 space-y-1">
-                    {dashboard.recentBalancePreview.homeTeam.map((player) => (
-                      <li
-                        key={`dashboard-home-${player.nickname}`}
-                        className={`text-sm text-slate-700 ${showMmr ? 'flex items-center justify-between' : ''}`}
-                      >
-                        <span>{player.nickname}</span>
-                        {showMmr && <span>{player.mmr}</span>}
-                      </li>
-                    ))}
-                  </ul>
-                  {showMmr && (
-                    <p className="mt-2 text-xs text-slate-500">
-                      {t('dashboard.recentBalance.homeMmr')}:{' '}
-                      <span className="font-semibold text-slate-700">
-                        {dashboard.recentBalancePreview.homeMmr}
-                      </span>
-                    </p>
-                  )}
-                </div>
+          {!loading && dashboard && !myTeammateSummary?.linked && (
+            <div className="mt-4 rounded-lg border border-dashed border-slate-200 px-3 py-8 text-center text-sm text-slate-500">
+              {t('dashboard.myTeammates.notLinked')}
+            </div>
+          )}
 
-                <div className="rounded-lg border border-slate-200 p-3">
-                  <h4 className="text-xs font-semibold tracking-wide text-slate-500">
-                    {t('dashboard.recentBalance.awayTeam')}
-                  </h4>
-                  <ul className="mt-2 space-y-1">
-                    {dashboard.recentBalancePreview.awayTeam.map((player) => (
-                      <li
-                        key={`dashboard-away-${player.nickname}`}
-                        className={`text-sm text-slate-700 ${showMmr ? 'flex items-center justify-between' : ''}`}
-                      >
-                        <span>{player.nickname}</span>
-                        {showMmr && <span>{player.mmr}</span>}
-                      </li>
-                    ))}
-                  </ul>
-                  {showMmr && (
-                    <p className="mt-2 text-xs text-slate-500">
-                      {t('dashboard.recentBalance.awayMmr')}:{' '}
-                      <span className="font-semibold text-slate-700">
-                        {dashboard.recentBalancePreview.awayMmr}
-                      </span>
-                    </p>
-                  )}
-                </div>
-              </div>
+          {!loading && myTeammateSummary?.linked && (
+            <div className="mt-4 grid gap-4 lg:grid-cols-3">
+              <section className="space-y-3">
+                <h4 className="text-sm font-semibold text-slate-900">
+                  {t('dashboard.myTeammates.bestDuos.title')}
+                </h4>
+                <TeammateList
+                  items={myTeammateSummary.bestDuos}
+                  emptyText={t('dashboard.myTeammates.bestDuos.empty')}
+                />
+              </section>
 
-              <div className={`mt-3 grid gap-2 ${showMmr ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
-                <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  {t('dashboard.recentBalance.matchId')}:{' '}
-                  <span className="font-semibold">
-                    {dashboard.recentBalancePreview.matchId}
-                  </span>
-                </div>
-                {showMmr && (
-                  <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                    {t('dashboard.recentBalance.mmrDiff')}:{' '}
-                    <span className="font-semibold">
-                      {dashboard.recentBalancePreview.mmrDiff}
-                    </span>
-                  </div>
-                )}
-                <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  {t('dashboard.recentBalance.createdAt')}:{' '}
-                  <span className="font-semibold">
-                    {formatDateTime(dashboard.recentBalancePreview.createdAt)}
-                  </span>
-                </div>
-              </div>
-            </>
+              <section className="space-y-3">
+                <h4 className="text-sm font-semibold text-slate-900">
+                  {t('dashboard.myTeammates.frequentTeammates.title')}
+                </h4>
+                <TeammateList
+                  items={myTeammateSummary.frequentTeammates}
+                  emptyText={t('dashboard.myTeammates.frequentTeammates.empty')}
+                />
+              </section>
+
+              <section className="space-y-3">
+                <h4 className="text-sm font-semibold text-slate-900">
+                  {t('dashboard.myTeammates.streakPartners.title')}
+                </h4>
+                <TeammateList
+                  items={myTeammateSummary.streakPartners}
+                  emptyText={t('dashboard.myTeammates.streakPartners.empty')}
+                  showStreak
+                />
+              </section>
+            </div>
           )}
         </article>
 

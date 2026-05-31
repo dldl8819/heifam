@@ -5,6 +5,8 @@ import com.balancify.backend.api.group.dto.DashboardMyGameTypeStatResponse;
 import com.balancify.backend.api.group.dto.DashboardMyGameTypeSummaryResponse;
 import com.balancify.backend.api.group.dto.DashboardMyRaceStatResponse;
 import com.balancify.backend.api.group.dto.DashboardMyRaceSummaryResponse;
+import com.balancify.backend.api.group.dto.DashboardMyTeammateStatResponse;
+import com.balancify.backend.api.group.dto.DashboardMyTeammateSummaryResponse;
 import com.balancify.backend.api.group.dto.DashboardRecentBalancePreviewResponse;
 import com.balancify.backend.api.group.dto.DashboardRecentBalanceTeamPlayerResponse;
 import com.balancify.backend.api.group.dto.DashboardTopRankingPreviewItemResponse;
@@ -33,6 +35,8 @@ public class DashboardQueryService {
 
     private static final List<String> DASHBOARD_RACE_ORDER = List.of("P", "T", "Z", "PT", "PZ", "TZ", "PTZ");
     private static final List<String> GAME_TYPE_RACE_ORDER = List.of("P", "T", "Z", "PTZ");
+    private static final int TEAMMATE_MIN_GAMES = 10;
+    private static final int TEAMMATE_PREVIEW_LIMIT = 3;
 
     private final PlayerRepository playerRepository;
     private final MatchParticipantRepository matchParticipantRepository;
@@ -76,8 +80,15 @@ public class DashboardQueryService {
 
         Map<Long, StatsAccumulator> statsByPlayerId = new HashMap<>();
         Map<Long, List<MatchParticipant>> historyByPlayerId = new HashMap<>();
+        Map<Long, List<MatchParticipant>> participantsByMatchId = new HashMap<>();
         Set<Long> rankedMatchIds = new HashSet<>();
         for (MatchParticipant matchParticipant : matchParticipants) {
+            if (matchParticipant.getMatch() != null && matchParticipant.getMatch().getId() != null) {
+                participantsByMatchId
+                    .computeIfAbsent(matchParticipant.getMatch().getId(), ignored -> new ArrayList<>())
+                    .add(matchParticipant);
+            }
+
             if (matchParticipant.getPlayer() == null || matchParticipant.getPlayer().getId() == null) {
                 continue;
             }
@@ -115,24 +126,6 @@ public class DashboardQueryService {
             totalGames
         );
 
-        List<DashboardTopRankingPreviewItemResponse> topRankingPreview = new ArrayList<>();
-        int rank = 1;
-        for (Player player : players.stream().limit(5).toList()) {
-            StatsAccumulator stats = statsByPlayerId.getOrDefault(player.getId(), new StatsAccumulator());
-            int games = stats.wins + stats.losses;
-            double winRate = games == 0 ? 0.0 : round2((stats.wins * 100.0) / games);
-
-            topRankingPreview.add(new DashboardTopRankingPreviewItemResponse(
-                rank++,
-                player.getNickname(),
-                normalizeRace(player.getRace()),
-                safeInt(player.getMmr()),
-                winRate
-            ));
-        }
-
-        DashboardRecentBalancePreviewResponse recentBalancePreview =
-            buildRecentBalancePreview(groupId).orElse(null);
         Player targetPlayer = findRequesterPlayer(players, requesterNickname);
         DashboardMyRaceSummaryResponse myRaceSummary =
             buildMyRaceSummary(historyByPlayerId, targetPlayer, requesterNickname);
@@ -143,14 +136,22 @@ public class DashboardQueryService {
                 targetPlayer,
                 requesterNickname
             );
+        DashboardMyTeammateSummaryResponse myTeammateSummary =
+            buildMyTeammateSummary(
+                historyByPlayerId,
+                participantsByMatchId,
+                targetPlayer,
+                requesterNickname
+            );
 
         return new GroupDashboardResponse(
             currentKFactor,
             kpiSummary,
-            topRankingPreview,
-            recentBalancePreview,
+            List.of(),
+            null,
             myRaceSummary,
-            myGameTypeSummary
+            myGameTypeSummary,
+            myTeammateSummary
         );
     }
 
@@ -357,6 +358,93 @@ public class DashboardQueryService {
         );
     }
 
+    private DashboardMyTeammateSummaryResponse buildMyTeammateSummary(
+        Map<Long, List<MatchParticipant>> historyByPlayerId,
+        Map<Long, List<MatchParticipant>> participantsByMatchId,
+        Player targetPlayer,
+        String requesterNickname
+    ) {
+        if (targetPlayer == null || targetPlayer.getId() == null) {
+            return emptyMyTeammateSummary(requestedNicknameOrNull(requesterNickname));
+        }
+
+        List<MatchParticipant> history = historyByPlayerId.getOrDefault(targetPlayer.getId(), List.of());
+        Map<Long, TeammateStatsAccumulator> statsByTeammateId = new HashMap<>();
+        for (MatchParticipant targetParticipant : history) {
+            if (targetParticipant.getMatch() == null || targetParticipant.getMatch().getId() == null) {
+                continue;
+            }
+
+            Result result = resolveResult(targetParticipant);
+            if (result == Result.UNKNOWN) {
+                continue;
+            }
+
+            String targetTeam = normalizeTeam(targetParticipant.getTeam());
+            if (targetTeam.isEmpty()) {
+                continue;
+            }
+
+            List<MatchParticipant> teammates =
+                participantsByMatchId.getOrDefault(targetParticipant.getMatch().getId(), List.of());
+            for (MatchParticipant teammateParticipant : teammates) {
+                if (teammateParticipant == null
+                    || teammateParticipant.getPlayer() == null
+                    || teammateParticipant.getPlayer().getId() == null
+                    || teammateParticipant.getPlayer().getId().equals(targetPlayer.getId())
+                    || !targetTeam.equals(normalizeTeam(teammateParticipant.getTeam()))) {
+                    continue;
+                }
+
+                Player teammate = teammateParticipant.getPlayer();
+                TeammateStatsAccumulator stats =
+                    statsByTeammateId.computeIfAbsent(teammate.getId(), ignored -> new TeammateStatsAccumulator());
+                stats.nickname = teammate.getNickname();
+                if (result == Result.WIN) {
+                    stats.wins++;
+                } else {
+                    stats.losses++;
+                }
+                stats.recentResults.add(result);
+            }
+        }
+
+        List<DashboardMyTeammateStatResponse> eligibleStats = statsByTeammateId
+            .values()
+            .stream()
+            .map(this::toTeammateStatResponse)
+            .filter(stat -> stat.games() >= TEAMMATE_MIN_GAMES)
+            .toList();
+
+        List<DashboardMyTeammateStatResponse> bestDuos = eligibleStats
+            .stream()
+            .sorted(this::compareBestDuo)
+            .limit(TEAMMATE_PREVIEW_LIMIT)
+            .toList();
+
+        List<DashboardMyTeammateStatResponse> frequentTeammates = eligibleStats
+            .stream()
+            .sorted(this::compareFrequentTeammate)
+            .limit(TEAMMATE_PREVIEW_LIMIT)
+            .toList();
+
+        List<DashboardMyTeammateStatResponse> streakPartners = eligibleStats
+            .stream()
+            .filter(stat -> stat.currentWinStreak() > 0)
+            .sorted(this::compareStreakPartner)
+            .limit(TEAMMATE_PREVIEW_LIMIT)
+            .toList();
+
+        return new DashboardMyTeammateSummaryResponse(
+            true,
+            targetPlayer.getNickname(),
+            TEAMMATE_MIN_GAMES,
+            bestDuos,
+            frequentTeammates,
+            streakPartners
+        );
+    }
+
     private Map<Long, Map<String, String>> buildTeamCompositionByMatchTeam(List<MatchParticipant> matchParticipants) {
         Map<Long, Map<String, List<String>>> racesByMatchTeam = new HashMap<>();
         for (MatchParticipant participant : matchParticipants) {
@@ -513,6 +601,93 @@ public class DashboardQueryService {
         );
     }
 
+    private DashboardMyTeammateSummaryResponse emptyMyTeammateSummary(String nickname) {
+        return new DashboardMyTeammateSummaryResponse(
+            false,
+            nickname,
+            TEAMMATE_MIN_GAMES,
+            List.of(),
+            List.of(),
+            List.of()
+        );
+    }
+
+    private DashboardMyTeammateStatResponse toTeammateStatResponse(TeammateStatsAccumulator stats) {
+        int games = stats.wins + stats.losses;
+        double winRate = games == 0 ? 0.0 : round2((stats.wins * 100.0) / games);
+        int currentWinStreak = 0;
+        for (Result result : stats.recentResults) {
+            if (result != Result.WIN) {
+                break;
+            }
+            currentWinStreak++;
+        }
+
+        return new DashboardMyTeammateStatResponse(
+            stats.nickname,
+            stats.wins,
+            stats.losses,
+            games,
+            winRate,
+            currentWinStreak
+        );
+    }
+
+    private int compareBestDuo(
+        DashboardMyTeammateStatResponse left,
+        DashboardMyTeammateStatResponse right
+    ) {
+        int winRateComparison = Double.compare(right.winRate(), left.winRate());
+        if (winRateComparison != 0) {
+            return winRateComparison;
+        }
+        if (right.wins() != left.wins()) {
+            return Integer.compare(right.wins(), left.wins());
+        }
+        if (right.games() != left.games()) {
+            return Integer.compare(right.games(), left.games());
+        }
+        return compareNullableNickname(left.nickname(), right.nickname());
+    }
+
+    private int compareFrequentTeammate(
+        DashboardMyTeammateStatResponse left,
+        DashboardMyTeammateStatResponse right
+    ) {
+        if (right.games() != left.games()) {
+            return Integer.compare(right.games(), left.games());
+        }
+        if (right.wins() != left.wins()) {
+            return Integer.compare(right.wins(), left.wins());
+        }
+        int winRateComparison = Double.compare(right.winRate(), left.winRate());
+        if (winRateComparison != 0) {
+            return winRateComparison;
+        }
+        return compareNullableNickname(left.nickname(), right.nickname());
+    }
+
+    private int compareStreakPartner(
+        DashboardMyTeammateStatResponse left,
+        DashboardMyTeammateStatResponse right
+    ) {
+        if (right.currentWinStreak() != left.currentWinStreak()) {
+            return Integer.compare(right.currentWinStreak(), left.currentWinStreak());
+        }
+        if (right.games() != left.games()) {
+            return Integer.compare(right.games(), left.games());
+        }
+        int winRateComparison = Double.compare(right.winRate(), left.winRate());
+        if (winRateComparison != 0) {
+            return winRateComparison;
+        }
+        return compareNullableNickname(left.nickname(), right.nickname());
+    }
+
+    private int compareNullableNickname(String left, String right) {
+        return safeTrim(left).compareToIgnoreCase(safeTrim(right));
+    }
+
     private Player findRequesterPlayer(List<Player> players, String requesterNickname) {
         String normalizedNickname = safeTrim(requesterNickname);
         if (normalizedNickname.isEmpty()) {
@@ -574,5 +749,12 @@ public class DashboardQueryService {
     private static class RaceStatsAccumulator {
         private int wins;
         private int losses;
+    }
+
+    private static class TeammateStatsAccumulator {
+        private String nickname;
+        private int wins;
+        private int losses;
+        private final List<Result> recentResults = new ArrayList<>();
     }
 }

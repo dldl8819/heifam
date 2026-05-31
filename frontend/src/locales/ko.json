@@ -356,6 +356,29 @@
       "mmrDiff": "MMR 차이",
       "createdAt": "생성 시각"
     },
+    "myTeammates": {
+      "title": "내 팀메이트 궁합",
+      "description": "같이 팀으로 10경기 이상 한 플레이어만 집계합니다.",
+      "notLinked": "내 닉네임이 로스터와 연결되지 않아 팀메이트 지표를 표시할 수 없습니다. 권한 관리에서 닉네임을 확인해 주세요.",
+      "minGames": "{count}경기 이상",
+      "metrics": {
+        "games": "{count}경기",
+        "winRate": "승률 {value}",
+        "currentWinStreak": "현재 {count}연승"
+      },
+      "bestDuos": {
+        "title": "찰떡 듀오",
+        "empty": "10경기 이상 함께한 승률 높은 듀오가 아직 없습니다."
+      },
+      "frequentTeammates": {
+        "title": "최다 팀메이트",
+        "empty": "10경기 이상 함께한 팀메이트가 아직 없습니다."
+      },
+      "streakPartners": {
+        "title": "연승 메이트",
+        "empty": "현재 연승 중인 10경기 이상 팀메이트가 없습니다."
+      }
+    },
     "ratingRecalculation": {
       "title": "MMR 재계산",
       "description": "현재 K값과 레이팅 규칙으로 전체 경기 이력을 다시 계산합니다. 먼저 dry-run 결과를 확인한 뒤 실제 실행하세요.",

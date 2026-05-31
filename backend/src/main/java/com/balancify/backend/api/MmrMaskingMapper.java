@@ -158,7 +158,8 @@ public final class MmrMaskingMapper {
             maskedTopPreview,
             maskedRecentPreview,
             response.myRaceSummary(),
-            response.myGameTypeSummary()
+            response.myGameTypeSummary(),
+            response.myTeammateSummary()
         );
     }
 

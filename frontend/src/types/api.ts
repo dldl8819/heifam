@@ -308,6 +308,24 @@ export type GroupDashboardMyGameTypeSummary = {
   byGameType: GroupDashboardMyGameTypeStat[]
 }
 
+export type GroupDashboardMyTeammateStat = {
+  nickname: string
+  wins: number
+  losses: number
+  games: number
+  winRate: number
+  currentWinStreak: number
+}
+
+export type GroupDashboardMyTeammateSummary = {
+  linked: boolean
+  nickname: string | null
+  minGames: number
+  bestDuos: GroupDashboardMyTeammateStat[]
+  frequentTeammates: GroupDashboardMyTeammateStat[]
+  streakPartners: GroupDashboardMyTeammateStat[]
+}
+
 export type GroupDashboardResponse = {
   currentKFactor: number
   kpiSummary: GroupDashboardKpiSummary
@@ -315,6 +333,7 @@ export type GroupDashboardResponse = {
   recentBalancePreview: GroupDashboardRecentBalancePreview | null
   myRaceSummary: GroupDashboardMyRaceSummary
   myGameTypeSummary: GroupDashboardMyGameTypeSummary
+  myTeammateSummary: GroupDashboardMyTeammateSummary
 }
 
 export type CaptainDraftTeam = 'HOME' | 'AWAY' | 'UNASSIGNED'

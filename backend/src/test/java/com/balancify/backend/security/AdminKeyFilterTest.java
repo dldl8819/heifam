@@ -1223,6 +1223,7 @@ class AdminKeyFilterTest {
                         OffsetDateTime.parse("2026-05-31T12:00:00Z")
                     ),
                     null,
+                    null,
                     null
                 )
             );
@@ -1253,6 +1254,7 @@ class AdminKeyFilterTest {
                     24,
                     new DashboardKpiSummaryResponse(10, 1400, 1320.5, 12),
                     List.of(new DashboardTopRankingPreviewItemResponse(1, "alpha", "P", 1400, 75.0)),
+                    null,
                     null,
                     null,
                     null
@@ -1292,6 +1294,7 @@ class AdminKeyFilterTest {
                     24,
                     new DashboardKpiSummaryResponse(10, 1400, 1320.5, 12),
                     List.of(new DashboardTopRankingPreviewItemResponse(1, "alpha", "P", 1400, 75.0)),
+                    null,
                     null,
                     null,
                     null

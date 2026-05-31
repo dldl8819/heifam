@@ -8,6 +8,7 @@ public record GroupDashboardResponse(
     List<DashboardTopRankingPreviewItemResponse> topRankingPreview,
     DashboardRecentBalancePreviewResponse recentBalancePreview,
     DashboardMyRaceSummaryResponse myRaceSummary,
-    DashboardMyGameTypeSummaryResponse myGameTypeSummary
+    DashboardMyGameTypeSummaryResponse myGameTypeSummary,
+    DashboardMyTeammateSummaryResponse myTeammateSummary
 ) {
 }
