@@ -334,6 +334,7 @@
       "toRanking": "랭킹 확인"
     },
     "tierBoard": {
+      "period": "{period} 티어",
       "total": "{count} 명",
       "loadError": "티어표 데이터를 불러오지 못했습니다."
     },

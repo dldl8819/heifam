@@ -165,7 +165,7 @@ class PlayerQueryServiceTest {
     }
 
     @Test
-    void returnsTierBoardWithoutLoadingMatchHistory() {
+    void returnsTierBoardUsingCurrentMmrTierForNextMonthPreview() {
         Group group = new Group();
         group.setId(1L);
 
@@ -182,11 +182,14 @@ class PlayerQueryServiceTest {
         assertThat(response).hasSize(2);
         assertThat(response).extracting(GroupPlayerTierBoardResponse::nickname)
             .containsExactly("Bravo", "Alpha");
-        assertThat(response.get(0).tier()).isEqualTo("A");
+        assertThat(response.get(0).tier()).isEqualTo("A+");
         assertThat(response.get(0).liveTier()).isEqualTo("A+");
-        assertThat(response.get(1).tier()).isEqualTo("B");
+        assertThat(response.get(1).tier()).isEqualTo("B+");
         assertThat(response.get(1).liveTier()).isEqualTo("B+");
-        verifyNoInteractions(matchParticipantRepository, monthlyTierRefreshService, dormancyMmrDecayService);
+        InOrder ordered = inOrder(monthlyTierRefreshService, dormancyMmrDecayService);
+        ordered.verify(monthlyTierRefreshService).applyMonthlyTierRefreshIfDue();
+        ordered.verify(dormancyMmrDecayService).applyGroupDormancyDecay(1L);
+        verifyNoInteractions(matchParticipantRepository);
     }
 
     @Test

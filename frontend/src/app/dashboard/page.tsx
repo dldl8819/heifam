@@ -53,17 +53,28 @@ function formatDateTime(value: string): string {
   return new Date(parsed).toLocaleString()
 }
 
-function formatKstDate(value = new Date()): string {
+function resolveKstDateParts(value = new Date()): { year: number; month: number; day: number } {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Seoul',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
   }).formatToParts(value)
-  const year = parts.find((part) => part.type === 'year')?.value ?? '0000'
-  const month = parts.find((part) => part.type === 'month')?.value ?? '00'
-  const day = parts.find((part) => part.type === 'day')?.value ?? '00'
-  return `${year}-${month}-${day}`
+  return {
+    year: Number(parts.find((part) => part.type === 'year')?.value ?? '0'),
+    month: Number(parts.find((part) => part.type === 'month')?.value ?? '0'),
+    day: Number(parts.find((part) => part.type === 'day')?.value ?? '0'),
+  }
+}
+
+function resolveTierBoardPeriod(value = new Date()): string {
+  const { year, month, day } = resolveKstDateParts(value)
+  const lastDayOfMonth = new Date(Date.UTC(year, month, 0)).getUTCDate()
+  const useNextMonth = day === lastDayOfMonth
+  const targetMonth = useNextMonth ? month + 1 : month
+  const targetYear = targetMonth > 12 ? year + 1 : year
+  const normalizedMonth = targetMonth > 12 ? 1 : targetMonth
+  return `${targetYear}-${String(normalizedMonth).padStart(2, '0')}`
 }
 
 function resolveTierBoardLabel(tier: PlayerTierStatus): string {
@@ -96,8 +107,8 @@ function buildTierBoardBuckets(
   rows
     .filter((row) => row.active !== false)
     .forEach((row) => {
-      const assignedTier = row.tier ?? 'UNASSIGNED'
-      buckets[assignedTier].push(row)
+      const projectedTier = row.liveTier ?? row.tier ?? 'UNASSIGNED'
+      buckets[projectedTier].push(row)
     })
 
   TIER_BOARD_COLUMNS.forEach((tier) => {
@@ -108,14 +119,7 @@ function buildTierBoardBuckets(
 }
 
 async function loadTierBoardRows(): Promise<GroupPlayerTierBoardItem[]> {
-  const players = await apiClient.getGroupPlayers(TEMP_GROUP_ID)
-  return players.map((player) => ({
-    id: player.id,
-    nickname: player.nickname,
-    race: player.race,
-    tier: player.tier,
-    active: player.active,
-  }))
+  return apiClient.getGroupPlayerTierBoard(TEMP_GROUP_ID)
 }
 
 export default function DashboardPage() {
@@ -142,7 +146,7 @@ export default function DashboardPage() {
     () => TIER_BOARD_COLUMNS.reduce((total, tier) => total + tierBoardBuckets[tier].length, 0),
     [tierBoardBuckets]
   )
-  const tierBoardDate = useMemo(() => formatKstDate(), [])
+  const tierBoardPeriod = useMemo(() => resolveTierBoardPeriod(), [])
 
   useEffect(() => {
     let active = true
@@ -305,7 +309,7 @@ export default function DashboardPage() {
                         className="border border-slate-900 bg-white px-2 py-2 text-right text-xs font-semibold text-slate-900"
                         colSpan={TIER_BOARD_COLUMNS.length}
                       >
-                        {tierBoardDate}
+                        {t('dashboard.tierBoard.period', { period: tierBoardPeriod })}
                       </td>
                       <td className="border border-slate-900 bg-[#c6e0b4] px-2 py-2 text-xs font-semibold text-slate-900">
                         {t('dashboard.tierBoard.total', { count: tierBoardTotalCount })}

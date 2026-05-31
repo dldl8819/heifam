@@ -121,6 +121,8 @@ public class PlayerQueryService {
     }
 
     public List<GroupPlayerTierBoardResponse> getGroupPlayerTierBoard(Long groupId) {
+        monthlyTierRefreshService.applyMonthlyTierRefreshIfDue();
+        dormancyMmrDecayService.applyGroupDormancyDecay(groupId);
         List<Player> players = new ArrayList<>(
             playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId)
                 .stream()
@@ -138,14 +140,13 @@ public class PlayerQueryService {
             .stream()
             .map(player -> {
                 int currentMmr = safeInt(player.getMmr());
-                String currentTier = PlayerTierPolicy.resolveTierForSnapshot(player.getTier(), currentMmr);
-                String liveTier = PlayerTierPolicy.resolveTier(currentMmr);
+                String projectedTier = PlayerTierPolicy.resolveTier(currentMmr);
                 return new GroupPlayerTierBoardResponse(
                     player.getId(),
                     player.getNickname(),
                     normalizeRace(player.getRace()),
-                    currentTier,
-                    liveTier,
+                    projectedTier,
+                    projectedTier,
                     player.isActive()
                 );
             })
