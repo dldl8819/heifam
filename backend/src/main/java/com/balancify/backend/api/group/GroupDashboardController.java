@@ -9,6 +9,7 @@ import com.balancify.backend.service.DashboardQueryService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,17 +25,20 @@ public class GroupDashboardController {
     private final AdminRequestResolver adminRequestResolver;
     private final AccessControlService accessControlService;
     private final AuthenticatedRequestResolver authenticatedRequestResolver;
+    private final boolean dashboardEnabled;
 
     public GroupDashboardController(
         DashboardQueryService dashboardQueryService,
         AdminRequestResolver adminRequestResolver,
         AccessControlService accessControlService,
-        AuthenticatedRequestResolver authenticatedRequestResolver
+        AuthenticatedRequestResolver authenticatedRequestResolver,
+        @Value("${balancify.dashboard.enabled:false}") boolean dashboardEnabled
     ) {
         this.dashboardQueryService = dashboardQueryService;
         this.adminRequestResolver = adminRequestResolver;
         this.accessControlService = accessControlService;
         this.authenticatedRequestResolver = authenticatedRequestResolver;
+        this.dashboardEnabled = dashboardEnabled;
     }
 
     @GetMapping("/{groupId}/dashboard")
@@ -42,6 +46,10 @@ public class GroupDashboardController {
         @PathVariable Long groupId,
         HttpServletRequest request
     ) {
+        if (!dashboardEnabled) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Dashboard is temporarily disabled");
+        }
+
         AuthenticatedRequestResolver.ResolvedRequestIdentity identity = authenticatedRequestResolver.resolve(request);
         String requestEmail = safeTrim(identity.email());
         String requestNickname = safeTrim(identity.nickname());

@@ -9,11 +9,7 @@ import { supabase } from '@/lib/supabase'
 
 const CALLBACK_ACCESS_PREFETCH_GRACE_MS = 1500
 
-function getDefaultAuthenticatedPath(access: { admin: boolean; superAdmin: boolean }): string {
-  if (access.superAdmin) {
-    return '/dashboard'
-  }
-
+function getDefaultAuthenticatedPath(): string {
   return '/players'
 }
 
@@ -156,7 +152,7 @@ export default function AuthCallbackPage() {
           return
         }
 
-        router.replace(getDefaultAuthenticatedPath(access))
+        router.replace(getDefaultAuthenticatedPath())
       } catch (callbackError) {
         if (
           callbackError instanceof ApiRequestError &&

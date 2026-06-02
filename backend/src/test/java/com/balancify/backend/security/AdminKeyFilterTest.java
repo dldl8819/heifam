@@ -106,7 +106,8 @@ import org.springframework.test.web.servlet.MockMvc;
     "balancify.admin.emails=admin@hei.gg,ops@hei.gg",
     "balancify.admin.super-emails=superadmin@hei.gg",
     "balancify.auth.allow-email-header-fallback=true",
-    "balancify.auth.require-jwt=false"
+    "balancify.auth.require-jwt=false",
+    "balancify.dashboard.enabled=true"
 })
 class AdminKeyFilterTest {
 

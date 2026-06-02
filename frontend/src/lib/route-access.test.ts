@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getRouteAccessDecision } from '@/lib/route-access'
 
 describe('route access', () => {
-  it('allows admins to open dashboard', () => {
+  it('redirects admins away from temporarily disabled dashboard', () => {
     const decision = getRouteAccessDecision('/dashboard', {
       isLoggedIn: true,
       canAccess: true,
@@ -11,8 +11,8 @@ describe('route access', () => {
     })
 
     expect(decision).toEqual({
-      allowed: true,
-      redirectTo: null,
+      allowed: false,
+      redirectTo: '/players',
       blocked: false,
     })
   })
@@ -26,6 +26,6 @@ describe('route access', () => {
     })
 
     expect(decision.allowed).toBe(false)
-    expect(decision.redirectTo).toBe('/dashboard')
+    expect(decision.redirectTo).toBe('/players')
   })
 })

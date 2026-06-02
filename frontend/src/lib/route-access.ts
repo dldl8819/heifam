@@ -11,19 +11,16 @@ export type RouteAccessDecision = {
   blocked: boolean
 }
 
-type RouteRequirement = 'public' | 'member' | 'admin' | 'super_admin'
+type RouteRequirement = 'public' | 'member' | 'admin' | 'super_admin' | 'disabled'
 
 const AUTH_PATH_PREFIX = '/auth'
+const DISABLED_PATHS = ['/dashboard']
 const PUBLIC_PATHS = ['/', '/results', '/privacy', '/terms']
 const MEMBER_PATHS = ['/balance', '/players', '/ranking']
-const ADMIN_PATHS = ['/dashboard', '/balance/multi', '/captain-draft', '/import', '/players/import']
+const ADMIN_PATHS = ['/balance/multi', '/captain-draft', '/import', '/players/import']
 const SUPER_ADMIN_PATHS = ['/admin/access', '/admin/audit']
 
-function getAuthenticatedDefaultPath(context: RouteAccessContext): string {
-  if (context.isAdmin) {
-    return '/dashboard'
-  }
-
+function getAuthenticatedDefaultPath(_context: RouteAccessContext): string {
   return '/players'
 }
 
@@ -38,6 +35,10 @@ function matchesPath(pathname: string, path: string): boolean {
 function resolveRouteRequirement(pathname: string): RouteRequirement {
   if (pathname === AUTH_PATH_PREFIX || pathname.startsWith(`${AUTH_PATH_PREFIX}/`)) {
     return 'public'
+  }
+
+  if (DISABLED_PATHS.some((path) => matchesPath(pathname, path))) {
+    return 'disabled'
   }
 
   if (SUPER_ADMIN_PATHS.some((path) => matchesPath(pathname, path))) {
@@ -68,6 +69,14 @@ export function getRouteAccessDecision(
   context: RouteAccessContext
 ): RouteAccessDecision {
   const requirement = resolveRouteRequirement(pathname)
+
+  if (requirement === 'disabled') {
+    return {
+      allowed: false,
+      redirectTo: context.isLoggedIn && context.canAccess ? getAuthenticatedDefaultPath(context) : '/',
+      blocked: false,
+    }
+  }
 
   if (requirement === 'public') {
     if (pathname === '/' && context.isLoggedIn && context.canAccess) {

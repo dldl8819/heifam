@@ -22,7 +22,6 @@ export function getVisibleNavItems(context: NavVisibilityContext): NavItem[] {
 
   if (context.isAdmin) {
     const adminItems: NavItem[] = [
-      { label: t('nav.dashboard'), href: '/dashboard' },
       { label: t('nav.players'), href: '/players' },
       { label: t('nav.ranking'), href: '/ranking' },
       { label: t('nav.balance'), href: '/balance' },
