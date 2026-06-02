@@ -82,7 +82,7 @@ public class PlayerQueryService {
             Integer lastTierSnapshotMmr = player.getLastTierSnapshotMmr();
             String lastTierSnapshotTier = lastTierSnapshotMmr == null
                 ? null
-                : PlayerTierPolicy.resolveTier(lastTierSnapshotMmr);
+                : currentTier;
             String liveTier = PlayerTierPolicy.resolveTier(currentMmr);
 
             responses.add(new GroupPlayerResponse(

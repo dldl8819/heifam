@@ -146,7 +146,7 @@ class PlayerQueryServiceTest {
         assertThat(item.tier()).isEqualTo("B");
         assertThat(item.lastTierSnapshotAt()).isEqualTo(snapshotAt);
         assertThat(item.lastTierSnapshotMmr()).isEqualTo(980);
-        assertThat(item.lastTierSnapshotTier()).isEqualTo("B-");
+        assertThat(item.lastTierSnapshotTier()).isEqualTo("B");
         assertThat(item.liveTier()).isEqualTo("B+");
         assertThat(item.currentMmr()).isEqualTo(1220);
     }
