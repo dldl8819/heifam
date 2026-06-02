@@ -7,7 +7,7 @@ import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
-import type { RankingItem } from '@/types/api'
+import type { PlayerTierStatus, RankingItem } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
 
@@ -67,6 +67,7 @@ export default function RankingPage() {
   const { mmrVisible } = useMmrVisibility()
   const showMmr = isSuperAdmin && mmrVisible
   const [rows, setRows] = useState<RankingItem[]>([])
+  const [tierByNickname, setTierByNickname] = useState<Map<string, PlayerTierStatus>>(new Map())
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -84,13 +85,24 @@ export default function RankingPage() {
       setError(null)
 
       try {
-        const response = await apiClient.getRanking(TEMP_GROUP_ID)
+        const [rankingResponse, rosterResponse] = await Promise.all([
+          apiClient.getRanking(TEMP_GROUP_ID),
+          apiClient.getGroupPlayers(TEMP_GROUP_ID).catch(() => []),
+        ])
 
         if (!active) {
           return
         }
 
-        setRows(response)
+        setRows(rankingResponse)
+        setTierByNickname(
+          new Map(
+            rosterResponse.map((player) => [
+              player.nickname,
+              player.tier,
+            ])
+          )
+        )
       } catch {
         if (!active) {
           return
@@ -146,6 +158,9 @@ export default function RankingPage() {
       }),
     [rows]
   )
+
+  const resolveDisplayTier = (row: RankingItem): PlayerTierStatus =>
+    tierByNickname.get(row.nickname) ?? row.tier
 
   return (
     <section className="space-y-6">
@@ -214,7 +229,7 @@ export default function RankingPage() {
                     <td className="px-4 py-3 font-semibold text-slate-900">{row.rank}</td>
                     <td className="px-4 py-3 font-medium text-slate-900">{row.nickname}</td>
                     <td className="px-4 py-3 text-slate-700">{row.race}</td>
-                    <td className="px-4 py-3 text-slate-700">{formatTier(row.tier)}</td>
+                    <td className="px-4 py-3 text-slate-700">{formatTier(resolveDisplayTier(row))}</td>
                     {showMmr && (
                       <td className="px-4 py-3 text-slate-700">
                         {typeof row.currentMmr === 'number' ? row.currentMmr : '-'}
