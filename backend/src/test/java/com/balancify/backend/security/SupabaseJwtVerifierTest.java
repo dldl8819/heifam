@@ -31,6 +31,7 @@ class SupabaseJwtVerifierTest {
 
     private HttpServer jwksServer;
     private final AtomicInteger jwksRequestCount = new AtomicInteger();
+    private final AtomicInteger authUserRequestCount = new AtomicInteger();
 
     @AfterEach
     void tearDown() {
@@ -171,10 +172,44 @@ class SupabaseJwtVerifierTest {
         assertThat(jwksRequestCount.get()).isEqualTo(1);
     }
 
+    @Test
+    void fallsBackToSupabaseAuthUserEndpointWhenJwksVerificationFails() throws Exception {
+        String baseUrl = startJwksServer(new JWKSet().toString());
+        jwksServer.createContext(
+            "/auth/v1/user",
+            new StaticBodyHandler(
+                """
+                    {
+                      "email": "player@example.test",
+                      "user_metadata": {
+                        "nickname": "PlayerAlpha"
+                      }
+                    }
+                    """,
+                authUserRequestCount
+            )
+        );
+
+        SupabaseAuthProperties properties = new SupabaseAuthProperties();
+        properties.setSupabaseUrl(baseUrl);
+        properties.setVerifyTimeoutMs(1000);
+        properties.setVerificationCacheTtlSeconds(60);
+
+        SupabaseJwtVerifier verifier = new SupabaseJwtVerifier(properties);
+
+        Optional<SupabaseJwtVerifier.VerifiedUser> verifiedUser = verifier.verify("opaque-token");
+
+        assertThat(verifiedUser).isPresent();
+        assertThat(verifiedUser.orElseThrow().email()).isEqualTo("player@example.test");
+        assertThat(verifiedUser.orElseThrow().nickname()).isEqualTo("PlayerAlpha");
+        assertThat(authUserRequestCount.get()).isEqualTo(1);
+    }
+
     private String startJwksServer(String responseBody) throws IOException {
         jwksRequestCount.set(0);
+        authUserRequestCount.set(0);
         jwksServer = HttpServer.create(new InetSocketAddress(0), 0);
-        jwksServer.createContext("/auth/v1/.well-known/jwks.json", new StaticBodyHandler(responseBody));
+        jwksServer.createContext("/auth/v1/.well-known/jwks.json", new StaticBodyHandler(responseBody, jwksRequestCount));
         jwksServer.start();
         int port = jwksServer.getAddress().getPort();
         return "http://127.0.0.1:" + port;
@@ -218,14 +253,16 @@ class SupabaseJwtVerifierTest {
     private class StaticBodyHandler implements HttpHandler {
 
         private final byte[] responseBody;
+        private final AtomicInteger requestCount;
 
-        private StaticBodyHandler(String responseBody) {
+        private StaticBodyHandler(String responseBody, AtomicInteger requestCount) {
             this.responseBody = responseBody.getBytes(StandardCharsets.UTF_8);
+            this.requestCount = requestCount;
         }
 
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            jwksRequestCount.incrementAndGet();
+            requestCount.incrementAndGet();
             exchange.getResponseHeaders().add("Content-Type", "application/json");
             exchange.sendResponseHeaders(200, responseBody.length);
             try (OutputStream outputStream = exchange.getResponseBody()) {

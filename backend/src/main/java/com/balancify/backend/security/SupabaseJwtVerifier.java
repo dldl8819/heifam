@@ -1,5 +1,7 @@
 package com.balancify.backend.security;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.jwk.source.RemoteJWKSet;
@@ -11,9 +13,16 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.proc.ConfigurableJWTProcessor;
 import com.nimbusds.jwt.proc.DefaultJWTProcessor;
 import com.nimbusds.jose.util.DefaultResourceRetriever;
+import java.io.IOException;
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 import java.util.Locale;
@@ -31,6 +40,8 @@ public class SupabaseJwtVerifier {
     private final SupabaseAuthProperties supabaseAuthProperties;
     private final ConcurrentMap<String, CachedVerification> verificationCache = new ConcurrentHashMap<>();
     private final ConfigurableJWTProcessor<SecurityContext> jwtProcessor;
+    private final HttpClient authHttpClient;
+    private final ObjectMapper objectMapper = new ObjectMapper();
     private final String expectedIssuer;
 
     public SupabaseJwtVerifier(
@@ -39,6 +50,10 @@ public class SupabaseJwtVerifier {
         this.supabaseAuthProperties = supabaseAuthProperties;
         this.expectedIssuer = resolveExpectedIssuer();
         this.jwtProcessor = createJwtProcessor();
+        this.authHttpClient = HttpClient
+            .newBuilder()
+            .connectTimeout(Duration.ofMillis(supabaseAuthProperties.getVerifyTimeoutMs()))
+            .build();
     }
 
     public Optional<VerifiedUser> verify(String bearerToken) {
@@ -53,41 +68,103 @@ public class SupabaseJwtVerifier {
             return Optional.of(cachedVerification.user());
         }
 
-        if (jwtProcessor == null || expectedIssuer.isEmpty()) {
+        if (expectedIssuer.isEmpty()) {
             verificationCache.remove(normalizedToken);
             return Optional.empty();
         }
 
+        if (jwtProcessor != null) {
+            Optional<VerifiedUser> jwksVerifiedUser = verifyWithJwks(normalizedToken, now);
+            if (jwksVerifiedUser.isPresent()) {
+                cacheVerification(normalizedToken, jwksVerifiedUser.get(), now, 0L);
+                return jwksVerifiedUser;
+            }
+        }
+
+        Optional<VerifiedUser> authApiVerifiedUser = verifyWithSupabaseAuthApi(normalizedToken);
+        if (authApiVerifiedUser.isPresent()) {
+            cacheVerification(normalizedToken, authApiVerifiedUser.get(), now, 0L);
+            return authApiVerifiedUser;
+        }
+
+        verificationCache.remove(normalizedToken);
+        return Optional.empty();
+    }
+
+    private Optional<VerifiedUser> verifyWithJwks(String normalizedToken, long now) {
         try {
             JWTClaimsSet claims = jwtProcessor.process(normalizedToken, null);
             if (!isValidClaims(claims, now)) {
-                verificationCache.remove(normalizedToken);
                 return Optional.empty();
             }
 
             String email = normalizeEmail(claims.getStringClaim("email"));
             if (email.isEmpty()) {
-                verificationCache.remove(normalizedToken);
                 return Optional.empty();
             }
 
             String nickname = resolveNickname(claims.getClaim("user_metadata"));
-            VerifiedUser verifiedUser = new VerifiedUser(email, nickname);
-
-            long ttlMillis = (long) supabaseAuthProperties.getVerificationCacheTtlSeconds() * 1000L;
-            if (ttlMillis > 0) {
-                long expirationBound = resolveExpirationBound(claims, now);
-                long expiresAt = expirationBound > 0
-                    ? Math.min(now + ttlMillis, expirationBound)
-                    : now + ttlMillis;
-                verificationCache.put(normalizedToken, new CachedVerification(verifiedUser, expiresAt));
-            }
-
-            return Optional.of(verifiedUser);
+            return Optional.of(new VerifiedUser(email, nickname));
         } catch (BadJOSEException | JOSEException | ParseException exception) {
-            verificationCache.remove(normalizedToken);
             return Optional.empty();
         }
+    }
+
+    private Optional<VerifiedUser> verifyWithSupabaseAuthApi(String normalizedToken) {
+        if (expectedIssuer.isEmpty()) {
+            return Optional.empty();
+        }
+
+        try {
+            HttpRequest request = HttpRequest
+                .newBuilder(URI.create(expectedIssuer + "/user"))
+                .timeout(Duration.ofMillis(supabaseAuthProperties.getVerifyTimeoutMs()))
+                .header("Authorization", "Bearer " + normalizedToken)
+                .header("Accept", "application/json")
+                .GET()
+                .build();
+            HttpResponse<String> response = authHttpClient.send(
+                request,
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
+            );
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                return Optional.empty();
+            }
+
+            Map<String, Object> payload = objectMapper.readValue(
+                response.body(),
+                new TypeReference<>() {
+                }
+            );
+            String email = normalizeEmail(asString(payload.get("email")));
+            if (email.isEmpty()) {
+                return Optional.empty();
+            }
+            String nickname = resolveNickname(payload.get("user_metadata"));
+            return Optional.of(new VerifiedUser(email, nickname));
+        } catch (InterruptedException interruptedException) {
+            Thread.currentThread().interrupt();
+            return Optional.empty();
+        } catch (IOException | IllegalArgumentException runtimeException) {
+            return Optional.empty();
+        }
+    }
+
+    private void cacheVerification(
+        String normalizedToken,
+        VerifiedUser verifiedUser,
+        long now,
+        long expirationBound
+    ) {
+        long ttlMillis = (long) supabaseAuthProperties.getVerificationCacheTtlSeconds() * 1000L;
+        if (ttlMillis <= 0) {
+            return;
+        }
+
+        long expiresAt = expirationBound > 0
+            ? Math.min(now + ttlMillis, expirationBound)
+            : now + ttlMillis;
+        verificationCache.put(normalizedToken, new CachedVerification(verifiedUser, expiresAt));
     }
 
     private ConfigurableJWTProcessor<SecurityContext> createJwtProcessor() {
@@ -188,6 +265,10 @@ public class SupabaseJwtVerifier {
 
     private String normalizeEmail(String value) {
         return safeTrim(value).toLowerCase(Locale.ROOT);
+    }
+
+    private String asString(Object value) {
+        return value == null ? "" : value.toString();
     }
 
     private String safeTrim(String value) {
