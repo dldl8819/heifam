@@ -3,7 +3,6 @@ package com.balancify.backend.service;
 import com.balancify.backend.api.group.dto.GroupPlayerUpdateRequest;
 import com.balancify.backend.api.group.dto.GroupPlayerMmrUpdateRequest;
 import com.balancify.backend.domain.Player;
-import com.balancify.backend.domain.PlayerTierPolicy;
 import com.balancify.backend.repository.PlayerRepository;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -106,10 +105,7 @@ public class PlayerAdminService {
         }
 
         if (!tier.isEmpty()) {
-            int defaultMmr = PlayerTierPolicy.resolveDefaultMmrForTier(tier);
             player.setTier(tier);
-            player.setBaseMmr(defaultMmr);
-            player.setMmr(defaultMmr);
         }
 
         if (active != null) {

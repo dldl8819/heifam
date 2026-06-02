@@ -89,8 +89,8 @@ class PlayerAdminServiceTest {
         );
 
         assertThat(player.getTier()).isEqualTo("B+");
-        assertThat(player.getBaseMmr()).isEqualTo(1200);
-        assertThat(player.getMmr()).isEqualTo(1200);
+        assertThat(player.getBaseMmr()).isEqualTo(800);
+        assertThat(player.getMmr()).isEqualTo(800);
         verify(playerRepository, never()).findByGroup_IdAndNicknameIgnoreCase(anyLong(), anyString());
         verify(playerRepository).save(player);
     }
@@ -121,7 +121,7 @@ class PlayerAdminServiceTest {
     }
 
     @Test
-    void resetsMmrToZeroWhenTierIsUnassigned() {
+    void preservesMmrWhenTierIsUnassigned() {
         Player player = player(10L, 1L, "PlayerAlpha");
         when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
         when(playerRepository.save(any(Player.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -133,8 +133,8 @@ class PlayerAdminServiceTest {
         );
 
         assertThat(player.getTier()).isEqualTo("UNASSIGNED");
-        assertThat(player.getBaseMmr()).isZero();
-        assertThat(player.getMmr()).isZero();
+        assertThat(player.getBaseMmr()).isEqualTo(800);
+        assertThat(player.getMmr()).isEqualTo(800);
         verify(playerRepository).save(player);
     }
 
