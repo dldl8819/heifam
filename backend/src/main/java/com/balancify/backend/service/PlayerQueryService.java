@@ -21,25 +21,17 @@ public class PlayerQueryService {
 
     private final PlayerRepository playerRepository;
     private final MatchParticipantRepository matchParticipantRepository;
-    private final DormancyMmrDecayService dormancyMmrDecayService;
-    private final MonthlyTierRefreshService monthlyTierRefreshService;
 
     @Autowired
     public PlayerQueryService(
         PlayerRepository playerRepository,
-        MatchParticipantRepository matchParticipantRepository,
-        DormancyMmrDecayService dormancyMmrDecayService,
-        MonthlyTierRefreshService monthlyTierRefreshService
+        MatchParticipantRepository matchParticipantRepository
     ) {
         this.playerRepository = playerRepository;
         this.matchParticipantRepository = matchParticipantRepository;
-        this.dormancyMmrDecayService = dormancyMmrDecayService;
-        this.monthlyTierRefreshService = monthlyTierRefreshService;
     }
 
     public List<GroupPlayerResponse> getGroupPlayers(Long groupId, boolean includeInactive) {
-        monthlyTierRefreshService.applyMonthlyTierRefreshIfDue();
-        dormancyMmrDecayService.applyGroupDormancyDecay(groupId);
         List<Player> players = new ArrayList<>(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId));
         if (!includeInactive) {
             players = new ArrayList<>(players.stream().filter(Player::isActive).toList());
@@ -121,8 +113,6 @@ public class PlayerQueryService {
     }
 
     public List<GroupPlayerTierBoardResponse> getGroupPlayerTierBoard(Long groupId) {
-        monthlyTierRefreshService.applyMonthlyTierRefreshIfDue();
-        dormancyMmrDecayService.applyGroupDormancyDecay(groupId);
         List<Player> players = new ArrayList<>(
             playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId)
                 .stream()
@@ -140,13 +130,14 @@ public class PlayerQueryService {
             .stream()
             .map(player -> {
                 int currentMmr = safeInt(player.getMmr());
-                String projectedTier = PlayerTierPolicy.resolveTier(currentMmr);
+                String monthlyTier = PlayerTierPolicy.resolveTierForSnapshot(player.getTier(), currentMmr);
+                String liveTier = PlayerTierPolicy.resolveTier(currentMmr);
                 return new GroupPlayerTierBoardResponse(
                     player.getId(),
                     player.getNickname(),
                     normalizeRace(player.getRace()),
-                    projectedTier,
-                    projectedTier,
+                    monthlyTier,
+                    liveTier,
                     player.isActive()
                 );
             })

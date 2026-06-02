@@ -1,7 +1,6 @@
 package com.balancify.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.when;
 
 import com.balancify.backend.api.group.dto.RankingItemResponse;
@@ -13,7 +12,6 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -26,30 +24,22 @@ class RankingServiceTest {
     @Mock
     private MatchParticipantRepository matchParticipantRepository;
 
-    @Mock
-    private DormancyMmrDecayService dormancyMmrDecayService;
-
-    @Mock
-    private MonthlyTierRefreshService monthlyTierRefreshService;
-
     private RankingService rankingService;
 
     @BeforeEach
     void setUp() {
         rankingService = new RankingService(
             playerRepository,
-            matchParticipantRepository,
-            dormancyMmrDecayService,
-            monthlyTierRefreshService
+            matchParticipantRepository
         );
     }
 
     @Test
-    void returnsRankingTierFromCurrentMmrForNextMonthPreview() {
+    void returnsRankingTierFromMonthlyTierWhileKeepingCurrentMmr() {
         Group group = new Group();
         group.setId(1L);
-        Player player = player(1L, group, "PlayerAlpha", "P", "B", 1220);
-        Player unassigned = player(2L, group, "PlayerBravo", "T", "B", 0);
+        Player player = player(1L, group, "PlayerAlpha", "P", "B-", 790);
+        Player unassigned = player(2L, group, "PlayerBravo", "T", null, 0);
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
             .thenReturn(List.of(player, unassigned));
@@ -59,14 +49,10 @@ class RankingServiceTest {
         List<RankingItemResponse> response = rankingService.getGroupRanking(1L);
 
         assertThat(response).hasSize(2);
-        assertThat(response.get(0).tier()).isEqualTo("B+");
-        assertThat(response.get(0).currentMmr()).isEqualTo(1220);
+        assertThat(response.get(0).tier()).isEqualTo("B-");
+        assertThat(response.get(0).currentMmr()).isEqualTo(790);
         assertThat(response.get(1).tier()).isEqualTo("UNASSIGNED");
         assertThat(response.get(1).currentMmr()).isEqualTo(0);
-
-        InOrder ordered = inOrder(monthlyTierRefreshService, dormancyMmrDecayService);
-        ordered.verify(monthlyTierRefreshService).applyMonthlyTierRefreshIfDue();
-        ordered.verify(dormancyMmrDecayService).applyGroupDormancyDecay(1L);
     }
 
     private Player player(

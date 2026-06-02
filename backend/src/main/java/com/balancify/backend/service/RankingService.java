@@ -19,24 +19,16 @@ public class RankingService {
 
     private final PlayerRepository playerRepository;
     private final MatchParticipantRepository matchParticipantRepository;
-    private final DormancyMmrDecayService dormancyMmrDecayService;
-    private final MonthlyTierRefreshService monthlyTierRefreshService;
 
     public RankingService(
         PlayerRepository playerRepository,
-        MatchParticipantRepository matchParticipantRepository,
-        DormancyMmrDecayService dormancyMmrDecayService,
-        MonthlyTierRefreshService monthlyTierRefreshService
+        MatchParticipantRepository matchParticipantRepository
     ) {
         this.playerRepository = playerRepository;
         this.matchParticipantRepository = matchParticipantRepository;
-        this.dormancyMmrDecayService = dormancyMmrDecayService;
-        this.monthlyTierRefreshService = monthlyTierRefreshService;
     }
 
     public List<RankingItemResponse> getGroupRanking(Long groupId) {
-        monthlyTierRefreshService.applyMonthlyTierRefreshIfDue();
-        dormancyMmrDecayService.applyGroupDormancyDecay(groupId);
         List<Player> players = playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId)
             .stream()
             .filter(Player::isActive)
@@ -56,7 +48,9 @@ public class RankingService {
                 historyByPlayerId.getOrDefault(player.getId(), Collections.emptyList());
             RankingStats stats = calculateStats(history);
             int currentMmr = safeInt(player.getMmr());
-            String currentTier = normalizeTier(PlayerTierPolicy.resolveTier(currentMmr));
+            String currentTier = normalizeTier(
+                PlayerTierPolicy.resolveTierForSnapshot(player.getTier(), currentMmr)
+            );
 
             candidates.add(new RankingCandidate(
                 player.getId(),

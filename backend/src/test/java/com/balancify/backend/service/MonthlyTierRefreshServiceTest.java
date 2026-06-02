@@ -25,8 +25,8 @@ class MonthlyTierRefreshServiceTest {
     private PlayerRepository playerRepository;
 
     @Test
-    void refreshesTierFromPreviousMonthEndMmrOnFirstDayOfKstMonth() {
-        OffsetDateTime now = OffsetDateTime.parse("2026-04-30T15:01:00Z");
+    void refreshesTierFromMonthEndMmrAtKstMonthEndSettlementTime() {
+        OffsetDateTime now = OffsetDateTime.parse("2026-04-30T14:59:00Z");
         MonthlyTierRefreshService service = service(now);
         Player player = player(1L, "S", 890);
 
@@ -37,14 +37,26 @@ class MonthlyTierRefreshServiceTest {
         assertThat(player.getTier()).isEqualTo("B-");
         assertThat(player.getLastTierRecalculatedAt()).isEqualTo(now);
         assertThat(player.getLastTierSnapshotAt())
-            .isEqualTo(OffsetDateTime.parse("2026-04-30T23:59:59+09:00"));
+            .isEqualTo(OffsetDateTime.parse("2026-04-30T23:59:00+09:00"));
         assertThat(player.getLastTierSnapshotMmr()).isEqualTo(890);
         verify(playerRepository).saveAll(List.of(player));
     }
 
     @Test
-    void doesNotRefreshTierOutsideFirstDayOfKstMonth() {
-        MonthlyTierRefreshService service = service(OffsetDateTime.parse("2026-05-01T15:01:00Z"));
+    void doesNotRefreshTierBeforeKstMonthEndSettlementTime() {
+        MonthlyTierRefreshService service = service(OffsetDateTime.parse("2026-04-30T14:58:00Z"));
+        Player player = player(1L, "S", 890);
+
+        service.applyMonthlyTierRefreshIfDue();
+
+        assertThat(player.getTier()).isEqualTo("S");
+        verify(playerRepository, never()).findAll();
+        verify(playerRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void doesNotRefreshTierOnFirstDayOfKstMonth() {
+        MonthlyTierRefreshService service = service(OffsetDateTime.parse("2026-04-30T15:01:00Z"));
         Player player = player(1L, "S", 890);
 
         service.applyMonthlyTierRefreshIfDue();
@@ -56,10 +68,10 @@ class MonthlyTierRefreshServiceTest {
 
     @Test
     void refreshesOnlyOncePerKstMonth() {
-        OffsetDateTime now = OffsetDateTime.parse("2026-04-30T15:01:00Z");
+        OffsetDateTime now = OffsetDateTime.parse("2026-04-30T14:59:00Z");
         MonthlyTierRefreshService service = service(now);
         Player player = player(1L, "A", 930);
-        player.setLastTierRecalculatedAt(OffsetDateTime.parse("2026-04-30T15:05:00Z"));
+        player.setLastTierRecalculatedAt(now);
 
         when(playerRepository.findAll()).thenReturn(List.of(player));
 

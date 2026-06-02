@@ -1,7 +1,6 @@
 package com.balancify.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -18,7 +17,6 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -33,21 +31,13 @@ class PlayerQueryServiceTest {
     @Mock
     private MatchParticipantRepository matchParticipantRepository;
 
-    @Mock
-    private DormancyMmrDecayService dormancyMmrDecayService;
-
-    @Mock
-    private MonthlyTierRefreshService monthlyTierRefreshService;
-
     private PlayerQueryService playerQueryService;
 
     @BeforeEach
     void setUp() {
         playerQueryService = new PlayerQueryService(
             playerRepository,
-            matchParticipantRepository,
-            dormancyMmrDecayService,
-            monthlyTierRefreshService
+            matchParticipantRepository
         );
     }
 
@@ -111,9 +101,6 @@ class PlayerQueryServiceTest {
 
         List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(99L, false);
         assertThat(response).isEmpty();
-        InOrder ordered = inOrder(monthlyTierRefreshService, dormancyMmrDecayService);
-        ordered.verify(monthlyTierRefreshService).applyMonthlyTierRefreshIfDue();
-        ordered.verify(dormancyMmrDecayService).applyGroupDormancyDecay(99L);
     }
 
     @Test
@@ -165,12 +152,12 @@ class PlayerQueryServiceTest {
     }
 
     @Test
-    void returnsTierBoardUsingCurrentMmrTierForNextMonthPreview() {
+    void returnsTierBoardUsingMonthlyTierAndLiveTierSeparately() {
         Group group = new Group();
         group.setId(1L);
 
-        Player first = player(1L, group, "Alpha", "P", "B", 1220);
-        Player second = player(2L, group, "Bravo", "T", "A", 1810);
+        Player first = player(1L, group, "PlayerAlpha", "P", "B-", 790);
+        Player second = player(2L, group, "PlayerBravo", "T", "A", 1810);
         Player inactive = player(3L, group, "Charlie", "Z", "A", 1900);
         inactive.setActive(false);
 
@@ -181,14 +168,11 @@ class PlayerQueryServiceTest {
 
         assertThat(response).hasSize(2);
         assertThat(response).extracting(GroupPlayerTierBoardResponse::nickname)
-            .containsExactly("Bravo", "Alpha");
-        assertThat(response.get(0).tier()).isEqualTo("A+");
+            .containsExactly("PlayerBravo", "PlayerAlpha");
+        assertThat(response.get(0).tier()).isEqualTo("A");
         assertThat(response.get(0).liveTier()).isEqualTo("A+");
-        assertThat(response.get(1).tier()).isEqualTo("B+");
-        assertThat(response.get(1).liveTier()).isEqualTo("B+");
-        InOrder ordered = inOrder(monthlyTierRefreshService, dormancyMmrDecayService);
-        ordered.verify(monthlyTierRefreshService).applyMonthlyTierRefreshIfDue();
-        ordered.verify(dormancyMmrDecayService).applyGroupDormancyDecay(1L);
+        assertThat(response.get(1).tier()).isEqualTo("B-");
+        assertThat(response.get(1).liveTier()).isEqualTo("C+");
         verifyNoInteractions(matchParticipantRepository);
     }
 

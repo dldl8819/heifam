@@ -5,6 +5,8 @@ import com.balancify.backend.domain.PlayerTierPolicy;
 import com.balancify.backend.repository.PlayerRepository;
 import java.time.Clock;
 import java.time.DateTimeException;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import java.time.ZoneId;
@@ -21,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class MonthlyTierRefreshService {
 
     private static final String DEFAULT_SETTLEMENT_ZONE_ID = "Asia/Seoul";
+    private static final LocalTime MONTH_END_SETTLEMENT_TIME = LocalTime.of(23, 59);
 
     private final PlayerRepository playerRepository;
     private final boolean enabled;
@@ -49,7 +52,7 @@ public class MonthlyTierRefreshService {
     }
 
     @Scheduled(
-        cron = "${balancify.rank.monthly-tier-refresh.cron:0 1 0 1 * *}",
+        cron = "${balancify.rank.monthly-tier-refresh.cron:0 59 23 28-31 * *}",
         zone = "${balancify.rank.monthly-tier-refresh.zone:" + DEFAULT_SETTLEMENT_ZONE_ID + "}"
     )
     @Transactional
@@ -65,15 +68,12 @@ public class MonthlyTierRefreshService {
 
         OffsetDateTime now = OffsetDateTime.now(clock);
         ZonedDateTime nowInSettlementZone = now.atZoneSameInstant(settlementZone);
-        if (nowInSettlementZone.getDayOfMonth() != 1) {
+        YearMonth effectiveMonth = YearMonth.from(nowInSettlementZone);
+        if (!isMonthEndSettlementWindow(nowInSettlementZone, effectiveMonth)) {
             return;
         }
 
-        YearMonth effectiveMonth = YearMonth.from(nowInSettlementZone);
-        OffsetDateTime snapshotAt = effectiveMonth.atDay(1)
-            .atStartOfDay(settlementZone)
-            .minusSeconds(1)
-            .toOffsetDateTime();
+        OffsetDateTime snapshotAt = nowInSettlementZone.toOffsetDateTime();
         List<Player> playersToSave = new ArrayList<>();
         for (Player player : playerRepository.findAll()) {
             if (wasAlreadyRefreshedForEffectiveMonth(player, effectiveMonth)) {
@@ -94,6 +94,12 @@ public class MonthlyTierRefreshService {
         if (!playersToSave.isEmpty()) {
             playerRepository.saveAll(playersToSave);
         }
+    }
+
+    private boolean isMonthEndSettlementWindow(ZonedDateTime nowInSettlementZone, YearMonth effectiveMonth) {
+        LocalDate today = nowInSettlementZone.toLocalDate();
+        return today.equals(effectiveMonth.atEndOfMonth())
+            && !nowInSettlementZone.toLocalTime().isBefore(MONTH_END_SETTLEMENT_TIME);
     }
 
     private boolean wasAlreadyRefreshedForEffectiveMonth(Player player, YearMonth effectiveMonth) {
