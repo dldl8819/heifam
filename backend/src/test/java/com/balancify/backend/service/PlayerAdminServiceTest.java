@@ -96,6 +96,27 @@ class PlayerAdminServiceTest {
     }
 
     @Test
+    void seedsMmrWhenAssigningTierToUnassignedPlayerWithoutMmr() {
+        Player player = player(10L, 1L, "PlayerAlpha");
+        player.setTier("UNASSIGNED");
+        player.setBaseMmr(0);
+        player.setMmr(0);
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+        when(playerRepository.save(any(Player.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        playerAdminService.updatePlayer(
+            1L,
+            10L,
+            new GroupPlayerUpdateRequest(null, null, "b+", null, null, null, null, null)
+        );
+
+        assertThat(player.getTier()).isEqualTo("B+");
+        assertThat(player.getBaseMmr()).isEqualTo(1200);
+        assertThat(player.getMmr()).isEqualTo(1200);
+        verify(playerRepository).save(player);
+    }
+
+    @Test
     void recordsTierChangeAuditLogWhenTierIsUpdated() {
         Player player = player(10L, 1L, "PlayerAlpha");
         player.setTier("C");

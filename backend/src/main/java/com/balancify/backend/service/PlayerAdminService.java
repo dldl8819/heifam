@@ -3,6 +3,7 @@ package com.balancify.backend.service;
 import com.balancify.backend.api.group.dto.GroupPlayerUpdateRequest;
 import com.balancify.backend.api.group.dto.GroupPlayerMmrUpdateRequest;
 import com.balancify.backend.domain.Player;
+import com.balancify.backend.domain.PlayerTierPolicy;
 import com.balancify.backend.repository.PlayerRepository;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -105,6 +106,11 @@ public class PlayerAdminService {
         }
 
         if (!tier.isEmpty()) {
+            if (shouldSeedMmrForTierAssignment(player, previousTier, tier)) {
+                int defaultMmr = PlayerTierPolicy.resolveDefaultMmrForTier(tier);
+                player.setBaseMmr(defaultMmr);
+                player.setMmr(defaultMmr);
+            }
             player.setTier(tier);
         }
 
@@ -188,6 +194,17 @@ public class PlayerAdminService {
 
     private String safeTrim(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private boolean shouldSeedMmrForTierAssignment(Player player, String previousTier, String nextTier) {
+        if (!"UNASSIGNED".equals(previousTier) || "UNASSIGNED".equals(nextTier)) {
+            return false;
+        }
+        return safeMmr(player.getBaseMmr()) <= 0 && safeMmr(player.getMmr()) <= 0;
+    }
+
+    private int safeMmr(Integer value) {
+        return value == null ? 0 : value;
     }
 
     private String normalizeTierChangeAcknowledgement(String value) {
