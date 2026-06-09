@@ -103,7 +103,9 @@ class OperationAuditLogServiceTest {
             1L,
             player,
             "C",
-            "B+"
+            "B+",
+            1000,
+            1200
         );
 
         ArgumentCaptor<OperationAuditLog> logCaptor = ArgumentCaptor.forClass(OperationAuditLog.class);
@@ -115,7 +117,7 @@ class OperationAuditLogServiceTest {
         assertThat(log.getTargetId()).isEqualTo(10L);
         assertThat(log.getTargetLabel()).isEqualTo("PlayerAlpha");
         assertThat(log.getSummary()).isEqualTo("티어 수정");
-        assertThat(log.getDetails()).isEqualTo("tier=C -> B+");
+        assertThat(log.getDetails()).isEqualTo("tier=C -> B+, mmr=1000 -> 1200");
     }
 
     @Test

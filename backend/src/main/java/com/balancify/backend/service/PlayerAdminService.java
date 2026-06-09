@@ -55,6 +55,7 @@ public class PlayerAdminService {
             .orElseThrow(() -> new NoSuchElementException("Player not found"));
 
         String previousTier = normalizeAuditTier(player.getTier());
+        Integer previousMmr = player.getMmr();
         String nickname = safeTrim(request == null ? null : request.nickname());
         String race = safeTrim(request == null ? null : request.race());
         String tier = normalizeEditableTier(request == null ? null : request.tier());
@@ -149,7 +150,9 @@ public class PlayerAdminService {
                 groupId,
                 player,
                 previousTier,
-                tier
+                tier,
+                previousMmr,
+                player.getMmr()
             );
         }
     }

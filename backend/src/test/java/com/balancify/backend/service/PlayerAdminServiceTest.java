@@ -137,7 +137,9 @@ class PlayerAdminServiceTest {
             eq(1L),
             eq(player),
             eq("C"),
-            eq("B+")
+            eq("B+"),
+            eq(800),
+            eq(1200)
         );
     }
 

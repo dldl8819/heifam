@@ -97,7 +97,9 @@ public class OperationAuditLogService {
         Long groupId,
         Player player,
         String previousTier,
-        String nextTier
+        String nextTier,
+        Integer previousMmr,
+        Integer nextMmr
     ) {
         if (player == null) {
             return;
@@ -113,7 +115,10 @@ public class OperationAuditLogService {
             groupId
         );
         log.setSummary("티어 수정");
-        log.setDetails("tier=" + formatTierForAudit(previousTier) + " -> " + formatTierForAudit(nextTier));
+        log.setDetails(
+            "tier=" + formatTierForAudit(previousTier) + " -> " + formatTierForAudit(nextTier)
+                + ", mmr=" + formatMmrForAudit(previousMmr) + " -> " + formatMmrForAudit(nextMmr)
+        );
         operationAuditLogRepository.save(log);
     }
 
@@ -179,6 +184,10 @@ public class OperationAuditLogService {
     private String formatTierForAudit(String value) {
         String normalized = trimToNull(value);
         return normalized == null ? "UNASSIGNED" : normalized.toUpperCase(Locale.ROOT);
+    }
+
+    private String formatMmrForAudit(Integer value) {
+        return String.valueOf(Math.max(0, value == null ? 0 : value));
     }
 
     private OperationAuditLogResponse toResponse(OperationAuditLog log) {
