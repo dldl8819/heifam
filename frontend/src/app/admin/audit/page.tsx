@@ -58,17 +58,6 @@ function getActionLabel(action: string): string {
   }
 }
 
-function getTargetTypeLabel(targetType: string): string {
-  switch (targetType) {
-    case 'PLAYER':
-      return t('audit.targetTypes.player')
-    case 'MATCH':
-      return t('audit.targetTypes.match')
-    default:
-      return targetType
-  }
-}
-
 export default function OperationAuditPage() {
   const { isSuperAdmin, isLoading } = useAdminAuth()
   const [logs, setLogs] = useState<OperationAuditLogItem[]>([])
@@ -195,9 +184,7 @@ export default function OperationAuditPage() {
                         </span>
                       </td>
                       <td className="px-3 py-2 text-slate-700">{formatActor(log)}</td>
-                      <td className="px-3 py-2 text-slate-700">
-                        {getTargetTypeLabel(log.targetType)} {formatTarget(log)}
-                      </td>
+                      <td className="px-3 py-2 text-slate-700">{formatTarget(log)}</td>
                       <td className="px-3 py-2 text-slate-800">{log.summary}</td>
                       <td className="px-3 py-2 text-xs text-slate-500">{log.details ?? '-'}</td>
                     </tr>
