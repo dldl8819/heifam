@@ -247,7 +247,7 @@
       "playerRegistered": "선수 등록",
       "playerRegistrationUpdated": "선수 정보 갱신",
       "playerReactivatedByRegistration": "선수 재등록",
-      "playerTierUpdated": "선수 티어 수정",
+      "playerTierUpdated": "티어 수정",
       "matchDeleted": "경기 삭제"
     },
     "pagination": {
