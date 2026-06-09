@@ -39,6 +39,7 @@ public final class PlayerTierPolicy {
     private static final int PLACEMENT_GAME_COUNT = 5;
     private static final int PROMOTION_MMR_BUFFER = 30;
     private static final int DEMOTION_MMR_BUFFER = 50;
+    private static final int MAX_DORMANCY_DEMOTION_STEPS = 2;
 
     private PlayerTierPolicy() {
     }
@@ -129,18 +130,31 @@ public final class PlayerTierPolicy {
 
     public static int resolveDormancyAdjustedMmr(String currentTier, Integer mmr, int demoteSteps) {
         int normalizedMmr = Math.max(0, mmr == null ? 0 : mmr);
-        if (normalizedMmr <= 0 || demoteSteps <= 0) {
+        int cappedDemoteSteps = capDormancyDemoteSteps(demoteSteps);
+        if (normalizedMmr <= 0 || cappedDemoteSteps <= 0) {
             return normalizedMmr;
         }
 
         String normalizedCurrentTier = canonicalTier(currentTier, resolveTier(normalizedMmr));
-        String demotedTier = demoteTier(normalizedCurrentTier, demoteSteps);
+        String demotedTier = demoteTier(normalizedCurrentTier, cappedDemoteSteps);
         if (demotedTier.equals(normalizedCurrentTier)) {
             return normalizedMmr;
         }
 
         int upperMmrNearTop = nearTopMmrForTier(demotedTier);
         return Math.min(normalizedMmr, upperMmrNearTop);
+    }
+
+    public static int resolveDormancyMinimumMmr(String currentTier, Integer mmr, int demoteSteps) {
+        int normalizedMmr = Math.max(0, mmr == null ? 0 : mmr);
+        int cappedDemoteSteps = capDormancyDemoteSteps(demoteSteps);
+        if (normalizedMmr <= 0 || cappedDemoteSteps <= 0) {
+            return 0;
+        }
+
+        String normalizedCurrentTier = canonicalTier(currentTier, resolveTier(normalizedMmr));
+        String demotedTier = demoteTier(normalizedCurrentTier, cappedDemoteSteps);
+        return TIER_FLOOR_MMR.getOrDefault(demotedTier, 0);
     }
 
     public static boolean isLowTier(Integer mmr) {
@@ -172,6 +186,10 @@ public final class PlayerTierPolicy {
         int index = tierIndex(tier);
         int nextIndex = Math.max(0, Math.min(ORDERED_TIERS.size() - 1, index + step));
         return ORDERED_TIERS.get(nextIndex);
+    }
+
+    private static int capDormancyDemoteSteps(int steps) {
+        return Math.max(0, Math.min(MAX_DORMANCY_DEMOTION_STEPS, steps));
     }
 
     private static boolean canPromote(String currentTier, int mmr) {

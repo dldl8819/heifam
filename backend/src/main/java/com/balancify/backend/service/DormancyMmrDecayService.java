@@ -2,6 +2,7 @@ package com.balancify.backend.service;
 
 import com.balancify.backend.domain.MatchParticipant;
 import com.balancify.backend.domain.Player;
+import com.balancify.backend.domain.PlayerTierPolicy;
 import com.balancify.backend.repository.GroupRepository;
 import com.balancify.backend.repository.MatchParticipantRepository;
 import com.balancify.backend.repository.PlayerRepository;
@@ -20,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class DormancyMmrDecayService {
+
+    private static final int MAX_DORMANCY_TIER_DEMOTION_STEPS = 2;
 
     private final PlayerRepository playerRepository;
     private final MatchParticipantRepository matchParticipantRepository;
@@ -158,7 +161,13 @@ public class DormancyMmrDecayService {
 
         int currentMmr = Math.max(0, player.getMmr() == null ? 0 : player.getMmr());
         int totalDrop = safeTotalDrop(elapsedPeriods);
-        int nextMmr = Math.max(0, currentMmr - totalDrop);
+        int rawNextMmr = Math.max(0, currentMmr - totalDrop);
+        int minimumAllowedMmr = PlayerTierPolicy.resolveDormancyMinimumMmr(
+            player.getTier(),
+            currentMmr,
+            MAX_DORMANCY_TIER_DEMOTION_STEPS
+        );
+        int nextMmr = Math.max(rawNextMmr, minimumAllowedMmr);
         OffsetDateTime appliedThrough = decayAnchor.plusDays(elapsedPeriods * (long) inactiveDays);
         OffsetDateTime dormantSince = activityReference.plusDays(inactiveDays);
 

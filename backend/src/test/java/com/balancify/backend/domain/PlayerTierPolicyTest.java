@@ -100,8 +100,23 @@ class PlayerTierPolicyTest {
     }
 
     @Test
+    void capsDormancyAdjustedMmrAtTwoDemotionSteps() {
+        assertThat(PlayerTierPolicy.resolveDormancyAdjustedMmr("A", 1680, 2)).isEqualTo(1390);
+        assertThat(PlayerTierPolicy.resolveDormancyAdjustedMmr("A", 1680, 3)).isEqualTo(1390);
+        assertThat(PlayerTierPolicy.resolveDormancyAdjustedMmr("B+", 1320, 5)).isEqualTo(990);
+    }
+
+    @Test
+    void resolvesDormancyMinimumMmrAtTwoDemotionSteps() {
+        assertThat(PlayerTierPolicy.resolveDormancyMinimumMmr("A", 1680, 2)).isEqualTo(1200);
+        assertThat(PlayerTierPolicy.resolveDormancyMinimumMmr("A", 1680, 3)).isEqualTo(1200);
+        assertThat(PlayerTierPolicy.resolveDormancyMinimumMmr("B+", 1320, 5)).isEqualTo(800);
+    }
+
+    @Test
     void doesNotIncreaseMmrWhenDormancyTargetIsHigherThanCurrent() {
         assertThat(PlayerTierPolicy.resolveDormancyAdjustedMmr("A+", 1750, 1)).isEqualTo(1750);
         assertThat(PlayerTierPolicy.resolveDormancyAdjustedMmr("NONE", 0, 1)).isEqualTo(0);
+        assertThat(PlayerTierPolicy.resolveDormancyMinimumMmr("UNASSIGNED", 0, 2)).isEqualTo(0);
     }
 }
