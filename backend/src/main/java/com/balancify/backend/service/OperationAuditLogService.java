@@ -5,6 +5,7 @@ import com.balancify.backend.api.admin.dto.OperationAuditLogResponse;
 import com.balancify.backend.domain.OperationAuditLog;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.OperationAuditLogRepository;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import org.springframework.data.domain.Page;
@@ -87,6 +88,40 @@ public class OperationAuditLogService {
         OperationAuditLog log = baseLog(actorEmail, actorNickname, action, "PLAYER", player.getId(), player.getNickname(), groupId);
         log.setSummary(summary);
         log.setDetails(buildPlayerDetails(player));
+        operationAuditLogRepository.save(log);
+    }
+
+    @Transactional
+    public void recordPlayerProfileUpdate(
+        String actorEmail,
+        String actorNickname,
+        Long groupId,
+        Player player,
+        String previousNickname,
+        String nextNickname,
+        String previousRace,
+        String nextRace
+    ) {
+        if (player == null) {
+            return;
+        }
+
+        String details = buildPlayerProfileUpdateDetails(previousNickname, nextNickname, previousRace, nextRace);
+        if (details == null) {
+            return;
+        }
+
+        OperationAuditLog log = baseLog(
+            actorEmail,
+            actorNickname,
+            ACTION_PLAYER_REGISTRATION_UPDATED,
+            "PLAYER",
+            player.getId(),
+            player.getNickname(),
+            groupId
+        );
+        log.setSummary("선수 정보 갱신");
+        log.setDetails(details);
         operationAuditLogRepository.save(log);
     }
 
@@ -179,6 +214,31 @@ public class OperationAuditLogService {
             return "tier=" + tier;
         }
         return "tier=" + tier + ", race=" + race;
+    }
+
+    private String buildPlayerProfileUpdateDetails(
+        String previousNickname,
+        String nextNickname,
+        String previousRace,
+        String nextRace
+    ) {
+        List<String> changes = new ArrayList<>();
+        addAuditChange(changes, "nickname", previousNickname, nextNickname);
+        addAuditChange(changes, "race", previousRace, nextRace);
+        return changes.isEmpty() ? null : String.join(", ", changes);
+    }
+
+    private void addAuditChange(List<String> changes, String field, String previousValue, String nextValue) {
+        String previous = trimToNull(previousValue);
+        String next = trimToNull(nextValue);
+        if (previous == null ? next == null : previous.equals(next)) {
+            return;
+        }
+        changes.add(field + "=" + formatTextForAudit(previous) + " -> " + formatTextForAudit(next));
+    }
+
+    private String formatTextForAudit(String value) {
+        return value == null ? "-" : value;
     }
 
     private String formatTierForAudit(String value) {

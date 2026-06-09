@@ -238,6 +238,17 @@ export type GroupPlayerTierBoardItem = Pick<
   'id' | 'nickname' | 'race' | 'tier' | 'liveTier' | 'active'
 >
 
+export type GroupPlayerUpdateRequest = {
+  nickname?: string
+  race?: PlayerRace
+  tier?: PlayerTierStatus
+  active?: boolean
+  chatLeftAt?: string | null
+  chatLeftReason?: string | null
+  chatRejoinedAt?: string | null
+  tierChangeAcknowledgedTier?: PlayerTierStatus | null
+}
+
 export type GroupPlayerMmrUpdateRequest = {
   mmr: number
 }

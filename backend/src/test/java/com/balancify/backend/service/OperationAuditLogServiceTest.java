@@ -92,6 +92,36 @@ class OperationAuditLogServiceTest {
     }
 
     @Test
+    void recordsPlayerProfileUpdateAuditLogWithChangedFields() {
+        Player player = new Player();
+        player.setId(10L);
+        player.setNickname("PlayerAlpha");
+        player.setRace("PTZ");
+
+        operationAuditLogService.recordPlayerProfileUpdate(
+            "ops@example.com",
+            "OpsUser",
+            1L,
+            player,
+            "PlayerAlpha",
+            "PlayerAlpha",
+            "P",
+            "PTZ"
+        );
+
+        ArgumentCaptor<OperationAuditLog> logCaptor = ArgumentCaptor.forClass(OperationAuditLog.class);
+        verify(operationAuditLogRepository).save(logCaptor.capture());
+        OperationAuditLog log = logCaptor.getValue();
+
+        assertThat(log.getAction()).isEqualTo(OperationAuditLogService.ACTION_PLAYER_REGISTRATION_UPDATED);
+        assertThat(log.getTargetType()).isEqualTo("PLAYER");
+        assertThat(log.getTargetId()).isEqualTo(10L);
+        assertThat(log.getTargetLabel()).isEqualTo("PlayerAlpha");
+        assertThat(log.getSummary()).isEqualTo("선수 정보 갱신");
+        assertThat(log.getDetails()).isEqualTo("race=P -> PTZ");
+    }
+
+    @Test
     void recordsPlayerTierUpdateAuditLogWithPreviousAndNextTier() {
         Player player = new Player();
         player.setId(10L);

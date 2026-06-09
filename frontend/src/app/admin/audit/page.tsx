@@ -168,7 +168,6 @@ export default function OperationAuditPage() {
                     <th className="px-3 py-2">{t('audit.table.action')}</th>
                     <th className="px-3 py-2">{t('audit.table.actor')}</th>
                     <th className="px-3 py-2">{t('audit.table.target')}</th>
-                    <th className="px-3 py-2">{t('audit.table.summary')}</th>
                     <th className="px-3 py-2">{t('audit.table.details')}</th>
                   </tr>
                 </thead>
@@ -185,7 +184,6 @@ export default function OperationAuditPage() {
                       </td>
                       <td className="px-3 py-2 text-slate-700">{formatActor(log)}</td>
                       <td className="px-3 py-2 text-slate-700">{formatTarget(log)}</td>
-                      <td className="px-3 py-2 text-slate-800">{log.summary}</td>
                       <td className="px-3 py-2 text-xs text-slate-500">{log.details ?? '-'}</td>
                     </tr>
                   ))}

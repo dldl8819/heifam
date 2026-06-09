@@ -264,7 +264,6 @@
       "action": "작업",
       "actor": "처리자",
       "target": "대상",
-      "summary": "내용",
       "details": "상세"
     }
   },

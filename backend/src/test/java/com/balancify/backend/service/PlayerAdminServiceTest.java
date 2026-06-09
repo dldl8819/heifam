@@ -144,6 +144,90 @@ class PlayerAdminServiceTest {
     }
 
     @Test
+    void recordsProfileUpdateAndDoesNotRecordTierUpdateWhenOnlyRaceChanges() {
+        Player player = player(10L, 1L, "PlayerAlpha");
+        player.setTier("A");
+        player.setRace("P");
+        player.setBaseMmr(800);
+        player.setMmr(900);
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+        when(playerRepository.save(any(Player.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        playerAdminService.updatePlayer(
+            1L,
+            10L,
+            new GroupPlayerUpdateRequest(null, "PTZ", null, null, null, null, null),
+            "ops@example.com",
+            "OpsUser"
+        );
+
+        assertThat(player.getRace()).isEqualTo("PTZ");
+        assertThat(player.getMmr()).isEqualTo(900);
+        verify(operationAuditLogService).recordPlayerProfileUpdate(
+            eq("ops@example.com"),
+            eq("OpsUser"),
+            eq(1L),
+            eq(player),
+            eq("PlayerAlpha"),
+            eq("PlayerAlpha"),
+            eq("P"),
+            eq("PTZ")
+        );
+        verify(operationAuditLogService, never()).recordPlayerTierUpdate(
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any()
+        );
+    }
+
+    @Test
+    void doesNotResetMmrOrRecordTierUpdateWhenTierIsUnchanged() {
+        Player player = player(10L, 1L, "PlayerAlpha");
+        player.setTier("B+");
+        player.setBaseMmr(1200);
+        player.setMmr(1420);
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+        when(playerRepository.save(any(Player.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        playerAdminService.updatePlayer(
+            1L,
+            10L,
+            new GroupPlayerUpdateRequest(null, null, "B+", null, null, null, null, null),
+            "ops@example.com",
+            "OpsUser"
+        );
+
+        assertThat(player.getTier()).isEqualTo("B+");
+        assertThat(player.getBaseMmr()).isEqualTo(1200);
+        assertThat(player.getMmr()).isEqualTo(1420);
+        verify(operationAuditLogService, never()).recordPlayerProfileUpdate(
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any()
+        );
+        verify(operationAuditLogService, never()).recordPlayerTierUpdate(
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any()
+        );
+    }
+
+    @Test
     void resetsMmrWhenTierIsUnassigned() {
         Player player = player(10L, 1L, "PlayerAlpha");
         when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));

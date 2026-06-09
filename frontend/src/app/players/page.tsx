@@ -14,6 +14,7 @@ import {
   toTierOrder,
   type TierChangeTarget,
 } from '@/lib/player-tier-change'
+import { buildPlayerProfileUpdateRequest } from '@/lib/player-edit'
 import type { PlayerRace, PlayerRosterItem, PlayerTierStatus } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
@@ -433,11 +434,14 @@ export default function PlayersPage() {
     setPlayerActionError(null)
     setPlayerActionSuccess(null)
     try {
-      await apiClient.updateGroupPlayer(TEMP_GROUP_ID, playerId, {
+      const profilePayload = buildPlayerProfileUpdateRequest(targetRow, {
         nickname: nextNickname,
         race: editingRace,
         tier: editingTier,
       })
+      if (Object.keys(profilePayload).length > 0) {
+        await apiClient.updateGroupPlayer(TEMP_GROUP_ID, playerId, profilePayload)
+      }
 
       const targetMmr = typeof targetRow.currentMmr === 'number' ? targetRow.currentMmr : null
       if (isSuperAdmin && nextMmr !== null && nextMmr !== targetMmr) {

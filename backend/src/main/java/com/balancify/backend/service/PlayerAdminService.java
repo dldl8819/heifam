@@ -54,6 +54,8 @@ public class PlayerAdminService {
         Player player = playerRepository.findByIdAndGroup_Id(playerId, groupId)
             .orElseThrow(() -> new NoSuchElementException("Player not found"));
 
+        String previousNickname = safeTrim(player.getNickname());
+        String previousRace = PlayerRacePolicy.toDisplayRace(player.getRace());
         String previousTier = normalizeAuditTier(player.getTier());
         Integer previousMmr = player.getMmr();
         String nickname = safeTrim(request == null ? null : request.nickname());
@@ -85,6 +87,7 @@ public class PlayerAdminService {
             throw new IllegalArgumentException("Chat activity metadata requires active status change");
         }
 
+        boolean nicknameChanged = !nickname.isEmpty() && !nickname.equals(previousNickname);
         if (!nickname.isEmpty()) {
             List<Player> sameNicknamePlayers =
                 playerRepository.findByGroup_IdAndNicknameIgnoreCase(groupId, nickname);
@@ -98,15 +101,22 @@ public class PlayerAdminService {
             player.setNickname(nickname);
         }
 
+        String nextRace = "";
+        boolean raceChanged = false;
         if (!normalizedRace.isEmpty()) {
             try {
-                player.setRace(PlayerRacePolicy.normalizeCapability(normalizedRace));
+                nextRace = PlayerRacePolicy.normalizeCapability(normalizedRace);
             } catch (IllegalArgumentException exception) {
                 throw new IllegalArgumentException("Race must be one of P,T,Z,PT,PZ,TZ,PTZ");
             }
+            raceChanged = !nextRace.equals(previousRace);
+            if (raceChanged) {
+                player.setRace(nextRace);
+            }
         }
 
-        if (!tier.isEmpty()) {
+        boolean tierChanged = !tier.isEmpty() && !tier.equals(previousTier);
+        if (tierChanged) {
             int defaultMmr = PlayerTierPolicy.resolveDefaultMmrForTier(tier);
             player.setBaseMmr(defaultMmr);
             player.setMmr(defaultMmr);
@@ -143,7 +153,19 @@ public class PlayerAdminService {
         }
 
         playerRepository.save(player);
-        if (!tier.isEmpty()) {
+        if (nicknameChanged || raceChanged) {
+            operationAuditLogService.recordPlayerProfileUpdate(
+                actorEmail,
+                actorNickname,
+                groupId,
+                player,
+                previousNickname,
+                player.getNickname(),
+                previousRace,
+                player.getRace()
+            );
+        }
+        if (tierChanged) {
             operationAuditLogService.recordPlayerTierUpdate(
                 actorEmail,
                 actorNickname,

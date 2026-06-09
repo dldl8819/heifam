@@ -11,6 +11,7 @@ import type {
   CaptainDraftResponse,
   GroupDashboardResponse,
   GroupPlayerMmrUpdateRequest,
+  GroupPlayerUpdateRequest,
   GroupPlayerTierBoardItem,
   HealthResponse,
   MatchTeamSide,
@@ -661,16 +662,7 @@ export const apiClient = {
   updateGroupPlayer: (
     groupId: number,
     playerId: number,
-    payload: {
-      nickname?: string
-      race?: string
-      tier?: PlayerTierStatus
-      active?: boolean
-      chatLeftAt?: string | null
-      chatLeftReason?: string | null
-      chatRejoinedAt?: string | null
-      tierChangeAcknowledgedTier?: PlayerTierStatus | null
-    }
+    payload: GroupPlayerUpdateRequest
   ) =>
     apiRequest<void>(
       `/api/groups/${groupId}/players/${playerId}`,
