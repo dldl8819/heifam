@@ -193,7 +193,7 @@ public class OperationAuditLogService {
             player.getNickname(),
             groupId
         );
-        log.setSummary("선수 정보 갱신");
+        log.setSummary("종족 수정");
         log.setDetails(details);
         operationAuditLogRepository.save(log);
     }

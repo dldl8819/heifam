@@ -259,7 +259,7 @@
     },
     "actions": {
       "playerRegistered": "선수 등록",
-      "playerRegistrationUpdated": "선수 정보 갱신",
+      "playerRegistrationUpdated": "종족 수정",
       "playerReactivatedByRegistration": "선수 재등록",
       "playerTierUpdated": "티어 수정",
       "matchDeleted": "경기 삭제"

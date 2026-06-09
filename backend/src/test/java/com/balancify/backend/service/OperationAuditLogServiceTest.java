@@ -123,7 +123,7 @@ class OperationAuditLogServiceTest {
         assertThat(log.getTargetType()).isEqualTo("PLAYER");
         assertThat(log.getTargetId()).isEqualTo(10L);
         assertThat(log.getTargetLabel()).isEqualTo("PlayerAlpha");
-        assertThat(log.getSummary()).isEqualTo("선수 정보 갱신");
+        assertThat(log.getSummary()).isEqualTo("종족 수정");
         assertThat(log.getDetails()).isEqualTo("race=P -> PTZ");
     }
 
@@ -213,7 +213,7 @@ class OperationAuditLogServiceTest {
         OperationAuditLog log = new OperationAuditLog();
         log.setAction(OperationAuditLogService.ACTION_PLAYER_REGISTRATION_UPDATED);
         log.setTargetType("PLAYER");
-        log.setSummary("선수 정보 갱신");
+        log.setSummary("종족 수정");
         log.setDetails("race=P -> PTZ");
         log.setCreatedAt(OffsetDateTime.parse("2026-06-09T12:00:00+09:00"));
 
