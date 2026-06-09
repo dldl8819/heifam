@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import com.balancify.backend.domain.OperationAuditLog;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.OperationAuditLogRepository;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 @ExtendWith(MockitoExtension.class)
 class OperationAuditLogServiceTest {
@@ -170,5 +172,35 @@ class OperationAuditLogServiceTest {
         assertThat(response.totalPages()).isEqualTo(2);
         assertThat(response.first()).isFalse();
         assertThat(response.last()).isTrue();
+    }
+
+    @Test
+    void returnsFilteredAuditLogsUsingSpecification() {
+        OperationAuditLog log = new OperationAuditLog();
+        log.setAction(OperationAuditLogService.ACTION_PLAYER_REGISTRATION_UPDATED);
+        log.setTargetType("PLAYER");
+        log.setSummary("선수 정보 갱신");
+        log.setDetails("race=P -> PTZ");
+        log.setCreatedAt(OffsetDateTime.parse("2026-06-09T12:00:00+09:00"));
+
+        when(operationAuditLogRepository.findAll(any(Specification.class), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(log), PageRequest.of(0, 20), 1));
+
+        var response = operationAuditLogService.getLogs(
+            0,
+            20,
+            new OperationAuditLogService.OperationAuditLogFilter(
+                LocalDate.parse("2026-06-09"),
+                LocalDate.parse("2026-06-09"),
+                "ops",
+                OperationAuditLogService.ACTION_PLAYER_REGISTRATION_UPDATED,
+                "race",
+                "PlayerAlpha"
+            )
+        );
+
+        assertThat(response.items()).hasSize(1);
+        assertThat(response.totalElements()).isEqualTo(1);
+        verify(operationAuditLogRepository).findAll(any(Specification.class), any(Pageable.class));
     }
 }

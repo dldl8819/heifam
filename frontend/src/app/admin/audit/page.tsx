@@ -1,14 +1,54 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { apiClient, isApiForbiddenError, isApiUnauthorizedError } from '@/lib/api'
 import { t } from '@/lib/i18n'
 import { useAdminAuth } from '@/lib/admin-auth'
-import type { OperationAuditLogItem } from '@/types/api'
+import type { OperationAuditLogFilters, OperationAuditLogItem } from '@/types/api'
 
 const AUDIT_PAGE_SIZE = 20
+const AUDIT_ACTION_FILTER_OPTIONS = [
+  'ALL',
+  'PLAYER_REGISTERED',
+  'PLAYER_REGISTRATION_UPDATED',
+  'PLAYER_REACTIVATED_BY_REGISTRATION',
+  'PLAYER_TIER_UPDATED',
+  'MATCH_DELETED',
+] as const
+
+type AuditActionFilter = (typeof AUDIT_ACTION_FILTER_OPTIONS)[number]
+type AuditFilterForm = {
+  fromDate: string
+  toDate: string
+  actor: string
+  action: AuditActionFilter
+  content: string
+  target: string
+}
+
+function createEmptyAuditFilters(): AuditFilterForm {
+  return {
+    fromDate: '',
+    toDate: '',
+    actor: '',
+    action: 'ALL',
+    content: '',
+    target: '',
+  }
+}
+
+function toApiFilters(filters: AuditFilterForm): OperationAuditLogFilters {
+  return {
+    fromDate: filters.fromDate,
+    toDate: filters.toDate,
+    actor: filters.actor,
+    action: filters.action === 'ALL' ? undefined : filters.action,
+    content: filters.content,
+    target: filters.target,
+  }
+}
 
 function formatDateTime(value: string): string {
   const date = new Date(value)
@@ -62,6 +102,8 @@ export default function OperationAuditPage() {
   const { isSuperAdmin, isLoading } = useAdminAuth()
   const [logs, setLogs] = useState<OperationAuditLogItem[]>([])
   const [page, setPage] = useState<number>(0)
+  const [draftFilters, setDraftFilters] = useState<AuditFilterForm>(() => createEmptyAuditFilters())
+  const [appliedFilters, setAppliedFilters] = useState<AuditFilterForm>(() => createEmptyAuditFilters())
   const [totalElements, setTotalElements] = useState<number>(0)
   const [totalPages, setTotalPages] = useState<number>(0)
   const [isFirstPage, setIsFirstPage] = useState<boolean>(true)
@@ -90,7 +132,11 @@ export default function OperationAuditPage() {
       setLoading(true)
       setError(null)
       try {
-        const response = await apiClient.getOperationAuditLogPage({ page, size: AUDIT_PAGE_SIZE })
+        const response = await apiClient.getOperationAuditLogPage({
+          page,
+          size: AUDIT_PAGE_SIZE,
+          ...toApiFilters(appliedFilters),
+        })
         if (active) {
           setLogs(response.items)
           setTotalElements(response.totalElements)
@@ -120,7 +166,20 @@ export default function OperationAuditPage() {
     return () => {
       active = false
     }
-  }, [isLoading, isSuperAdmin, page])
+  }, [appliedFilters, isLoading, isSuperAdmin, page])
+
+  const handleFilterSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setPage(0)
+    setAppliedFilters({ ...draftFilters })
+  }
+
+  const handleFilterReset = () => {
+    const emptyFilters = createEmptyAuditFilters()
+    setDraftFilters(emptyFilters)
+    setAppliedFilters({ ...emptyFilters })
+    setPage(0)
+  }
 
   return (
     <section className="space-y-6">
@@ -149,6 +208,88 @@ export default function OperationAuditPage() {
             {t('audit.count', { count: totalElements })}
           </span>
         </div>
+
+        <form onSubmit={handleFilterSubmit} className="mt-4 grid gap-3 border-t border-slate-100 pt-4 sm:grid-cols-2 lg:grid-cols-6">
+          <label className="space-y-1 text-xs font-medium text-slate-600">
+            <span>{t('audit.filters.fromDate')}</span>
+            <input
+              type="date"
+              value={draftFilters.fromDate}
+              onChange={(event) => setDraftFilters((current) => ({ ...current, fromDate: event.target.value }))}
+              className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+            />
+          </label>
+          <label className="space-y-1 text-xs font-medium text-slate-600">
+            <span>{t('audit.filters.toDate')}</span>
+            <input
+              type="date"
+              value={draftFilters.toDate}
+              onChange={(event) => setDraftFilters((current) => ({ ...current, toDate: event.target.value }))}
+              className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+            />
+          </label>
+          <label className="space-y-1 text-xs font-medium text-slate-600">
+            <span>{t('audit.filters.actor')}</span>
+            <input
+              type="search"
+              value={draftFilters.actor}
+              onChange={(event) => setDraftFilters((current) => ({ ...current, actor: event.target.value }))}
+              placeholder={t('audit.filters.actorPlaceholder')}
+              className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+            />
+          </label>
+          <label className="space-y-1 text-xs font-medium text-slate-600">
+            <span>{t('audit.filters.action')}</span>
+            <select
+              value={draftFilters.action}
+              onChange={(event) =>
+                setDraftFilters((current) => ({ ...current, action: event.target.value as AuditActionFilter }))
+              }
+              className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+            >
+              {AUDIT_ACTION_FILTER_OPTIONS.map((action) => (
+                <option key={action} value={action}>
+                  {action === 'ALL' ? t('audit.filters.actionAll') : getActionLabel(action)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-1 text-xs font-medium text-slate-600">
+            <span>{t('audit.filters.content')}</span>
+            <input
+              type="search"
+              value={draftFilters.content}
+              onChange={(event) => setDraftFilters((current) => ({ ...current, content: event.target.value }))}
+              placeholder={t('audit.filters.contentPlaceholder')}
+              className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+            />
+          </label>
+          <label className="space-y-1 text-xs font-medium text-slate-600">
+            <span>{t('audit.filters.target')}</span>
+            <input
+              type="search"
+              value={draftFilters.target}
+              onChange={(event) => setDraftFilters((current) => ({ ...current, target: event.target.value }))}
+              placeholder={t('audit.filters.targetPlaceholder')}
+              className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+            />
+          </label>
+          <div className="flex gap-2 sm:col-span-2 lg:col-span-6">
+            <button
+              type="submit"
+              className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-700"
+            >
+              {t('audit.filters.apply')}
+            </button>
+            <button
+              type="button"
+              onClick={handleFilterReset}
+              className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              {t('audit.filters.reset')}
+            </button>
+          </div>
+        </form>
 
         {loading ? (
           <div className="mt-6 flex justify-center">

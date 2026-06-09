@@ -880,7 +880,7 @@ class AdminKeyFilterTest {
             eq(10L),
             argThat(request -> request != null && "B+".equals(request.tier())),
             eq("admin@hei.gg"),
-            eq("")
+            eq("admin")
         );
     }
 

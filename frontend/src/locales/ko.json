@@ -243,6 +243,20 @@
     "recentDescription": "최신순으로 페이지당 20건씩 표시됩니다.",
     "count": "총 {count}건",
     "empty": "표시할 운영 로그가 없습니다.",
+    "filters": {
+      "fromDate": "시작일",
+      "toDate": "종료일",
+      "actor": "처리자",
+      "actorPlaceholder": "이름 또는 이메일",
+      "action": "작업",
+      "actionAll": "전체",
+      "content": "작업 내용",
+      "contentPlaceholder": "상세 내용",
+      "target": "대상",
+      "targetPlaceholder": "이름 또는 번호",
+      "apply": "조회",
+      "reset": "초기화"
+    },
     "actions": {
       "playerRegistered": "선수 등록",
       "playerRegistrationUpdated": "선수 정보 갱신",

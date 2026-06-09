@@ -470,3 +470,12 @@ export type OperationAuditLogPage = {
   first: boolean
   last: boolean
 }
+
+export type OperationAuditLogFilters = {
+  fromDate?: string
+  toDate?: string
+  actor?: string
+  action?: string
+  content?: string
+  target?: string
+}

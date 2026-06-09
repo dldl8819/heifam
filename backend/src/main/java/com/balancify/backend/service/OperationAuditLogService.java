@@ -5,12 +5,17 @@ import com.balancify.backend.api.admin.dto.OperationAuditLogResponse;
 import com.balancify.backend.domain.OperationAuditLog;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.OperationAuditLogRepository;
+import jakarta.persistence.criteria.Predicate;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +43,11 @@ public class OperationAuditLogService {
 
     @Transactional(readOnly = true)
     public OperationAuditLogPageResponse getLogs(int page, int size) {
+        return getLogs(page, size, OperationAuditLogFilter.empty());
+    }
+
+    @Transactional(readOnly = true)
+    public OperationAuditLogPageResponse getLogs(int page, int size, OperationAuditLogFilter filter) {
         int normalizedPage = Math.max(0, page);
         int normalizedLimit = Math.max(1, Math.min(MAX_PAGE_SIZE, size));
         PageRequest pageRequest = PageRequest.of(
@@ -45,7 +55,10 @@ public class OperationAuditLogService {
             normalizedLimit,
             Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))
         );
-        Page<OperationAuditLog> logs = operationAuditLogRepository.findAllByOrderByCreatedAtDescIdDesc(pageRequest);
+        OperationAuditLogFilter normalizedFilter = filter == null ? OperationAuditLogFilter.empty() : filter;
+        Page<OperationAuditLog> logs = normalizedFilter.isEmpty()
+            ? operationAuditLogRepository.findAllByOrderByCreatedAtDescIdDesc(pageRequest)
+            : operationAuditLogRepository.findAll(buildSpecification(normalizedFilter), pageRequest);
         List<OperationAuditLogResponse> items = logs
             .stream()
             .map(this::toResponse)
@@ -59,6 +72,61 @@ public class OperationAuditLogService {
             logs.isFirst(),
             logs.isLast()
         );
+    }
+
+    private Specification<OperationAuditLog> buildSpecification(OperationAuditLogFilter filter) {
+        return (root, query, criteriaBuilder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (filter.fromDate() != null) {
+                predicates.add(criteriaBuilder.greaterThanOrEqualTo(
+                    root.<OffsetDateTime>get("createdAt"),
+                    filter.fromDate().atStartOfDay().atOffset(filter.zoneOffset())
+                ));
+            }
+            if (filter.toDate() != null) {
+                predicates.add(criteriaBuilder.lessThan(
+                    root.<OffsetDateTime>get("createdAt"),
+                    filter.toDate().plusDays(1).atStartOfDay().atOffset(filter.zoneOffset())
+                ));
+            }
+
+            String actor = toLikePattern(filter.actor());
+            if (actor != null) {
+                predicates.add(criteriaBuilder.or(
+                    criteriaBuilder.like(criteriaBuilder.lower(root.get("actorEmail")), actor, '\\'),
+                    criteriaBuilder.like(criteriaBuilder.lower(root.get("actorNickname")), actor, '\\')
+                ));
+            }
+
+            String action = normalizeActionFilter(filter.action());
+            if (action != null) {
+                predicates.add(criteriaBuilder.equal(root.get("action"), action));
+            }
+
+            String content = toLikePattern(filter.content());
+            if (content != null) {
+                predicates.add(criteriaBuilder.or(
+                    criteriaBuilder.like(criteriaBuilder.lower(root.get("action")), content, '\\'),
+                    criteriaBuilder.like(criteriaBuilder.lower(root.get("summary")), content, '\\'),
+                    criteriaBuilder.like(criteriaBuilder.lower(root.get("details")), content, '\\')
+                ));
+            }
+
+            String target = toLikePattern(filter.target());
+            if (target != null) {
+                List<Predicate> targetPredicates = new ArrayList<>();
+                targetPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("targetType")), target, '\\'));
+                targetPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("targetLabel")), target, '\\'));
+                Long targetId = parseLong(filter.target());
+                if (targetId != null) {
+                    targetPredicates.add(criteriaBuilder.equal(root.get("targetId"), targetId));
+                }
+                predicates.add(criteriaBuilder.or(targetPredicates.toArray(Predicate[]::new)));
+            }
+
+            return criteriaBuilder.and(predicates.toArray(Predicate[]::new));
+        };
     }
 
     @Transactional
@@ -241,6 +309,41 @@ public class OperationAuditLogService {
         return value == null ? "-" : value;
     }
 
+    private String normalizeActionFilter(String value) {
+        String normalized = safeTrim(value).toUpperCase(Locale.ROOT);
+        if (normalized.isEmpty() || "ALL".equals(normalized)) {
+            return null;
+        }
+        return normalized;
+    }
+
+    private String toLikePattern(String value) {
+        String normalized = safeTrim(value).toLowerCase(Locale.ROOT);
+        if (normalized.isEmpty()) {
+            return null;
+        }
+        return "%" + escapeLikePattern(normalized) + "%";
+    }
+
+    private String escapeLikePattern(String value) {
+        return value
+            .replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_");
+    }
+
+    private Long parseLong(String value) {
+        String normalized = safeTrim(value);
+        if (normalized.isEmpty()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(normalized);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
     private String formatTierForAudit(String value) {
         String normalized = trimToNull(value);
         return normalized == null ? "UNASSIGNED" : normalized.toUpperCase(Locale.ROOT);
@@ -285,5 +388,41 @@ public class OperationAuditLogService {
             return value;
         }
         return value.substring(0, maxLength);
+    }
+
+    public record OperationAuditLogFilter(
+        LocalDate fromDate,
+        LocalDate toDate,
+        String actor,
+        String action,
+        String content,
+        String target
+    ) {
+        private static final ZoneOffset KST_OFFSET = ZoneOffset.ofHours(9);
+
+        public static OperationAuditLogFilter empty() {
+            return new OperationAuditLogFilter(null, null, null, null, null, null);
+        }
+
+        private boolean isEmpty() {
+            return fromDate == null
+                && toDate == null
+                && isBlank(actor)
+                && isEmptyAction(action)
+                && isBlank(content)
+                && isBlank(target);
+        }
+
+        private ZoneOffset zoneOffset() {
+            return KST_OFFSET;
+        }
+
+        private static boolean isBlank(String value) {
+            return value == null || value.trim().isEmpty();
+        }
+
+        private static boolean isEmptyAction(String value) {
+            return isBlank(value) || "ALL".equalsIgnoreCase(value.trim());
+        }
     }
 }

@@ -20,6 +20,7 @@ import type {
   MatchResultRequest,
   MatchResultResponse,
   ManualMatchCreateRequest,
+  OperationAuditLogFilters,
   OperationAuditLogItem,
   OperationAuditLogPage,
   PlayerRosterItem,
@@ -206,6 +207,13 @@ function buildHeaders(
   }
 
   return headers
+}
+
+function appendOptionalSearchParam(params: URLSearchParams, key: string, value: string | undefined): void {
+  const normalized = value?.trim() ?? ''
+  if (normalized.length > 0) {
+    params.set(key, normalized)
+  }
 }
 
 async function apiRequest<T>(
@@ -899,14 +907,24 @@ export const apiClient = {
       }
     ),
   getOperationAuditLogPage: async (
-    options: { page?: number; size?: number } = {}
+    options: ({ page?: number; size?: number } & OperationAuditLogFilters) = {}
   ): Promise<OperationAuditLogPage> => {
     const requestedPage = Number.isFinite(options.page) ? Math.floor(options.page ?? 0) : 0
     const requestedSize = Number.isFinite(options.size) ? Math.floor(options.size ?? 20) : 20
     const safePage = Math.max(0, requestedPage)
     const safeSize = Math.max(1, Math.min(100, requestedSize))
+    const params = new URLSearchParams({
+      page: String(safePage),
+      size: String(safeSize),
+    })
+    appendOptionalSearchParam(params, 'fromDate', options.fromDate)
+    appendOptionalSearchParam(params, 'toDate', options.toDate)
+    appendOptionalSearchParam(params, 'actor', options.actor)
+    appendOptionalSearchParam(params, 'action', options.action)
+    appendOptionalSearchParam(params, 'content', options.content)
+    appendOptionalSearchParam(params, 'target', options.target)
     const payload = await apiRequest<unknown>(
-      `/api/admin/audit-logs?page=${safePage}&size=${safeSize}`,
+      `/api/admin/audit-logs?${params.toString()}`,
       undefined,
       {
         requireUserEmail: true,

@@ -4,6 +4,7 @@ import com.balancify.backend.api.group.dto.GroupPlayerUpdateRequest;
 import com.balancify.backend.api.group.dto.GroupPlayerMmrUpdateRequest;
 import com.balancify.backend.security.AuthenticatedRequestResolver;
 import com.balancify.backend.security.MmrAccessRequestResolver;
+import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.PlayerAdminService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.NoSuchElementException;
@@ -23,15 +24,18 @@ public class GroupPlayerAdminController {
     private final PlayerAdminService playerAdminService;
     private final MmrAccessRequestResolver mmrAccessRequestResolver;
     private final AuthenticatedRequestResolver authenticatedRequestResolver;
+    private final AccessControlService accessControlService;
 
     public GroupPlayerAdminController(
         PlayerAdminService playerAdminService,
         MmrAccessRequestResolver mmrAccessRequestResolver,
-        AuthenticatedRequestResolver authenticatedRequestResolver
+        AuthenticatedRequestResolver authenticatedRequestResolver,
+        AccessControlService accessControlService
     ) {
         this.playerAdminService = playerAdminService;
         this.mmrAccessRequestResolver = mmrAccessRequestResolver;
         this.authenticatedRequestResolver = authenticatedRequestResolver;
+        this.accessControlService = accessControlService;
     }
 
     @PatchMapping("/{groupId}/players/{playerId}")
@@ -56,7 +60,7 @@ public class GroupPlayerAdminController {
                 playerId,
                 request,
                 identity.email(),
-                identity.nickname()
+                resolveActorNickname(identity)
             );
         } catch (IllegalArgumentException illegalArgumentException) {
             throw new ResponseStatusException(
@@ -122,5 +126,18 @@ public class GroupPlayerAdminController {
         return request != null
             && request.tierChangeAcknowledgedTier() != null
             && !request.tierChangeAcknowledgedTier().isBlank();
+    }
+
+    private String resolveActorNickname(AuthenticatedRequestResolver.ResolvedRequestIdentity identity) {
+        if (identity == null || identity.email().isBlank()) {
+            return null;
+        }
+
+        if (identity.nickname() != null && !identity.nickname().isBlank()) {
+            return identity.nickname().trim();
+        }
+
+        String nickname = accessControlService.resolveAccessProfile(identity.email()).nickname();
+        return nickname == null || nickname.isBlank() ? null : nickname.trim();
     }
 }
