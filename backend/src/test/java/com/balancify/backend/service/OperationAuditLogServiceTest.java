@@ -2,6 +2,7 @@ package com.balancify.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -29,11 +30,14 @@ class OperationAuditLogServiceTest {
     @Mock
     private OperationAuditLogRepository operationAuditLogRepository;
 
+    @Mock
+    private AccessControlService accessControlService;
+
     private OperationAuditLogService operationAuditLogService;
 
     @BeforeEach
     void setUp() {
-        operationAuditLogService = new OperationAuditLogService(operationAuditLogRepository);
+        operationAuditLogService = new OperationAuditLogService(operationAuditLogRepository, accessControlService);
         lenient().when(operationAuditLogRepository.save(any(OperationAuditLog.class)))
             .thenAnswer(invocation -> invocation.getArgument(0));
     }
@@ -172,6 +176,36 @@ class OperationAuditLogServiceTest {
         assertThat(response.totalPages()).isEqualTo(2);
         assertThat(response.first()).isFalse();
         assertThat(response.last()).isTrue();
+    }
+
+    @Test
+    void fillsMissingActorNicknameFromAccessProfileWithoutExposingActorEmail() {
+        OperationAuditLog log = new OperationAuditLog();
+        log.setAction(OperationAuditLogService.ACTION_PLAYER_TIER_UPDATED);
+        log.setActorEmail("operator-id");
+        log.setTargetType("PLAYER");
+        log.setSummary("?곗뼱 ?섏젙");
+        log.setCreatedAt(OffsetDateTime.parse("2026-06-09T12:00:00+09:00"));
+
+        when(operationAuditLogRepository.findAllByOrderByCreatedAtDescIdDesc(any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(log), PageRequest.of(0, 20), 1));
+        when(accessControlService.resolveAccessProfile(eq("operator-id")))
+            .thenReturn(new AccessControlService.AccessProfile(
+                "operator-id",
+                "OpsUser",
+                "SUPER_ADMIN",
+                true,
+                true,
+                true,
+                true,
+                null
+            ));
+
+        var response = operationAuditLogService.getLogs(0, 20);
+
+        assertThat(response.items()).hasSize(1);
+        assertThat(response.items().get(0).actorNickname()).isEqualTo("OpsUser");
+        assertThat(response.items().get(0).actorEmail()).isNull();
     }
 
     @Test

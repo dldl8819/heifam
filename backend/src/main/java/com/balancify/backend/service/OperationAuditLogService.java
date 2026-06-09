@@ -31,9 +31,14 @@ public class OperationAuditLogService {
     private static final int MAX_PAGE_SIZE = 200;
 
     private final OperationAuditLogRepository operationAuditLogRepository;
+    private final AccessControlService accessControlService;
 
-    public OperationAuditLogService(OperationAuditLogRepository operationAuditLogRepository) {
+    public OperationAuditLogService(
+        OperationAuditLogRepository operationAuditLogRepository,
+        AccessControlService accessControlService
+    ) {
         this.operationAuditLogRepository = operationAuditLogRepository;
+        this.accessControlService = accessControlService;
     }
 
     @Transactional(readOnly = true)
@@ -357,8 +362,8 @@ public class OperationAuditLogService {
         return new OperationAuditLogResponse(
             log.getId(),
             log.getAction(),
-            log.getActorEmail(),
-            log.getActorNickname(),
+            null,
+            resolveActorNickname(log),
             log.getTargetType(),
             log.getTargetId(),
             log.getTargetLabel(),
@@ -367,6 +372,20 @@ public class OperationAuditLogService {
             log.getDetails(),
             log.getCreatedAt()
         );
+    }
+
+    private String resolveActorNickname(OperationAuditLog log) {
+        String storedNickname = trimToNull(log.getActorNickname());
+        if (storedNickname != null) {
+            return storedNickname;
+        }
+
+        String actorEmail = trimToNull(log.getActorEmail());
+        if (actorEmail == null) {
+            return null;
+        }
+
+        return trimToNull(accessControlService.resolveAccessProfile(actorEmail).nickname());
     }
 
     private String normalizeEmail(String value) {

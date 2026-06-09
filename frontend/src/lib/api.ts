@@ -561,7 +561,6 @@ function normalizeOperationAuditLogItem(value: unknown): OperationAuditLogItem |
   return {
     id,
     action,
-    actorEmail: typeof source.actorEmail === 'string' ? source.actorEmail : undefined,
     actorNickname: typeof source.actorNickname === 'string' ? source.actorNickname : undefined,
     targetType,
     targetId: targetId ?? undefined,

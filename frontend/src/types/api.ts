@@ -450,7 +450,6 @@ export type AccessAllowedEmailListResponse = {
 export type OperationAuditLogItem = {
   id: number
   action: string
-  actorEmail?: string
   actorNickname?: string
   targetType: string
   targetId?: number
