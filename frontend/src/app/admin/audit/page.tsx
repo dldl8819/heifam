@@ -65,10 +65,8 @@ function formatDateTime(value: string): string {
 }
 
 function formatActor(log: OperationAuditLogItem): string {
-  if (log.actorNickname && log.actorEmail) {
-    return `${log.actorNickname} (${log.actorEmail})`
-  }
-  return log.actorNickname ?? log.actorEmail ?? '-'
+  const nickname = log.actorNickname?.trim() ?? ''
+  return nickname.length > 0 ? nickname : '-'
 }
 
 function formatTarget(log: OperationAuditLogItem): string {

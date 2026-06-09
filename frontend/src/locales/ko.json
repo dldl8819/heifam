@@ -247,7 +247,7 @@
       "fromDate": "시작일",
       "toDate": "종료일",
       "actor": "처리자",
-      "actorPlaceholder": "이름 또는 이메일",
+      "actorPlaceholder": "이름",
       "action": "작업",
       "actionAll": "전체",
       "content": "작업 내용",
