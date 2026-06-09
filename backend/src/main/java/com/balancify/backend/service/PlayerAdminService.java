@@ -106,11 +106,9 @@ public class PlayerAdminService {
         }
 
         if (!tier.isEmpty()) {
-            if (shouldSeedMmrForTierAssignment(player, previousTier, tier)) {
-                int defaultMmr = PlayerTierPolicy.resolveDefaultMmrForTier(tier);
-                player.setBaseMmr(defaultMmr);
-                player.setMmr(defaultMmr);
-            }
+            int defaultMmr = PlayerTierPolicy.resolveDefaultMmrForTier(tier);
+            player.setBaseMmr(defaultMmr);
+            player.setMmr(defaultMmr);
             player.setTier(tier);
         }
 
@@ -194,17 +192,6 @@ public class PlayerAdminService {
 
     private String safeTrim(String value) {
         return value == null ? "" : value.trim();
-    }
-
-    private boolean shouldSeedMmrForTierAssignment(Player player, String previousTier, String nextTier) {
-        if (!"UNASSIGNED".equals(previousTier) || "UNASSIGNED".equals(nextTier)) {
-            return false;
-        }
-        return safeMmr(player.getBaseMmr()) <= 0 && safeMmr(player.getMmr()) <= 0;
-    }
-
-    private int safeMmr(Integer value) {
-        return value == null ? 0 : value;
     }
 
     private String normalizeTierChangeAcknowledgement(String value) {
