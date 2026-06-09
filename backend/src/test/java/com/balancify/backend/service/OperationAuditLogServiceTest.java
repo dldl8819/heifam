@@ -127,14 +127,14 @@ class OperationAuditLogServiceTest {
         log.setCreatedAt(OffsetDateTime.parse("2026-05-23T12:00:00Z"));
 
         when(operationAuditLogRepository.findAllByOrderByCreatedAtDescIdDesc(any(Pageable.class)))
-            .thenReturn(new PageImpl<>(List.of(log), PageRequest.of(1, 20), 25));
+            .thenReturn(new PageImpl<>(List.of(log), PageRequest.of(1, 20), 21));
 
         var response = operationAuditLogService.getLogs(1, 20);
 
         assertThat(response.items()).hasSize(1);
         assertThat(response.page()).isEqualTo(1);
         assertThat(response.size()).isEqualTo(20);
-        assertThat(response.totalElements()).isEqualTo(25);
+        assertThat(response.totalElements()).isEqualTo(21);
         assertThat(response.totalPages()).isEqualTo(2);
         assertThat(response.first()).isFalse();
         assertThat(response.last()).isTrue();
