@@ -477,7 +477,7 @@ function normalizePlayerRosterItem(value: unknown): PlayerRosterItem | null {
   const lastTierSnapshotMmr = toNumber(source.lastTierSnapshotMmr)
   const lastTierSnapshotTier = normalizeTier(source.lastTierSnapshotTier)
   const liveTier = normalizeTier(source.liveTier)
-  const tierChangeAcknowledgedTier = normalizeTier(source.tierChangeAcknowledgedTier)
+  const dormancyMmrFloorTier = normalizeTier(source.dormancyMmrFloorTier)
   const wins = toNumber(source.wins) ?? 0
   const losses = toNumber(source.losses) ?? 0
   const games = toNumber(source.games) ?? wins + losses
@@ -494,6 +494,7 @@ function normalizePlayerRosterItem(value: unknown): PlayerRosterItem | null {
     baseMmr: baseMmr ?? undefined,
     baseTier: baseTier ?? undefined,
     currentMmr: currentMmr ?? undefined,
+    dormancyMmrFloorTier: dormancyMmrFloorTier ?? undefined,
     lastTierSnapshotAt: typeof source.lastTierSnapshotAt === 'string' ? source.lastTierSnapshotAt : undefined,
     lastTierSnapshotMmr: lastTierSnapshotMmr ?? undefined,
     lastTierSnapshotTier: lastTierSnapshotTier ?? undefined,
@@ -505,9 +506,6 @@ function normalizePlayerRosterItem(value: unknown): PlayerRosterItem | null {
     chatLeftAt: typeof source.chatLeftAt === 'string' ? source.chatLeftAt : undefined,
     chatLeftReason: typeof source.chatLeftReason === 'string' ? source.chatLeftReason : undefined,
     chatRejoinedAt: typeof source.chatRejoinedAt === 'string' ? source.chatRejoinedAt : undefined,
-    tierChangeAcknowledgedTier: tierChangeAcknowledgedTier ?? undefined,
-    tierChangeAcknowledgedAt:
-      typeof source.tierChangeAcknowledgedAt === 'string' ? source.tierChangeAcknowledgedAt : undefined,
   }
 }
 

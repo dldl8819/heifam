@@ -43,7 +43,8 @@ class MmrMaskingMapperTest {
             "Synthetic note",
             chatRejoinedAt,
             "A",
-            chatRejoinedAt
+            chatRejoinedAt,
+            "B+"
         );
 
         GroupPlayerResponse masked = MmrMaskingMapper.maskGroupPlayersForMember(List.of(source)).getFirst();
@@ -60,6 +61,7 @@ class MmrMaskingMapperTest {
         assertThat(masked.chatRejoinedAt()).isNull();
         assertThat(masked.tierChangeAcknowledgedTier()).isNull();
         assertThat(masked.tierChangeAcknowledgedAt()).isNull();
+        assertThat(masked.dormancyMmrFloorTier()).isNull();
     }
 
     @Test
@@ -87,7 +89,8 @@ class MmrMaskingMapperTest {
             "Synthetic note",
             chatRejoinedAt,
             "A",
-            chatRejoinedAt
+            chatRejoinedAt,
+            "B+"
         );
 
         GroupPlayerResponse masked = MmrMaskingMapper.maskGroupPlayersForAdmin(List.of(source)).getFirst();
@@ -104,6 +107,42 @@ class MmrMaskingMapperTest {
         assertThat(masked.chatRejoinedAt()).isEqualTo(chatRejoinedAt);
         assertThat(masked.tierChangeAcknowledgedTier()).isEqualTo("A");
         assertThat(masked.tierChangeAcknowledgedAt()).isEqualTo(chatRejoinedAt);
+        assertThat(masked.dormancyMmrFloorTier()).isNull();
+    }
+
+    @Test
+    void maskGroupPlayersForMmrViewerKeepsMmrButRemovesDormancyFloorTier() {
+        OffsetDateTime snapshotAt = OffsetDateTime.parse("2026-04-30T23:59:59+09:00");
+        GroupPlayerResponse source = new GroupPlayerResponse(
+            1L,
+            "PlayerAlpha",
+            "P",
+            "A",
+            1500,
+            "A",
+            1520,
+            snapshotAt,
+            1500,
+            "A",
+            "A+",
+            10,
+            5,
+            15,
+            true,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "B+"
+        );
+
+        GroupPlayerResponse masked = MmrMaskingMapper.maskGroupPlayersForMmrViewer(List.of(source)).getFirst();
+
+        assertThat(masked.currentMmr()).isEqualTo(1520);
+        assertThat(masked.lastTierSnapshotMmr()).isEqualTo(1500);
+        assertThat(masked.liveTier()).isEqualTo("A+");
+        assertThat(masked.dormancyMmrFloorTier()).isNull();
     }
 
     @Test

@@ -162,10 +162,14 @@ public class DormancyMmrDecayService {
         int currentMmr = Math.max(0, player.getMmr() == null ? 0 : player.getMmr());
         int totalDrop = safeTotalDrop(elapsedPeriods);
         int rawNextMmr = Math.max(0, currentMmr - totalDrop);
-        int minimumAllowedMmr = PlayerTierPolicy.resolveDormancyMinimumMmr(
-            player.getTier(),
+        int minimumAllowedMmr = Math.min(
             currentMmr,
-            MAX_DORMANCY_TIER_DEMOTION_STEPS
+            PlayerTierPolicy.resolveDormancyMinimumMmr(
+                player.getTier(),
+                currentMmr,
+                MAX_DORMANCY_TIER_DEMOTION_STEPS,
+                player.getDormancyMmrFloorTier()
+            )
         );
         int nextMmr = Math.max(rawNextMmr, minimumAllowedMmr);
         OffsetDateTime appliedThrough = decayAnchor.plusDays(elapsedPeriods * (long) inactiveDays);

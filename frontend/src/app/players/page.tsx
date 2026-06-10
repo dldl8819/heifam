@@ -7,13 +7,7 @@ import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
-import {
-  buildTierChangeTargets,
-  formatTierChangeDescription,
-  resolveTierChangeSnapshotDateLabel,
-  toTierOrder,
-  type TierChangeTarget,
-} from '@/lib/player-tier-change'
+import { toTierOrder } from '@/lib/player-tier'
 import { buildPlayerProfileUpdateRequest } from '@/lib/player-edit'
 import type { PlayerRace, PlayerRosterItem, PlayerTierStatus } from '@/types/api'
 
@@ -77,6 +71,20 @@ const PLAYER_REGISTRATION_TIER_OPTIONS: PlayerRegistrationTier[] = [
   'D',
   'UNASSIGNED',
 ]
+const PLAYER_DORMANCY_FLOOR_TIER_OPTIONS: PlayerTierStatus[] = [
+  'UNASSIGNED',
+  'S',
+  'A+',
+  'A',
+  'A-',
+  'B+',
+  'B',
+  'B-',
+  'C+',
+  'C',
+  'C-',
+  'D',
+]
 const REASSIGNMENT_IMPORT_TIER = '\uC7AC\uBC30\uC815\uB300\uC0C1'
 
 function comparePlayersByTierThenNickname(a: PlayerRosterItem, b: PlayerRosterItem): number {
@@ -118,6 +126,13 @@ function formatMmrValue(value: number | undefined): string {
     return '-'
   }
   return value === 0 ? 'None' : String(value)
+}
+
+function formatTierOption(tier: PlayerTierStatus | undefined): string {
+  if (tier === undefined || tier === 'UNASSIGNED') {
+    return t('players.dormancyFloor.defaultPolicy')
+  }
+  return tier
 }
 
 function formatDateTimeLocalInputValue(date: Date): string {
@@ -251,7 +266,6 @@ export default function PlayersPage() {
   const { isAdmin, isSuperAdmin, canViewMmr } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
   const showMmrColumn = canViewMmr && mmrVisible
-  const showTierChangeNotice = canViewMmr
   const [rows, setRows] = useState<PlayerRosterItem[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
@@ -274,7 +288,8 @@ export default function PlayersPage() {
   const [savingMmrPlayerId, setSavingMmrPlayerId] = useState<number | null>(null)
   const [deletingPlayerId, setDeletingPlayerId] = useState<number | null>(null)
   const [togglingPlayerId, setTogglingPlayerId] = useState<number | null>(null)
-  const [acknowledgingTierChangePlayerId, setAcknowledgingTierChangePlayerId] = useState<number | null>(null)
+  const [dormancyFloorSelections, setDormancyFloorSelections] = useState<Record<number, PlayerTierStatus>>({})
+  const [savingDormancyFloorPlayerId, setSavingDormancyFloorPlayerId] = useState<number | null>(null)
   const [activityForm, setActivityForm] = useState<ActivityFormState | null>(null)
   const [showInactive, setShowInactive] = useState<boolean>(false)
   const [playerActionError, setPlayerActionError] = useState<string | null>(null)
@@ -300,6 +315,17 @@ export default function PlayersPage() {
   useEffect(() => {
     void fetchRoster()
   }, [fetchRoster])
+
+  useEffect(() => {
+    setDormancyFloorSelections((currentSelections) => {
+      const nextSelections: Record<number, PlayerTierStatus> = {}
+      for (const row of rows) {
+        nextSelections[row.id] =
+          currentSelections[row.id] ?? row.dormancyMmrFloorTier ?? 'UNASSIGNED'
+      }
+      return nextSelections
+    })
+  }, [rows])
 
   const handleRegisterPlayer = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -567,6 +593,11 @@ export default function PlayersPage() {
       if (activityForm?.player.id === player.id) {
         setActivityForm(null)
       }
+      setDormancyFloorSelections((currentSelections) => {
+        const nextSelections = { ...currentSelections }
+        delete nextSelections[player.id]
+        return nextSelections
+      })
       setPlayerActionSuccess(t('players.actions.deleteSuccess'))
       await fetchRoster()
     } catch (actionError) {
@@ -708,43 +739,48 @@ export default function PlayersPage() {
     }
   }
 
-  const handleAcknowledgeTierChange = async (target: TierChangeTarget) => {
-    if (!isAdmin || !canViewMmr) {
+  const handleSaveDormancyFloor = async (player: PlayerRosterItem) => {
+    if (!isSuperAdmin) {
       setPlayerActionError(t('common.adminOnlyAction'))
       return
     }
 
-    setAcknowledgingTierChangePlayerId(target.playerId)
+    const selectedTier = dormancyFloorSelections[player.id] ?? player.dormancyMmrFloorTier ?? 'UNASSIGNED'
+    const currentTier = player.dormancyMmrFloorTier ?? 'UNASSIGNED'
+    if (selectedTier === currentTier) {
+      setPlayerActionError(t('players.dormancyFloor.noChange'))
+      return
+    }
+
+    setSavingDormancyFloorPlayerId(player.id)
     setPlayerActionError(null)
     setPlayerActionSuccess(null)
 
     try {
-      await apiClient.updateGroupPlayer(TEMP_GROUP_ID, target.playerId, {
-        tierChangeAcknowledgedTier: target.currentTier,
+      await apiClient.updateGroupPlayer(TEMP_GROUP_ID, player.id, {
+        dormancyMmrFloorTier: selectedTier,
       })
-      const acknowledgedAt = new Date().toISOString()
       setRows((currentRows) =>
         currentRows.map((row) =>
-          row.id === target.playerId
+          row.id === player.id
             ? {
                 ...row,
-                tierChangeAcknowledgedTier: target.currentTier,
-                tierChangeAcknowledgedAt: acknowledgedAt,
+                dormancyMmrFloorTier: selectedTier === 'UNASSIGNED' ? undefined : selectedTier,
               }
             : row
         )
       )
-      setPlayerActionSuccess(t('players.tierChange.acknowledgeSuccess', { nickname: target.nickname }))
+      setPlayerActionSuccess(t('players.dormancyFloor.updateSuccess', { nickname: player.nickname }))
     } catch (actionError) {
       if (isApiForbiddenError(actionError)) {
         setPlayerActionError(t('common.permissionDenied'))
       } else if (isApiNotFoundError(actionError)) {
         setPlayerActionError(t('players.actions.updateNotFound'))
       } else {
-        setPlayerActionError(t('players.tierChange.acknowledgeFailure'))
+        setPlayerActionError(t('players.dormancyFloor.updateFailure'))
       }
     } finally {
-      setAcknowledgingTierChangePlayerId(null)
+      setSavingDormancyFloorPlayerId(null)
     }
   }
 
@@ -771,18 +807,6 @@ export default function PlayersPage() {
   const showActionsColumn = isAdmin
   const tableColumnCount =
     6 + (showStatusColumn ? 1 : 0) + (showMmrColumn ? 1 : 0) + (showActionsColumn ? 1 : 0)
-  const tierChangeTargets = useMemo<TierChangeTarget[]>(
-    () => buildTierChangeTargets(rows),
-    [rows]
-  )
-  const tierChangeTargetById = useMemo(
-    () => new Map(tierChangeTargets.map((target) => [target.playerId, target])),
-    [tierChangeTargets]
-  )
-  const tierChangeSnapshotDateLabel = useMemo(
-    () => resolveTierChangeSnapshotDateLabel(rows, tierChangeTargets),
-    [rows, tierChangeTargets]
-  )
   const downloadableRows = useMemo(
     () => [...rows].sort(comparePlayersByTierThenNickname),
     [rows]
@@ -1045,69 +1069,84 @@ export default function PlayersPage() {
         </div>
       )}
 
-      {showTierChangeNotice && (
-        <article className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-amber-950">{t('players.tierChange.title')}</h3>
-            <span className="rounded-md border border-amber-300 bg-white px-2 py-0.5 text-xs font-medium text-amber-800">
-              {t('players.tierChange.count', { count: tierChangeTargets.length })}
-            </span>
+      {isSuperAdmin && (
+        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900">{t('players.dormancyFloor.title')}</h3>
+              <p className="mt-1 text-xs text-slate-500">{t('players.dormancyFloor.description')}</p>
+            </div>
           </div>
-          <p className="mt-1 text-xs text-amber-900">
-            {formatTierChangeDescription(tierChangeSnapshotDateLabel, t)}
-          </p>
-          {tierChangeTargets.length === 0 ? (
-            <p className="mt-3 rounded-md border border-amber-200 bg-white/70 px-3 py-2 text-xs text-amber-800">
-              {t('players.tierChange.empty')}
-            </p>
-          ) : (
-            <ul className="mt-3 space-y-2">
-              {tierChangeTargets.map((target) => {
-                const fromTierLabel =
-                  target.snapshotTier === 'UNASSIGNED' ? t('players.table.unassigned') : target.snapshotTier
-                const toTierLabel =
-                  target.currentTier === 'UNASSIGNED'
-                    ? t('players.table.unassigned')
-                    : target.currentTier
+          <div className="mt-3 overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="bg-slate-50 text-xs tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-3 py-2">{t('players.dormancyFloor.player')}</th>
+                  <th className="px-3 py-2">{t('players.dormancyFloor.currentFloor')}</th>
+                  <th className="px-3 py-2">{t('players.dormancyFloor.nextFloor')}</th>
+                  <th className="px-3 py-2">{t('players.dormancyFloor.action')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr className="border-t border-slate-100">
+                    <td className="px-3 py-3" colSpan={4}>
+                      <LoadingIndicator label={t('common.loading')} />
+                    </td>
+                  </tr>
+                ) : rows.length === 0 ? (
+                  <tr className="border-t border-slate-100">
+                    <td className="px-3 py-4 text-center text-xs text-slate-500" colSpan={4}>
+                      {t('players.dormancyFloor.empty')}
+                    </td>
+                  </tr>
+                ) : (
+                  rows.map((row) => {
+                    const selectedTier =
+                      dormancyFloorSelections[row.id] ?? row.dormancyMmrFloorTier ?? 'UNASSIGNED'
+                    const currentTier = row.dormancyMmrFloorTier ?? 'UNASSIGNED'
+                    const isSavingFloor = savingDormancyFloorPlayerId === row.id
+                    const hasChanged = selectedTier !== currentTier
 
-                return (
-                  <li
-                    key={`tier-change-${target.playerId}`}
-                    className="rounded-md border border-amber-200 bg-white/80 px-3 py-2 text-sm text-slate-800"
-                  >
-                    <div className="font-medium text-slate-900">{target.nickname}</div>
-                    <div className="mt-0.5 text-xs text-slate-700">
-                      {t('players.tierChange.fromTo', { from: fromTierLabel, to: toTierLabel })}
-                    </div>
-                    {showMmrColumn && (
-                      <div className="mt-0.5 text-xs text-slate-600">
-                        {t('players.tierChange.mmrFlow', {
-                          from: formatMmrValue(target.snapshotMmr),
-                          to: formatMmrValue(target.currentMmr),
-                        })}
-                      </div>
-                    )}
-                    {isAdmin && (
-                      <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100">
-                        <input
-                          type="checkbox"
-                          checked={acknowledgingTierChangePlayerId === target.playerId}
-                          disabled={acknowledgingTierChangePlayerId !== null}
-                          onChange={() => void handleAcknowledgeTierChange(target)}
-                          className="h-3.5 w-3.5 rounded border-amber-300 text-amber-700 focus:ring-amber-500 disabled:cursor-not-allowed"
-                        />
-                        <span>
-                          {acknowledgingTierChangePlayerId === target.playerId
-                            ? t('players.tierChange.acknowledging')
-                            : t('players.tierChange.acknowledge')}
-                        </span>
-                      </label>
-                    )}
-                  </li>
-                )
-              })}
-            </ul>
-          )}
+                    return (
+                      <tr key={`dormancy-floor-${row.id}`} className="border-t border-slate-100">
+                        <td className="px-3 py-2 font-medium text-slate-900">{row.nickname}</td>
+                        <td className="px-3 py-2 text-slate-700">{formatTierOption(row.dormancyMmrFloorTier)}</td>
+                        <td className="px-3 py-2">
+                          <select
+                            value={selectedTier}
+                            onChange={(event) =>
+                              setDormancyFloorSelections((currentSelections) => ({
+                                ...currentSelections,
+                                [row.id]: event.target.value as PlayerTierStatus,
+                              }))
+                            }
+                            className="w-32 rounded-md border border-slate-200 px-2 py-1 text-xs outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                          >
+                            {PLAYER_DORMANCY_FLOOR_TIER_OPTIONS.map((tierOption) => (
+                              <option key={`dormancy-floor-option-${tierOption}`} value={tierOption}>
+                                {formatTierOption(tierOption)}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-3 py-2">
+                          <button
+                            type="button"
+                            disabled={!hasChanged || savingDormancyFloorPlayerId !== null}
+                            onClick={() => void handleSaveDormancyFloor(row)}
+                            className="rounded-md bg-slate-900 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                          >
+                            {isSavingFloor ? t('players.dormancyFloor.saving') : t('players.dormancyFloor.save')}
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </article>
       )}
 
@@ -1226,7 +1265,6 @@ export default function PlayersPage() {
                 const isToggling = togglingPlayerId === row.id
                 const busy = isSaving || isSavingMmr || isDeleting || isToggling
                 const isActive = row.active !== false
-                const tierChangeTarget = tierChangeTargetById.get(row.id)
 
                 return (
                   <tr
@@ -1251,11 +1289,6 @@ export default function PlayersPage() {
                           {!isActive && (
                             <span className="rounded-md border border-slate-300 bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
                               {t('players.table.inactive')}
-                            </span>
-                          )}
-                          {showTierChangeNotice && tierChangeTarget && (
-                            <span className="rounded-md border border-amber-300 bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
-                              {t('players.tierChange.badge')}
                             </span>
                           )}
                         </div>

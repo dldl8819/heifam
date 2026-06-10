@@ -82,6 +82,37 @@ public final class MmrMaskingMapper {
             .toList();
     }
 
+    public static List<GroupPlayerResponse> maskGroupPlayersForMmrViewer(List<GroupPlayerResponse> responses) {
+        return responses
+            .stream()
+            .map(response ->
+                new GroupPlayerResponse(
+                    response.id(),
+                    response.nickname(),
+                    response.race(),
+                    response.tier(),
+                    response.baseMmr(),
+                    response.baseTier(),
+                    response.currentMmr(),
+                    response.lastTierSnapshotAt(),
+                    response.lastTierSnapshotMmr(),
+                    response.lastTierSnapshotTier(),
+                    response.liveTier(),
+                    response.wins(),
+                    response.losses(),
+                    response.games(),
+                    response.active(),
+                    response.chatLeftAt(),
+                    response.chatLeftReason(),
+                    response.chatRejoinedAt(),
+                    response.tierChangeAcknowledgedTier(),
+                    response.tierChangeAcknowledgedAt(),
+                    null
+                )
+            )
+            .toList();
+    }
+
     public static List<RankingItemResponse> maskRanking(List<RankingItemResponse> responses) {
         return responses
             .stream()

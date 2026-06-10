@@ -157,6 +157,38 @@ class DormancyMmrDecayServiceTest {
     }
 
     @Test
+    void appliesConfiguredDormancyFloorTierWhenItIsHigherThanTwoStepCap() {
+        Group group = group(1L);
+        Player player = player(9L, group, 1930, "2026-01-02T00:00:00Z");
+        player.setTier("A+");
+        player.setDormancyMmrFloorTier("A");
+
+        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of(player));
+        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L)).thenReturn(List.of());
+
+        service.applyGroupDormancyDecay(1L);
+
+        assertThat(player.getMmr()).isEqualTo(1600);
+        verify(playerRepository).saveAll(List.of(player));
+    }
+
+    @Test
+    void doesNotIncreaseMmrWhenConfiguredDormancyFloorIsAboveCurrentMmr() {
+        Group group = group(1L);
+        Player player = player(9L, group, 1500, "2026-01-02T00:00:00Z");
+        player.setTier("A");
+        player.setDormancyMmrFloorTier("A");
+
+        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of(player));
+        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L)).thenReturn(List.of());
+
+        service.applyGroupDormancyDecay(1L);
+
+        assertThat(player.getMmr()).isEqualTo(1500);
+        verify(playerRepository).saveAll(List.of(player));
+    }
+
+    @Test
     void doesNotApplyTheSameDormancyPeriodTwice() {
         Group group = group(1L);
         Player player = player(9L, group, 330, "2026-01-02T00:00:00Z");

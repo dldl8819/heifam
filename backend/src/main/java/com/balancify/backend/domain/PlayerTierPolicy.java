@@ -124,6 +124,11 @@ public final class PlayerTierPolicy {
         return TIER_FLOOR_MMR.getOrDefault(normalizedTier, 0);
     }
 
+    public static String normalizeRankedTier(String tier) {
+        String normalizedTier = canonicalTier(tier, "");
+        return TIER_NONE.equals(normalizedTier) ? "" : normalizedTier;
+    }
+
     public static String demoteTier(String tier, int steps) {
         if (steps <= 0) {
             return canonicalTier(tier, TIER_NONE);
@@ -160,6 +165,26 @@ public final class PlayerTierPolicy {
         String normalizedCurrentTier = canonicalTier(currentTier, resolveTier(normalizedMmr));
         String demotedTier = demoteTier(normalizedCurrentTier, cappedDemoteSteps);
         return TIER_FLOOR_MMR.getOrDefault(demotedTier, 0);
+    }
+
+    public static int resolveDormancyMinimumMmr(
+        String currentTier,
+        Integer mmr,
+        int demoteSteps,
+        String dormancyFloorTier
+    ) {
+        int policyMinimumMmr = resolveDormancyMinimumMmr(currentTier, mmr, demoteSteps);
+        int normalizedMmr = Math.max(0, mmr == null ? 0 : mmr);
+        if (normalizedMmr <= 0) {
+            return 0;
+        }
+
+        String normalizedFloorTier = normalizeRankedTier(dormancyFloorTier);
+        if (normalizedFloorTier.isEmpty()) {
+            return policyMinimumMmr;
+        }
+
+        return Math.max(policyMinimumMmr, TIER_FLOOR_MMR.getOrDefault(normalizedFloorTier, 0));
     }
 
     public static boolean isLowTier(Integer mmr) {

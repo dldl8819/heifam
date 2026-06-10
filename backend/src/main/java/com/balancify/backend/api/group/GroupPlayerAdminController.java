@@ -4,6 +4,7 @@ import com.balancify.backend.api.group.dto.GroupPlayerUpdateRequest;
 import com.balancify.backend.api.group.dto.GroupPlayerMmrUpdateRequest;
 import com.balancify.backend.security.AuthenticatedRequestResolver;
 import com.balancify.backend.security.MmrAccessRequestResolver;
+import com.balancify.backend.security.SuperAdminRequestResolver;
 import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.PlayerAdminService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,17 +24,20 @@ public class GroupPlayerAdminController {
 
     private final PlayerAdminService playerAdminService;
     private final MmrAccessRequestResolver mmrAccessRequestResolver;
+    private final SuperAdminRequestResolver superAdminRequestResolver;
     private final AuthenticatedRequestResolver authenticatedRequestResolver;
     private final AccessControlService accessControlService;
 
     public GroupPlayerAdminController(
         PlayerAdminService playerAdminService,
         MmrAccessRequestResolver mmrAccessRequestResolver,
+        SuperAdminRequestResolver superAdminRequestResolver,
         AuthenticatedRequestResolver authenticatedRequestResolver,
         AccessControlService accessControlService
     ) {
         this.playerAdminService = playerAdminService;
         this.mmrAccessRequestResolver = mmrAccessRequestResolver;
+        this.superAdminRequestResolver = superAdminRequestResolver;
         this.authenticatedRequestResolver = authenticatedRequestResolver;
         this.accessControlService = accessControlService;
     }
@@ -49,6 +53,12 @@ public class GroupPlayerAdminController {
             throw new ResponseStatusException(
                 HttpStatus.FORBIDDEN,
                 "MMR access is required to acknowledge tier change"
+            );
+        }
+        if (hasDormancyMmrFloorTier(request) && !superAdminRequestResolver.isSuperAdminRequest(httpRequest)) {
+            throw new ResponseStatusException(
+                HttpStatus.FORBIDDEN,
+                "Super admin role is required to update dormancy MMR floor tier"
             );
         }
 
@@ -126,6 +136,10 @@ public class GroupPlayerAdminController {
         return request != null
             && request.tierChangeAcknowledgedTier() != null
             && !request.tierChangeAcknowledgedTier().isBlank();
+    }
+
+    private boolean hasDormancyMmrFloorTier(GroupPlayerUpdateRequest request) {
+        return request != null && request.dormancyMmrFloorTier() != null;
     }
 
     private String resolveActorNickname(AuthenticatedRequestResolver.ResolvedRequestIdentity identity) {

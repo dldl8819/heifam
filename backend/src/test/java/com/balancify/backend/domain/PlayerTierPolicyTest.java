@@ -122,6 +122,20 @@ class PlayerTierPolicyTest {
     }
 
     @Test
+    void appliesConfiguredDormancyFloorTierWhenItIsHigherThanDefaultCap() {
+        assertThat(PlayerTierPolicy.resolveDormancyMinimumMmr("A+", 1930, 2, "A")).isEqualTo(1600);
+        assertThat(PlayerTierPolicy.resolveDormancyMinimumMmr("A", 1680, 2, "B+")).isEqualTo(1200);
+        assertThat(PlayerTierPolicy.resolveDormancyMinimumMmr("A", 1680, 2, "UNASSIGNED")).isEqualTo(1200);
+    }
+
+    @Test
+    void normalizesRankedTierForDormancyFloorSettings() {
+        assertThat(PlayerTierPolicy.normalizeRankedTier(" b+ ")).isEqualTo("B+");
+        assertThat(PlayerTierPolicy.normalizeRankedTier("UNASSIGNED")).isEmpty();
+        assertThat(PlayerTierPolicy.normalizeRankedTier("diamond")).isEmpty();
+    }
+
+    @Test
     void doesNotIncreaseMmrWhenDormancyTargetIsHigherThanCurrent() {
         assertThat(PlayerTierPolicy.resolveDormancyAdjustedMmr("A+", 1750, 1)).isEqualTo(1750);
         assertThat(PlayerTierPolicy.resolveDormancyAdjustedMmr("NONE", 0, 1)).isEqualTo(0);

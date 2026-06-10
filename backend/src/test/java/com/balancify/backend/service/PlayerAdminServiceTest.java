@@ -475,6 +475,67 @@ class PlayerAdminServiceTest {
     }
 
     @Test
+    void storesDormancyMmrFloorTierWithoutOtherPlayerChanges() {
+        Player player = player(10L, 1L, "PlayerAlpha");
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+        when(playerRepository.save(any(Player.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        playerAdminService.updatePlayer(
+            1L,
+            10L,
+            new GroupPlayerUpdateRequest(null, null, null, null, null, null, null, null, "b+")
+        );
+
+        assertThat(player.getDormancyMmrFloorTier()).isEqualTo("B+");
+        verify(playerRepository).save(player);
+        verify(operationAuditLogService, never()).recordPlayerTierUpdate(
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any()
+        );
+    }
+
+    @Test
+    void clearsDormancyMmrFloorTierWhenDefaultPolicyIsRequested() {
+        Player player = player(10L, 1L, "PlayerAlpha");
+        player.setDormancyMmrFloorTier("B");
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+        when(playerRepository.save(any(Player.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        playerAdminService.updatePlayer(
+            1L,
+            10L,
+            new GroupPlayerUpdateRequest(null, null, null, null, null, null, null, null, "UNASSIGNED")
+        );
+
+        assertThat(player.getDormancyMmrFloorTier()).isNull();
+        verify(playerRepository).save(player);
+    }
+
+    @Test
+    void throwsWhenDormancyMmrFloorTierIsInvalid() {
+        Player player = player(10L, 1L, "PlayerAlpha");
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+
+        assertThatThrownBy(() ->
+            playerAdminService.updatePlayer(
+                1L,
+                10L,
+                new GroupPlayerUpdateRequest(null, null, null, null, null, null, null, null, "diamond")
+            )
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Dormancy MMR floor tier is invalid");
+
+        verify(playerRepository, never()).save(any(Player.class));
+    }
+
+    @Test
     void throwsWhenTierChangeAcknowledgementTierIsInvalid() {
         Player player = player(10L, 1L, "기존닉");
         when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));

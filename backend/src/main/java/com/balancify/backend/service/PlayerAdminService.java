@@ -9,6 +9,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -67,6 +68,10 @@ public class PlayerAdminService {
         OffsetDateTime chatRejoinedAt = request == null ? null : request.chatRejoinedAt();
         String tierChangeAcknowledgedTier =
             normalizeTierChangeAcknowledgement(request == null ? null : request.tierChangeAcknowledgedTier());
+        boolean hasDormancyMmrFloorTier = request != null && request.dormancyMmrFloorTier() != null;
+        String dormancyMmrFloorTier = hasDormancyMmrFloorTier
+            ? normalizeDormancyMmrFloorTier(request.dormancyMmrFloorTier())
+            : null;
         String normalizedRace = race.isEmpty() ? "" : race.toUpperCase(Locale.ROOT);
 
         if (
@@ -78,6 +83,7 @@ public class PlayerAdminService {
                 && chatLeftReason.isEmpty()
                 && chatRejoinedAt == null
                 && tierChangeAcknowledgedTier.isEmpty()
+                && !hasDormancyMmrFloorTier
         ) {
             throw new IllegalArgumentException("At least one field is required");
         }
@@ -150,6 +156,10 @@ public class PlayerAdminService {
         if (!tierChangeAcknowledgedTier.isEmpty()) {
             player.setTierChangeAcknowledgedTier(tierChangeAcknowledgedTier);
             player.setTierChangeAcknowledgedAt(OffsetDateTime.now());
+        }
+
+        if (hasDormancyMmrFloorTier && !Objects.equals(dormancyMmrFloorTier, player.getDormancyMmrFloorTier())) {
+            player.setDormancyMmrFloorTier(dormancyMmrFloorTier);
         }
 
         playerRepository.save(player);
@@ -245,6 +255,23 @@ public class PlayerAdminService {
             throw new IllegalArgumentException("Tier is invalid");
         }
         return normalized;
+    }
+
+    private String normalizeDormancyMmrFloorTier(String value) {
+        String normalized = safeTrim(value).toUpperCase(Locale.ROOT);
+        if (normalized.isEmpty()
+            || "UNASSIGNED".equals(normalized)
+            || "NONE".equals(normalized)
+            || "PENDING".equals(normalized)
+            || "TBD".equals(normalized)) {
+            return null;
+        }
+
+        String rankedTier = PlayerTierPolicy.normalizeRankedTier(normalized);
+        if (rankedTier.isEmpty()) {
+            throw new IllegalArgumentException("Dormancy MMR floor tier is invalid");
+        }
+        return rankedTier;
     }
 
     private String normalizeAuditTier(String value) {

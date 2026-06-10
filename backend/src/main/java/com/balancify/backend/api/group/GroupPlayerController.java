@@ -47,8 +47,11 @@ public class GroupPlayerController {
             groupId,
             accessProfile.admin() && includeInactive
         );
-        if (accessProfile.canViewMmr()) {
+        if (accessProfile.superAdmin()) {
             return response;
+        }
+        if (accessProfile.canViewMmr()) {
+            return MmrMaskingMapper.maskGroupPlayersForMmrViewer(response);
         }
         if (accessProfile.admin()) {
             return MmrMaskingMapper.maskGroupPlayersForAdmin(response);

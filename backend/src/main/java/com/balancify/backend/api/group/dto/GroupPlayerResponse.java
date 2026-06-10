@@ -24,6 +24,53 @@ public record GroupPlayerResponse(
     String chatLeftReason,
     OffsetDateTime chatRejoinedAt,
     String tierChangeAcknowledgedTier,
-    OffsetDateTime tierChangeAcknowledgedAt
+    OffsetDateTime tierChangeAcknowledgedAt,
+    String dormancyMmrFloorTier
 ) {
+    public GroupPlayerResponse(
+        Long id,
+        String nickname,
+        String race,
+        String tier,
+        Integer baseMmr,
+        String baseTier,
+        Integer currentMmr,
+        OffsetDateTime lastTierSnapshotAt,
+        Integer lastTierSnapshotMmr,
+        String lastTierSnapshotTier,
+        String liveTier,
+        int wins,
+        int losses,
+        int games,
+        boolean active,
+        OffsetDateTime chatLeftAt,
+        String chatLeftReason,
+        OffsetDateTime chatRejoinedAt,
+        String tierChangeAcknowledgedTier,
+        OffsetDateTime tierChangeAcknowledgedAt
+    ) {
+        this(
+            id,
+            nickname,
+            race,
+            tier,
+            baseMmr,
+            baseTier,
+            currentMmr,
+            lastTierSnapshotAt,
+            lastTierSnapshotMmr,
+            lastTierSnapshotTier,
+            liveTier,
+            wins,
+            losses,
+            games,
+            active,
+            chatLeftAt,
+            chatLeftReason,
+            chatRejoinedAt,
+            tierChangeAcknowledgedTier,
+            tierChangeAcknowledgedAt,
+            null
+        );
+    }
 }

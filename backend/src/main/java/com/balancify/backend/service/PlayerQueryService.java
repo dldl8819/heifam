@@ -105,7 +105,10 @@ public class PlayerQueryService {
                 player.getChatLeftReason(),
                 player.getChatRejoinedAt(),
                 player.getTierChangeAcknowledgedTier(),
-                player.getTierChangeAcknowledgedAt()
+                player.getTierChangeAcknowledgedAt(),
+                PlayerTierPolicy.normalizeRankedTier(player.getDormancyMmrFloorTier()).isEmpty()
+                    ? null
+                    : PlayerTierPolicy.normalizeRankedTier(player.getDormancyMmrFloorTier())
             ));
         }
 

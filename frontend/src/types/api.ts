@@ -219,6 +219,7 @@ export type PlayerRosterItem = {
   baseMmr?: number
   baseTier?: PlayerTierStatus
   currentMmr?: number
+  dormancyMmrFloorTier?: PlayerTierStatus
   lastTierSnapshotAt?: string
   lastTierSnapshotMmr?: number
   lastTierSnapshotTier?: PlayerTierStatus
@@ -230,8 +231,6 @@ export type PlayerRosterItem = {
   chatLeftAt?: string
   chatLeftReason?: string
   chatRejoinedAt?: string
-  tierChangeAcknowledgedTier?: PlayerTierStatus
-  tierChangeAcknowledgedAt?: string
 }
 
 export type GroupPlayerTierBoardItem = Pick<
@@ -247,7 +246,7 @@ export type GroupPlayerUpdateRequest = {
   chatLeftAt?: string | null
   chatLeftReason?: string | null
   chatRejoinedAt?: string | null
-  tierChangeAcknowledgedTier?: PlayerTierStatus | null
+  dormancyMmrFloorTier?: PlayerTierStatus
 }
 
 export type GroupPlayerMmrUpdateRequest = {
