@@ -4,6 +4,7 @@ type PlayerProfileEditInput = {
   nickname: string
   race: PlayerRace
   tier: PlayerTierStatus
+  dormancyMmrFloorTier?: PlayerTierStatus
 }
 
 export function buildPlayerProfileUpdateRequest(
@@ -21,6 +22,12 @@ export function buildPlayerProfileUpdateRequest(
   }
   if (next.tier !== current.tier) {
     payload.tier = next.tier
+  }
+  if (
+    next.dormancyMmrFloorTier !== undefined &&
+    next.dormancyMmrFloorTier !== (current.dormancyMmrFloorTier ?? 'UNASSIGNED')
+  ) {
+    payload.dormancyMmrFloorTier = next.dormancyMmrFloorTier
   }
 
   return payload

@@ -282,14 +282,11 @@ export default function PlayersPage() {
   const [editingRace, setEditingRace] = useState<PlayerRace>('P')
   const [editingTier, setEditingTier] = useState<PlayerTierStatus>('UNASSIGNED')
   const [editingInlineMmrValue, setEditingInlineMmrValue] = useState<string>('')
+  const [editingDormancyFloorTier, setEditingDormancyFloorTier] =
+    useState<PlayerTierStatus>('UNASSIGNED')
   const [savingPlayerId, setSavingPlayerId] = useState<number | null>(null)
-  const [editingMmrPlayerId, setEditingMmrPlayerId] = useState<number | null>(null)
-  const [editingMmrValue, setEditingMmrValue] = useState<string>('')
-  const [savingMmrPlayerId, setSavingMmrPlayerId] = useState<number | null>(null)
   const [deletingPlayerId, setDeletingPlayerId] = useState<number | null>(null)
   const [togglingPlayerId, setTogglingPlayerId] = useState<number | null>(null)
-  const [dormancyFloorSelections, setDormancyFloorSelections] = useState<Record<number, PlayerTierStatus>>({})
-  const [savingDormancyFloorPlayerId, setSavingDormancyFloorPlayerId] = useState<number | null>(null)
   const [activityForm, setActivityForm] = useState<ActivityFormState | null>(null)
   const [showInactive, setShowInactive] = useState<boolean>(false)
   const [playerActionError, setPlayerActionError] = useState<string | null>(null)
@@ -315,17 +312,6 @@ export default function PlayersPage() {
   useEffect(() => {
     void fetchRoster()
   }, [fetchRoster])
-
-  useEffect(() => {
-    setDormancyFloorSelections((currentSelections) => {
-      const nextSelections: Record<number, PlayerTierStatus> = {}
-      for (const row of rows) {
-        nextSelections[row.id] =
-          currentSelections[row.id] ?? row.dormancyMmrFloorTier ?? 'UNASSIGNED'
-      }
-      return nextSelections
-    })
-  }, [rows])
 
   const handleRegisterPlayer = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -403,8 +389,6 @@ export default function PlayersPage() {
       return
     }
 
-    setEditingMmrPlayerId(null)
-    setEditingMmrValue('')
     setEditingPlayerId(player.id)
     setEditingNickname(player.nickname)
     setEditingRace(player.race)
@@ -412,6 +396,7 @@ export default function PlayersPage() {
     setEditingInlineMmrValue(
       typeof player.currentMmr === 'number' ? String(player.currentMmr) : ''
     )
+    setEditingDormancyFloorTier(player.dormancyMmrFloorTier ?? 'UNASSIGNED')
     setActivityForm(null)
     setPlayerActionError(null)
     setPlayerActionSuccess(null)
@@ -423,6 +408,7 @@ export default function PlayersPage() {
     setEditingRace('P')
     setEditingTier('UNASSIGNED')
     setEditingInlineMmrValue('')
+    setEditingDormancyFloorTier('UNASSIGNED')
   }
 
   const handleSaveEdit = async (playerId: number) => {
@@ -467,13 +453,15 @@ export default function PlayersPage() {
         nickname: nextNickname,
         race: editingRace,
         tier: editingTier,
+        dormancyMmrFloorTier: isSuperAdmin ? editingDormancyFloorTier : undefined,
       })
       if (Object.keys(profilePayload).length > 0) {
         await apiClient.updateGroupPlayer(TEMP_GROUP_ID, playerId, profilePayload)
       }
 
       const targetMmr = typeof targetRow.currentMmr === 'number' ? targetRow.currentMmr : null
-      if (isSuperAdmin && nextMmr !== null && nextMmr !== targetMmr) {
+      const didUpdateMmr = isSuperAdmin && nextMmr !== null && nextMmr !== targetMmr
+      if (didUpdateMmr && nextMmr !== null) {
         await apiClient.updateGroupPlayerMmr(TEMP_GROUP_ID, playerId, {
           mmr: nextMmr,
         })
@@ -484,8 +472,9 @@ export default function PlayersPage() {
       setEditingRace('P')
       setEditingTier('UNASSIGNED')
       setEditingInlineMmrValue('')
+      setEditingDormancyFloorTier('UNASSIGNED')
       setPlayerActionSuccess(
-        isSuperAdmin ? t('players.actions.updateAndMmrSuccess') : t('players.actions.updateSuccess')
+        didUpdateMmr ? t('players.actions.updateAndMmrSuccess') : t('players.actions.updateSuccess')
       )
       await fetchRoster()
     } catch (actionError) {
@@ -498,69 +487,6 @@ export default function PlayersPage() {
       }
     } finally {
       setSavingPlayerId(null)
-    }
-  }
-
-  const handleStartMmrEdit = (player: PlayerRosterItem) => {
-    if (!isSuperAdmin) {
-      return
-    }
-
-    setEditingPlayerId(null)
-    setEditingNickname('')
-    setEditingRace('P')
-    setEditingTier('UNASSIGNED')
-    setEditingMmrPlayerId(player.id)
-    setEditingMmrValue(typeof player.currentMmr === 'number' ? String(player.currentMmr) : '')
-    setActivityForm(null)
-    setPlayerActionError(null)
-    setPlayerActionSuccess(null)
-  }
-
-  const handleCancelMmrEdit = () => {
-    setEditingMmrPlayerId(null)
-    setEditingMmrValue('')
-  }
-
-  const handleSaveMmr = async (playerId: number) => {
-    if (!isSuperAdmin) {
-      setPlayerActionError(t('common.adminOnlyAction'))
-      return
-    }
-
-    const raw = editingMmrValue.trim()
-    if (raw.length === 0) {
-      setPlayerActionError(t('players.actions.mmrRequired'))
-      return
-    }
-
-    const parsed = Number(raw)
-    const isInteger = Number.isInteger(parsed)
-    if (!isInteger || parsed < 0 || parsed > 5000) {
-      setPlayerActionError(t('players.actions.mmrInvalid'))
-      return
-    }
-
-    setSavingMmrPlayerId(playerId)
-    setPlayerActionError(null)
-    setPlayerActionSuccess(null)
-
-    try {
-      await apiClient.updateGroupPlayerMmr(TEMP_GROUP_ID, playerId, { mmr: parsed })
-      setEditingMmrPlayerId(null)
-      setEditingMmrValue('')
-      setPlayerActionSuccess(t('players.actions.mmrUpdateSuccess'))
-      await fetchRoster()
-    } catch (actionError) {
-      if (isApiForbiddenError(actionError)) {
-        setPlayerActionError(t('common.permissionDenied'))
-      } else if (isApiNotFoundError(actionError)) {
-        setPlayerActionError(t('players.actions.mmrUpdateNotFound'))
-      } else {
-        setPlayerActionError(t('players.actions.mmrUpdateFailure'))
-      }
-    } finally {
-      setSavingMmrPlayerId(null)
     }
   }
 
@@ -585,19 +511,11 @@ export default function PlayersPage() {
         setEditingRace('P')
         setEditingTier('UNASSIGNED')
         setEditingInlineMmrValue('')
-      }
-      if (editingMmrPlayerId === player.id) {
-        setEditingMmrPlayerId(null)
-        setEditingMmrValue('')
+        setEditingDormancyFloorTier('UNASSIGNED')
       }
       if (activityForm?.player.id === player.id) {
         setActivityForm(null)
       }
-      setDormancyFloorSelections((currentSelections) => {
-        const nextSelections = { ...currentSelections }
-        delete nextSelections[player.id]
-        return nextSelections
-      })
       setPlayerActionSuccess(t('players.actions.deleteSuccess'))
       await fetchRoster()
     } catch (actionError) {
@@ -715,10 +633,7 @@ export default function PlayersPage() {
         setEditingRace('P')
         setEditingTier('UNASSIGNED')
         setEditingInlineMmrValue('')
-      }
-      if (editingMmrPlayerId === player.id) {
-        setEditingMmrPlayerId(null)
-        setEditingMmrValue('')
+        setEditingDormancyFloorTier('UNASSIGNED')
       }
       setPlayerActionSuccess(
         nextActive ? t('players.actions.reactivateSuccess') : t('players.actions.deactivateSuccess')
@@ -736,51 +651,6 @@ export default function PlayersPage() {
       }
     } finally {
       setTogglingPlayerId(null)
-    }
-  }
-
-  const handleSaveDormancyFloor = async (player: PlayerRosterItem) => {
-    if (!isSuperAdmin) {
-      setPlayerActionError(t('common.adminOnlyAction'))
-      return
-    }
-
-    const selectedTier = dormancyFloorSelections[player.id] ?? player.dormancyMmrFloorTier ?? 'UNASSIGNED'
-    const currentTier = player.dormancyMmrFloorTier ?? 'UNASSIGNED'
-    if (selectedTier === currentTier) {
-      setPlayerActionError(t('players.dormancyFloor.noChange'))
-      return
-    }
-
-    setSavingDormancyFloorPlayerId(player.id)
-    setPlayerActionError(null)
-    setPlayerActionSuccess(null)
-
-    try {
-      await apiClient.updateGroupPlayer(TEMP_GROUP_ID, player.id, {
-        dormancyMmrFloorTier: selectedTier,
-      })
-      setRows((currentRows) =>
-        currentRows.map((row) =>
-          row.id === player.id
-            ? {
-                ...row,
-                dormancyMmrFloorTier: selectedTier === 'UNASSIGNED' ? undefined : selectedTier,
-              }
-            : row
-        )
-      )
-      setPlayerActionSuccess(t('players.dormancyFloor.updateSuccess', { nickname: player.nickname }))
-    } catch (actionError) {
-      if (isApiForbiddenError(actionError)) {
-        setPlayerActionError(t('common.permissionDenied'))
-      } else if (isApiNotFoundError(actionError)) {
-        setPlayerActionError(t('players.actions.updateNotFound'))
-      } else {
-        setPlayerActionError(t('players.dormancyFloor.updateFailure'))
-      }
-    } finally {
-      setSavingDormancyFloorPlayerId(null)
     }
   }
 
@@ -1069,87 +939,6 @@ export default function PlayersPage() {
         </div>
       )}
 
-      {isSuperAdmin && (
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-900">{t('players.dormancyFloor.title')}</h3>
-              <p className="mt-1 text-xs text-slate-500">{t('players.dormancyFloor.description')}</p>
-            </div>
-          </div>
-          <div className="mt-3 overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs tracking-wide text-slate-500">
-                <tr>
-                  <th className="px-3 py-2">{t('players.dormancyFloor.player')}</th>
-                  <th className="px-3 py-2">{t('players.dormancyFloor.currentFloor')}</th>
-                  <th className="px-3 py-2">{t('players.dormancyFloor.nextFloor')}</th>
-                  <th className="px-3 py-2">{t('players.dormancyFloor.action')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr className="border-t border-slate-100">
-                    <td className="px-3 py-3" colSpan={4}>
-                      <LoadingIndicator label={t('common.loading')} />
-                    </td>
-                  </tr>
-                ) : rows.length === 0 ? (
-                  <tr className="border-t border-slate-100">
-                    <td className="px-3 py-4 text-center text-xs text-slate-500" colSpan={4}>
-                      {t('players.dormancyFloor.empty')}
-                    </td>
-                  </tr>
-                ) : (
-                  rows.map((row) => {
-                    const selectedTier =
-                      dormancyFloorSelections[row.id] ?? row.dormancyMmrFloorTier ?? 'UNASSIGNED'
-                    const currentTier = row.dormancyMmrFloorTier ?? 'UNASSIGNED'
-                    const isSavingFloor = savingDormancyFloorPlayerId === row.id
-                    const hasChanged = selectedTier !== currentTier
-
-                    return (
-                      <tr key={`dormancy-floor-${row.id}`} className="border-t border-slate-100">
-                        <td className="px-3 py-2 font-medium text-slate-900">{row.nickname}</td>
-                        <td className="px-3 py-2 text-slate-700">{formatTierOption(row.dormancyMmrFloorTier)}</td>
-                        <td className="px-3 py-2">
-                          <select
-                            value={selectedTier}
-                            onChange={(event) =>
-                              setDormancyFloorSelections((currentSelections) => ({
-                                ...currentSelections,
-                                [row.id]: event.target.value as PlayerTierStatus,
-                              }))
-                            }
-                            className="w-32 rounded-md border border-slate-200 px-2 py-1 text-xs outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-                          >
-                            {PLAYER_DORMANCY_FLOOR_TIER_OPTIONS.map((tierOption) => (
-                              <option key={`dormancy-floor-option-${tierOption}`} value={tierOption}>
-                                {formatTierOption(tierOption)}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="px-3 py-2">
-                          <button
-                            type="button"
-                            disabled={!hasChanged || savingDormancyFloorPlayerId !== null}
-                            onClick={() => void handleSaveDormancyFloor(row)}
-                            className="rounded-md bg-slate-900 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-                          >
-                            {isSavingFloor ? t('players.dormancyFloor.saving') : t('players.dormancyFloor.save')}
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </article>
-      )}
-
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         {isAdmin && (
           <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -1258,12 +1047,10 @@ export default function PlayersPage() {
             {!loading &&
               filteredRows.map((row) => {
                 const isEditing = editingPlayerId === row.id
-                const isMmrEditing = editingMmrPlayerId === row.id
                 const isSaving = savingPlayerId === row.id
-                const isSavingMmr = savingMmrPlayerId === row.id
                 const isDeleting = deletingPlayerId === row.id
                 const isToggling = togglingPlayerId === row.id
-                const busy = isSaving || isSavingMmr || isDeleting || isToggling
+                const busy = isSaving || isDeleting || isToggling
                 const isActive = row.active !== false
 
                 return (
@@ -1336,7 +1123,7 @@ export default function PlayersPage() {
                     </td>
                     {showStatusColumn && (
                       <td className="px-4 py-3">
-                        <div className="space-y-1">
+                        <div className="space-y-2">
                           <span
                             className={`rounded-md px-2 py-1 text-xs font-semibold ${
                               isActive
@@ -1363,6 +1150,32 @@ export default function PlayersPage() {
                               {t('players.table.chatRejoinedAt', {
                                 value: formatChatRecordDisplay(row.chatRejoinedAt),
                               })}
+                            </div>
+                          )}
+                          {isSuperAdmin && (
+                            <div className="space-y-1">
+                              <div className="text-[11px] font-medium text-slate-500">
+                                {t('players.dormancyFloor.inlineLabel')}
+                              </div>
+                              {isEditing ? (
+                                <select
+                                  value={editingDormancyFloorTier}
+                                  onChange={(event) =>
+                                    setEditingDormancyFloorTier(event.target.value as PlayerTierStatus)
+                                  }
+                                  className="w-32 rounded-md border border-slate-200 px-2 py-1 text-xs outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                                >
+                                  {PLAYER_DORMANCY_FLOOR_TIER_OPTIONS.map((tierOption) => (
+                                    <option key={`dormancy-floor-option-${tierOption}`} value={tierOption}>
+                                      {formatTierOption(tierOption)}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-700">
+                                  {formatTierOption(row.dormancyMmrFloorTier)}
+                                </span>
+                              )}
                             </div>
                           )}
                         </div>
@@ -1415,7 +1228,6 @@ export default function PlayersPage() {
                               type="button"
                               disabled={
                                 editingPlayerId !== null ||
-                                editingMmrPlayerId !== null ||
                                 deletingPlayerId !== null ||
                                 activityForm !== null
                               }
@@ -1426,56 +1238,9 @@ export default function PlayersPage() {
                             </button>
                           )}
 
-                          {isSuperAdmin &&
-                            showMmrColumn &&
-                            !isEditing &&
-                            (isMmrEditing ? (
-                              <>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  max={5000}
-                                  step={1}
-                                  value={editingMmrValue}
-                                  onChange={(event) => setEditingMmrValue(event.target.value)}
-                                  className="w-24 rounded-md border border-slate-200 px-2 py-1 text-xs outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-                                />
-                                <button
-                                  type="button"
-                                  disabled={busy}
-                                  onClick={() => handleSaveMmr(row.id)}
-                                  className="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-300"
-                                >
-                                  {isSavingMmr ? t('players.actions.mmrSaving') : t('players.actions.mmrSave')}
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={busy}
-                                  onClick={handleCancelMmrEdit}
-                                  className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                  {t('players.actions.mmrCancel')}
-                                </button>
-                              </>
-                            ) : (
-                              <button
-                                type="button"
-                                disabled={
-                                  editingPlayerId !== null ||
-                                  editingMmrPlayerId !== null ||
-                                  deletingPlayerId !== null ||
-                                  activityForm !== null
-                                }
-                                onClick={() => handleStartMmrEdit(row)}
-                                className="rounded-md border border-indigo-300 px-2.5 py-1 text-xs font-medium text-indigo-700 transition-colors hover:border-indigo-600 hover:bg-indigo-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                {t('players.actions.mmrEdit')}
-                              </button>
-                            ))}
-
                           <button
                             type="button"
-                            disabled={busy || editingPlayerId !== null || editingMmrPlayerId !== null || activityForm !== null}
+                            disabled={busy || editingPlayerId !== null || activityForm !== null}
                             onClick={() => handleTogglePlayerActive(row)}
                             className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                               isActive
@@ -1492,7 +1257,7 @@ export default function PlayersPage() {
 
                           <button
                             type="button"
-                            disabled={busy || editingPlayerId !== null || editingMmrPlayerId !== null || activityForm !== null}
+                            disabled={busy || editingPlayerId !== null || activityForm !== null}
                             onClick={() => handleDeletePlayer(row)}
                             className="rounded-md border border-rose-300 px-2.5 py-1 text-xs font-medium text-rose-700 transition-colors hover:border-rose-600 hover:bg-rose-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
                           >

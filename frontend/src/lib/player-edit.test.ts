@@ -48,4 +48,37 @@ describe('buildPlayerProfileUpdateRequest', () => {
 
     expect(payload).toEqual({ tier: 'A' })
   })
+
+  it('sends dormancy floor tier when it changes', () => {
+    const payload = buildPlayerProfileUpdateRequest(player({ dormancyMmrFloorTier: 'B+' }), {
+      nickname: 'PlayerAlpha',
+      race: 'P',
+      tier: 'B+',
+      dormancyMmrFloorTier: 'A',
+    })
+
+    expect(payload).toEqual({ dormancyMmrFloorTier: 'A' })
+  })
+
+  it('treats missing dormancy floor tier as default policy', () => {
+    const payload = buildPlayerProfileUpdateRequest(player(), {
+      nickname: 'PlayerAlpha',
+      race: 'P',
+      tier: 'B+',
+      dormancyMmrFloorTier: 'UNASSIGNED',
+    })
+
+    expect(payload).toEqual({})
+  })
+
+  it('sends default policy when clearing a configured dormancy floor tier', () => {
+    const payload = buildPlayerProfileUpdateRequest(player({ dormancyMmrFloorTier: 'B+' }), {
+      nickname: 'PlayerAlpha',
+      race: 'P',
+      tier: 'B+',
+      dormancyMmrFloorTier: 'UNASSIGNED',
+    })
+
+    expect(payload).toEqual({ dormancyMmrFloorTier: 'UNASSIGNED' })
+  })
 })
