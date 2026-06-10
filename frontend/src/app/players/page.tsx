@@ -674,9 +674,14 @@ export default function PlayersPage() {
   )
 
   const showStatusColumn = isAdmin
+  const showDormancyFloorColumn = isSuperAdmin
   const showActionsColumn = isAdmin
   const tableColumnCount =
-    6 + (showStatusColumn ? 1 : 0) + (showMmrColumn ? 1 : 0) + (showActionsColumn ? 1 : 0)
+    6 +
+    (showStatusColumn ? 1 : 0) +
+    (showDormancyFloorColumn ? 1 : 0) +
+    (showMmrColumn ? 1 : 0) +
+    (showActionsColumn ? 1 : 0)
   const downloadableRows = useMemo(
     () => [...rows].sort(comparePlayersByTierThenNickname),
     [rows]
@@ -1013,6 +1018,9 @@ export default function PlayersPage() {
               <th className="px-4 py-3">{t('players.table.race')}</th>
               <th className="px-4 py-3">{t('players.table.tier')}</th>
               {showStatusColumn && <th className="px-4 py-3">{t('players.table.status')}</th>}
+              {showDormancyFloorColumn && (
+                <th className="px-4 py-3">{t('players.dormancyFloor.inlineLabel')}</th>
+              )}
               {showMmrColumn && <th className="px-4 py-3">{t('players.table.currentMmr')}</th>}
               <th className="px-4 py-3">{t('players.table.wins')}</th>
               <th className="px-4 py-3">{t('players.table.losses')}</th>
@@ -1123,7 +1131,7 @@ export default function PlayersPage() {
                     </td>
                     {showStatusColumn && (
                       <td className="px-4 py-3">
-                        <div className="space-y-2">
+                        <div className="space-y-1">
                           <span
                             className={`rounded-md px-2 py-1 text-xs font-semibold ${
                               isActive
@@ -1152,33 +1160,30 @@ export default function PlayersPage() {
                               })}
                             </div>
                           )}
-                          {isSuperAdmin && (
-                            <div className="space-y-1">
-                              <div className="text-[11px] font-medium text-slate-500">
-                                {t('players.dormancyFloor.inlineLabel')}
-                              </div>
-                              {isEditing ? (
-                                <select
-                                  value={editingDormancyFloorTier}
-                                  onChange={(event) =>
-                                    setEditingDormancyFloorTier(event.target.value as PlayerTierStatus)
-                                  }
-                                  className="w-32 rounded-md border border-slate-200 px-2 py-1 text-xs outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-                                >
-                                  {PLAYER_DORMANCY_FLOOR_TIER_OPTIONS.map((tierOption) => (
-                                    <option key={`dormancy-floor-option-${tierOption}`} value={tierOption}>
-                                      {formatTierOption(tierOption)}
-                                    </option>
-                                  ))}
-                                </select>
-                              ) : (
-                                <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-700">
-                                  {formatTierOption(row.dormancyMmrFloorTier)}
-                                </span>
-                              )}
-                            </div>
-                          )}
                         </div>
+                      </td>
+                    )}
+                    {showDormancyFloorColumn && (
+                      <td className="px-4 py-3">
+                        {isEditing ? (
+                          <select
+                            value={editingDormancyFloorTier}
+                            onChange={(event) =>
+                              setEditingDormancyFloorTier(event.target.value as PlayerTierStatus)
+                            }
+                            className="w-32 rounded-md border border-slate-200 px-2 py-1 text-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                          >
+                            {PLAYER_DORMANCY_FLOOR_TIER_OPTIONS.map((tierOption) => (
+                              <option key={`dormancy-floor-option-${tierOption}`} value={tierOption}>
+                                {formatTierOption(tierOption)}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700">
+                            {formatTierOption(row.dormancyMmrFloorTier)}
+                          </span>
+                        )}
                       </td>
                     )}
                     {showMmrColumn && (
