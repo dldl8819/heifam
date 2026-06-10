@@ -189,7 +189,7 @@ class DormancyMmrDecayServiceTest {
     }
 
     @Test
-    void capsMmrAtZero() {
+    void doesNotDemoteDTierBelowOneMmr() {
         Group group = group(1L);
         Player player = player(9L, group, 15, "2025-12-03T00:00:00Z");
 
@@ -198,8 +198,22 @@ class DormancyMmrDecayServiceTest {
 
         service.applyGroupDormancyDecay(1L);
 
+        assertThat(player.getMmr()).isEqualTo(1);
+        assertThat(player.getTier()).isEqualTo("D");
+    }
+
+    @Test
+    void keepsZeroMmrAtNoneForDormancyException() {
+        Group group = group(1L);
+        Player player = player(9L, group, 0, "2025-12-03T00:00:00Z");
+
+        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of(player));
+        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L)).thenReturn(List.of());
+
+        service.applyGroupDormancyDecay(1L);
+
         assertThat(player.getMmr()).isZero();
-        assertThat(player.getTier()).isEqualTo("C-");
+        assertThat(player.getTier()).isEqualTo("NONE");
     }
 
     private Group group(Long id) {

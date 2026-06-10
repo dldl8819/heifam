@@ -43,6 +43,21 @@ class MonthlyTierRefreshServiceTest {
     }
 
     @Test
+    void refreshesTierToDFromMonthEndMmr() {
+        OffsetDateTime now = OffsetDateTime.parse("2026-04-30T14:59:00Z");
+        MonthlyTierRefreshService service = service(now);
+        Player player = player(1L, "C-", 150);
+
+        when(playerRepository.findAll()).thenReturn(List.of(player));
+
+        service.applyMonthlyTierRefreshIfDue();
+
+        assertThat(player.getTier()).isEqualTo("D");
+        assertThat(player.getLastTierSnapshotMmr()).isEqualTo(150);
+        verify(playerRepository).saveAll(List.of(player));
+    }
+
+    @Test
     void doesNotRefreshTierBeforeKstMonthEndSettlementTime() {
         MonthlyTierRefreshService service = service(OffsetDateTime.parse("2026-04-30T14:58:00Z"));
         Player player = player(1L, "S", 890);

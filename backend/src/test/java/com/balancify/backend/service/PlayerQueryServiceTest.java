@@ -152,6 +152,31 @@ class PlayerQueryServiceTest {
     }
 
     @Test
+    void returnsDTierForSnapshotAndLiveTierFields() {
+        Group group = new Group();
+        group.setId(1L);
+
+        OffsetDateTime snapshotAt = OffsetDateTime.parse("2026-04-30T23:59:59+09:00");
+        Player player = player(1L, group, "PlayerDelta", "P", "D", 150);
+        player.setLastTierSnapshotAt(snapshotAt);
+        player.setLastTierSnapshotMmr(150);
+
+        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
+            .thenReturn(List.of(player));
+        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L))
+            .thenReturn(List.of());
+
+        List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L, false);
+
+        assertThat(response).hasSize(1);
+        GroupPlayerResponse item = response.get(0);
+        assertThat(item.tier()).isEqualTo("D");
+        assertThat(item.lastTierSnapshotMmr()).isEqualTo(150);
+        assertThat(item.lastTierSnapshotTier()).isEqualTo("D");
+        assertThat(item.liveTier()).isEqualTo("D");
+    }
+
+    @Test
     void returnsTierBoardUsingMonthlyTierAndLiveTierSeparately() {
         Group group = new Group();
         group.setId(1L);

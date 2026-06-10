@@ -46,6 +46,7 @@ const TIER_ROWS: TierRow[] = [
   { key: 'C+', label: 'C+', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950' },
   { key: 'C', label: 'C', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950' },
   { key: 'C-', label: 'C-', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950' },
+  { key: 'D', label: 'D', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950' },
   {
     key: 'UNASSIGNED',
     label: t('common.tierBoard.unassigned'),
@@ -99,6 +100,7 @@ export function TierParticipantBoard({
       'C+': [],
       C: [],
       'C-': [],
+      D: [],
       UNASSIGNED: [],
     },
   )

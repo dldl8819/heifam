@@ -21,7 +21,8 @@ const TIER_DOWNLOAD_ORDER: Record<PlayerTierStatus, number> = {
   'C+': 7,
   C: 8,
   'C-': 9,
-  UNASSIGNED: 10,
+  D: 10,
+  UNASSIGNED: 11,
 }
 
 export function toTierOrder(tier: PlayerTierStatus): number {

@@ -8,23 +8,25 @@ public final class PlayerTierPolicy {
 
     private static final String TIER_NONE = "NONE";
     private static final List<String> ORDERED_TIERS = List.of(
-        TIER_NONE, "C-", "C", "C+", "B-", "B", "B+", "A-", "A", "A+", "S"
+        TIER_NONE, "D", "C-", "C", "C+", "B-", "B", "B+", "A-", "A", "A+", "S"
     );
     private static final Map<String, Integer> TIER_INDEX = Map.ofEntries(
         Map.entry(TIER_NONE, 0),
-        Map.entry("C-", 1),
-        Map.entry("C", 2),
-        Map.entry("C+", 3),
-        Map.entry("B-", 4),
-        Map.entry("B", 5),
-        Map.entry("B+", 6),
-        Map.entry("A-", 7),
-        Map.entry("A", 8),
-        Map.entry("A+", 9),
-        Map.entry("S", 10)
+        Map.entry("D", 1),
+        Map.entry("C-", 2),
+        Map.entry("C", 3),
+        Map.entry("C+", 4),
+        Map.entry("B-", 5),
+        Map.entry("B", 6),
+        Map.entry("B+", 7),
+        Map.entry("A-", 8),
+        Map.entry("A", 9),
+        Map.entry("A+", 10),
+        Map.entry("S", 11)
     );
     private static final Map<String, Integer> TIER_FLOOR_MMR = Map.ofEntries(
         Map.entry(TIER_NONE, 0),
+        Map.entry("D", 1),
         Map.entry("C-", 200),
         Map.entry("C", 400),
         Map.entry("C+", 600),
@@ -50,6 +52,9 @@ public final class PlayerTierPolicy {
             return TIER_NONE;
         }
 
+        if (normalizedMmr < 200) {
+            return "D";
+        }
         if (normalizedMmr < 400) {
             return "C-";
         }
@@ -159,7 +164,7 @@ public final class PlayerTierPolicy {
 
     public static boolean isLowTier(Integer mmr) {
         String tier = resolveTier(mmr);
-        return TIER_NONE.equals(tier) || "C+".equals(tier) || "C".equals(tier) || "C-".equals(tier);
+        return TIER_NONE.equals(tier) || "C+".equals(tier) || "C".equals(tier) || "C-".equals(tier) || "D".equals(tier);
     }
 
     private static String canonicalTier(String tier, String fallback) {
@@ -184,7 +189,8 @@ public final class PlayerTierPolicy {
 
     private static String stepTier(String tier, int step) {
         int index = tierIndex(tier);
-        int nextIndex = Math.max(0, Math.min(ORDERED_TIERS.size() - 1, index + step));
+        int lowerBound = TIER_NONE.equals(tier) ? 0 : 1;
+        int nextIndex = Math.max(lowerBound, Math.min(ORDERED_TIERS.size() - 1, index + step));
         return ORDERED_TIERS.get(nextIndex);
     }
 

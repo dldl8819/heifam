@@ -61,6 +61,7 @@ const PLAYER_EDIT_TIER_OPTIONS: PlayerTierStatus[] = [
   'C+',
   'C',
   'C-',
+  'D',
   'UNASSIGNED',
 ]
 const PLAYER_REGISTRATION_TIER_OPTIONS: PlayerRegistrationTier[] = [
@@ -73,6 +74,7 @@ const PLAYER_REGISTRATION_TIER_OPTIONS: PlayerRegistrationTier[] = [
   'C+',
   'C',
   'C-',
+  'D',
   'UNASSIGNED',
 ]
 const REASSIGNMENT_IMPORT_TIER = '\uC7AC\uBC30\uC815\uB300\uC0C1'
@@ -236,6 +238,7 @@ function getTierBadgeClass(tier: PlayerTierStatus): string {
     case 'C+':
     case 'C':
     case 'C-':
+    case 'D':
       return 'bg-emerald-100 text-emerald-800'
     case 'UNASSIGNED':
       return 'bg-rose-100 text-rose-800'

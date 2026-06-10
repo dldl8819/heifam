@@ -253,6 +253,7 @@ public class PlayerImportService {
         mapping.put("C+", 600);
         mapping.put("C", 400);
         mapping.put("C-", 200);
+        mapping.put("D", 1);
         return Map.copyOf(mapping);
     }
 

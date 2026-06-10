@@ -5,6 +5,7 @@ import {
   buildTierChangeTargets,
   formatTierChangeDescription,
   formatTierChangeSnapshotDateLabel,
+  toTierOrder,
 } from './player-tier-change'
 import type { PlayerRosterItem } from '@/types/api'
 
@@ -112,6 +113,39 @@ describe('buildTierChangeTargets', () => {
       snapshotMmr: 980,
       currentMmr: 1410,
     })
+  })
+
+  it('supports D tier snapshot and live tier comparisons', () => {
+    const targets = buildTierChangeTargets([
+      player({
+        currentMmr: 205,
+        lastTierSnapshotAt: SNAPSHOT_AT,
+        lastTierSnapshotMmr: 150,
+        lastTierSnapshotTier: 'D',
+        liveTier: 'C-',
+      }),
+      player({
+        id: 2,
+        currentMmr: 150,
+        lastTierSnapshotAt: SNAPSHOT_AT,
+        lastTierSnapshotMmr: 150,
+        lastTierSnapshotTier: 'D',
+        liveTier: 'D',
+      }),
+    ])
+
+    expect(targets).toHaveLength(1)
+    expect(targets[0]).toMatchObject({
+      snapshotTier: 'D',
+      currentTier: 'C-',
+      snapshotMmr: 150,
+      currentMmr: 205,
+    })
+  })
+
+  it('orders D below C- and above unassigned', () => {
+    expect(toTierOrder('C-')).toBeLessThan(toTierOrder('D'))
+    expect(toTierOrder('D')).toBeLessThan(toTierOrder('UNASSIGNED'))
   })
 })
 

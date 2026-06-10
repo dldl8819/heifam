@@ -10,8 +10,9 @@ class PlayerTierPolicyTest {
     void resolvesTierByMmrBoundaries() {
         assertThat(PlayerTierPolicy.resolveTier(-10)).isEqualTo("NONE");
         assertThat(PlayerTierPolicy.resolveTier(0)).isEqualTo("NONE");
-        assertThat(PlayerTierPolicy.resolveTier(1)).isEqualTo("C-");
-        assertThat(PlayerTierPolicy.resolveTier(199)).isEqualTo("C-");
+        assertThat(PlayerTierPolicy.resolveTier(1)).isEqualTo("D");
+        assertThat(PlayerTierPolicy.resolveTier(199)).isEqualTo("D");
+        assertThat(PlayerTierPolicy.resolveTier(200)).isEqualTo("C-");
         assertThat(PlayerTierPolicy.resolveTier(399)).isEqualTo("C-");
         assertThat(PlayerTierPolicy.resolveTier(400)).isEqualTo("C");
         assertThat(PlayerTierPolicy.resolveTier(599)).isEqualTo("C");
@@ -30,6 +31,11 @@ class PlayerTierPolicyTest {
         assertThat(PlayerTierPolicy.resolveTier(1800)).isEqualTo("A+");
         assertThat(PlayerTierPolicy.resolveTier(1999)).isEqualTo("A+");
         assertThat(PlayerTierPolicy.resolveTier(2000)).isEqualTo("S");
+    }
+
+    @Test
+    void resolvesDefaultMmrForDTier() {
+        assertThat(PlayerTierPolicy.resolveDefaultMmrForTier("D")).isEqualTo(1);
     }
 
     @Test
@@ -85,7 +91,8 @@ class PlayerTierPolicyTest {
     void demotesTierByRequestedSteps() {
         assertThat(PlayerTierPolicy.demoteTier("A+", 1)).isEqualTo("A");
         assertThat(PlayerTierPolicy.demoteTier("A+", 2)).isEqualTo("A-");
-        assertThat(PlayerTierPolicy.demoteTier("C-", 1)).isEqualTo("NONE");
+        assertThat(PlayerTierPolicy.demoteTier("C-", 1)).isEqualTo("D");
+        assertThat(PlayerTierPolicy.demoteTier("D", 1)).isEqualTo("D");
     }
 
     @Test
@@ -111,6 +118,7 @@ class PlayerTierPolicyTest {
         assertThat(PlayerTierPolicy.resolveDormancyMinimumMmr("A", 1680, 2)).isEqualTo(1200);
         assertThat(PlayerTierPolicy.resolveDormancyMinimumMmr("A", 1680, 3)).isEqualTo(1200);
         assertThat(PlayerTierPolicy.resolveDormancyMinimumMmr("B+", 1320, 5)).isEqualTo(800);
+        assertThat(PlayerTierPolicy.resolveDormancyMinimumMmr("D", 150, 5)).isEqualTo(1);
     }
 
     @Test
