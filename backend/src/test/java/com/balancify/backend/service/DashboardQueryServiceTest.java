@@ -56,20 +56,9 @@ class DashboardQueryServiceTest {
         Player p5 = player(5L, group, "Echo", "T", 1500);
         Player p6 = player(6L, group, "Foxtrot", "Z", 1400);
 
-        Match m1 = match(101L, group, "HOME", OffsetDateTime.parse("2026-03-21T10:00:00+09:00"));
-        Match m2 = match(102L, group, "AWAY", OffsetDateTime.parse("2026-03-22T10:00:00+09:00"));
-
-        List<MatchParticipant> groupParticipants = List.of(
-            participant(1001L, m1, p1, "HOME", null),
-            participant(1002L, m1, p2, "AWAY", null),
-            participant(1003L, m2, p1, "HOME", null),
-            participant(1004L, m2, p2, "AWAY", null)
-        );
-
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
             .thenReturn(List.of(p1, p2, p3, p4, p5, p6));
-        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L))
-            .thenReturn(groupParticipants);
+        when(matchRepository.countByGroup_IdAndWinningTeamIsNotNull(1L)).thenReturn(2L);
 
         GroupDashboardResponse response = dashboardQueryService.getGroupDashboard(1L);
 
@@ -89,7 +78,7 @@ class DashboardQueryServiceTest {
     @Test
     void returnsEmptyDashboardWhenGroupHasNoData() {
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(99L)).thenReturn(List.of());
-        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(99L)).thenReturn(List.of());
+        when(matchRepository.countByGroup_IdAndWinningTeamIsNotNull(99L)).thenReturn(0L);
 
         GroupDashboardResponse response = dashboardQueryService.getGroupDashboard(99L);
 
@@ -140,6 +129,7 @@ class DashboardQueryServiceTest {
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
             .thenReturn(List.of(alpha, bravo, charlie, delta, echo));
+        when(matchRepository.countByGroup_IdAndWinningTeamIsNotNull(1L)).thenReturn(3L);
         when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L))
             .thenReturn(groupParticipants);
         GroupDashboardResponse response = dashboardQueryService.getGroupDashboard(1L, "Alpha");
@@ -192,6 +182,8 @@ class DashboardQueryServiceTest {
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
             .thenReturn(List.of(alpha, bravo, charlie, delta, echo));
+        when(matchRepository.countByGroup_IdAndWinningTeamIsNotNull(1L))
+            .thenReturn((long) groupParticipants.size() / 2);
         when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L))
             .thenReturn(groupParticipants);
 

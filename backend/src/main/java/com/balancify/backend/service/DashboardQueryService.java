@@ -22,11 +22,9 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -73,15 +71,40 @@ public class DashboardQueryService {
                 .thenComparing(Player::getId, Comparator.nullsLast(Long::compareTo))
         );
 
+        int totalPlayers = players.size();
+        int topMmr = players.isEmpty() ? 0 : safeInt(players.get(0).getMmr());
+        double averageMmr = totalPlayers == 0
+            ? 0.0
+            : round2(players.stream().mapToInt(player -> safeInt(player.getMmr())).average().orElse(0.0));
+        int totalGames = safeLongToInt(matchRepository.countByGroup_IdAndWinningTeamIsNotNull(groupId));
+
+        DashboardKpiSummaryResponse kpiSummary = new DashboardKpiSummaryResponse(
+            totalPlayers,
+            topMmr,
+            averageMmr,
+            totalGames
+        );
+
+        Player targetPlayer = findRequesterPlayer(players, requesterNickname);
+        if (targetPlayer == null) {
+            return new GroupDashboardResponse(
+                currentKFactor,
+                kpiSummary,
+                List.of(),
+                null,
+                emptyMyRaceSummary(requestedNicknameOrNull(requesterNickname)),
+                emptyMyGameTypeSummary(requestedNicknameOrNull(requesterNickname)),
+                emptyMyTeammateSummary(requestedNicknameOrNull(requesterNickname))
+            );
+        }
+
         List<MatchParticipant> matchParticipants =
             matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(groupId);
         Map<Long, Map<String, String>> teamCompositionByMatchTeam =
             buildTeamCompositionByMatchTeam(matchParticipants);
 
-        Map<Long, StatsAccumulator> statsByPlayerId = new HashMap<>();
         Map<Long, List<MatchParticipant>> historyByPlayerId = new HashMap<>();
         Map<Long, List<MatchParticipant>> participantsByMatchId = new HashMap<>();
-        Set<Long> rankedMatchIds = new HashSet<>();
         for (MatchParticipant matchParticipant : matchParticipants) {
             if (matchParticipant.getMatch() != null && matchParticipant.getMatch().getId() != null) {
                 participantsByMatchId
@@ -94,39 +117,9 @@ public class DashboardQueryService {
             }
 
             Long playerId = matchParticipant.getPlayer().getId();
-            StatsAccumulator stats =
-                statsByPlayerId.computeIfAbsent(playerId, ignored -> new StatsAccumulator());
             historyByPlayerId.computeIfAbsent(playerId, ignored -> new ArrayList<>()).add(matchParticipant);
-
-            Result result = resolveResult(matchParticipant);
-            if (result == Result.WIN) {
-                stats.wins++;
-            } else if (result == Result.LOSS) {
-                stats.losses++;
-            }
-
-            if (result != Result.UNKNOWN
-                && matchParticipant.getMatch() != null
-                && matchParticipant.getMatch().getId() != null) {
-                rankedMatchIds.add(matchParticipant.getMatch().getId());
-            }
         }
 
-        int totalPlayers = players.size();
-        int topMmr = players.isEmpty() ? 0 : safeInt(players.get(0).getMmr());
-        double averageMmr = totalPlayers == 0
-            ? 0.0
-            : round2(players.stream().mapToInt(player -> safeInt(player.getMmr())).average().orElse(0.0));
-        int totalGames = rankedMatchIds.size();
-
-        DashboardKpiSummaryResponse kpiSummary = new DashboardKpiSummaryResponse(
-            totalPlayers,
-            topMmr,
-            averageMmr,
-            totalGames
-        );
-
-        Player targetPlayer = findRequesterPlayer(players, requesterNickname);
         DashboardMyRaceSummaryResponse myRaceSummary =
             buildMyRaceSummary(historyByPlayerId, targetPlayer, requesterNickname);
         DashboardMyGameTypeSummaryResponse myGameTypeSummary =
@@ -500,6 +493,13 @@ public class DashboardQueryService {
         return value == null ? 0 : value;
     }
 
+    private int safeLongToInt(Long value) {
+        if (value == null) {
+            return 0;
+        }
+        return (int) Math.max(0, Math.min(Integer.MAX_VALUE, value));
+    }
+
     private double round2(double value) {
         return Math.round(value * 100.0) / 100.0;
     }
@@ -739,11 +739,6 @@ public class DashboardQueryService {
         WIN,
         LOSS,
         UNKNOWN
-    }
-
-    private static class StatsAccumulator {
-        private int wins;
-        private int losses;
     }
 
     private static class RaceStatsAccumulator {

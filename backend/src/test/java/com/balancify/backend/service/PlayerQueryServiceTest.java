@@ -7,11 +7,10 @@ import static org.mockito.Mockito.when;
 import com.balancify.backend.api.group.dto.GroupPlayerResponse;
 import com.balancify.backend.api.group.dto.GroupPlayerTierBoardResponse;
 import com.balancify.backend.domain.Group;
-import com.balancify.backend.domain.Match;
-import com.balancify.backend.domain.MatchParticipant;
 import com.balancify.backend.domain.Player;
-import com.balancify.backend.repository.MatchParticipantRepository;
 import com.balancify.backend.repository.PlayerRepository;
+import com.balancify.backend.repository.PlayerStatsRepository;
+import com.balancify.backend.domain.PlayerStats;
 import java.time.OffsetDateTime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,7 +28,7 @@ class PlayerQueryServiceTest {
     private PlayerRepository playerRepository;
 
     @Mock
-    private MatchParticipantRepository matchParticipantRepository;
+    private PlayerStatsRepository playerStatsRepository;
 
     private PlayerQueryService playerQueryService;
 
@@ -37,7 +36,8 @@ class PlayerQueryServiceTest {
     void setUp() {
         playerQueryService = new PlayerQueryService(
             playerRepository,
-            matchParticipantRepository
+            playerStatsRepository,
+            new GroupReadCacheService(0)
         );
     }
 
@@ -50,20 +50,10 @@ class PlayerQueryServiceTest {
         Player p2 = player(2L, group, "Bravo", "T", null, 1700);
         Player p3 = player(3L, group, "Charlie", "Z", "b+", 1600);
 
-        Match m1 = match(11L, group, "HOME");
-        Match m2 = match(12L, group, "AWAY");
-
-        List<MatchParticipant> participants = List.of(
-            participant(101L, m1, p1, "HOME"),
-            participant(102L, m1, p2, "AWAY"),
-            participant(103L, m2, p1, "HOME"),
-            participant(104L, m2, p2, "AWAY")
-        );
-
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
             .thenReturn(List.of(p1, p2, p3));
-        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L))
-            .thenReturn(participants);
+        when(playerStatsRepository.findByGroupId(1L))
+            .thenReturn(List.of(resultStats(1L, 1, 1), resultStats(2L, 1, 1)));
 
         List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L, false);
 
@@ -97,7 +87,6 @@ class PlayerQueryServiceTest {
     @Test
     void returnsEmptyWhenGroupHasNoPlayers() {
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(99L)).thenReturn(List.of());
-        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(99L)).thenReturn(List.of());
 
         List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(99L, false);
         assertThat(response).isEmpty();
@@ -114,7 +103,7 @@ class PlayerQueryServiceTest {
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
             .thenReturn(List.of(robo));
-        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L))
+        when(playerStatsRepository.findByGroupId(1L))
             .thenReturn(List.of());
 
         List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L, false);
@@ -138,7 +127,7 @@ class PlayerQueryServiceTest {
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
             .thenReturn(List.of(player));
-        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L))
+        when(playerStatsRepository.findByGroupId(1L))
             .thenReturn(List.of());
 
         List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L, false);
@@ -165,7 +154,7 @@ class PlayerQueryServiceTest {
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
             .thenReturn(List.of(player));
-        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L))
+        when(playerStatsRepository.findByGroupId(1L))
             .thenReturn(List.of());
 
         List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L, false);
@@ -200,7 +189,7 @@ class PlayerQueryServiceTest {
         assertThat(response.get(0).liveTier()).isEqualTo("A+");
         assertThat(response.get(1).tier()).isEqualTo("B-");
         assertThat(response.get(1).liveTier()).isEqualTo("C+");
-        verifyNoInteractions(matchParticipantRepository);
+        verifyNoInteractions(playerStatsRepository);
     }
 
     @Test
@@ -212,7 +201,7 @@ class PlayerQueryServiceTest {
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
             .thenReturn(List.of(player));
-        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L))
+        when(playerStatsRepository.findByGroupId(1L))
             .thenReturn(List.of());
 
         List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L, false);
@@ -233,22 +222,10 @@ class PlayerQueryServiceTest {
         Player robo = player(9L, group, "로보", "P", "A+", 930);
         robo.setCreatedAt(OffsetDateTime.parse("2026-03-20T00:00:00Z"));
 
-        Match m1 = match(21L, group, "HOME", "2026-03-20T00:00:00Z");
-        Match m2 = match(22L, group, "HOME", "2026-03-21T00:00:00Z");
-        Match m3 = match(23L, group, "HOME", "2026-03-22T00:00:00Z");
-        Match m4 = match(24L, group, "HOME", "2026-03-23T00:00:00Z");
-
-        List<MatchParticipant> participants = List.of(
-            participant(201L, m4, robo, "HOME"),
-            participant(202L, m3, robo, "HOME"),
-            participant(203L, m2, robo, "HOME"),
-            participant(204L, m1, robo, "HOME")
-        );
-
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
             .thenReturn(List.of(robo));
-        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L))
-            .thenReturn(participants);
+        when(playerStatsRepository.findByGroupId(1L))
+            .thenReturn(List.of(resultStats(9L, 4, 0)));
 
         List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L, false);
 
@@ -271,7 +248,7 @@ class PlayerQueryServiceTest {
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
             .thenReturn(List.of(inactive, active));
-        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L))
+        when(playerStatsRepository.findByGroupId(1L))
             .thenReturn(List.of());
 
         List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L, false);
@@ -294,7 +271,7 @@ class PlayerQueryServiceTest {
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
             .thenReturn(List.of(inactive, active));
-        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L))
+        when(playerStatsRepository.findByGroupId(1L))
             .thenReturn(List.of());
 
         List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L, true);
@@ -322,7 +299,7 @@ class PlayerQueryServiceTest {
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
             .thenReturn(List.of(reactivated));
-        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L))
+        when(playerStatsRepository.findByGroupId(1L))
             .thenReturn(List.of());
 
         List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L, false);
@@ -355,26 +332,14 @@ class PlayerQueryServiceTest {
         return player;
     }
 
-    private Match match(Long id, Group group, String winningTeam) {
-        Match match = new Match();
-        match.setId(id);
-        match.setGroup(group);
-        match.setWinningTeam(winningTeam);
-        return match;
-    }
-
-    private Match match(Long id, Group group, String winningTeam, String playedAtIso) {
-        Match match = match(id, group, winningTeam);
-        match.setPlayedAt(OffsetDateTime.parse(playedAtIso));
-        return match;
-    }
-
-    private MatchParticipant participant(Long id, Match match, Player player, String team) {
-        MatchParticipant participant = new MatchParticipant();
-        participant.setId(id);
-        participant.setMatch(match);
-        participant.setPlayer(player);
-        participant.setTeam(team);
-        return participant;
+    private PlayerStats resultStats(Long playerId, int wins, int losses) {
+        PlayerStats stats = new PlayerStats();
+        stats.setPlayerId(playerId);
+        stats.setGroupId(1L);
+        stats.setWins(wins);
+        stats.setLosses(losses);
+        stats.setGames(wins + losses);
+        stats.setMmrDelta(0);
+        return stats;
     }
 }

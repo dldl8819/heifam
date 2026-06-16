@@ -1,10 +1,10 @@
 package com.balancify.backend.service;
 
-import com.balancify.backend.domain.MatchParticipant;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.domain.PlayerTierPolicy;
 import com.balancify.backend.repository.GroupRepository;
 import com.balancify.backend.repository.MatchParticipantRepository;
+import com.balancify.backend.repository.MatchParticipantRepository.PlayerLastPlayedAtProjection;
 import com.balancify.backend.repository.PlayerRepository;
 import java.time.Clock;
 import java.time.OffsetDateTime;
@@ -33,6 +33,7 @@ public class DormancyMmrDecayService {
     private final int returnBoostGames;
     private final double returnBoostMultiplier;
     private final Clock clock;
+    private final GroupReadCacheService groupReadCacheService;
 
     @Autowired
     public DormancyMmrDecayService(
@@ -43,7 +44,8 @@ public class DormancyMmrDecayService {
         @Value("${balancify.rank.dormancy.inactive-days:30}") int inactiveDays,
         @Value("${balancify.rank.dormancy.mmr-drop-per-period:10}") int mmrDropPerPeriod,
         @Value("${balancify.rank.return-boost.games:5}") int returnBoostGames,
-        @Value("${balancify.rank.return-boost.multiplier:2.0}") double returnBoostMultiplier
+        @Value("${balancify.rank.return-boost.multiplier:2.0}") double returnBoostMultiplier,
+        GroupReadCacheService groupReadCacheService
     ) {
         this(
             playerRepository,
@@ -54,6 +56,7 @@ public class DormancyMmrDecayService {
             mmrDropPerPeriod,
             returnBoostGames,
             returnBoostMultiplier,
+            groupReadCacheService,
             Clock.systemUTC()
         );
     }
@@ -67,6 +70,7 @@ public class DormancyMmrDecayService {
         int mmrDropPerPeriod,
         int returnBoostGames,
         double returnBoostMultiplier,
+        GroupReadCacheService groupReadCacheService,
         Clock clock
     ) {
         this.playerRepository = playerRepository;
@@ -77,6 +81,7 @@ public class DormancyMmrDecayService {
         this.mmrDropPerPeriod = Math.max(0, mmrDropPerPeriod);
         this.returnBoostGames = Math.max(0, returnBoostGames);
         this.returnBoostMultiplier = Math.max(1.0, returnBoostMultiplier);
+        this.groupReadCacheService = groupReadCacheService;
         this.clock = clock;
     }
 
@@ -118,23 +123,20 @@ public class DormancyMmrDecayService {
 
         if (!changedPlayers.isEmpty()) {
             playerRepository.saveAll(changedPlayers);
+            groupReadCacheService.evictGroup(groupId);
         }
     }
 
     private Map<Long, OffsetDateTime> resolveLastPlayedAtByPlayerId(Long groupId) {
-        List<MatchParticipant> participants = matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(groupId);
         Map<Long, OffsetDateTime> lastPlayedAtByPlayerId = new HashMap<>();
-        for (MatchParticipant participant : participants) {
-            if (participant.getPlayer() == null
-                || participant.getPlayer().getId() == null
-                || participant.getMatch() == null
-                || participant.getMatch().getPlayedAt() == null) {
+        for (PlayerLastPlayedAtProjection lastPlayedAt : matchParticipantRepository.findLastPlayedAtByGroupId(groupId)) {
+            if (lastPlayedAt.getPlayerId() == null || lastPlayedAt.getLastPlayedAt() == null) {
                 continue;
             }
 
             lastPlayedAtByPlayerId.putIfAbsent(
-                participant.getPlayer().getId(),
-                participant.getMatch().getPlayedAt()
+                lastPlayedAt.getPlayerId(),
+                lastPlayedAt.getLastPlayedAt()
             );
         }
         return lastPlayedAtByPlayerId;

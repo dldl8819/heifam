@@ -28,15 +28,18 @@ public class PlayerImportService {
     private final PlayerRepository playerRepository;
     private final GroupRepository groupRepository;
     private final OperationAuditLogService operationAuditLogService;
+    private final GroupReadCacheService groupReadCacheService;
 
     public PlayerImportService(
         PlayerRepository playerRepository,
         GroupRepository groupRepository,
-        OperationAuditLogService operationAuditLogService
+        OperationAuditLogService operationAuditLogService,
+        GroupReadCacheService groupReadCacheService
     ) {
         this.playerRepository = playerRepository;
         this.groupRepository = groupRepository;
         this.operationAuditLogService = operationAuditLogService;
+        this.groupReadCacheService = groupReadCacheService;
     }
 
     @Transactional
@@ -112,6 +115,10 @@ public class PlayerImportService {
             } else {
                 updatedCount++;
             }
+        }
+
+        if (createdCount > 0 || updatedCount > 0) {
+            groupReadCacheService.evictGroup(groupId);
         }
 
         return new GroupPlayerImportResponse(

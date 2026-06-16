@@ -48,6 +48,9 @@ class MatchResultServiceTest {
     @Mock
     private MmrHistoryRepository mmrHistoryRepository;
 
+    @Mock
+    private PlayerStatsRefreshService playerStatsRefreshService;
+
     private MatchResultService matchResultService;
 
     @BeforeEach
@@ -71,7 +74,9 @@ class MatchResultServiceTest {
             800,
             1.5,
             5,
-            2.0
+            2.0,
+            new GroupReadCacheService(0),
+            playerStatsRefreshService
         );
     }
 
@@ -145,6 +150,7 @@ class MatchResultServiceTest {
             assertThat(history.getAfterMmr()).isNotNull();
             assertThat(history.getDelta()).isNotNull();
         });
+        verify(playerStatsRefreshService).rebuildGroupStats(7L);
     }
 
     @Test
@@ -322,6 +328,7 @@ class MatchResultServiceTest {
         verify(mmrHistoryRepository).deleteByMatch_Id(99L);
         verify(matchParticipantRepository).deleteByMatch_Id(99L);
         verify(matchRepository).delete(match);
+        verify(playerStatsRefreshService).rebuildGroupStats(1L);
     }
 
     @Test

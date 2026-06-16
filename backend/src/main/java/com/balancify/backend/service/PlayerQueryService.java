@@ -2,12 +2,11 @@ package com.balancify.backend.service;
 
 import com.balancify.backend.api.group.dto.GroupPlayerResponse;
 import com.balancify.backend.api.group.dto.GroupPlayerTierBoardResponse;
-import com.balancify.backend.domain.MatchParticipant;
 import com.balancify.backend.domain.Player;
+import com.balancify.backend.domain.PlayerStats;
 import com.balancify.backend.domain.PlayerTierPolicy;
-import com.balancify.backend.repository.MatchParticipantRepository;
 import com.balancify.backend.repository.PlayerRepository;
-import java.time.OffsetDateTime;
+import com.balancify.backend.repository.PlayerStatsRepository;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -20,22 +19,34 @@ import org.springframework.stereotype.Service;
 public class PlayerQueryService {
 
     private final PlayerRepository playerRepository;
-    private final MatchParticipantRepository matchParticipantRepository;
+    private final PlayerStatsRepository playerStatsRepository;
+    private final GroupReadCacheService groupReadCacheService;
 
     @Autowired
     public PlayerQueryService(
         PlayerRepository playerRepository,
-        MatchParticipantRepository matchParticipantRepository
+        PlayerStatsRepository playerStatsRepository,
+        GroupReadCacheService groupReadCacheService
     ) {
         this.playerRepository = playerRepository;
-        this.matchParticipantRepository = matchParticipantRepository;
+        this.playerStatsRepository = playerStatsRepository;
+        this.groupReadCacheService = groupReadCacheService;
     }
 
     public List<GroupPlayerResponse> getGroupPlayers(Long groupId, boolean includeInactive) {
+        String cacheKey = "players:group:%d:includeInactive:%s".formatted(groupId, includeInactive);
+        return groupReadCacheService.get(cacheKey, () -> List.copyOf(loadGroupPlayers(groupId, includeInactive)));
+    }
+
+    private List<GroupPlayerResponse> loadGroupPlayers(Long groupId, boolean includeInactive) {
         List<Player> players = new ArrayList<>(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId));
         if (!includeInactive) {
             players = new ArrayList<>(players.stream().filter(Player::isActive).toList());
         }
+        if (players.isEmpty()) {
+            return List.of();
+        }
+
         players.sort(
             Comparator
                 .comparingInt((Player player) -> safeInt(player.getMmr()))
@@ -43,38 +54,22 @@ public class PlayerQueryService {
                 .thenComparing(Player::getId, Comparator.nullsLast(Long::compareTo))
         );
 
-        List<MatchParticipant> matchParticipants =
-            matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(groupId);
-
         Map<Long, StatsAccumulator> statsByPlayerId = new HashMap<>();
-        for (MatchParticipant participant : matchParticipants) {
-            if (participant.getPlayer() == null || participant.getPlayer().getId() == null) {
+        for (PlayerStats stats : playerStatsRepository.findByGroupId(groupId)) {
+            if (stats.getPlayerId() == null) {
                 continue;
             }
-
-            Long playerId = participant.getPlayer().getId();
-            StatsAccumulator stats =
-                statsByPlayerId.computeIfAbsent(playerId, ignored -> new StatsAccumulator());
-
-            if (stats.lastPlayedAt == null
-                && participant.getMatch() != null
-                && participant.getMatch().getPlayedAt() != null) {
-                stats.lastPlayedAt = participant.getMatch().getPlayedAt();
-            }
-
-            Result result = resolveResult(participant);
-            if (result == Result.WIN) {
-                stats.wins++;
-            } else if (result == Result.LOSS) {
-                stats.losses++;
-            }
+            statsByPlayerId.put(stats.getPlayerId(), new StatsAccumulator(
+                safeInt(stats.getWins()),
+                safeInt(stats.getLosses())
+            ));
         }
 
         List<GroupPlayerResponse> responses = new ArrayList<>();
         for (Player player : players) {
             StatsAccumulator stats =
-                statsByPlayerId.getOrDefault(player.getId(), new StatsAccumulator());
-            int games = stats.wins + stats.losses;
+                statsByPlayerId.getOrDefault(player.getId(), new StatsAccumulator(0, 0));
+            int games = stats.wins() + stats.losses();
             Integer baseMmr = player.getBaseMmr();
             String baseTier = baseMmr == null ? null : PlayerTierPolicy.resolveTier(baseMmr);
             int currentMmr = safeInt(player.getMmr());
@@ -97,8 +92,8 @@ public class PlayerQueryService {
                 lastTierSnapshotMmr,
                 lastTierSnapshotTier,
                 liveTier,
-                stats.wins,
-                stats.losses,
+                stats.wins(),
+                stats.losses(),
                 games,
                 player.isActive(),
                 player.getChatLeftAt(),
@@ -116,6 +111,11 @@ public class PlayerQueryService {
     }
 
     public List<GroupPlayerTierBoardResponse> getGroupPlayerTierBoard(Long groupId) {
+        String cacheKey = "players-tier-board:group:%d:".formatted(groupId);
+        return groupReadCacheService.get(cacheKey, () -> List.copyOf(loadGroupPlayerTierBoard(groupId)));
+    }
+
+    private List<GroupPlayerTierBoardResponse> loadGroupPlayerTierBoard(Long groupId) {
         List<Player> players = new ArrayList<>(
             playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId)
                 .stream()
@@ -147,19 +147,6 @@ public class PlayerQueryService {
             .toList();
     }
 
-    private Result resolveResult(MatchParticipant participant) {
-        if (participant.getMatch() == null
-            || participant.getMatch().getWinningTeam() == null
-            || participant.getTeam() == null
-            || participant.getTeam().isBlank()) {
-            return Result.UNKNOWN;
-        }
-
-        return participant.getMatch().getWinningTeam().equalsIgnoreCase(participant.getTeam())
-            ? Result.WIN
-            : Result.LOSS;
-    }
-
     private String normalizeRace(String race) {
         return PlayerRacePolicy.toDisplayRace(race);
     }
@@ -168,16 +155,7 @@ public class PlayerQueryService {
         return value == null ? 0 : value;
     }
 
-    private enum Result {
-        WIN,
-        LOSS,
-        UNKNOWN
-    }
-
-    private static class StatsAccumulator {
-        private int wins;
-        private int losses;
-        private OffsetDateTime lastPlayedAt;
+    private record StatsAccumulator(int wins, int losses) {
     }
 
 }

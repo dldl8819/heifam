@@ -42,7 +42,8 @@ class PlayerImportServiceTest {
         playerImportService = new PlayerImportService(
             playerRepository,
             groupRepository,
-            operationAuditLogService
+            operationAuditLogService,
+            new GroupReadCacheService(0)
         );
     }
 

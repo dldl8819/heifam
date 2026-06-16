@@ -29,25 +29,29 @@ public class MonthlyTierRefreshService {
     private final boolean enabled;
     private final ZoneId settlementZone;
     private final Clock clock;
+    private final GroupReadCacheService groupReadCacheService;
 
     @Autowired
     public MonthlyTierRefreshService(
         PlayerRepository playerRepository,
         @Value("${balancify.rank.monthly-tier-refresh.enabled:true}") boolean enabled,
-        @Value("${balancify.rank.monthly-tier-refresh.zone:" + DEFAULT_SETTLEMENT_ZONE_ID + "}") String settlementZoneId
+        @Value("${balancify.rank.monthly-tier-refresh.zone:" + DEFAULT_SETTLEMENT_ZONE_ID + "}") String settlementZoneId,
+        GroupReadCacheService groupReadCacheService
     ) {
-        this(playerRepository, enabled, settlementZoneId, Clock.systemUTC());
+        this(playerRepository, enabled, settlementZoneId, groupReadCacheService, Clock.systemUTC());
     }
 
     MonthlyTierRefreshService(
         PlayerRepository playerRepository,
         boolean enabled,
         String settlementZoneId,
+        GroupReadCacheService groupReadCacheService,
         Clock clock
     ) {
         this.playerRepository = playerRepository;
         this.enabled = enabled;
         this.settlementZone = resolveSettlementZone(settlementZoneId);
+        this.groupReadCacheService = groupReadCacheService;
         this.clock = clock;
     }
 
@@ -93,6 +97,7 @@ public class MonthlyTierRefreshService {
 
         if (!playersToSave.isEmpty()) {
             playerRepository.saveAll(playersToSave);
+            groupReadCacheService.clearAll();
         }
     }
 

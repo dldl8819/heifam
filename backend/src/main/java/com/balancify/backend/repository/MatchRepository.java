@@ -21,6 +21,8 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 
     Optional<Match> findTopByGroup_IdAndStatusOrderByPlayedAtDescIdDesc(Long groupId, MatchStatus status);
 
+    long countByGroup_IdAndWinningTeamIsNotNull(Long groupId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select m from Match m where m.id = :matchId")
     Optional<Match> findByIdForUpdate(@Param("matchId") Long matchId);

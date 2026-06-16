@@ -26,13 +26,16 @@ public class PlayerAdminService {
 
     private final PlayerRepository playerRepository;
     private final OperationAuditLogService operationAuditLogService;
+    private final GroupReadCacheService groupReadCacheService;
 
     public PlayerAdminService(
         PlayerRepository playerRepository,
-        OperationAuditLogService operationAuditLogService
+        OperationAuditLogService operationAuditLogService,
+        GroupReadCacheService groupReadCacheService
     ) {
         this.playerRepository = playerRepository;
         this.operationAuditLogService = operationAuditLogService;
+        this.groupReadCacheService = groupReadCacheService;
     }
 
     @Transactional
@@ -163,6 +166,7 @@ public class PlayerAdminService {
         }
 
         playerRepository.save(player);
+        groupReadCacheService.evictGroup(groupId);
         if (nicknameChanged || raceChanged) {
             operationAuditLogService.recordPlayerProfileUpdate(
                 actorEmail,
@@ -208,6 +212,7 @@ public class PlayerAdminService {
 
         player.setMmr(nextMmr);
         playerRepository.save(player);
+        groupReadCacheService.evictGroup(groupId);
     }
 
     @Transactional
@@ -217,6 +222,7 @@ public class PlayerAdminService {
         try {
             playerRepository.delete(player);
             playerRepository.flush();
+            groupReadCacheService.evictGroup(groupId);
         } catch (DataIntegrityViolationException exception) {
             throw new IllegalStateException(
                 "매치 또는 드래프트 기록이 남아 있는 선수는 삭제할 수 없습니다.",

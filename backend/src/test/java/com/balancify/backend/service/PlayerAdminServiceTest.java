@@ -39,7 +39,11 @@ class PlayerAdminServiceTest {
 
     @BeforeEach
     void setUp() {
-        playerAdminService = new PlayerAdminService(playerRepository, operationAuditLogService);
+        playerAdminService = new PlayerAdminService(
+            playerRepository,
+            operationAuditLogService,
+            new GroupReadCacheService(0)
+        );
     }
 
     @Test

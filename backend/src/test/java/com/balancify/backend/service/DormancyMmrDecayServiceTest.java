@@ -7,10 +7,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.balancify.backend.domain.Group;
-import com.balancify.backend.domain.Match;
-import com.balancify.backend.domain.MatchParticipant;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.MatchParticipantRepository;
+import com.balancify.backend.repository.MatchParticipantRepository.PlayerLastPlayedAtProjection;
 import com.balancify.backend.repository.PlayerRepository;
 import com.balancify.backend.repository.GroupRepository;
 import java.time.Clock;
@@ -50,6 +49,7 @@ class DormancyMmrDecayServiceTest {
             100,
             5,
             2.0,
+            new GroupReadCacheService(0),
             Clock.fixed(FIXED_NOW.toInstant(), ZoneOffset.UTC)
         );
     }
@@ -64,8 +64,8 @@ class DormancyMmrDecayServiceTest {
         when(groupRepository.findAll()).thenReturn(List.of(first, second));
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of(firstPlayer));
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(2L)).thenReturn(List.of(secondPlayer));
-        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L)).thenReturn(List.of());
-        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(2L)).thenReturn(List.of());
+        when(matchParticipantRepository.findLastPlayedAtByGroupId(1L)).thenReturn(List.of());
+        when(matchParticipantRepository.findLastPlayedAtByGroupId(2L)).thenReturn(List.of());
 
         service.applyAllGroupsDormancyDecay();
 
@@ -79,7 +79,7 @@ class DormancyMmrDecayServiceTest {
         Player player = player(9L, group, 930, "2026-01-02T00:00:00Z");
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of(player));
-        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L)).thenReturn(List.of());
+        when(matchParticipantRepository.findLastPlayedAtByGroupId(1L)).thenReturn(List.of());
 
         service.applyGroupDormancyDecay(1L);
 
@@ -100,7 +100,7 @@ class DormancyMmrDecayServiceTest {
         Player player = player(9L, group, 930, "2026-03-18T00:00:00Z");
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of(player));
-        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L)).thenReturn(List.of());
+        when(matchParticipantRepository.findLastPlayedAtByGroupId(1L)).thenReturn(List.of());
 
         service.applyGroupDormancyDecay(1L);
 
@@ -115,7 +115,7 @@ class DormancyMmrDecayServiceTest {
         player.setTier("A");
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of(player));
-        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L)).thenReturn(List.of());
+        when(matchParticipantRepository.findLastPlayedAtByGroupId(1L)).thenReturn(List.of());
 
         service.applyGroupDormancyDecay(1L);
 
@@ -131,7 +131,7 @@ class DormancyMmrDecayServiceTest {
         player.setTier("B+");
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of(player));
-        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L)).thenReturn(List.of());
+        when(matchParticipantRepository.findLastPlayedAtByGroupId(1L)).thenReturn(List.of());
 
         service.applyGroupDormancyDecay(1L);
 
@@ -147,7 +147,7 @@ class DormancyMmrDecayServiceTest {
         player.setTier("B+");
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of(player));
-        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L)).thenReturn(List.of());
+        when(matchParticipantRepository.findLastPlayedAtByGroupId(1L)).thenReturn(List.of());
 
         service.applyGroupDormancyDecay(1L);
 
@@ -164,7 +164,7 @@ class DormancyMmrDecayServiceTest {
         player.setDormancyMmrFloorTier("A");
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of(player));
-        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L)).thenReturn(List.of());
+        when(matchParticipantRepository.findLastPlayedAtByGroupId(1L)).thenReturn(List.of());
 
         service.applyGroupDormancyDecay(1L);
 
@@ -180,7 +180,7 @@ class DormancyMmrDecayServiceTest {
         player.setDormancyMmrFloorTier("A");
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of(player));
-        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L)).thenReturn(List.of());
+        when(matchParticipantRepository.findLastPlayedAtByGroupId(1L)).thenReturn(List.of());
 
         service.applyGroupDormancyDecay(1L);
 
@@ -195,7 +195,7 @@ class DormancyMmrDecayServiceTest {
         player.setLastDormancyMmrDecayAt(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of(player));
-        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L)).thenReturn(List.of());
+        when(matchParticipantRepository.findLastPlayedAtByGroupId(1L)).thenReturn(List.of());
 
         service.applyGroupDormancyDecay(1L);
 
@@ -208,11 +208,9 @@ class DormancyMmrDecayServiceTest {
         Group group = group(1L);
         Player player = player(9L, group, 930, "2026-01-02T00:00:00Z");
         player.setLastDormancyMmrDecayAt(OffsetDateTime.parse("2026-02-01T00:00:00Z"));
-        Match match = match(group, "2026-03-20T00:00:00Z");
-        MatchParticipant participant = participant(match, player);
-
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of(player));
-        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L)).thenReturn(List.of(participant));
+        when(matchParticipantRepository.findLastPlayedAtByGroupId(1L))
+            .thenReturn(List.of(lastPlayedAt(9L, "2026-03-20T00:00:00Z")));
 
         service.applyGroupDormancyDecay(1L);
 
@@ -226,7 +224,7 @@ class DormancyMmrDecayServiceTest {
         Player player = player(9L, group, 15, "2025-12-03T00:00:00Z");
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of(player));
-        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L)).thenReturn(List.of());
+        when(matchParticipantRepository.findLastPlayedAtByGroupId(1L)).thenReturn(List.of());
 
         service.applyGroupDormancyDecay(1L);
 
@@ -240,7 +238,7 @@ class DormancyMmrDecayServiceTest {
         Player player = player(9L, group, 0, "2025-12-03T00:00:00Z");
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of(player));
-        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L)).thenReturn(List.of());
+        when(matchParticipantRepository.findLastPlayedAtByGroupId(1L)).thenReturn(List.of());
 
         service.applyGroupDormancyDecay(1L);
 
@@ -266,20 +264,17 @@ class DormancyMmrDecayServiceTest {
         return player;
     }
 
-    private Match match(Group group, String playedAt) {
-        Match match = new Match();
-        match.setId(1L);
-        match.setGroup(group);
-        match.setPlayedAt(OffsetDateTime.parse(playedAt));
-        return match;
-    }
+    private PlayerLastPlayedAtProjection lastPlayedAt(Long playerId, String playedAt) {
+        return new PlayerLastPlayedAtProjection() {
+            @Override
+            public Long getPlayerId() {
+                return playerId;
+            }
 
-    private MatchParticipant participant(Match match, Player player) {
-        MatchParticipant participant = new MatchParticipant();
-        participant.setId(1L);
-        participant.setMatch(match);
-        participant.setPlayer(player);
-        participant.setTeam("HOME");
-        return participant;
+            @Override
+            public OffsetDateTime getLastPlayedAt() {
+                return OffsetDateTime.parse(playedAt);
+            }
+        };
     }
 }

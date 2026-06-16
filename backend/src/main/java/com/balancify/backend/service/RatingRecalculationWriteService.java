@@ -9,10 +9,12 @@ import com.balancify.backend.repository.MatchRepository;
 import com.balancify.backend.repository.MmrHistoryRepository;
 import com.balancify.backend.repository.PlayerRepository;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,17 +27,23 @@ class RatingRecalculationWriteService {
     private final MatchRepository matchRepository;
     private final MatchParticipantRepository matchParticipantRepository;
     private final MmrHistoryRepository mmrHistoryRepository;
+    private final GroupReadCacheService groupReadCacheService;
+    private final PlayerStatsRefreshService playerStatsRefreshService;
 
     RatingRecalculationWriteService(
         PlayerRepository playerRepository,
         MatchRepository matchRepository,
         MatchParticipantRepository matchParticipantRepository,
-        MmrHistoryRepository mmrHistoryRepository
+        MmrHistoryRepository mmrHistoryRepository,
+        GroupReadCacheService groupReadCacheService,
+        PlayerStatsRefreshService playerStatsRefreshService
     ) {
         this.playerRepository = playerRepository;
         this.matchRepository = matchRepository;
         this.matchParticipantRepository = matchParticipantRepository;
         this.mmrHistoryRepository = mmrHistoryRepository;
+        this.groupReadCacheService = groupReadCacheService;
+        this.playerStatsRefreshService = playerStatsRefreshService;
     }
 
     @Transactional
@@ -103,6 +111,21 @@ class RatingRecalculationWriteService {
 
         saveParticipants(participantsToSave);
         saveHistories(historiesToSave);
+        for (Long groupId : resolveGroupIds(playersById)) {
+            playerStatsRefreshService.rebuildGroupStats(groupId);
+        }
+        groupReadCacheService.clearAll();
+    }
+
+    private Set<Long> resolveGroupIds(Map<Long, Player> playersById) {
+        Set<Long> groupIds = new HashSet<>();
+        for (Player player : playersById.values()) {
+            if (player.getGroup() == null || player.getGroup().getId() == null) {
+                continue;
+            }
+            groupIds.add(player.getGroup().getId());
+        }
+        return groupIds;
     }
 
     private void savePlayers(List<Player> players) {

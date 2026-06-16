@@ -47,6 +47,8 @@ public class MatchResultService {
     private final double underdogUpsetMaxMultiplier;
     private final int returnBoostGames;
     private final double returnBoostMultiplier;
+    private final GroupReadCacheService groupReadCacheService;
+    private final PlayerStatsRefreshService playerStatsRefreshService;
 
     public MatchResultService(
         MatchRepository matchRepository,
@@ -63,7 +65,9 @@ public class MatchResultService {
         @Value("${balancify.elo.underdog-upset-bonus-range:800}") double underdogUpsetBonusRange,
         @Value("${balancify.elo.underdog-upset-max-multiplier:1.5}") double underdogUpsetMaxMultiplier,
         @Value("${balancify.rank.return-boost.games:5}") int returnBoostGames,
-        @Value("${balancify.rank.return-boost.multiplier:2.0}") double returnBoostMultiplier
+        @Value("${balancify.rank.return-boost.multiplier:2.0}") double returnBoostMultiplier,
+        GroupReadCacheService groupReadCacheService,
+        PlayerStatsRefreshService playerStatsRefreshService
     ) {
         this.matchRepository = matchRepository;
         this.matchParticipantRepository = matchParticipantRepository;
@@ -80,6 +84,8 @@ public class MatchResultService {
         this.underdogUpsetMaxMultiplier = Math.max(1.0, underdogUpsetMaxMultiplier);
         this.returnBoostGames = Math.max(0, returnBoostGames);
         this.returnBoostMultiplier = Math.max(1.0, returnBoostMultiplier);
+        this.groupReadCacheService = groupReadCacheService;
+        this.playerStatsRefreshService = playerStatsRefreshService;
     }
 
     @Transactional
@@ -243,6 +249,9 @@ public class MatchResultService {
         playerRepository.saveAll(new ArrayList<>(updatedPlayers.values()));
         mmrHistoryRepository.saveAll(mmrHistories);
         matchRepository.save(match);
+        Long groupId = resolveGroupId(match, participants);
+        playerStatsRefreshService.rebuildGroupStats(groupId);
+        evictGroupReadCache(groupId);
 
         return new MatchResultResponse(
             match.getId(),
@@ -480,11 +489,11 @@ public class MatchResultService {
     public DeletedMatchAuditSnapshot deleteMatch(Long matchId) {
         Match match = matchRepository.findById(matchId)
             .orElseThrow(() -> new NoSuchElementException("Match not found: " + matchId));
-        Long groupId = match.getGroup() == null ? null : match.getGroup().getId();
         OffsetDateTime playedAt = match.getPlayedAt();
 
         List<MatchParticipant> participants =
             matchParticipantRepository.findByMatchIdWithPlayerAndMatch(matchId);
+        Long groupId = resolveGroupId(match, participants);
 
         Map<Long, Player> playersToUpdate = new LinkedHashMap<>();
         boolean matchHadResult = hasProcessedResult(match.getWinningTeam());
@@ -513,8 +522,32 @@ public class MatchResultService {
         mmrHistoryRepository.deleteByMatch_Id(matchId);
         matchParticipantRepository.deleteByMatch_Id(matchId);
         matchRepository.delete(match);
+        playerStatsRefreshService.rebuildGroupStats(groupId);
+        evictGroupReadCache(groupId);
 
         return new DeletedMatchAuditSnapshot(matchId, groupId, playedAt, matchHadResult);
+    }
+
+    private Long resolveGroupId(Match match, List<MatchParticipant> participants) {
+        if (match != null && match.getGroup() != null && match.getGroup().getId() != null) {
+            return match.getGroup().getId();
+        }
+        if (participants == null) {
+            return null;
+        }
+        return participants.stream()
+            .map(MatchParticipant::getPlayer)
+            .filter(player -> player != null && player.getGroup() != null && player.getGroup().getId() != null)
+            .map(player -> player.getGroup().getId())
+            .findFirst()
+            .orElse(null);
+    }
+
+    private void evictGroupReadCache(Long groupId) {
+        if (groupId == null) {
+            return;
+        }
+        groupReadCacheService.evictGroup(groupId);
     }
 
     public record DeletedMatchAuditSnapshot(

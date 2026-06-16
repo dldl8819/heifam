@@ -101,6 +101,7 @@ class MonthlyTierRefreshServiceTest {
             playerRepository,
             true,
             "Asia/Seoul",
+            new GroupReadCacheService(0),
             Clock.fixed(now.toInstant(), ZoneOffset.UTC)
         );
     }
