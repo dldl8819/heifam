@@ -8,7 +8,11 @@ import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
 import { toTierOrder } from '@/lib/player-tier'
-import { buildPlayerProfileUpdateRequest } from '@/lib/player-edit'
+import {
+  buildPlayerProfileUpdateRequest,
+  resolveDefaultMmrForTier,
+  resolveEditableMmrValue,
+} from '@/lib/player-edit'
 import type { PlayerRace, PlayerRosterItem, PlayerTierStatus } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
@@ -393,9 +397,7 @@ export default function PlayersPage() {
     setEditingNickname(player.nickname)
     setEditingRace(player.race)
     setEditingTier(player.tier)
-    setEditingInlineMmrValue(
-      typeof player.currentMmr === 'number' ? String(player.currentMmr) : ''
-    )
+    setEditingInlineMmrValue(resolveEditableMmrValue(player))
     setEditingDormancyFloorTier(player.dormancyMmrFloorTier ?? 'UNASSIGNED')
     setActivityForm(null)
     setPlayerActionError(null)
@@ -1110,7 +1112,13 @@ export default function PlayersPage() {
                       {isEditing ? (
                         <select
                           value={editingTier}
-                          onChange={(event) => setEditingTier(event.target.value as PlayerTierStatus)}
+                          onChange={(event) => {
+                            const nextTier = event.target.value as PlayerTierStatus
+                            setEditingTier(nextTier)
+                            if (isSuperAdmin) {
+                              setEditingInlineMmrValue(String(resolveDefaultMmrForTier(nextTier)))
+                            }
+                          }}
                           className="w-full rounded-md border border-slate-200 px-2 py-1 text-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
                         >
                           {PLAYER_EDIT_TIER_OPTIONS.map((tierOption) => (
