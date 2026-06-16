@@ -39,9 +39,9 @@ public interface PlayerStatsRepository extends JpaRepository<PlayerStats, Long> 
             select
                 player_id,
                 group_id,
-                count(*) filter (where result_symbol = 'W')::integer as wins,
-                count(*) filter (where result_symbol = 'L')::integer as losses,
-                coalesce(sum(mmr_delta) filter (where participant_id is not null), 0)::integer as mmr_delta,
+                cast(count(*) filter (where result_symbol = 'W') as integer) as wins,
+                cast(count(*) filter (where result_symbol = 'L') as integer) as losses,
+                cast(coalesce(sum(mmr_delta) filter (where participant_id is not null), 0) as integer) as mmr_delta,
                 max(played_at) filter (where participant_id is not null) as last_played_at
             from participant_results
             group by player_id, group_id
@@ -89,7 +89,7 @@ public interface PlayerStatsRepository extends JpaRepository<PlayerStats, Long> 
                     ''
                 ) as last10,
                 coalesce(max(first_result), 'N') as streak_symbol,
-                (count(result_symbol) filter (where mismatch_count = 0))::integer as streak_count
+                cast(count(result_symbol) filter (where mismatch_count = 0) as integer) as streak_count
             from marked_results
             group by player_id
         )
