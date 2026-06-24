@@ -12,6 +12,7 @@ export function getVisibleNavItems(context: NavVisibilityContext): NavItem[] {
   if (!context.isLoggedIn) {
     return [
       { label: t('nav.home'), href: '/' },
+      { label: t('nav.ads'), href: '/ads' },
       { label: t('nav.results'), href: '/results' },
     ]
   }
@@ -27,6 +28,7 @@ export function getVisibleNavItems(context: NavVisibilityContext): NavItem[] {
       { label: t('nav.balance'), href: '/balance' },
       { label: t('nav.captainDraft'), href: '/captain-draft' },
       { label: t('nav.multiBalance'), href: '/balance/multi' },
+      { label: t('nav.ads'), href: '/ads' },
       { label: t('nav.results'), href: '/results' },
     ]
 
@@ -42,6 +44,7 @@ export function getVisibleNavItems(context: NavVisibilityContext): NavItem[] {
     { label: t('nav.players'), href: '/players' },
     { label: t('nav.ranking'), href: '/ranking' },
     { label: t('nav.balance'), href: '/balance' },
+    { label: t('nav.ads'), href: '/ads' },
     { label: t('nav.results'), href: '/results' },
   ]
 }

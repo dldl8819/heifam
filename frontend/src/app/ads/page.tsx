@@ -1,0 +1,141 @@
+import Image from 'next/image'
+
+type Promotion = {
+  title: string
+  eyebrow: string
+  description: string
+  imageSrc: string
+  imageAlt: string
+  highlights: string[]
+  note: string
+  href?: string
+  ctaLabel?: string
+  secondaryHref?: string
+  secondaryCtaLabel?: string
+}
+
+const promotions: Promotion[] = [
+  {
+    title: '김해 대동 생 블루베리',
+    eyebrow: '시즌 상품',
+    description: 'Hei 유튜브 보고 연락 시 모든 상품 1kg당 2,000원 할인',
+    imageSrc: '/promotions/blueberry-card.png',
+    imageAlt: '김해 대동 생 블루베리 할인 안내 배너',
+    highlights: ['모든 상품 1kg당 2,000원 할인', '한정 수량 100kg', 'QR 주문 가능'],
+    note: '상품별 재고와 배송 가능 지역은 주문 시 확인해 주세요.',
+    href: 'https://forms.gle/dmjsyBw1kzWLAd6C7',
+    ctaLabel: '주문서 열기',
+  },
+  {
+    title: '창원 진해 장수돼지',
+    eyebrow: '동네 가게',
+    description: '창원 진해에서 든든하게 먹기 좋은 고기집',
+    imageSrc: '/promotions/jangsudaeji-photo.png',
+    imageAlt: '창원 진해 장수돼지 매장 외관',
+    highlights: ['경남 창원시 진해구 이동로 52', '주소 검색으로 방문 가능', '근처 방문 시 추천'],
+    note: '방문 전 영업 여부는 지도 앱 또는 매장 안내를 확인해 주세요.',
+    href: 'https://naver.me/xdp0ZI0M',
+    ctaLabel: '네이버 지도 보기',
+  },
+  {
+    title: '목포 디스커버리',
+    eyebrow: '동네 가게',
+    description: '정은이형이 운영하는 목포 공간',
+    imageSrc: '/promotions/mokpo-discovery-photo.png',
+    imageAlt: '목포 디스커버리 매장 외관',
+    highlights: ['전남 목포시 상동 1012-6', '네이버 지도 연결', '목포 방문 시 추천'],
+    note: '방문 전 영업 여부는 지도 앱 또는 매장 안내를 확인해 주세요.',
+    href: 'https://naver.me/xQJPxoD8',
+    ctaLabel: '네이버 지도 보기',
+    secondaryHref:
+      'https://pcmap.place.naver.com/place/32674509/photo?from=map&fromPanelNum=1&additionalHeight=76&timestamp=202606242232&locale=ko&svcName=map_pcv5',
+    secondaryCtaLabel: '사진 보기',
+  },
+]
+
+export default function AdsPage() {
+  return (
+    <section className="space-y-6">
+      <div className="rounded-lg border border-emerald-100 bg-white px-5 py-6 shadow-sm sm:px-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
+          Hei`Fam Local
+        </p>
+        <div className="mt-3 max-w-3xl space-y-2">
+          <h2 className="text-3xl font-bold tracking-tight text-slate-950">우리 팸 가게</h2>
+          <p className="text-sm leading-6 text-slate-600">
+            팸원이 운영하는 가게와 시즌 상품을 모아둔 공개 홍보 공간입니다.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {promotions.map((promotion) => (
+          <article
+            key={promotion.title}
+            className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+          >
+            <div className="relative aspect-[16/9] w-full bg-slate-100">
+              <Image
+                src={promotion.imageSrc}
+                alt={promotion.imageAlt}
+                fill
+                className="object-cover"
+                sizes="(min-width: 1024px) 50vw, 100vw"
+                priority={promotion.title === promotions[0].title}
+              />
+            </div>
+            <div className="space-y-4 p-5">
+              <div className="space-y-2">
+                <span className="inline-flex rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                  {promotion.eyebrow}
+                </span>
+                <h3 className="text-xl font-bold text-slate-950">{promotion.title}</h3>
+                <p className="text-sm leading-6 text-slate-600">{promotion.description}</p>
+              </div>
+
+              <ul className="grid gap-2 text-sm text-slate-700 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+                {promotion.highlights.map((highlight) => (
+                  <li
+                    key={highlight}
+                    className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 font-medium"
+                  >
+                    {highlight}
+                  </li>
+                ))}
+              </ul>
+
+              <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+                {promotion.note}
+              </p>
+
+              {(promotion.href || promotion.secondaryHref) && (
+                <div className="flex flex-wrap gap-2">
+                  {promotion.href && promotion.ctaLabel && (
+                    <a
+                      href={promotion.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
+                    >
+                      {promotion.ctaLabel}
+                    </a>
+                  )}
+                  {promotion.secondaryHref && promotion.secondaryCtaLabel && (
+                    <a
+                      href={promotion.secondaryHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition-colors hover:border-slate-900 hover:bg-slate-50"
+                    >
+                      {promotion.secondaryCtaLabel}
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
