@@ -147,15 +147,16 @@ export default function AdsPage() {
                   href={promotion.orderHref}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-2 text-sm font-semibold text-emerald-800 transition-colors hover:border-emerald-500 hover:bg-emerald-100"
+                  className="inline-flex flex-col items-center gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800 transition-colors hover:border-emerald-500 hover:bg-emerald-100 sm:flex-row"
                 >
-                  <span className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md bg-white">
+                  <span className="relative h-36 w-36 shrink-0 overflow-hidden rounded-md bg-white">
                     <Image
                       src={promotion.qrImageSrc}
                       alt={promotion.qrImageAlt}
                       fill
+                      unoptimized
                       className="object-contain"
-                      sizes="64px"
+                      sizes="144px"
                     />
                   </span>
                   <span>QR로 주문서 열기</span>
