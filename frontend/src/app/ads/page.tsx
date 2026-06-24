@@ -47,7 +47,7 @@ const promotions: Promotion[] = [
     description: '헤이 팸원이면 택배비 무료',
     imageSrc: '/promotions/mokpo-discovery-photo.png',
     imageAlt: '목포 정은 디스커버리 매장 외관',
-    highlights: ['전남 목포시 상동 1012-6', '목포 방문 시 추천', '주문 폼 연결'],
+    highlights: ['전남 목포시 상동 1012-6', '목포 방문 시 추천', '전국 택배 가능'],
     note: '방문 전 영업 여부는 지도 앱 또는 매장 안내를 확인해 주세요.',
     href: 'https://naver.me/xQJPxoD8',
     ctaLabel: '네이버 지도 보기',
