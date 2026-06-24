@@ -76,6 +76,11 @@ export default function AdsPage() {
         </div>
       </div>
 
+      <div className="rounded-lg border border-slate-200 bg-white px-5 py-4 shadow-sm sm:px-6">
+        <p className="text-sm font-semibold text-slate-950">광고 문의는 운영진에게 연락해 주세요.</p>
+        <p className="mt-1 text-sm leading-6 text-slate-600">가게/상품 홍보를 진행해드립니다.</p>
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-2">
         {promotions.map((promotion) => (
           <article
