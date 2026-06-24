@@ -12,6 +12,10 @@ type Promotion = {
   ctaLabel?: string
   secondaryHref?: string
   secondaryCtaLabel?: string
+  orderHref?: string
+  orderCtaLabel?: string
+  qrImageSrc?: string
+  qrImageAlt?: string
 }
 
 const promotions: Promotion[] = [
@@ -43,13 +47,17 @@ const promotions: Promotion[] = [
     description: '헤이 팸원이면 택배비 무료',
     imageSrc: '/promotions/mokpo-discovery-photo.png',
     imageAlt: '목포 정은 디스커버리 매장 외관',
-    highlights: ['전남 목포시 상동 1012-6', '목포 방문 시 추천'],
+    highlights: ['전남 목포시 상동 1012-6', '목포 방문 시 추천', '주문 폼 연결'],
     note: '방문 전 영업 여부는 지도 앱 또는 매장 안내를 확인해 주세요.',
     href: 'https://naver.me/xQJPxoD8',
     ctaLabel: '네이버 지도 보기',
     secondaryHref:
       'https://pcmap.place.naver.com/place/32674509/photo?from=map&fromPanelNum=1&additionalHeight=76&timestamp=202606242232&locale=ko&svcName=map_pcv5',
     secondaryCtaLabel: '사진 보기',
+    orderHref: 'https://forms.gle/T1TPx6YWf4xzwWiu5',
+    orderCtaLabel: '디스커버리 주문',
+    qrImageSrc: '/promotions/mokpo-discovery-order-qr.jpg',
+    qrImageAlt: '디스커버리 주문 QR 코드',
   },
 ]
 
@@ -121,7 +129,27 @@ export default function AdsPage() {
                 {promotion.note}
               </p>
 
-              {(promotion.href || promotion.secondaryHref) && (
+              {promotion.qrImageSrc && promotion.qrImageAlt && promotion.orderHref && (
+                <a
+                  href={promotion.orderHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-2 text-sm font-semibold text-emerald-800 transition-colors hover:border-emerald-500 hover:bg-emerald-100"
+                >
+                  <span className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md bg-white">
+                    <Image
+                      src={promotion.qrImageSrc}
+                      alt={promotion.qrImageAlt}
+                      fill
+                      className="object-contain"
+                      sizes="64px"
+                    />
+                  </span>
+                  <span>QR로 주문서 열기</span>
+                </a>
+              )}
+
+              {(promotion.href || promotion.secondaryHref || promotion.orderHref) && (
                 <div className="flex flex-wrap gap-2">
                   {promotion.href && promotion.ctaLabel && (
                     <a
@@ -141,6 +169,16 @@ export default function AdsPage() {
                       className="inline-flex rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition-colors hover:border-slate-900 hover:bg-slate-50"
                     >
                       {promotion.secondaryCtaLabel}
+                    </a>
+                  )}
+                  {promotion.orderHref && promotion.orderCtaLabel && (
+                    <a
+                      href={promotion.orderHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-800"
+                    >
+                      {promotion.orderCtaLabel}
                     </a>
                   )}
                 </div>
