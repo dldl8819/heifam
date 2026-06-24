@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { t } from '@/lib/i18n'
 
 const YOUTUBE_URL = 'https://www.youtube.com/@hei1749'
+const INSTAGRAM_URL = 'https://www.instagram.com/hei.minsik'
 
 export function SiteFooter() {
   return (
@@ -23,6 +24,17 @@ export function SiteFooter() {
                   className="ml-2 text-slate-700 underline-offset-2 hover:text-slate-900 hover:underline"
                 >
                   {t('footer.youtubeLinkText')}
+                </a>
+              </p>
+              <p>
+                <span className="font-semibold text-slate-900">{t('footer.instagramLabel')}</span>
+                <a
+                  href={INSTAGRAM_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="ml-2 text-slate-700 underline-offset-2 hover:text-slate-900 hover:underline"
+                >
+                  {t('footer.instagramLinkText')}
                 </a>
               </p>
               <p>
