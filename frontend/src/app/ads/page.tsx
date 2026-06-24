@@ -79,6 +79,14 @@ export default function AdsPage() {
       <div className="rounded-lg border border-slate-200 bg-white px-5 py-4 shadow-sm sm:px-6">
         <p className="text-sm font-semibold text-slate-950">광고 문의는 운영진에게 연락해 주세요.</p>
         <p className="mt-1 text-sm leading-6 text-slate-600">가게/상품 홍보를 진행해드립니다.</p>
+        <a
+          href="https://www.youtube.com/@Hei-minsik"
+          target="_blank"
+          rel="noreferrer"
+          className="mt-3 inline-flex rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition-colors hover:border-red-500 hover:bg-red-100"
+        >
+          유튜브 채널 보기
+        </a>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
