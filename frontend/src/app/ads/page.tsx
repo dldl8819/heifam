@@ -32,7 +32,7 @@ const promotions: Promotion[] = [
     description: '창원 진해에서 든든하게 먹기 좋은 고기집',
     imageSrc: '/promotions/jangsudaeji-photo.png',
     imageAlt: '창원 진해 장수돼지 매장 외관',
-    highlights: ['경남 창원시 진해구 이동로 52', '주소 검색으로 방문 가능', '근처 방문 시 추천'],
+    highlights: ['경남 창원시 진해구 이동로 52', '창원 숙성 고기 맛집'],
     note: '방문 전 영업 여부는 지도 앱 또는 매장 안내를 확인해 주세요.',
     href: 'https://naver.me/xdp0ZI0M',
     ctaLabel: '네이버 지도 보기',
@@ -43,7 +43,7 @@ const promotions: Promotion[] = [
     description: '정은이형이 운영하는 목포 공간',
     imageSrc: '/promotions/mokpo-discovery-photo.png',
     imageAlt: '목포 디스커버리 매장 외관',
-    highlights: ['전남 목포시 상동 1012-6', '네이버 지도 연결', '목포 방문 시 추천'],
+    highlights: ['전남 목포시 상동 1012-6', '목포 방문 시 추천'],
     note: '방문 전 영업 여부는 지도 앱 또는 매장 안내를 확인해 주세요.',
     href: 'https://naver.me/xQJPxoD8',
     ctaLabel: '네이버 지도 보기',
@@ -89,7 +89,20 @@ export default function AdsPage() {
                 <span className="inline-flex rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
                   {promotion.eyebrow}
                 </span>
-                <h3 className="text-xl font-bold text-slate-950">{promotion.title}</h3>
+                {promotion.href ? (
+                  <h3 className="text-xl font-bold text-slate-950">
+                    <a
+                      href={promotion.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="transition-colors hover:text-emerald-700"
+                    >
+                      {promotion.title}
+                    </a>
+                  </h3>
+                ) : (
+                  <h3 className="text-xl font-bold text-slate-950">{promotion.title}</h3>
+                )}
                 <p className="text-sm leading-6 text-slate-600">{promotion.description}</p>
               </div>
 
