@@ -7,6 +7,7 @@ type Promotion = {
   imageSrc: string
   imageAlt: string
   imageHref?: string
+  imageFit?: 'cover' | 'contain'
   highlights: string[]
   note: string
   href?: string
@@ -54,8 +55,9 @@ const promotions: Promotion[] = [
     eyebrow: '국산 참기름',
     description: '스마트스토어에서 주문 가능한 국산 참기름',
     imageSrc: '/promotions/gyeongseong-sesame-oil-photo.png',
-    imageAlt: '경성참기름집 국산 참기름 상품 사진',
-    highlights: ['국산 참기름', '스마트스토어 주문 가능', '네이버 지도 연결'],
+    imageAlt: '경성참기름집 매장 사진',
+    imageFit: 'contain',
+    highlights: ['서울 서대문구 연희동 712-31', '기름 제조 체험', '저온압착'],
     note: '주문 가능 상품과 배송 조건은 스마트스토어에서 확인해 주세요.',
     href: 'https://naver.me/FtTtMiD0',
     ctaLabel: '네이버 지도 보기',
@@ -129,7 +131,7 @@ export default function AdsPage() {
                   src={promotion.imageSrc}
                   alt={promotion.imageAlt}
                   fill
-                  className="object-cover"
+                  className={promotion.imageFit === 'contain' ? 'object-contain' : 'object-cover'}
                   sizes="(min-width: 1024px) 50vw, 100vw"
                   priority={promotion.title === promotions[0].title}
                 />
@@ -140,7 +142,7 @@ export default function AdsPage() {
                   src={promotion.imageSrc}
                   alt={promotion.imageAlt}
                   fill
-                  className="object-cover"
+                  className={promotion.imageFit === 'contain' ? 'object-contain' : 'object-cover'}
                   sizes="(min-width: 1024px) 50vw, 100vw"
                   priority={promotion.title === promotions[0].title}
                 />
