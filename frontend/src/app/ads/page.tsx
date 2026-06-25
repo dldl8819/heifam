@@ -6,6 +6,7 @@ type Promotion = {
   description: string
   imageSrc: string
   imageAlt: string
+  imageHref?: string
   highlights: string[]
   note: string
   href?: string
@@ -22,17 +23,20 @@ const promotions: Promotion[] = [
   {
     title: '김해 창민 블루베리',
     eyebrow: '시즌 상품',
-    description: 'Hei 유튜브 보고 연락 시 모든 상품 1kg당 2,000원 할인',
+    description: 'Hei 유튜브 보고 연락 시 모든 상품 1kg당 2,000원 할인, 한정 수량 100kg까지',
     imageSrc: '/promotions/blueberry-card.png',
     imageAlt: '김해 창민 블루베리 할인 안내 배너',
-    highlights: ['모든 상품 1kg당 2,000원 할인', '한정 수량 100kg', 'QR 주문 가능'],
+    imageHref: '/promotions/blueberry-flyer.png',
+    highlights: ['모든 상품 1kg당 2,000원 할인', '한정 수량 100kg', '김해 대동농장'],
     note: '상품별 재고와 배송 가능 지역은 주문 시 확인해 주세요.',
-    href: 'https://forms.gle/dmjsyBw1kzWLAd6C7',
-    ctaLabel: '주문서 열기',
+    orderHref: 'https://forms.gle/dmjsyBw1kzWLAd6C7',
+    orderCtaLabel: '블루베리 주문',
+    qrImageSrc: '/promotions/blueberry-order-qr.jpg',
+    qrImageAlt: '블루베리 주문 QR 코드',
   },
   {
     title: '창원 솜솜 장수돼지',
-    eyebrow: '동네 가게',
+    eyebrow: '고기 맛집',
     description: '창원 진해 숙성 고기와 고기 주문 상담 가능',
     imageSrc: '/promotions/jangsudaeji-photo.png',
     imageAlt: '창원 솜솜 장수돼지 매장 외관',
@@ -47,7 +51,7 @@ const promotions: Promotion[] = [
   },
   {
     title: '목포 정은 디스커버리',
-    eyebrow: '동네 가게',
+    eyebrow: 'Discovery',
     description: '헤이 팸원이면 택배비 무료',
     imageSrc: '/promotions/mokpo-discovery-photo.png',
     imageAlt: '목포 정은 디스커버리 매장 외관',
@@ -98,16 +102,35 @@ export default function AdsPage() {
             key={promotion.title}
             className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
           >
-            <div className="relative aspect-[16/9] w-full bg-slate-100">
-              <Image
-                src={promotion.imageSrc}
-                alt={promotion.imageAlt}
-                fill
-                className="object-cover"
-                sizes="(min-width: 1024px) 50vw, 100vw"
-                priority={promotion.title === promotions[0].title}
-              />
-            </div>
+            {promotion.imageHref ? (
+              <a
+                href={promotion.imageHref}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`${promotion.title} 상세 이미지 보기`}
+                className="relative block aspect-[16/9] w-full bg-slate-100"
+              >
+                <Image
+                  src={promotion.imageSrc}
+                  alt={promotion.imageAlt}
+                  fill
+                  className="object-cover"
+                  sizes="(min-width: 1024px) 50vw, 100vw"
+                  priority={promotion.title === promotions[0].title}
+                />
+              </a>
+            ) : (
+              <div className="relative aspect-[16/9] w-full bg-slate-100">
+                <Image
+                  src={promotion.imageSrc}
+                  alt={promotion.imageAlt}
+                  fill
+                  className="object-cover"
+                  sizes="(min-width: 1024px) 50vw, 100vw"
+                  priority={promotion.title === promotions[0].title}
+                />
+              </div>
+            )}
             <div className="space-y-4 p-5">
               <div className="space-y-2">
                 <span className="inline-flex rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
