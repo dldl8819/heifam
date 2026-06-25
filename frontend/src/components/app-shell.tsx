@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import Image from 'next/image'
 import { AuthControls } from '@/components/auth-controls'
 import { AccessGate } from '@/components/access-gate'
@@ -15,29 +15,11 @@ type AppShellProps = {
 }
 
 export function AppShell({ children }: AppShellProps) {
-  const [isScrolled, setIsScrolled] = useState<boolean>(false)
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 18)
-    }
-
-    handleScroll()
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
-
   return (
     <MmrVisibilityProvider>
       <div className="min-h-screen bg-slate-100 text-slate-900">
         <header className="sticky top-0 z-30 border-b border-slate-700 bg-slate-900/95 text-white backdrop-blur">
-          <div
-            className={`mx-auto flex flex-col gap-3 transition-all duration-300 ${
-              isScrolled
-                ? 'max-w-screen-2xl px-3 py-2 sm:px-4 md:px-6 md:py-4'
-                : 'max-w-screen-2xl px-4 py-4 sm:px-6'
-            }`}
-          >
+          <div className="mx-auto flex max-w-screen-2xl flex-col gap-3 px-4 py-4 sm:px-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-start gap-3">
                 <div className="relative h-11 w-11 overflow-hidden rounded-md border border-slate-700/80 bg-slate-950/70">
