@@ -69,7 +69,7 @@ export default function AdsPage() {
           Hei`Fam Local
         </p>
         <div className="mt-3 max-w-3xl space-y-2">
-          <h2 className="text-3xl font-bold tracking-tight text-slate-950">우리 팸 가게</h2>
+          <h2 className="text-3xl font-bold tracking-tight text-slate-950">파트너스</h2>
           <p className="text-sm leading-6 text-slate-600">
             팸원이 운영하는 가게와 시즌 상품을 모아둔 공개 홍보 공간입니다.
           </p>
