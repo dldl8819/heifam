@@ -55,9 +55,6 @@ const promotions: Promotion[] = [
     note: '방문 전 영업 여부는 지도 앱 또는 매장 안내를 확인해 주세요.',
     href: 'https://naver.me/xQJPxoD8',
     ctaLabel: '네이버 지도 보기',
-    secondaryHref:
-      'https://pcmap.place.naver.com/place/32674509/photo?from=map&fromPanelNum=1&additionalHeight=76&timestamp=202606242232&locale=ko&svcName=map_pcv5',
-    secondaryCtaLabel: '사진 보기',
     orderHref: 'https://forms.gle/T1TPx6YWf4xzwWiu5',
     orderCtaLabel: '디스커버리 주문',
     qrImageSrc: '/promotions/mokpo-discovery-order-qr.jpg',
