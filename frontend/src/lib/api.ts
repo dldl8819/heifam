@@ -48,6 +48,7 @@ const ACCESS_API_BASE_URL =
   RAW_ACCESS_API_BASE_URL.length > 0 ? RAW_ACCESS_API_BASE_URL : API_BASE_URL
 const DEFAULT_API_REQUEST_TIMEOUT_MS = 10000
 const ACCESS_API_REQUEST_TIMEOUT_MS = process.env.NODE_ENV === 'production' ? 45000 : 15000
+const MULTI_BALANCE_API_REQUEST_TIMEOUT_MS = 45000
 const IMPORT_API_REQUEST_TIMEOUT_MS = 120000
 const RATING_RECALCULATION_API_REQUEST_TIMEOUT_MS = 300000
 const SESSION_IDENTITY_CACHE_TTL_MS = 5000
@@ -624,7 +625,7 @@ export const apiClient = {
     apiRequest<MultiBalanceResponse>('/api/matches/balance/multi', {
       method: 'POST',
       body: JSON.stringify(payload),
-    }, { includeUserEmail: true }),
+    }, { includeUserEmail: true, timeoutMs: MULTI_BALANCE_API_REQUEST_TIMEOUT_MS }),
   submitMatchResult: (matchId: number, payload: MatchResultRequest) =>
     apiRequest<MatchResultResponse>(`/api/matches/${matchId}/result`, {
       method: 'POST',

@@ -7,7 +7,7 @@ const FALLBACK_BACKEND_BASE_URLS = [
 ]
 
 const RETRYABLE_UPSTREAM_STATUSES = new Set([404, 502, 503, 504])
-const DEFAULT_UPSTREAM_TIMEOUT_MS = 25000
+const DEFAULT_UPSTREAM_TIMEOUT_MS = 45000
 
 const HOP_BY_HOP_HEADERS = new Set([
   'connection',
@@ -32,6 +32,7 @@ const UPSTREAM_RESPONSE_HEADER_ALLOWLIST = new Set([
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 function parseCsv(value: string | undefined): string[] {
   if (!value) {
