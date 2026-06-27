@@ -38,7 +38,6 @@ const TEAM_CARD_THEMES = [
     card: 'border-emerald-200',
     header: 'border-emerald-200 bg-emerald-50',
     label: 'text-emerald-700',
-    badge: 'border-emerald-200 bg-white text-emerald-700',
     metric: 'border-emerald-100 bg-emerald-50/70',
     player: 'border-emerald-100 bg-emerald-50 text-slate-900',
   },
@@ -46,7 +45,6 @@ const TEAM_CARD_THEMES = [
     card: 'border-amber-200',
     header: 'border-amber-200 bg-amber-50',
     label: 'text-amber-700',
-    badge: 'border-amber-200 bg-white text-amber-800',
     metric: 'border-amber-100 bg-amber-50/70',
     player: 'border-amber-100 bg-amber-50 text-slate-900',
   },
@@ -54,7 +52,6 @@ const TEAM_CARD_THEMES = [
     card: 'border-rose-200',
     header: 'border-rose-200 bg-rose-50',
     label: 'text-rose-700',
-    badge: 'border-rose-200 bg-white text-rose-700',
     metric: 'border-rose-100 bg-rose-50/70',
     player: 'border-rose-100 bg-rose-50 text-slate-900',
   },
@@ -62,7 +59,6 @@ const TEAM_CARD_THEMES = [
     card: 'border-teal-200',
     header: 'border-teal-200 bg-teal-50',
     label: 'text-teal-700',
-    badge: 'border-teal-200 bg-white text-teal-700',
     metric: 'border-teal-100 bg-teal-50/70',
     player: 'border-teal-100 bg-teal-50 text-slate-900',
   },
@@ -73,7 +69,6 @@ type MultiBalanceDisplayTeam = {
   teamNumber: number
   players: BalancePlayerInput[]
   totalMmr?: number
-  raceSummary: string
 }
 
 function getTeamCardTheme(teamNumber: number) {
@@ -93,24 +88,6 @@ function buildPlayerLine(player: BalancePlayerInput, showMmr: boolean): string {
     : `${player.name}${assignedRaceText}`
 }
 
-function buildTeamRaceSummary(players: BalancePlayerInput[], responseSummary: string): string {
-  const assignedRaceSummary = players
-    .map((player) => player.assignedRace)
-    .filter(Boolean)
-    .join('')
-
-  if (assignedRaceSummary.length === players.length) {
-    return assignedRaceSummary
-  }
-
-  const trimmedResponseSummary = responseSummary.trim()
-  if (trimmedResponseSummary.length > 0 && trimmedResponseSummary.length <= players.length) {
-    return trimmedResponseSummary
-  }
-
-  return '-'
-}
-
 function buildDisplayTeams(result: MultiBalanceResponse): MultiBalanceDisplayTeam[] {
   return result.matches.flatMap((match, matchIndex) => [
     {
@@ -118,14 +95,12 @@ function buildDisplayTeams(result: MultiBalanceResponse): MultiBalanceDisplayTea
       teamNumber: matchIndex * 2 + 1,
       players: match.homeTeam,
       totalMmr: match.homeMmr,
-      raceSummary: buildTeamRaceSummary(match.homeTeam, match.raceSummary.home),
     },
     {
       key: `multi-team-${match.matchNumber}-away`,
       teamNumber: matchIndex * 2 + 2,
       players: match.awayTeam,
       totalMmr: match.awayMmr,
-      raceSummary: buildTeamRaceSummary(match.awayTeam, match.raceSummary.away),
     },
   ])
 }
@@ -534,9 +509,9 @@ export default function MultiBalancePage() {
             </div>
           </header>
 
-          <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <h4 className="text-sm font-semibold text-slate-900">{t('multiBalance.result.waitingTitle')}</h4>
-            {result.waitingPlayers.length > 0 ? (
+          {result.waitingPlayers.length > 0 && (
+            <article className="rounded-lg border border-amber-200 bg-white p-4 shadow-sm">
+              <h4 className="text-sm font-semibold text-slate-900">{t('multiBalance.result.waitingTitle')}</h4>
               <ul className="mt-3 flex flex-wrap gap-2">
                 {result.waitingPlayers.map((player) => (
                   <li
@@ -547,10 +522,8 @@ export default function MultiBalancePage() {
                   </li>
                 ))}
               </ul>
-            ) : (
-              <p className="mt-2 text-xs text-slate-500">{t('multiBalance.result.noWaiting')}</p>
-            )}
-          </article>
+            </article>
+          )}
 
           <div className="grid gap-4 md:grid-cols-2">
             {displayTeams.map((team) => {
@@ -561,7 +534,7 @@ export default function MultiBalancePage() {
                   key={team.key}
                   className={`overflow-hidden rounded-lg border bg-white shadow-sm ${theme.card}`}
                 >
-                  <header className={`flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 ${theme.header}`}>
+                  <header className={`border-b px-4 py-3 ${theme.header}`}>
                     <div>
                       <p className={`text-xs font-semibold ${theme.label}`}>
                         {t('multiBalance.result.teamLabel', { number: team.teamNumber })}
@@ -570,9 +543,6 @@ export default function MultiBalancePage() {
                         {t('multiBalance.result.teamMemberCount', { count: team.players.length })}
                       </h4>
                     </div>
-                    <span className={`rounded-md border px-2.5 py-1 text-xs font-semibold ${theme.badge}`}>
-                      {t('multiBalance.result.teamRaceComposition')}: {team.raceSummary}
-                    </span>
                   </header>
 
                   {showMmr && (
