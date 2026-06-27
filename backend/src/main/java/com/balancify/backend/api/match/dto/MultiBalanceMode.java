@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 
 public enum MultiBalanceMode {
     MMR_FIRST,
+    RANDOM,
     DIVERSITY_FIRST,
     RACE_DISTRIBUTION_FIRST;
 

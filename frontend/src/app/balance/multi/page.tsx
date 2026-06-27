@@ -249,13 +249,13 @@ export default function MultiBalancePage() {
   )
 
   useEffect(() => {
-    if (!raceCompositionTeamSize) {
+    if (balanceMode === 'RANDOM' || !raceCompositionTeamSize) {
       setRaceComposition(null)
       return
     }
 
     setRaceComposition((previous) => normalizeRaceComposition(raceCompositionTeamSize, previous))
-  }, [raceCompositionTeamSize])
+  }, [balanceMode, raceCompositionTeamSize])
 
   const selectedTotalMmr = selectedPlayers.reduce(
     (sum, player) => sum + (typeof player.currentMmr === 'number' ? player.currentMmr : 0),
@@ -333,7 +333,12 @@ export default function MultiBalancePage() {
     setSubmitting(true)
     try {
       const response = await apiClient.balanceMatchMulti(
-        buildMultiBalanceRequestPayload(TEMP_GROUP_ID, selectedIds, balanceMode, raceComposition)
+        buildMultiBalanceRequestPayload(
+          TEMP_GROUP_ID,
+          selectedIds,
+          balanceMode,
+          balanceMode === 'RANDOM' ? null : raceComposition
+        )
       )
       setResult(response)
     } catch (error) {
@@ -424,33 +429,35 @@ export default function MultiBalancePage() {
             </div>
           </div>
 
-          <label className="mt-4 block space-y-1 text-xs font-medium text-slate-500">
-            {t('multiBalance.raceComposition.label')}
-            <select
-              value={raceComposition ?? ''}
-              onChange={(event) =>
-                setRaceComposition(
-                  raceCompositionTeamSize
-                    ? normalizeRaceComposition(raceCompositionTeamSize, event.target.value)
-                    : null,
-                )
-              }
-              disabled={raceCompositionOptions.length === 0}
-              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:bg-slate-100"
-            >
-              <option value="">{t('multiBalance.raceComposition.placeholder')}</option>
-              {raceCompositionOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-            {raceCompositionOptions.length === 0 && selectedIds.length >= 4 && (
-              <p className="text-[11px] text-slate-500">
-                {t('multiBalance.raceComposition.unavailable')}
-              </p>
-            )}
-          </label>
+          {balanceMode !== 'RANDOM' && (
+            <label className="mt-4 block space-y-1 text-xs font-medium text-slate-500">
+              {t('multiBalance.raceComposition.label')}
+              <select
+                value={raceComposition ?? ''}
+                onChange={(event) =>
+                  setRaceComposition(
+                    raceCompositionTeamSize
+                      ? normalizeRaceComposition(raceCompositionTeamSize, event.target.value)
+                      : null,
+                  )
+                }
+                disabled={raceCompositionOptions.length === 0}
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:bg-slate-100"
+              >
+                <option value="">{t('multiBalance.raceComposition.placeholder')}</option>
+                {raceCompositionOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+              {raceCompositionOptions.length === 0 && selectedIds.length >= 4 && (
+                <p className="text-[11px] text-slate-500">
+                  {t('multiBalance.raceComposition.unavailable')}
+                </p>
+              )}
+            </label>
+          )}
 
           {validationMessage && (
             <p className="mt-3 text-xs text-amber-700">{validationMessage}</p>

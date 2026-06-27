@@ -10,11 +10,11 @@ assert.equal(normalizeMultiBalanceMode(undefined), DEFAULT_MULTI_BALANCE_MODE)
 assert.equal(normalizeMultiBalanceMode(null), DEFAULT_MULTI_BALANCE_MODE)
 assert.equal(normalizeMultiBalanceMode(''), DEFAULT_MULTI_BALANCE_MODE)
 
-const payload = buildMultiBalanceRequestPayload(1, [1, 2, 3, 4, 5, 6], 'DIVERSITY_FIRST')
+const payload = buildMultiBalanceRequestPayload(1, [1, 2, 3, 4, 5, 6], 'RANDOM')
 assert.deepEqual(payload, {
   groupId: 1,
   playerIds: [1, 2, 3, 4, 5, 6],
-  balanceMode: 'DIVERSITY_FIRST',
+  balanceMode: 'RANDOM',
 })
 
 assert.equal(

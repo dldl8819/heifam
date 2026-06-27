@@ -182,6 +182,31 @@ class MultiMatchBalancingServiceTest {
     }
 
     @Test
+    void randomModeGeneratesRandomAssignmentShape() {
+        MultiMatchBalancingService service = createService();
+        List<Player> players = createPlayers(1L, 12, 2000, 15, List.of("P", "T", "Z"));
+        List<Long> playerIds = players.stream().map(Player::getId).toList();
+        when(playerRepository.findByGroup_IdAndIdIn(1L, playerIds)).thenReturn(players);
+
+        MultiBalanceResponse response = service.balance(new MultiBalanceRequest(1L, playerIds, "RANDOM"));
+
+        assertThat(response.balanceMode()).isEqualTo("RANDOM");
+        assertThat(response.totalPlayers()).isEqualTo(12);
+        assertThat(response.assignedPlayers()).isEqualTo(12);
+        assertThat(response.waitingPlayers()).isEmpty();
+        assertThat(response.matches()).hasSize(2);
+        assertThat(countMatchesByTeamSize(response.matches(), 3)).isEqualTo(2);
+        assertMatchShapes(response.matches());
+        assertThat(collectAssignedIds(response.matches())).containsExactlyInAnyOrderElementsOf(playerIds);
+        assertThat(response.matches())
+            .allSatisfy(match -> {
+                assertThat(match.penaltySummary().repeatTeammatePenalty()).isZero();
+                assertThat(match.penaltySummary().repeatMatchupPenalty()).isZero();
+                assertThat(match.penaltySummary().racePenalty()).isZero();
+            });
+    }
+
+    @Test
     void diversityModePrefersLowerRepeatPenalties() {
         MultiMatchBalancingService service = createService();
         List<Player> players = createPlayers(1L, 6, 1000, 0, List.of("P", "P", "P", "P", "P", "P"));

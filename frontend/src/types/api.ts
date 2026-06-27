@@ -51,6 +51,7 @@ export type MultiBalanceRequest = {
 
 export type MultiBalanceMode =
   | 'MMR_FIRST'
+  | 'RANDOM'
   | 'DIVERSITY_FIRST'
   | 'RACE_DISTRIBUTION_FIRST'
 

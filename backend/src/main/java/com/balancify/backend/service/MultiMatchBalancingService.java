@@ -16,6 +16,7 @@ import com.balancify.backend.repository.MatchParticipantRepository;
 import com.balancify.backend.repository.MatchRepository;
 import com.balancify.backend.repository.PlayerRepository;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -99,11 +100,17 @@ public class MultiMatchBalancingService {
 
         List<PlayerSnapshot> orderedPlayers = loadPlayers(groupId, playerIds);
         MultiBalanceMode balanceMode = MultiBalanceMode.fromNullable(request.balanceMode());
-        String raceComposition = RaceCompositionPolicy.normalizeForAnyTeamSize(request.raceComposition());
-        WeightProfile weightProfile = resolveWeightProfile(balanceMode);
+        String raceComposition = balanceMode == MultiBalanceMode.RANDOM
+            ? null
+            : RaceCompositionPolicy.normalizeForAnyTeamSize(request.raceComposition());
 
         MatchAllocationPlan allocationPlan = buildAllocationPlan(orderedPlayers.size());
         validateRaceCompositionAllocation(allocationPlan.teamSizes(), raceComposition);
+        if (balanceMode == MultiBalanceMode.RANDOM) {
+            return balanceRandom(orderedPlayers, allocationPlan);
+        }
+
+        WeightProfile weightProfile = resolveWeightProfile(balanceMode);
         int assignedPlayersCount = allocationPlan.assignedPlayers();
         int waitingPlayersCount = allocationPlan.waitingPlayers();
 
@@ -146,6 +153,93 @@ public class MultiMatchBalancingService {
             matches.size(),
             matches
         );
+    }
+
+    private MultiBalanceResponse balanceRandom(
+        List<PlayerSnapshot> orderedPlayers,
+        MatchAllocationPlan allocationPlan
+    ) {
+        int waitingPlayersCount = allocationPlan.waitingPlayers();
+        List<PlayerSnapshot> shuffledPlayers = new ArrayList<>(orderedPlayers);
+        Collections.shuffle(shuffledPlayers);
+
+        List<PlayerSnapshot> assignedPlayers = new ArrayList<>(
+            shuffledPlayers.subList(0, Math.max(0, shuffledPlayers.size() - waitingPlayersCount))
+        );
+        List<PlayerSnapshot> waitingPlayers = new ArrayList<>(
+            shuffledPlayers.subList(Math.max(0, shuffledPlayers.size() - waitingPlayersCount), shuffledPlayers.size())
+        );
+        List<MultiBalanceMatchResponse> matches = buildRandomMatches(assignedPlayers, allocationPlan.teamSizes());
+        List<MultiBalanceWaitingPlayerResponse> waitingResponses = waitingPlayers.stream()
+            .map(player -> new MultiBalanceWaitingPlayerResponse(player.id(), player.nickname()))
+            .toList();
+
+        return new MultiBalanceResponse(
+            MultiBalanceMode.RANDOM.name(),
+            orderedPlayers.size(),
+            allocationPlan.assignedPlayers(),
+            waitingResponses,
+            matches.size(),
+            matches
+        );
+    }
+
+    private List<MultiBalanceMatchResponse> buildRandomMatches(
+        List<PlayerSnapshot> assignedPlayers,
+        List<Integer> teamSizes
+    ) {
+        List<MultiBalanceMatchResponse> matches = new ArrayList<>();
+        int offset = 0;
+        for (int index = 0; index < teamSizes.size(); index++) {
+            int teamSize = teamSizes.get(index);
+            int groupPlayerCount = teamSize * 2;
+            List<PlayerSnapshot> groupPlayers = assignedPlayers.subList(offset, offset + groupPlayerCount);
+            List<BalancePlayerDto> homeTeam = groupPlayers.subList(0, teamSize).stream()
+                .map(this::toBalancePlayerDto)
+                .toList();
+            List<BalancePlayerDto> awayTeam = groupPlayers.subList(teamSize, groupPlayerCount).stream()
+                .map(this::toBalancePlayerDto)
+                .toList();
+            int homeMmr = sumDtoMmr(homeTeam);
+            int awayMmr = sumDtoMmr(awayTeam);
+            TeamBalancingService.BalanceCandidate candidate = new TeamBalancingService.BalanceCandidate(
+                teamSize,
+                homeTeam,
+                awayTeam,
+                homeMmr,
+                awayMmr,
+                Math.abs(homeMmr - awayMmr)
+            );
+            BalanceResponse balanced = teamBalancingService.toResponse(candidate);
+            Map<Long, PlayerSnapshot> byId = indexById(groupPlayers);
+
+            matches.add(new MultiBalanceMatchResponse(
+                index + 1,
+                teamSize == TEAM_SIZE_THREE ? MATCH_TYPE_3V3 : MATCH_TYPE_2V2,
+                teamSize,
+                balanced.homeTeam(),
+                balanced.awayTeam(),
+                balanced.homeMmr(),
+                balanced.awayMmr(),
+                balanced.mmrDiff(),
+                balanced.expectedHomeWinRate(),
+                new MultiBalanceRaceSummaryResponse(
+                    buildRaceSummary(balanced.homeTeam(), byId),
+                    buildRaceSummary(balanced.awayTeam(), byId)
+                ),
+                new MultiBalancePenaltySummaryResponse(0, 0, 0)
+            ));
+            offset += groupPlayerCount;
+        }
+        return matches;
+    }
+
+    private BalancePlayerDto toBalancePlayerDto(PlayerSnapshot player) {
+        return new BalancePlayerDto(player.id(), player.nickname(), player.mmr());
+    }
+
+    private int sumDtoMmr(List<BalancePlayerDto> players) {
+        return players.stream().mapToInt(BalancePlayerDto::mmr).sum();
     }
 
     private List<PlayerSnapshot> loadPlayers(Long groupId, List<Long> playerIds) {
