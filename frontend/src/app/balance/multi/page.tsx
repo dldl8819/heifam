@@ -33,6 +33,40 @@ import type {
 const TEMP_GROUP_ID = 1
 const MODE_OPTIONS: MultiBalanceMode[] = [...MULTI_BALANCE_MODE_OPTIONS]
 const MINIMUM_SELECTION_SLOTS = 4
+const TEAM_CARD_THEMES = [
+  {
+    card: 'border-emerald-200',
+    header: 'border-emerald-200 bg-emerald-50',
+    label: 'text-emerald-700',
+    badge: 'border-emerald-200 bg-white text-emerald-700',
+    metric: 'border-emerald-100 bg-emerald-50/70',
+    player: 'border-emerald-100 bg-emerald-50 text-slate-900',
+  },
+  {
+    card: 'border-amber-200',
+    header: 'border-amber-200 bg-amber-50',
+    label: 'text-amber-700',
+    badge: 'border-amber-200 bg-white text-amber-800',
+    metric: 'border-amber-100 bg-amber-50/70',
+    player: 'border-amber-100 bg-amber-50 text-slate-900',
+  },
+  {
+    card: 'border-rose-200',
+    header: 'border-rose-200 bg-rose-50',
+    label: 'text-rose-700',
+    badge: 'border-rose-200 bg-white text-rose-700',
+    metric: 'border-rose-100 bg-rose-50/70',
+    player: 'border-rose-100 bg-rose-50 text-slate-900',
+  },
+  {
+    card: 'border-teal-200',
+    header: 'border-teal-200 bg-teal-50',
+    label: 'text-teal-700',
+    badge: 'border-teal-200 bg-white text-teal-700',
+    metric: 'border-teal-100 bg-teal-50/70',
+    player: 'border-teal-100 bg-teal-50 text-slate-900',
+  },
+]
 
 type MultiBalanceDisplayTeam = {
   key: string
@@ -40,6 +74,10 @@ type MultiBalanceDisplayTeam = {
   players: BalancePlayerInput[]
   totalMmr?: number
   raceSummary: string
+}
+
+function getTeamCardTheme(teamNumber: number) {
+  return TEAM_CARD_THEMES[(teamNumber - 1) % TEAM_CARD_THEMES.length]
 }
 
 function buildPlayerLine(player: BalancePlayerInput, showMmr: boolean): string {
@@ -464,34 +502,34 @@ export default function MultiBalancePage() {
 
       {result && (
         <section className="space-y-4">
-          <header className="overflow-hidden rounded-lg border border-slate-800 bg-slate-950 shadow-sm">
-            <div className="border-b border-cyan-500/30 px-4 py-3">
-              <p className="text-xs font-semibold text-cyan-300">{t('multiBalance.result.title')}</p>
-              <h3 className="mt-1 text-lg font-semibold text-white">
+          <header className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-200 px-4 py-3">
+              <p className="text-xs font-semibold text-emerald-700">{t('multiBalance.result.title')}</p>
+              <h3 className="mt-1 text-lg font-semibold text-slate-950">
                 {t('multiBalance.result.summary', {
                   totalPlayers: result.totalPlayers,
                   teamCount: displayTeams.length,
                 })}
               </h3>
-              <p className="mt-2 text-xs text-slate-300">
+              <p className="mt-2 text-xs text-slate-600">
                 {t('multiBalance.result.selectedMode')}:{' '}
-                <span className="font-semibold text-cyan-200">
+                <span className="font-semibold text-emerald-700">
                   {t(getMultiBalanceModeLabelKey(result.balanceMode))}
                 </span>
               </p>
             </div>
-            <div className="grid gap-px bg-slate-800 sm:grid-cols-3">
-              <div className="bg-slate-950 px-4 py-3 text-xs text-slate-300">
+            <div className="grid divide-y divide-slate-200 bg-slate-50 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+              <div className="px-4 py-3 text-xs text-slate-600">
                 <p>{t('multiBalance.result.teamCount')}</p>
-                <p className="mt-1 text-lg font-semibold text-white">{displayTeams.length}</p>
+                <p className="mt-1 text-lg font-semibold text-slate-950">{displayTeams.length}</p>
               </div>
-              <div className="bg-slate-950 px-4 py-3 text-xs text-slate-300">
+              <div className="px-4 py-3 text-xs text-slate-600">
                 <p>{t('multiBalance.result.assignedPlayers')}</p>
-                <p className="mt-1 text-lg font-semibold text-white">{result.assignedPlayers}</p>
+                <p className="mt-1 text-lg font-semibold text-slate-950">{result.assignedPlayers}</p>
               </div>
-              <div className="bg-slate-950 px-4 py-3 text-xs text-slate-300">
+              <div className="px-4 py-3 text-xs text-slate-600">
                 <p>{t('multiBalance.result.waitingPlayers')}</p>
-                <p className="mt-1 text-lg font-semibold text-white">{result.waitingPlayers.length}</p>
+                <p className="mt-1 text-lg font-semibold text-slate-950">{result.waitingPlayers.length}</p>
               </div>
             </div>
           </header>
@@ -515,46 +553,50 @@ export default function MultiBalancePage() {
           </article>
 
           <div className="grid gap-4 md:grid-cols-2">
-            {displayTeams.map((team) => (
-              <article
-                key={team.key}
-                className="overflow-hidden rounded-lg border border-slate-300 bg-white shadow-sm"
-              >
-                <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-950 px-4 py-3">
-                  <div>
-                    <p className="text-xs font-semibold text-cyan-300">
-                      {t('multiBalance.result.teamLabel', { number: team.teamNumber })}
-                    </p>
-                    <h4 className="mt-1 text-base font-semibold text-white">
-                      {t('multiBalance.result.teamMemberCount', { count: team.players.length })}
-                    </h4>
-                  </div>
-                  <span className="rounded-md border border-cyan-400/40 bg-cyan-400/10 px-2.5 py-1 text-xs font-semibold text-cyan-100">
-                    {t('multiBalance.result.teamRaceComposition')}: {team.raceSummary}
-                  </span>
-                </header>
+            {displayTeams.map((team) => {
+              const theme = getTeamCardTheme(team.teamNumber)
 
-                {showMmr && (
-                  <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-700">
-                    {t('multiBalance.result.teamTotalMmr')}:{' '}
-                    <span className="font-semibold text-slate-950">
-                      {typeof team.totalMmr === 'number' ? team.totalMmr : '-'}
+              return (
+                <article
+                  key={team.key}
+                  className={`overflow-hidden rounded-lg border bg-white shadow-sm ${theme.card}`}
+                >
+                  <header className={`flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 ${theme.header}`}>
+                    <div>
+                      <p className={`text-xs font-semibold ${theme.label}`}>
+                        {t('multiBalance.result.teamLabel', { number: team.teamNumber })}
+                      </p>
+                      <h4 className="mt-1 text-base font-semibold text-slate-950">
+                        {t('multiBalance.result.teamMemberCount', { count: team.players.length })}
+                      </h4>
+                    </div>
+                    <span className={`rounded-md border px-2.5 py-1 text-xs font-semibold ${theme.badge}`}>
+                      {t('multiBalance.result.teamRaceComposition')}: {team.raceSummary}
                     </span>
-                  </div>
-                )}
+                  </header>
 
-                <ul className="space-y-2 p-4">
-                  {team.players.map((player) => (
-                    <li
-                      key={`${team.key}-${player.name}`}
-                      className="rounded-md border border-cyan-100 bg-cyan-50 px-3 py-2 text-sm font-medium text-slate-900"
-                    >
-                      {buildPlayerLine(player, showMmr)}
-                    </li>
-                  ))}
-                </ul>
-              </article>
-            ))}
+                  {showMmr && (
+                    <div className={`border-b px-4 py-2 text-xs text-slate-700 ${theme.metric}`}>
+                      {t('multiBalance.result.teamTotalMmr')}:{' '}
+                      <span className="font-semibold text-slate-950">
+                        {typeof team.totalMmr === 'number' ? team.totalMmr : '-'}
+                      </span>
+                    </div>
+                  )}
+
+                  <ul className="space-y-2 p-4">
+                    {team.players.map((player) => (
+                      <li
+                        key={`${team.key}-${player.name}`}
+                        className={`rounded-md border px-3 py-2 text-sm font-medium ${theme.player}`}
+                      >
+                        {buildPlayerLine(player, showMmr)}
+                      </li>
+                    ))}
+                  </ul>
+                </article>
+              )
+            })}
           </div>
         </section>
       )}
