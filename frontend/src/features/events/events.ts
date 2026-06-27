@@ -35,10 +35,10 @@ export const events: EventRecord[] = [
     slug: 'public-3v3-win-streak-2026-06-27',
     title: '공방 3:3 연승 미션',
     category: '공방 이벤트',
-    status: 'scheduled',
+    status: 'completed',
     dateLabel: '2026.06.27 토요일',
     summary:
-      '12명 이상 모집되면 3명씩 4개 팀을 편성하고, 공방 3:3에서 가장 높은 연승 기록으로 순위를 정합니다.',
+      '참가 인원 12명 미달로 진행 조건을 충족하지 못해 종료되었습니다.',
     schedule: [
       { label: '참가 모집 마감', value: '2026.06.27 18:00' },
       { label: '팀 뽑기', value: '2026.06.27 18:30' },
@@ -64,6 +64,7 @@ export const events: EventRecord[] = [
     sponsors: ['바다', '웃음'],
     teamAssignmentNote:
       '참가자 확정 후 Hei 다중 밸런스의 랜덤 편성 모드로 3명씩 4개 팀을 나눕니다.',
+    resultNote: '참가 인원이 12명에 도달하지 않아 인원 미달로 종료했습니다.',
   },
 ]
 
