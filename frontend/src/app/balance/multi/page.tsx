@@ -34,9 +34,12 @@ const TEMP_GROUP_ID = 1
 const MODE_OPTIONS: MultiBalanceMode[] = [...MULTI_BALANCE_MODE_OPTIONS]
 const MINIMUM_SELECTION_SLOTS = 4
 
-function formatPercent(value: number): string {
-  const percent = value <= 1 ? value * 100 : value
-  return `${percent.toFixed(2)}%`
+type MultiBalanceDisplayTeam = {
+  key: string
+  teamNumber: number
+  players: BalancePlayerInput[]
+  totalMmr?: number
+  raceSummary: string
 }
 
 function buildPlayerLine(player: BalancePlayerInput, showMmr: boolean): string {
@@ -50,6 +53,43 @@ function buildPlayerLine(player: BalancePlayerInput, showMmr: boolean): string {
   return typeof player.mmr === 'number'
     ? `${player.name}${assignedRaceText} (${player.mmr} MMR)`
     : `${player.name}${assignedRaceText}`
+}
+
+function buildTeamRaceSummary(players: BalancePlayerInput[], responseSummary: string): string {
+  const assignedRaceSummary = players
+    .map((player) => player.assignedRace)
+    .filter(Boolean)
+    .join('')
+
+  if (assignedRaceSummary.length === players.length) {
+    return assignedRaceSummary
+  }
+
+  const trimmedResponseSummary = responseSummary.trim()
+  if (trimmedResponseSummary.length > 0 && trimmedResponseSummary.length <= players.length) {
+    return trimmedResponseSummary
+  }
+
+  return '-'
+}
+
+function buildDisplayTeams(result: MultiBalanceResponse): MultiBalanceDisplayTeam[] {
+  return result.matches.flatMap((match, matchIndex) => [
+    {
+      key: `multi-team-${match.matchNumber}-home`,
+      teamNumber: matchIndex * 2 + 1,
+      players: match.homeTeam,
+      totalMmr: match.homeMmr,
+      raceSummary: buildTeamRaceSummary(match.homeTeam, match.raceSummary.home),
+    },
+    {
+      key: `multi-team-${match.matchNumber}-away`,
+      teamNumber: matchIndex * 2 + 2,
+      players: match.awayTeam,
+      totalMmr: match.awayMmr,
+      raceSummary: buildTeamRaceSummary(match.awayTeam, match.raceSummary.away),
+    },
+  ])
 }
 
 function deriveMultiBalanceTeamSizes(totalPlayers: number): number[] {
@@ -216,6 +256,7 @@ export default function MultiBalancePage() {
       : selectedIds.length < 4
         ? t('multiBalance.validation.minimumFour')
         : null
+  const displayTeams = useMemo(() => (result ? buildDisplayTeams(result) : []), [result])
 
   const handleResetSelection = () => {
     setParticipantSlots(createParticipantSlots(MINIMUM_SELECTION_SLOTS))
@@ -429,7 +470,7 @@ export default function MultiBalancePage() {
               <h3 className="mt-1 text-lg font-semibold text-white">
                 {t('multiBalance.result.summary', {
                   totalPlayers: result.totalPlayers,
-                  matchCount: result.matchCount,
+                  teamCount: displayTeams.length,
                 })}
               </h3>
               <p className="mt-2 text-xs text-slate-300">
@@ -441,8 +482,8 @@ export default function MultiBalancePage() {
             </div>
             <div className="grid gap-px bg-slate-800 sm:grid-cols-3">
               <div className="bg-slate-950 px-4 py-3 text-xs text-slate-300">
-                <p>{t('multiBalance.result.totalSelected')}</p>
-                <p className="mt-1 text-lg font-semibold text-white">{result.totalPlayers}</p>
+                <p>{t('multiBalance.result.teamCount')}</p>
+                <p className="mt-1 text-lg font-semibold text-white">{displayTeams.length}</p>
               </div>
               <div className="bg-slate-950 px-4 py-3 text-xs text-slate-300">
                 <p>{t('multiBalance.result.assignedPlayers')}</p>
@@ -473,110 +514,47 @@ export default function MultiBalancePage() {
             )}
           </article>
 
-          <div className="grid gap-4">
-            {result.matches.map((match) => {
-              const displayRaceComposition =
-                raceComposition ??
-                (match.raceSummary.home && match.raceSummary.home === match.raceSummary.away
-                  ? match.raceSummary.home
-                  : '-')
-
-              return (
-                <article
-                  key={`multi-match-${match.matchNumber}`}
-                  className="overflow-hidden rounded-lg border border-slate-300 bg-white shadow-sm"
-                >
-                  <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-950 px-4 py-3">
-                    <div>
-                      <p className="text-xs font-semibold text-cyan-300">
-                        {t('multiBalance.result.matchNumber', { number: match.matchNumber })}
-                      </p>
-                      <h4 className="mt-1 text-base font-semibold text-white">
-                        {t('multiBalance.result.homeSheetLabel')} vs {t('multiBalance.result.awaySheetLabel')}
-                      </h4>
-                    </div>
-                    <div className="flex flex-wrap gap-2 text-xs">
-                      <span className="rounded-md border border-cyan-400/40 bg-cyan-400/10 px-2.5 py-1 font-semibold text-cyan-100">
-                        {t('multiBalance.result.raceComposition')}: {displayRaceComposition}
-                      </span>
-                      <span className="rounded-md border border-slate-500 bg-slate-900 px-2.5 py-1 font-semibold text-slate-100">
-                        {t('multiBalance.result.expectedHomeWinRate')}:{' '}
-                        {typeof match.expectedHomeWinRate === 'number'
-                          ? formatPercent(match.expectedHomeWinRate)
-                          : '-'}
-                      </span>
-                    </div>
-                  </header>
-
-                  {showMmr && (
-                    <div className="grid gap-px bg-slate-200 text-xs text-slate-700 sm:grid-cols-3">
-                      <div className="bg-slate-50 px-4 py-2">
-                        {t('multiBalance.result.homeMmr')}:{' '}
-                        <span className="font-semibold text-slate-950">
-                          {typeof match.homeMmr === 'number' ? match.homeMmr : '-'}
-                        </span>
-                      </div>
-                      <div className="bg-slate-50 px-4 py-2">
-                        {t('multiBalance.result.awayMmr')}:{' '}
-                        <span className="font-semibold text-slate-950">
-                          {typeof match.awayMmr === 'number' ? match.awayMmr : '-'}
-                        </span>
-                      </div>
-                      <div className="bg-slate-50 px-4 py-2">
-                        {t('multiBalance.result.mmrDiff')}:{' '}
-                        <span className="font-semibold text-slate-950">
-                          {typeof match.mmrDiff === 'number' ? match.mmrDiff : '-'}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="grid gap-px bg-slate-200 md:grid-cols-2">
-                    <section className="bg-white p-4">
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <h5 className="text-sm font-semibold text-sky-700">
-                          {t('multiBalance.result.homeSheetLabel')}
-                        </h5>
-                        <span className="rounded-md bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-700">
-                          {match.homeTeam.length}명
-                        </span>
-                      </div>
-                      <ul className="space-y-2">
-                        {match.homeTeam.map((player) => (
-                          <li
-                            key={`multi-home-${match.matchNumber}-${player.name}`}
-                            className="rounded-md border border-sky-100 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-900"
-                          >
-                            {buildPlayerLine(player, showMmr)}
-                          </li>
-                        ))}
-                      </ul>
-                    </section>
-
-                    <section className="bg-white p-4">
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <h5 className="text-sm font-semibold text-rose-700">
-                          {t('multiBalance.result.awaySheetLabel')}
-                        </h5>
-                        <span className="rounded-md bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700">
-                          {match.awayTeam.length}명
-                        </span>
-                      </div>
-                      <ul className="space-y-2">
-                        {match.awayTeam.map((player) => (
-                          <li
-                            key={`multi-away-${match.matchNumber}-${player.name}`}
-                            className="rounded-md border border-rose-100 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-900"
-                          >
-                            {buildPlayerLine(player, showMmr)}
-                          </li>
-                        ))}
-                      </ul>
-                    </section>
+          <div className="grid gap-4 md:grid-cols-2">
+            {displayTeams.map((team) => (
+              <article
+                key={team.key}
+                className="overflow-hidden rounded-lg border border-slate-300 bg-white shadow-sm"
+              >
+                <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-950 px-4 py-3">
+                  <div>
+                    <p className="text-xs font-semibold text-cyan-300">
+                      {t('multiBalance.result.teamLabel', { number: team.teamNumber })}
+                    </p>
+                    <h4 className="mt-1 text-base font-semibold text-white">
+                      {t('multiBalance.result.teamMemberCount', { count: team.players.length })}
+                    </h4>
                   </div>
-                </article>
-              )
-            })}
+                  <span className="rounded-md border border-cyan-400/40 bg-cyan-400/10 px-2.5 py-1 text-xs font-semibold text-cyan-100">
+                    {t('multiBalance.result.teamRaceComposition')}: {team.raceSummary}
+                  </span>
+                </header>
+
+                {showMmr && (
+                  <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-700">
+                    {t('multiBalance.result.teamTotalMmr')}:{' '}
+                    <span className="font-semibold text-slate-950">
+                      {typeof team.totalMmr === 'number' ? team.totalMmr : '-'}
+                    </span>
+                  </div>
+                )}
+
+                <ul className="space-y-2 p-4">
+                  {team.players.map((player) => (
+                    <li
+                      key={`${team.key}-${player.name}`}
+                      className="rounded-md border border-cyan-100 bg-cyan-50 px-3 py-2 text-sm font-medium text-slate-900"
+                    >
+                      {buildPlayerLine(player, showMmr)}
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            ))}
           </div>
         </section>
       )}

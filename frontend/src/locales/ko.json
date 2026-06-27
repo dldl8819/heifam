@@ -649,17 +649,17 @@
   },
   "multiBalance": {
     "title": "다중 밸런스",
-    "description": "참가자를 자동 배정해 3:3 우선, 필요 시 2:2까지 함께 생성합니다.",
+    "description": "참가자를 MMR 균형 기준으로 여러 팀으로 나눕니다.",
     "helper": {
-      "defaultPriority": "기본적으로 3:3을 우선으로 생성합니다.",
-      "addTwoVsTwo": "남는 인원이 4명일 경우 2:2 경기를 추가 생성합니다.",
-      "waiting": "매치를 만들 수 없는 남는 인원은 대기 인원으로 표시됩니다."
+      "defaultPriority": "기본적으로 3명 팀을 우선으로 편성합니다.",
+      "addTwoVsTwo": "남는 인원이 4명일 경우 2명 팀 2개를 추가로 편성합니다.",
+      "waiting": "팀을 만들 수 없는 남는 인원은 대기 인원으로 표시됩니다."
     },
     "loadError": "선수 목록을 불러오지 못했습니다. 백엔드 상태를 확인해 주세요.",
     "generateError": "다중 밸런스 생성에 실패했습니다.",
     "selection": {
       "title": "참가자 선택",
-      "helper": "밸런스 매치처럼 닉네임을 입력하면 티어표에 바로 배치됩니다.",
+      "helper": "닉네임을 입력하면 티어표에 바로 배치됩니다.",
       "reset": "초기화",
       "searchLabel": "닉네임 검색",
       "searchPlaceholder": "닉네임 입력...",
@@ -669,8 +669,8 @@
       "title": "선택 요약",
       "selectedCount": "{count}명 선택됨",
       "totalMmr": "선택된 총 MMR",
-      "submit": "다중 밸런스 생성",
-      "submitting": "생성 중..."
+      "submit": "팀 편성 생성",
+      "submitting": "편성 중..."
     },
     "mode": {
       "title": "운영 우선순위",
@@ -699,14 +699,19 @@
       "minimumFour": "최소 4명 이상 선택해야 합니다."
     },
     "result": {
-      "title": "생성 결과",
-      "summary": "총 {totalPlayers}명으로 {matchCount}경기를 생성했습니다.",
+      "title": "팀 편성 결과",
+      "summary": "총 {totalPlayers}명으로 {teamCount}개 팀을 편성했습니다.",
       "selectedMode": "적용 모드",
       "totalSelected": "총 참가자",
+      "teamCount": "편성 팀",
       "assignedPlayers": "배정 인원",
       "waitingPlayers": "대기 인원",
       "waitingTitle": "대기 인원",
       "noWaiting": "대기 인원이 없습니다.",
+      "teamLabel": "팀 {number}",
+      "teamMemberCount": "{count}명 팀",
+      "teamTotalMmr": "팀 총 MMR",
+      "teamRaceComposition": "팀 종족",
       "matchNumberHeader": "경기",
       "matchNumber": "경기 {number}",
       "matchType": "경기 유형",
