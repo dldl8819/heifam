@@ -17,6 +17,21 @@ describe('route access', () => {
     })
   })
 
+  it('allows events archive without login', () => {
+    const decision = getRouteAccessDecision('/events', {
+      isLoggedIn: false,
+      canAccess: false,
+      isAdmin: false,
+      isSuperAdmin: false,
+    })
+
+    expect(decision).toEqual({
+      allowed: true,
+      redirectTo: null,
+      blocked: false,
+    })
+  })
+
   it('redirects admins away from temporarily disabled dashboard', () => {
     const decision = getRouteAccessDecision('/dashboard', {
       isLoggedIn: true,

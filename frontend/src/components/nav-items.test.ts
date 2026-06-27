@@ -11,6 +11,7 @@ describe('navigation items', () => {
     })
 
     expect(items.map((item) => item.href)).toContain('/ads')
+    expect(items.map((item) => item.href)).toContain('/events')
   })
 
   it('hides temporarily disabled dashboard for admins', () => {
@@ -23,6 +24,7 @@ describe('navigation items', () => {
 
     expect(items.map((item) => item.href)).not.toContain('/dashboard')
     expect(items.map((item) => item.href)).toContain('/players')
+    expect(items.map((item) => item.href)).toContain('/events')
     expect(items.map((item) => item.href)).toContain('/ads')
     expect(items.map((item) => item.href)).not.toContain('/admin/access')
     expect(items.map((item) => item.href)).not.toContain('/admin/audit')

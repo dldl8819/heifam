@@ -15,7 +15,7 @@ type RouteRequirement = 'public' | 'member' | 'admin' | 'super_admin' | 'disable
 
 const AUTH_PATH_PREFIX = '/auth'
 const DISABLED_PATHS = ['/dashboard']
-const PUBLIC_PATHS = ['/', '/ads', '/results', '/privacy', '/terms']
+const PUBLIC_PATHS = ['/', '/events', '/ads', '/results', '/privacy', '/terms']
 const MEMBER_PATHS = ['/balance', '/players', '/ranking']
 const ADMIN_PATHS = ['/balance/multi', '/captain-draft', '/import', '/players/import']
 const SUPER_ADMIN_PATHS = ['/admin/access', '/admin/audit']
