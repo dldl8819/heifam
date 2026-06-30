@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { t } from '@/lib/i18n'
 
-const YOUTUBE_URL = 'https://www.youtube.com/@hei1749'
+const YOUTUBE_URL = 'https://www.youtube.com/@Hei-minsik'
 const INSTAGRAM_URL = 'https://www.instagram.com/hei.minsik'
 
 export function SiteFooter() {
