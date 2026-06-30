@@ -623,7 +623,7 @@
       "averageTeamMmr": "팀 평균 MMR"
     },
     "copy": {
-      "title": "스타 채팅용",
+      "ariaLabel": "스타크래프트 채팅용 밸런스 결과 복사",
       "button": "복사",
       "copiedButton": "복사 완료",
       "failed": "클립보드 복사에 실패했습니다."

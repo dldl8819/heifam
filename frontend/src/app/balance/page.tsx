@@ -901,39 +901,32 @@ export default function BalancePage() {
 
       {result && (
         <>
-          <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-semibold text-slate-900">{t('balance.copy.title')}</h3>
-                <p className="mt-2 break-words rounded-lg bg-slate-50 px-3 py-2 text-sm font-medium text-slate-800">
-                  {balanceChatText}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleCopyBalanceChatText}
-                className="shrink-0 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
-              >
-                {copyStatus === 'copied' ? t('balance.copy.copiedButton') : t('balance.copy.button')}
-              </button>
-            </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {copyStatus === 'failed' && (
-              <p className="mt-2 text-xs text-rose-700">{t('balance.copy.failed')}</p>
+              <p className="text-xs text-rose-700">{t('balance.copy.failed')}</p>
             )}
-          </article>
+            <button
+              type="button"
+              onClick={handleCopyBalanceChatText}
+              aria-label={t('balance.copy.ariaLabel')}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+            >
+              {copyStatus === 'copied' ? t('balance.copy.copiedButton') : t('balance.copy.button')}
+            </button>
+          </div>
 
           <section className="grid gap-4 lg:grid-cols-2">
-          <article
-            className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${
-              showMmr ? 'select-none' : ''
-            }`}
-            onCopy={handleProtectedClipboard}
-            onCut={handleProtectedClipboard}
-            onContextMenu={handleProtectedContextMenu}
-            onDragStart={handleProtectedDragStart}
-            onKeyDown={handleProtectedKeyDown}
-            style={protectedMmrStyle}
-          >
+            <article
+              className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${
+                showMmr ? 'select-none' : ''
+              }`}
+              onCopy={handleProtectedClipboard}
+              onCut={handleProtectedClipboard}
+              onContextMenu={handleProtectedContextMenu}
+              onDragStart={handleProtectedDragStart}
+              onKeyDown={handleProtectedKeyDown}
+              style={protectedMmrStyle}
+            >
             <h3 className="text-sm font-semibold text-slate-900">{t('balance.result.homeTeam')}</h3>
             <ul className="mt-3 space-y-2">
               {result.homeTeam.map((player) => (
