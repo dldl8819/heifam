@@ -87,6 +87,7 @@ class MonthlyTierRefreshServiceTest {
         MonthlyTierRefreshService service = service(now);
         Player player = player(1L, "A", 930);
         player.setLastTierRecalculatedAt(now);
+        player.setLastTierSnapshotAt(OffsetDateTime.parse("2026-04-30T23:59:59+09:00"));
 
         when(playerRepository.findAll()).thenReturn(List.of(player));
 
@@ -94,6 +95,26 @@ class MonthlyTierRefreshServiceTest {
 
         assertThat(player.getTier()).isEqualTo("A");
         verify(playerRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void refreshesWhenPreviousMonthSnapshotWasAppliedAfterMidnight() {
+        OffsetDateTime now = OffsetDateTime.parse("2026-06-30T14:59:59.123Z");
+        MonthlyTierRefreshService service = service(now);
+        Player player = player(1L, "S", 1455);
+        player.setLastTierRecalculatedAt(OffsetDateTime.parse("2026-05-31T15:01:00Z"));
+        player.setLastTierSnapshotAt(OffsetDateTime.parse("2026-05-31T23:59:59+09:00"));
+
+        when(playerRepository.findAll()).thenReturn(List.of(player));
+
+        service.applyMonthlyTierRefreshIfDue();
+
+        assertThat(player.getTier()).isEqualTo("A-");
+        assertThat(player.getLastTierRecalculatedAt()).isEqualTo(now);
+        assertThat(player.getLastTierSnapshotAt())
+            .isEqualTo(OffsetDateTime.parse("2026-06-30T23:59:59+09:00"));
+        assertThat(player.getLastTierSnapshotMmr()).isEqualTo(1455);
+        verify(playerRepository).saveAll(List.of(player));
     }
 
     private MonthlyTierRefreshService service(OffsetDateTime now) {

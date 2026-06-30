@@ -77,7 +77,7 @@ public class MonthlyTierRefreshService {
             return;
         }
 
-        OffsetDateTime snapshotAt = nowInSettlementZone.toOffsetDateTime();
+        OffsetDateTime snapshotAt = nowInSettlementZone.withNano(0).toOffsetDateTime();
         List<Player> playersToSave = new ArrayList<>();
         for (Player player : playerRepository.findAll()) {
             if (wasAlreadyRefreshedForEffectiveMonth(player, effectiveMonth)) {
@@ -108,9 +108,9 @@ public class MonthlyTierRefreshService {
     }
 
     private boolean wasAlreadyRefreshedForEffectiveMonth(Player player, YearMonth effectiveMonth) {
-        OffsetDateTime lastRecalculatedAt = player.getLastTierRecalculatedAt();
-        return lastRecalculatedAt != null
-            && YearMonth.from(lastRecalculatedAt.atZoneSameInstant(settlementZone)).equals(effectiveMonth);
+        OffsetDateTime lastSnapshotAt = player.getLastTierSnapshotAt();
+        return lastSnapshotAt != null
+            && YearMonth.from(lastSnapshotAt.atZoneSameInstant(settlementZone)).equals(effectiveMonth);
     }
 
     private ZoneId resolveSettlementZone(String settlementZoneId) {
