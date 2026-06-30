@@ -23,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class MonthlyTierRefreshService {
 
     private static final String DEFAULT_SETTLEMENT_ZONE_ID = "Asia/Seoul";
-    private static final LocalTime MONTH_END_SETTLEMENT_TIME = LocalTime.of(23, 59);
+    private static final LocalTime MONTH_END_SETTLEMENT_TIME = LocalTime.of(23, 59, 59);
 
     private final PlayerRepository playerRepository;
     private final boolean enabled;
@@ -56,7 +56,7 @@ public class MonthlyTierRefreshService {
     }
 
     @Scheduled(
-        cron = "${balancify.rank.monthly-tier-refresh.cron:0 59 23 28-31 * *}",
+        cron = "${balancify.rank.monthly-tier-refresh.cron:59 59 23 28-31 * *}",
         zone = "${balancify.rank.monthly-tier-refresh.zone:" + DEFAULT_SETTLEMENT_ZONE_ID + "}"
     )
     @Transactional
