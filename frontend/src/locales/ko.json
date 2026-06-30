@@ -622,6 +622,12 @@
       "expectedHomeWinRate": "홈 예상 승률",
       "averageTeamMmr": "팀 평균 MMR"
     },
+    "copy": {
+      "title": "스타 채팅용",
+      "button": "복사",
+      "copiedButton": "복사 완료",
+      "failed": "클립보드 복사에 실패했습니다."
+    },
     "quickResult": {
       "title": "밸런스에서 바로 결과 입력",
       "description": "승리 팀을 선택해 결과를 반영하면 그때 매치가 저장되고 바로 결과가 입력됩니다.",

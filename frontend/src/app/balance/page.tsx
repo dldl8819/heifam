@@ -21,6 +21,7 @@ import { useMmrVisibility } from '@/lib/mmr-visibility'
 import { findUniquePlayerByNicknamePrefix } from '@/lib/player-autocomplete'
 import { getRaceCompositionOptions, normalizeRaceComposition } from '@/lib/race-composition'
 import type {
+  BalancePlayerInput,
   BalancePlayerOption,
   BalanceResponse,
   MatchResultResponse,
@@ -65,6 +66,51 @@ function formatAssignedRace(assignedRace?: string): string {
     return ''
   }
   return ` · ${assignedRace}`
+}
+
+function formatPlayerForChat(player: BalancePlayerInput): string {
+  return `${player.name}${player.assignedRace ? `(${player.assignedRace})` : ''}`
+}
+
+function formatBalanceChatText(result: BalanceResponse): string {
+  const homeTeam = result.homeTeam.map(formatPlayerForChat).join(', ')
+  const awayTeam = result.awayTeam.map(formatPlayerForChat).join(', ')
+  const homeWinRate =
+    typeof result.expectedHomeWinRate === 'number'
+      ? formatPercent(result.expectedHomeWinRate)
+      : '-'
+
+  return `홈: ${homeTeam} / 어웨이: ${awayTeam} / 홈승률 ${homeWinRate}`
+}
+
+function copyTextWithFallback(text: string): Promise<void> {
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    return navigator.clipboard.writeText(text)
+  }
+
+  if (typeof document === 'undefined') {
+    return Promise.reject(new Error('Clipboard is unavailable.'))
+  }
+
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = '0'
+  document.body.appendChild(textarea)
+  textarea.select()
+
+  try {
+    const copied = document.execCommand('copy')
+    if (!copied) {
+      throw new Error('Copy command failed.')
+    }
+    return Promise.resolve()
+  } catch (error) {
+    return Promise.reject(error)
+  } finally {
+    document.body.removeChild(textarea)
+  }
 }
 
 function resolveReadableApiErrorMessage(error: unknown): string | null {
@@ -184,10 +230,12 @@ export default function BalancePage() {
   const [resultSubmitError, setResultSubmitError] = useState<string | null>(null)
   const [resultSubmitSuccess, setResultSubmitSuccess] = useState<MatchResultResponse | null>(null)
   const [matchCreateMessage, setMatchCreateMessage] = useState<string | null>(null)
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle')
   const [persistedReady, setPersistedReady] = useState<boolean>(false)
   const slotInputRefs = useRef<Array<HTMLInputElement | null>>([])
 
   const requiredPlayerCount = teamSize * 2
+  const balanceChatText = useMemo(() => (result ? formatBalanceChatText(result) : ''), [result])
 
   useEffect(() => {
     let active = true
@@ -285,6 +333,19 @@ export default function BalancePage() {
     }
   }, [teamSize, raceComposition, slots, slotInputs, persistedReady])
 
+  useEffect(() => {
+    setCopyStatus('idle')
+  }, [balanceChatText])
+
+  useEffect(() => {
+    if (copyStatus === 'idle') {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => setCopyStatus('idle'), 2000)
+    return () => window.clearTimeout(timeoutId)
+  }, [copyStatus])
+
   const activeSlotIndexes = useMemo(
     () => Array.from({ length: requiredPlayerCount }, (_, index) => index),
     [requiredPlayerCount]
@@ -372,6 +433,7 @@ export default function BalancePage() {
     setMatchCreateMessage(null)
     setResultSubmitError(null)
     setResultSubmitSuccess(null)
+    setCopyStatus('idle')
   }
 
   const handleTeamSizeChange = (nextTeamSize: SupportedTeamSize) => {
@@ -389,6 +451,7 @@ export default function BalancePage() {
     setMatchCreateMessage(null)
     setResultSubmitError(null)
     setResultSubmitSuccess(null)
+    setCopyStatus('idle')
   }
 
   const handleSlotInputChange = (index: number, value: string) => {
@@ -454,6 +517,7 @@ export default function BalancePage() {
     setMatchCreateMessage(null)
     setResultSubmitError(null)
     setResultSubmitSuccess(null)
+    setCopyStatus('idle')
 
     if (!allSelected || hasDuplicates) {
       setSubmitError(t('balance.validation.needExact', { count: requiredPlayerCount }))
@@ -482,6 +546,19 @@ export default function BalancePage() {
       }
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleCopyBalanceChatText = async () => {
+    if (!balanceChatText) {
+      return
+    }
+
+    try {
+      await copyTextWithFallback(balanceChatText)
+      setCopyStatus('copied')
+    } catch {
+      setCopyStatus('failed')
     }
   }
 
@@ -823,7 +900,29 @@ export default function BalancePage() {
       </div>
 
       {result && (
-        <section className="grid gap-4 lg:grid-cols-2">
+        <>
+          <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-semibold text-slate-900">{t('balance.copy.title')}</h3>
+                <p className="mt-2 break-words rounded-lg bg-slate-50 px-3 py-2 text-sm font-medium text-slate-800">
+                  {balanceChatText}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCopyBalanceChatText}
+                className="shrink-0 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+              >
+                {copyStatus === 'copied' ? t('balance.copy.copiedButton') : t('balance.copy.button')}
+              </button>
+            </div>
+            {copyStatus === 'failed' && (
+              <p className="mt-2 text-xs text-rose-700">{t('balance.copy.failed')}</p>
+            )}
+          </article>
+
+          <section className="grid gap-4 lg:grid-cols-2">
           <article
             className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${
               showMmr ? 'select-none' : ''
@@ -939,7 +1038,8 @@ export default function BalancePage() {
               )}
             </div>
           </article>
-        </section>
+          </section>
+        </>
       )}
 
       <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
