@@ -117,8 +117,9 @@ class RatingReplayCalculator {
                 double actual = winnerTeam.equals(normalizeTeam(participant.getTeam())) ? 1.0 : 0.0;
 
                 int beforeMmr = state.currentMmr();
-                int delta = (int) Math.round(effectiveKFactor * (actual - expected));
-                int afterMmr = beforeMmr + delta;
+                int rawDelta = (int) Math.round(effectiveKFactor * (actual - expected));
+                int afterMmr = floorMmr(beforeMmr + rawDelta);
+                int delta = afterMmr - beforeMmr;
                 int completedGames = state.completedGames() + 1;
                 String nextTier = PlayerTierPolicy.resolveTierForRankedMatch(
                     state.currentTier(),
@@ -227,7 +228,7 @@ class RatingReplayCalculator {
                     new PlayerState(
                         player.getId(),
                         player.getNickname(),
-                        safeInt(player.getMmr()),
+                        floorMmr(player.getMmr()),
                         seedMmr,
                         PlayerTierPolicy.resolveTier(seedMmr),
                         0
@@ -239,12 +240,12 @@ class RatingReplayCalculator {
 
     private int resolveSeedMmr(Player player, Integer earliestRecordedBefore) {
         if (player.getBaseMmr() != null) {
-            return safeInt(player.getBaseMmr());
+            return floorMmr(player.getBaseMmr());
         }
         if (earliestRecordedBefore != null) {
-            return safeInt(earliestRecordedBefore);
+            return floorMmr(earliestRecordedBefore);
         }
-        return safeInt(player.getMmr());
+        return floorMmr(player.getMmr());
     }
 
     private double averageCurrentMmr(List<MatchParticipant> participants, Map<Long, PlayerState> states) {
@@ -315,6 +316,14 @@ class RatingReplayCalculator {
 
     private int safeInt(Integer value) {
         return value == null ? 0 : value;
+    }
+
+    private int floorMmr(Integer value) {
+        return Math.max(0, safeInt(value));
+    }
+
+    private int floorMmr(int value) {
+        return Math.max(0, value);
     }
 
     private static final class PlayerState {

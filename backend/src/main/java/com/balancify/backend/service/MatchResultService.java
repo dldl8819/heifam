@@ -181,22 +181,23 @@ public class MatchResultService {
         for (MatchParticipant participant : participants) {
             Player player = participant.getPlayer();
             int baseMmrBefore = participant.getMmrBefore() != null
-                ? participant.getMmrBefore()
-                : safeMmr(player.getMmr());
+                ? floorMmr(participant.getMmrBefore())
+                : floorMmr(player.getMmr());
             boolean homeSide = TEAM_HOME.equals(normalizeTeam(participant.getTeam()));
             double expected = homeSide ? homeExpectedWinRate : awayExpectedWinRate;
             double actual = winnerTeam.equals(normalizeTeam(participant.getTeam())) ? 1.0 : 0.0;
             double playerReturnBoostMultiplier = resolveReturnBoostMultiplier(player, alreadyProcessed);
 
-            int mmrDelta = (int) Math.round(
+            int rawMmrDelta = (int) Math.round(
                 effectiveKFactor * outcomeMultiplier * playerReturnBoostMultiplier * (actual - expected)
             );
-            int mmrAfter = baseMmrBefore + mmrDelta;
+            int mmrAfter = floorMmr(baseMmrBefore + rawMmrDelta);
+            int mmrDelta = mmrAfter - baseMmrBefore;
             int previousDelta = safeMmr(participant.getMmrDelta());
-            int currentPlayerMmr = safeMmr(player.getMmr());
-            int updatedPlayerMmr = alreadyProcessed
+            int currentPlayerMmr = floorMmr(player.getMmr());
+            int updatedPlayerMmr = floorMmr(alreadyProcessed
                 ? currentPlayerMmr - previousDelta + mmrDelta
-                : currentPlayerMmr + mmrDelta;
+                : currentPlayerMmr + mmrDelta);
 
             if (participant.getRace() == null || participant.getRace().isBlank()) {
                 participant.setRace(player.getRace());
@@ -272,16 +273,24 @@ public class MatchResultService {
 
     private int participantReferenceMmr(MatchParticipant participant) {
         if (participant.getMmrBefore() != null) {
-            return participant.getMmrBefore();
+            return floorMmr(participant.getMmrBefore());
         }
         if (participant.getPlayer() != null) {
-            return safeMmr(participant.getPlayer().getMmr());
+            return floorMmr(participant.getPlayer().getMmr());
         }
         return 0;
     }
 
     private int safeMmr(Integer mmr) {
         return mmr == null ? 0 : mmr;
+    }
+
+    private int floorMmr(Integer mmr) {
+        return Math.max(0, safeMmr(mmr));
+    }
+
+    private int floorMmr(int mmr) {
+        return Math.max(0, mmr);
     }
 
     private int resolveRequiredTeamSize(Match match, List<MatchParticipant> participants) {

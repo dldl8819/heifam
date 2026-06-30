@@ -91,6 +91,44 @@ class RatingReplayCalculatorTest {
         assertThat(participant.beforeMmr()).isEqualTo(1200);
     }
 
+    @Test
+    void replayFloorsMmrAtZeroAndAdjustsDelta() {
+        RatingReplayCalculator calculator = new RatingReplayCalculator(36, 800, 300, 900, 0.6, 0.7);
+        Group group = new Group();
+        group.setId(1L);
+
+        Player h1 = player(1L, group, "H1", 10);
+        Player h2 = player(2L, group, "H2", 10);
+        Player a1 = player(3L, group, "A1", 5);
+        Player a2 = player(4L, group, "A2", 5);
+        Match match = match(201L, "HOME", OffsetDateTime.parse("2026-05-01T10:00:00Z"));
+        match.setTeamSize(2);
+
+        Map<Long, List<MatchParticipant>> participantsByMatchId = new LinkedHashMap<>();
+        participantsByMatchId.put(match.getId(), List.of(
+            participant(2001L, match, h1, "HOME"),
+            participant(2002L, match, h2, "HOME"),
+            participant(2003L, match, a1, "AWAY"),
+            participant(2004L, match, a2, "AWAY")
+        ));
+
+        RatingReplayPlan plan = calculator.calculate(
+            List.of(h1, h2, a1, a2),
+            List.of(match),
+            participantsByMatchId
+        );
+
+        assertThat(finalMmrByPlayerId(plan).get(3L)).isZero();
+        assertThat(finalMmrByPlayerId(plan).get(4L)).isZero();
+        plan.participants().stream()
+            .filter(result -> result.playerId().equals(3L) || result.playerId().equals(4L))
+            .forEach(result -> {
+                assertThat(result.beforeMmr()).isEqualTo(5);
+                assertThat(result.afterMmr()).isZero();
+                assertThat(result.delta()).isEqualTo(-5);
+            });
+    }
+
     private Map<Long, Integer> finalMmrByPlayerId(RatingReplayPlan plan) {
         Map<Long, Integer> values = new LinkedHashMap<>();
         for (RatingReplayPlan.PlayerResult player : plan.players()) {

@@ -250,6 +250,62 @@ class MatchResultServiceTest {
     }
 
     @Test
+    void floorsMmrAtZeroWhenLossWouldGoNegative() {
+        Match match = new Match();
+        match.setId(24L);
+        match.setStatus(MatchStatus.CONFIRMED);
+        match.setTeamSize(2);
+
+        Group group = new Group();
+        group.setId(1L);
+
+        List<MatchParticipant> participants = List.of(
+            participant(61L, match, player(41L, group, "H1", 10), "HOME"),
+            participant(62L, match, player(42L, group, "H2", 10), "HOME"),
+            participant(63L, match, player(43L, group, "A1", 5), "AWAY"),
+            participant(64L, match, player(44L, group, "A2", 5), "AWAY")
+        );
+
+        when(matchRepository.findByIdForUpdate(24L)).thenReturn(Optional.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(24L)).thenReturn(participants);
+        when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(playerRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(mmrHistoryRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MatchResultResponse response = matchResultService.processMatchResult(
+            24L,
+            new MatchResultRequest("HOME")
+        );
+
+        participants.stream()
+            .filter(participant -> "AWAY".equals(participant.getTeam()))
+            .forEach(participant -> {
+                assertThat(participant.getMmrBefore()).isEqualTo(5);
+                assertThat(participant.getMmrAfter()).isZero();
+                assertThat(participant.getMmrDelta()).isEqualTo(-5);
+                assertThat(participant.getPlayer().getMmr()).isZero();
+            });
+        response.participants().stream()
+            .filter(participant -> "AWAY".equals(participant.team()))
+            .forEach(participant -> {
+                assertThat(participant.mmrBefore()).isEqualTo(5);
+                assertThat(participant.mmrAfter()).isZero();
+                assertThat(participant.mmrDelta()).isEqualTo(-5);
+            });
+
+        ArgumentCaptor<List<MmrHistory>> historyCaptor = ArgumentCaptor.forClass(List.class);
+        verify(mmrHistoryRepository).saveAll(historyCaptor.capture());
+        historyCaptor.getValue().stream()
+            .filter(history -> history.getPlayer().getId().equals(43L) || history.getPlayer().getId().equals(44L))
+            .forEach(history -> {
+                assertThat(history.getBeforeMmr()).isEqualTo(5);
+                assertThat(history.getAfterMmr()).isZero();
+                assertThat(history.getDelta()).isEqualTo(-5);
+            });
+    }
+
+    @Test
     void returnBoostMultipliesDormantReturningPlayerDeltaAndConsumesOneGame() {
         Match match = new Match();
         match.setId(23L);

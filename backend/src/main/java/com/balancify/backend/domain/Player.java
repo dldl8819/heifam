@@ -137,11 +137,11 @@ public class Player {
     }
 
     public void setMmr(Integer mmr) {
-        this.mmr = mmr;
+        this.mmr = normalizeMmr(mmr);
     }
 
     public void applyRankedMmr(Integer mmr, int completedRankedGames) {
-        this.mmr = mmr;
+        this.mmr = normalizeMmr(mmr);
     }
 
     public Integer getBaseMmr() {
@@ -292,6 +292,7 @@ public class Player {
     @PreUpdate
     private void syncTierWithMmr() {
         this.race = PlayerRacePolicy.normalizeCapabilityOrDefault(this.race, "P");
+        this.mmr = normalizeMmr(this.mmr);
         this.returnBoostGamesRemaining = this.returnBoostGamesRemaining == null
             ? 0
             : Math.max(0, this.returnBoostGamesRemaining);
@@ -301,5 +302,9 @@ public class Player {
         if (this.tier == null || this.tier.isBlank()) {
             this.tier = PlayerTierPolicy.resolveTier(this.mmr);
         }
+    }
+
+    private int normalizeMmr(Integer mmr) {
+        return Math.max(0, mmr == null ? 0 : mmr);
     }
 }
