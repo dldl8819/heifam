@@ -821,18 +821,6 @@ export const apiClient = {
       .map(normalizePlayerTierBoardItem)
       .filter((item): item is GroupPlayerTierBoardItem => item !== null)
   },
-  getGroupPlayerRaceStats: async (groupId: number): Promise<GroupPlayerRaceStatsItem[]> => {
-    const payload = await apiRequest<unknown>(`/api/groups/${groupId}/players/race-stats`, undefined, {
-      includeUserEmail: true,
-    })
-    if (!Array.isArray(payload)) {
-      throw new Error('Invalid player race stats response format')
-    }
-
-    return payload
-      .map(normalizePlayerRaceStatsItem)
-      .filter((item): item is GroupPlayerRaceStatsItem => item !== null)
-  },
   getGroupPlayerRaceStatsForPlayer: async (
     groupId: number,
     playerId: number

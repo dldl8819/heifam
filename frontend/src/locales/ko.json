@@ -19,8 +19,7 @@
     "auditLogs": "운영 로그",
     "ads": "파트너스",
     "results": "경기 결과",
-    "ranking": "랭킹",
-    "stats": "종족 통계"
+    "ranking": "랭킹"
   },
   "landing": {
     "title": "Hei`Fam 내전 운영 플랫폼",
@@ -972,22 +971,6 @@
     "team": {
       "home": "홈",
       "away": "어웨이"
-    }
-  },
-  "stats": {
-    "title": "종족 통계",
-    "description": "선수별 출전 종족과 팀 종족 조합 기준 전적을 확인합니다.",
-    "loadError": "종족 통계를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
-    "empty": "표시할 종족 통계가 없습니다.",
-    "emptyStat": "전적 없음",
-    "searchLabel": "검색",
-    "searchPlaceholder": "닉네임, 종족, 조합 검색",
-    "table": {
-      "nickname": "닉네임",
-      "race": "주종",
-      "total": "전체 전적",
-      "byRace": "출전 종족별",
-      "byGameType": "팀 조합별"
     }
   },
   "statsModal": {
