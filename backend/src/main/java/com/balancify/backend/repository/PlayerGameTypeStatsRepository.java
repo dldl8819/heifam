@@ -40,8 +40,9 @@ public interface PlayerGameTypeStatsRepository extends JpaRepository<PlayerGameT
                         then upper(mp.assigned_race)
                     when upper(coalesce(mp.race, '')) in ('P', 'T', 'Z')
                         then upper(mp.race)
-                    else 'PTZ'
+                    else null
                 end as race_token,
+                upper(coalesce(m.race_composition, '')) as stored_game_type,
                 case
                     when m.winning_team is null
                         or mp.team is null
@@ -56,10 +57,13 @@ public interface PlayerGameTypeStatsRepository extends JpaRepository<PlayerGameT
             join matches m on m.id = mp.match_id and m.group_id = p.group_id
             where p.group_id = :groupId
         ),
-        team_compositions as (
+        raw_team_compositions as (
             select
                 match_id,
                 team,
+                max(stored_game_type) as stored_game_type,
+                count(*) as team_size,
+                count(race_token) as concrete_race_count,
                 string_agg(
                     race_token,
                     ''
@@ -71,16 +75,33 @@ public interface PlayerGameTypeStatsRepository extends JpaRepository<PlayerGameT
                             else 4
                         end,
                         race_token
-                ) as game_type
+                ) as assigned_game_type
             from participant_base
             where team in ('HOME', 'AWAY')
             group by match_id, team
+        ),
+        team_compositions as (
+            select
+                match_id,
+                team,
+                case
+                    when team_size in (2, 3)
+                        and concrete_race_count = team_size
+                        and assigned_game_type in ('PP', 'PT', 'PZ', 'PPP', 'PPT', 'PPZ', 'PTZ')
+                        then assigned_game_type
+                    when team_size in (2, 3)
+                        and stored_game_type in ('PP', 'PT', 'PZ', 'PPP', 'PPT', 'PPZ', 'PTZ')
+                        and length(stored_game_type) = team_size
+                        then stored_game_type
+                    else null
+                end as game_type
+            from raw_team_compositions
         ),
         participant_results as (
             select
                 base.player_id,
                 base.group_id,
-                coalesce(nullif(composition.game_type, ''), base.race_token) as game_type,
+                composition.game_type,
                 base.result_symbol
             from participant_base base
             left join team_compositions composition
@@ -97,6 +118,7 @@ public interface PlayerGameTypeStatsRepository extends JpaRepository<PlayerGameT
             now()
         from participant_results
         where result_symbol in ('W', 'L')
+            and game_type is not null
         group by player_id, group_id, game_type
         """, nativeQuery = true)
     void insertGroupGameTypeStats(@Param("groupId") Long groupId);

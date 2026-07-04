@@ -4,7 +4,7 @@ import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
 import type { GroupPlayerGameTypeStat, GroupPlayerRaceStatsItem } from '@/types/api'
 
-const DISPLAY_GAME_TYPES = ['PPP', 'PPT', 'PPZ', 'PTZ'] as const
+const DISPLAY_GAME_TYPES = ['PPP', 'PPT', 'PPZ', 'PTZ', 'PP', 'PT', 'PZ'] as const
 
 type PlayerGameTypeStatsModalProps = {
   open: boolean

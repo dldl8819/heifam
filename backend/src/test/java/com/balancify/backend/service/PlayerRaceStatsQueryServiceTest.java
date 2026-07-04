@@ -149,7 +149,9 @@ class PlayerRaceStatsQueryServiceTest {
                 gameTypeStats(1L, 1L, "PPP", 1, 0),
                 gameTypeStats(1L, 1L, "PPT", 2, 1),
                 gameTypeStats(1L, 1L, "PPZ", 1, 1),
-                gameTypeStats(1L, 1L, "PTZ", 0, 1)
+                gameTypeStats(1L, 1L, "PTZ", 0, 1),
+                gameTypeStats(1L, 1L, "PP", 1, 0),
+                gameTypeStats(1L, 1L, "PPTZPTZ", 9, 0)
             ));
 
         GroupPlayerRaceStatsResponse response =
@@ -160,7 +162,7 @@ class PlayerRaceStatsQueryServiceTest {
         assertThat(response.losses()).isEqualTo(2);
         assertThat(response.byGameType())
             .extracting("gameType")
-            .containsExactlyInAnyOrder("PPP", "PPT", "PPZ", "PTZ");
+            .containsExactlyInAnyOrder("PPP", "PPT", "PPZ", "PTZ", "PP");
         verify(playerRepository, never()).findByGroup_IdOrderByMmrDescIdAsc(1L);
         verify(playerRaceStatsRepository, never()).findByGroupId(1L);
         verify(playerGameTypeStatsRepository, never()).findByGroupId(1L);
@@ -177,20 +179,22 @@ class PlayerRaceStatsQueryServiceTest {
         when(playerMonthlyGameTypeStatsRepository.findByGroupIdAndPlayerIdAndStatMonth(1L, 1L, JULY_2026))
             .thenReturn(List.of(
                 monthlyGameTypeStats(1L, 1L, JULY_2026, "PPP", 1, 0),
-                monthlyGameTypeStats(1L, 1L, JULY_2026, "PPT", 2, 1)
+                monthlyGameTypeStats(1L, 1L, JULY_2026, "PPT", 2, 1),
+                monthlyGameTypeStats(1L, 1L, JULY_2026, "PT", 1, 1),
+                monthlyGameTypeStats(1L, 1L, JULY_2026, "PTZPTZPTZ", 3, 0)
             ));
 
         GroupPlayerRaceStatsResponse response =
             playerRaceStatsQueryService.getGroupPlayerMonthlyRaceStats(1L, 1L);
 
         assertThat(response.nickname()).isEqualTo("Alpha");
-        assertThat(response.wins()).isEqualTo(3);
-        assertThat(response.losses()).isEqualTo(1);
-        assertThat(response.games()).isEqualTo(4);
+        assertThat(response.wins()).isEqualTo(4);
+        assertThat(response.losses()).isEqualTo(2);
+        assertThat(response.games()).isEqualTo(6);
         assertThat(response.byRace()).isEmpty();
         assertThat(response.byGameType())
             .extracting("gameType")
-            .containsExactly("PPT", "PPP");
+            .containsExactly("PPT", "PT", "PPP");
         verify(playerRaceStatsRepository, never()).findByGroupIdAndPlayerId(1L, 1L);
         verify(playerGameTypeStatsRepository, never()).findByGroupIdAndPlayerId(1L, 1L);
     }

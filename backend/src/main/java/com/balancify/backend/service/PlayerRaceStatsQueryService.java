@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -27,6 +28,7 @@ public class PlayerRaceStatsQueryService {
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final List<String> RACE_ORDER = List.of("P", "T", "Z", "PT", "PZ", "TZ", "PTZ");
     private static final List<String> GAME_TYPE_RACE_ORDER = List.of("P", "T", "Z", "PTZ");
+    private static final Set<String> SUPPORTED_GAME_TYPES = Set.of("PP", "PT", "PZ", "PPP", "PPT", "PPZ", "PTZ");
 
     private final PlayerRepository playerRepository;
     private final PlayerRaceStatsRepository playerRaceStatsRepository;
@@ -106,6 +108,7 @@ public class PlayerRaceStatsQueryService {
         List<GroupPlayerGameTypeStatResponse> byGameType = playerMonthlyGameTypeStatsRepository
             .findByGroupIdAndPlayerIdAndStatMonth(groupId, playerId, statMonth)
             .stream()
+            .filter(stat -> isSupportedGameType(stat.getGameType()))
             .map(stat -> new GroupPlayerGameTypeStatResponse(
                 stat.getGameType(),
                 safeInt(stat.getWins()),
@@ -189,6 +192,7 @@ public class PlayerRaceStatsQueryService {
 
         List<GroupPlayerGameTypeStatResponse> byGameType = gameTypeStats
             .stream()
+            .filter(stat -> isSupportedGameType(stat.getGameType()))
             .map(stat -> new GroupPlayerGameTypeStatResponse(
                 stat.getGameType(),
                 safeInt(stat.getWins()),
@@ -272,6 +276,10 @@ public class PlayerRaceStatsQueryService {
     private int gameTypeRaceOrder(String race) {
         int index = GAME_TYPE_RACE_ORDER.indexOf(race);
         return index < 0 ? Integer.MAX_VALUE : index;
+    }
+
+    private boolean isSupportedGameType(String gameType) {
+        return SUPPORTED_GAME_TYPES.contains(gameType);
     }
 
     private double winRate(Integer wins, Integer games) {
