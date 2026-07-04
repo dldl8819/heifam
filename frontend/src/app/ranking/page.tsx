@@ -49,6 +49,15 @@ function formatStreak(value: string): string {
   return value
 }
 
+function isHotWinStreak(value: string): boolean {
+  if (!value || value.charAt(0) !== 'W') {
+    return false
+  }
+
+  const count = Number(value.slice(1))
+  return Number.isInteger(count) && count >= 3
+}
+
 function formatLast10(value: string): string {
   if (!value) {
     return '-'
@@ -281,6 +290,7 @@ export default function RankingPage() {
                 const playerId = playerIdByNickname.get(row.nickname) ?? null
                 const isStatsLoadingForRow =
                   gameTypeStatsLoading && gameTypeStatsPlayer?.id === playerId
+                const hotStreak = isHotWinStreak(row.streak)
 
                 return (
                   <tr
@@ -288,7 +298,19 @@ export default function RankingPage() {
                     className={`border-t border-slate-100 ${getRankClass(row.rank)}`}
                   >
                     <td className="px-4 py-3 font-semibold text-slate-900">{row.rank}</td>
-                    <td className="px-4 py-3 font-medium text-slate-900">{row.nickname}</td>
+                    <td className="px-4 py-3 font-medium text-slate-900">
+                      {hotStreak && (
+                        <span
+                          className="mr-1.5 inline-block"
+                          title={t('ranking.hotStreakLabel')}
+                          aria-label={t('ranking.hotStreakLabel')}
+                          role="img"
+                        >
+                          🔥
+                        </span>
+                      )}
+                      {row.nickname}
+                    </td>
                     <td className="px-4 py-3 text-slate-700">{row.race}</td>
                     <td className="px-4 py-3 text-slate-700">{formatTier(resolveDisplayTier(row))}</td>
                     {showMmr && (

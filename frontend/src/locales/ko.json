@@ -995,6 +995,7 @@
     "description": "현재 그룹 상위권을 MMR 기준으로 확인합니다.",
     "loadError": "랭킹 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
     "empty": "랭킹 데이터가 아직 없습니다.",
+    "hotStreakLabel": "3연승 이상",
     "table": {
       "rank": "순위",
       "nickname": "닉네임",
