@@ -974,7 +974,6 @@
     }
   },
   "statsModal": {
-    "eyebrow": "종족전별 승률",
     "title": "{nickname} 종족전별 승률",
     "button": "보기",
     "buttonLoading": "불러오는 중",
@@ -996,6 +995,7 @@
     "loadError": "랭킹 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
     "empty": "랭킹 데이터가 아직 없습니다.",
     "hotStreakLabel": "3연승 이상",
+    "monthlyPeriod": "{year}년 {month}월 전적 기준",
     "table": {
       "rank": "순위",
       "nickname": "닉네임",

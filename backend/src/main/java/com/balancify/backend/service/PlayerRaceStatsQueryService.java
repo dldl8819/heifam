@@ -7,8 +7,13 @@ import com.balancify.backend.domain.Player;
 import com.balancify.backend.domain.PlayerGameTypeStats;
 import com.balancify.backend.domain.PlayerRaceStats;
 import com.balancify.backend.repository.PlayerGameTypeStatsRepository;
+import com.balancify.backend.repository.PlayerMonthlyGameTypeStatsRepository;
 import com.balancify.backend.repository.PlayerRaceStatsRepository;
 import com.balancify.backend.repository.PlayerRepository;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,24 +23,48 @@ import org.springframework.stereotype.Service;
 @Service
 public class PlayerRaceStatsQueryService {
 
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final List<String> RACE_ORDER = List.of("P", "T", "Z", "PT", "PZ", "TZ", "PTZ");
     private static final List<String> GAME_TYPE_RACE_ORDER = List.of("P", "T", "Z", "PTZ");
 
     private final PlayerRepository playerRepository;
     private final PlayerRaceStatsRepository playerRaceStatsRepository;
     private final PlayerGameTypeStatsRepository playerGameTypeStatsRepository;
+    private final PlayerMonthlyGameTypeStatsRepository playerMonthlyGameTypeStatsRepository;
     private final GroupReadCacheService groupReadCacheService;
+    private final Clock clock;
 
     public PlayerRaceStatsQueryService(
         PlayerRepository playerRepository,
         PlayerRaceStatsRepository playerRaceStatsRepository,
         PlayerGameTypeStatsRepository playerGameTypeStatsRepository,
+        PlayerMonthlyGameTypeStatsRepository playerMonthlyGameTypeStatsRepository,
         GroupReadCacheService groupReadCacheService
+    ) {
+        this(
+            playerRepository,
+            playerRaceStatsRepository,
+            playerGameTypeStatsRepository,
+            playerMonthlyGameTypeStatsRepository,
+            groupReadCacheService,
+            Clock.system(KST)
+        );
+    }
+
+    PlayerRaceStatsQueryService(
+        PlayerRepository playerRepository,
+        PlayerRaceStatsRepository playerRaceStatsRepository,
+        PlayerGameTypeStatsRepository playerGameTypeStatsRepository,
+        PlayerMonthlyGameTypeStatsRepository playerMonthlyGameTypeStatsRepository,
+        GroupReadCacheService groupReadCacheService,
+        Clock clock
     ) {
         this.playerRepository = playerRepository;
         this.playerRaceStatsRepository = playerRaceStatsRepository;
         this.playerGameTypeStatsRepository = playerGameTypeStatsRepository;
+        this.playerMonthlyGameTypeStatsRepository = playerMonthlyGameTypeStatsRepository;
         this.groupReadCacheService = groupReadCacheService;
+        this.clock = clock == null ? Clock.system(KST) : clock;
     }
 
     public List<GroupPlayerRaceStatsResponse> getGroupPlayerRaceStats(Long groupId) {
@@ -48,6 +77,12 @@ public class PlayerRaceStatsQueryService {
         return groupReadCacheService.get(cacheKey, () -> loadGroupPlayerRaceStats(groupId, playerId));
     }
 
+    public GroupPlayerRaceStatsResponse getGroupPlayerMonthlyRaceStats(Long groupId, Long playerId) {
+        LocalDate statMonth = currentStatMonth();
+        String cacheKey = "player-race-stats:group:%d:player:%d:month:%s".formatted(groupId, playerId, statMonth);
+        return groupReadCacheService.get(cacheKey, () -> loadGroupPlayerMonthlyRaceStats(groupId, playerId, statMonth));
+    }
+
     private GroupPlayerRaceStatsResponse loadGroupPlayerRaceStats(Long groupId, Long playerId) {
         Player player = playerRepository.findByIdAndGroup_Id(playerId, groupId)
             .orElseThrow(() -> new NoSuchElementException("Player not found"));
@@ -56,6 +91,42 @@ public class PlayerRaceStatsQueryService {
             player,
             playerRaceStatsRepository.findByGroupIdAndPlayerId(groupId, playerId),
             playerGameTypeStatsRepository.findByGroupIdAndPlayerId(groupId, playerId)
+        );
+    }
+
+    private GroupPlayerRaceStatsResponse loadGroupPlayerMonthlyRaceStats(
+        Long groupId,
+        Long playerId,
+        LocalDate statMonth
+    ) {
+        Player player = playerRepository.findByIdAndGroup_Id(playerId, groupId)
+            .orElseThrow(() -> new NoSuchElementException("Player not found"));
+        List<GroupPlayerGameTypeStatResponse> byGameType = playerMonthlyGameTypeStatsRepository
+            .findByGroupIdAndPlayerIdAndStatMonth(groupId, playerId, statMonth)
+            .stream()
+            .map(stat -> new GroupPlayerGameTypeStatResponse(
+                stat.getGameType(),
+                safeInt(stat.getWins()),
+                safeInt(stat.getLosses()),
+                safeInt(stat.getGames()),
+                winRate(stat.getWins(), stat.getGames())
+            ))
+            .sorted(this::compareGameTypeStat)
+            .toList();
+        int wins = byGameType.stream().mapToInt(GroupPlayerGameTypeStatResponse::wins).sum();
+        int losses = byGameType.stream().mapToInt(GroupPlayerGameTypeStatResponse::losses).sum();
+        int games = wins + losses;
+
+        return new GroupPlayerRaceStatsResponse(
+            player.getId(),
+            player.getNickname(),
+            PlayerRacePolicy.toDisplayRace(player.getRace()),
+            wins,
+            losses,
+            games,
+            winRate(wins, games),
+            List.of(),
+            byGameType
         );
     }
 
@@ -141,6 +212,10 @@ public class PlayerRaceStatsQueryService {
             byRace,
             byGameType
         );
+    }
+
+    private LocalDate currentStatMonth() {
+        return YearMonth.now(clock.withZone(KST)).atDay(1);
     }
 
     private int compareRaceStat(GroupPlayerRaceStatResponse left, GroupPlayerRaceStatResponse right) {

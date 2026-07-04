@@ -101,6 +101,26 @@ public class GroupPlayerController {
         }
     }
 
+    @GetMapping("/{groupId}/players/{playerId}/race-stats/monthly")
+    public GroupPlayerRaceStatsResponse getGroupPlayerMonthlyRaceStats(
+        @PathVariable Long groupId,
+        @PathVariable Long playerId,
+        HttpServletRequest request
+    ) {
+        AccessControlService.AccessProfile accessProfile = accessControlService.resolveAccessProfile(
+            authenticatedRequestResolver.resolve(request).email()
+        );
+        if (!accessProfile.allowed()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access is not allowed");
+        }
+
+        try {
+            return playerRaceStatsQueryService.getGroupPlayerMonthlyRaceStats(groupId, playerId);
+        } catch (NoSuchElementException exception) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, exception.getMessage(), exception);
+        }
+    }
+
     @GetMapping("/{groupId}/players/tier-board")
     public List<GroupPlayerTierBoardResponse> getGroupPlayerTierBoard(
         @PathVariable Long groupId,

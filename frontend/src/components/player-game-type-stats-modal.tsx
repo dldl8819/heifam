@@ -60,8 +60,7 @@ export function PlayerGameTypeStatsModal({
       <article className="w-full max-w-xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
           <div>
-            <p className="text-xs font-semibold text-emerald-700">{t('statsModal.eyebrow')}</p>
-            <h2 id="player-game-type-stats-title" className="mt-1 text-lg font-bold text-slate-950">
+            <h2 id="player-game-type-stats-title" className="text-lg font-bold text-slate-950">
               {t('statsModal.title', { nickname: playerName })}
             </h2>
           </div>

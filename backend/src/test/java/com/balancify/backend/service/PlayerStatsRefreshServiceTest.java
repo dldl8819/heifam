@@ -4,6 +4,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.balancify.backend.repository.PlayerGameTypeStatsRepository;
+import com.balancify.backend.repository.PlayerMonthlyGameTypeStatsRepository;
+import com.balancify.backend.repository.PlayerMonthlyStatsRepository;
 import com.balancify.backend.repository.PlayerRaceStatsRepository;
 import com.balancify.backend.repository.PlayerStatsRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,6 +26,12 @@ class PlayerStatsRefreshServiceTest {
     @Mock
     private PlayerGameTypeStatsRepository playerGameTypeStatsRepository;
 
+    @Mock
+    private PlayerMonthlyStatsRepository playerMonthlyStatsRepository;
+
+    @Mock
+    private PlayerMonthlyGameTypeStatsRepository playerMonthlyGameTypeStatsRepository;
+
     private PlayerStatsRefreshService playerStatsRefreshService;
 
     @BeforeEach
@@ -31,7 +39,9 @@ class PlayerStatsRefreshServiceTest {
         playerStatsRefreshService = new PlayerStatsRefreshService(
             playerStatsRepository,
             playerRaceStatsRepository,
-            playerGameTypeStatsRepository
+            playerGameTypeStatsRepository,
+            playerMonthlyStatsRepository,
+            playerMonthlyGameTypeStatsRepository
         );
     }
 
@@ -44,6 +54,10 @@ class PlayerStatsRefreshServiceTest {
         verify(playerRaceStatsRepository).insertGroupRaceStats(7L);
         verify(playerGameTypeStatsRepository).deleteByGroupIdForRebuild(7L);
         verify(playerGameTypeStatsRepository).insertGroupGameTypeStats(7L);
+        verify(playerMonthlyStatsRepository).deleteByGroupIdForRebuild(7L);
+        verify(playerMonthlyStatsRepository).insertGroupMonthlyStats(7L);
+        verify(playerMonthlyGameTypeStatsRepository).deleteByGroupIdForRebuild(7L);
+        verify(playerMonthlyGameTypeStatsRepository).insertGroupMonthlyGameTypeStats(7L);
     }
 
     @Test
@@ -55,5 +69,9 @@ class PlayerStatsRefreshServiceTest {
         verify(playerRaceStatsRepository, never()).insertGroupRaceStats(null);
         verify(playerGameTypeStatsRepository, never()).deleteByGroupIdForRebuild(null);
         verify(playerGameTypeStatsRepository, never()).insertGroupGameTypeStats(null);
+        verify(playerMonthlyStatsRepository, never()).deleteByGroupIdForRebuild(null);
+        verify(playerMonthlyStatsRepository, never()).insertGroupMonthlyStats(null);
+        verify(playerMonthlyGameTypeStatsRepository, never()).deleteByGroupIdForRebuild(null);
+        verify(playerMonthlyGameTypeStatsRepository, never()).insertGroupMonthlyGameTypeStats(null);
     }
 }

@@ -839,6 +839,24 @@ export const apiClient = {
 
     return item
   },
+  getGroupPlayerMonthlyRaceStatsForPlayer: async (
+    groupId: number,
+    playerId: number
+  ): Promise<GroupPlayerRaceStatsItem> => {
+    const payload = await apiRequest<unknown>(
+      `/api/groups/${groupId}/players/${playerId}/race-stats/monthly`,
+      undefined,
+      {
+        includeUserEmail: true,
+      }
+    )
+    const item = normalizePlayerRaceStatsItem(payload)
+    if (item === null) {
+      throw new Error('Invalid player monthly race stats response format')
+    }
+
+    return item
+  },
   getGroupDashboard: (groupId: number) =>
     apiRequest<GroupDashboardResponse>(`/api/groups/${groupId}/dashboard`, undefined, {
       includeUserEmail: true,

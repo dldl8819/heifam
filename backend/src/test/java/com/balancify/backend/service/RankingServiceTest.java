@@ -8,9 +8,13 @@ import static org.mockito.Mockito.when;
 import com.balancify.backend.api.group.dto.RankingItemResponse;
 import com.balancify.backend.domain.Group;
 import com.balancify.backend.domain.Player;
-import com.balancify.backend.domain.PlayerStats;
+import com.balancify.backend.domain.PlayerMonthlyStats;
 import com.balancify.backend.repository.PlayerRepository;
-import com.balancify.backend.repository.PlayerStatsRepository;
+import com.balancify.backend.repository.PlayerMonthlyStatsRepository;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,11 +25,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class RankingServiceTest {
 
+    private static final LocalDate JULY_2026 = LocalDate.of(2026, 7, 1);
+    private static final Clock FIXED_CLOCK = Clock.fixed(
+        Instant.parse("2026-07-04T15:00:00Z"),
+        ZoneId.of("Asia/Seoul")
+    );
+
     @Mock
     private PlayerRepository playerRepository;
 
     @Mock
-    private PlayerStatsRepository playerStatsRepository;
+    private PlayerMonthlyStatsRepository playerMonthlyStatsRepository;
 
     private RankingService rankingService;
 
@@ -33,8 +43,9 @@ class RankingServiceTest {
     void setUp() {
         rankingService = new RankingService(
             playerRepository,
-            playerStatsRepository,
-            new GroupReadCacheService(0)
+            playerMonthlyStatsRepository,
+            new GroupReadCacheService(0),
+            FIXED_CLOCK
         );
     }
 
@@ -47,7 +58,7 @@ class RankingServiceTest {
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
             .thenReturn(List.of(player, unassigned));
-        when(playerStatsRepository.findByGroupId(1L))
+        when(playerMonthlyStatsRepository.findByGroupIdAndStatMonth(1L, JULY_2026))
             .thenReturn(List.of());
 
         List<RankingItemResponse> response = rankingService.getGroupRanking(1L);
@@ -57,18 +68,18 @@ class RankingServiceTest {
         assertThat(response.get(0).currentMmr()).isEqualTo(790);
         assertThat(response.get(1).tier()).isEqualTo("UNASSIGNED");
         assertThat(response.get(1).currentMmr()).isEqualTo(0);
-        verify(playerStatsRepository).findByGroupId(1L);
+        verify(playerMonthlyStatsRepository).findByGroupIdAndStatMonth(1L, JULY_2026);
     }
 
     @Test
-    void mapsRankingStatsFromPlayerStatsWithoutLoadingFullHistory() {
+    void mapsRankingStatsFromCurrentMonthStatsWithoutLoadingFullHistory() {
         Group group = new Group();
         group.setId(1L);
         Player player = player(1L, group, "PlayerAlpha", "P", "B-", 790);
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
             .thenReturn(List.of(player));
-        when(playerStatsRepository.findByGroupId(1L))
+        when(playerMonthlyStatsRepository.findByGroupIdAndStatMonth(1L, JULY_2026))
             .thenReturn(List.of(rankingStats(1L, 3, 2, 15, "WWLWL", "W", 2)));
 
         List<RankingItemResponse> response = rankingService.getGroupRanking(1L);
@@ -82,13 +93,35 @@ class RankingServiceTest {
         assertThat(item.last10()).isEqualTo("WWLWL");
         assertThat(item.streak()).isEqualTo("W2");
         assertThat(item.mmrDelta()).isEqualTo(15);
-        verify(playerStatsRepository).findByGroupId(1L);
+        verify(playerMonthlyStatsRepository).findByGroupIdAndStatMonth(1L, JULY_2026);
+    }
+
+    @Test
+    void returnsZeroStatsWhenPlayerHasNoCurrentMonthStats() {
+        Group group = new Group();
+        group.setId(1L);
+        Player player = player(1L, group, "PlayerAlpha", "P", "B-", 790);
+
+        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
+            .thenReturn(List.of(player));
+        when(playerMonthlyStatsRepository.findByGroupIdAndStatMonth(1L, JULY_2026))
+            .thenReturn(List.of());
+
+        RankingItemResponse item = rankingService.getGroupRanking(1L).get(0);
+
+        assertThat(item.wins()).isZero();
+        assertThat(item.losses()).isZero();
+        assertThat(item.games()).isZero();
+        assertThat(item.winRate()).isEqualTo(0.0);
+        assertThat(item.streak()).isEqualTo("N0");
+        assertThat(item.last10()).isEmpty();
+        assertThat(item.mmrDelta()).isZero();
     }
 
     @Test
     void cachesRankingBrieflyToAvoidRepeatedDatabaseEgress() {
         GroupReadCacheService cache = new GroupReadCacheService(60_000);
-        rankingService = new RankingService(playerRepository, playerStatsRepository, cache);
+        rankingService = new RankingService(playerRepository, playerMonthlyStatsRepository, cache, FIXED_CLOCK);
 
         Group group = new Group();
         group.setId(1L);
@@ -96,14 +129,14 @@ class RankingServiceTest {
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
             .thenReturn(List.of(player));
-        when(playerStatsRepository.findByGroupId(1L))
+        when(playerMonthlyStatsRepository.findByGroupIdAndStatMonth(1L, JULY_2026))
             .thenReturn(List.of());
 
         rankingService.getGroupRanking(1L);
         rankingService.getGroupRanking(1L);
 
         verify(playerRepository, times(1)).findByGroup_IdOrderByMmrDescIdAsc(1L);
-        verify(playerStatsRepository, times(1)).findByGroupId(1L);
+        verify(playerMonthlyStatsRepository, times(1)).findByGroupIdAndStatMonth(1L, JULY_2026);
     }
 
     private Player player(
@@ -125,7 +158,7 @@ class RankingServiceTest {
         return player;
     }
 
-    private PlayerStats rankingStats(
+    private PlayerMonthlyStats rankingStats(
         Long playerId,
         int wins,
         int losses,
@@ -134,9 +167,10 @@ class RankingServiceTest {
         String streakSymbol,
         int streakCount
     ) {
-        PlayerStats stats = new PlayerStats();
+        PlayerMonthlyStats stats = new PlayerMonthlyStats();
         stats.setPlayerId(playerId);
         stats.setGroupId(1L);
+        stats.setStatMonth(JULY_2026);
         stats.setWins(wins);
         stats.setLosses(losses);
         stats.setGames(wins + losses);

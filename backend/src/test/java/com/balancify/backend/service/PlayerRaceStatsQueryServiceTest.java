@@ -10,10 +10,16 @@ import com.balancify.backend.api.group.dto.GroupPlayerRaceStatsResponse;
 import com.balancify.backend.domain.Group;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.domain.PlayerGameTypeStats;
+import com.balancify.backend.domain.PlayerMonthlyGameTypeStats;
 import com.balancify.backend.domain.PlayerRaceStats;
 import com.balancify.backend.repository.PlayerGameTypeStatsRepository;
+import com.balancify.backend.repository.PlayerMonthlyGameTypeStatsRepository;
 import com.balancify.backend.repository.PlayerRaceStatsRepository;
 import com.balancify.backend.repository.PlayerRepository;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +30,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class PlayerRaceStatsQueryServiceTest {
 
+    private static final LocalDate JULY_2026 = LocalDate.of(2026, 7, 1);
+    private static final Clock FIXED_CLOCK = Clock.fixed(
+        Instant.parse("2026-07-04T15:00:00Z"),
+        ZoneId.of("Asia/Seoul")
+    );
+
     @Mock
     private PlayerRepository playerRepository;
 
@@ -33,6 +45,9 @@ class PlayerRaceStatsQueryServiceTest {
     @Mock
     private PlayerGameTypeStatsRepository playerGameTypeStatsRepository;
 
+    @Mock
+    private PlayerMonthlyGameTypeStatsRepository playerMonthlyGameTypeStatsRepository;
+
     private PlayerRaceStatsQueryService playerRaceStatsQueryService;
 
     @BeforeEach
@@ -41,7 +56,9 @@ class PlayerRaceStatsQueryServiceTest {
             playerRepository,
             playerRaceStatsRepository,
             playerGameTypeStatsRepository,
-            new GroupReadCacheService(30_000)
+            playerMonthlyGameTypeStatsRepository,
+            new GroupReadCacheService(30_000),
+            FIXED_CLOCK
         );
     }
 
@@ -149,6 +166,35 @@ class PlayerRaceStatsQueryServiceTest {
         verify(playerGameTypeStatsRepository, never()).findByGroupId(1L);
     }
 
+    @Test
+    void returnsSinglePlayerMonthlyGameTypeStatsForRankingModal() {
+        Group group = new Group();
+        group.setId(1L);
+        Player alpha = player(1L, group, "Alpha", "PT", 1500, true);
+
+        when(playerRepository.findByIdAndGroup_Id(1L, 1L))
+            .thenReturn(java.util.Optional.of(alpha));
+        when(playerMonthlyGameTypeStatsRepository.findByGroupIdAndPlayerIdAndStatMonth(1L, 1L, JULY_2026))
+            .thenReturn(List.of(
+                monthlyGameTypeStats(1L, 1L, JULY_2026, "PPP", 1, 0),
+                monthlyGameTypeStats(1L, 1L, JULY_2026, "PPT", 2, 1)
+            ));
+
+        GroupPlayerRaceStatsResponse response =
+            playerRaceStatsQueryService.getGroupPlayerMonthlyRaceStats(1L, 1L);
+
+        assertThat(response.nickname()).isEqualTo("Alpha");
+        assertThat(response.wins()).isEqualTo(3);
+        assertThat(response.losses()).isEqualTo(1);
+        assertThat(response.games()).isEqualTo(4);
+        assertThat(response.byRace()).isEmpty();
+        assertThat(response.byGameType())
+            .extracting("gameType")
+            .containsExactly("PPT", "PPP");
+        verify(playerRaceStatsRepository, never()).findByGroupIdAndPlayerId(1L, 1L);
+        verify(playerGameTypeStatsRepository, never()).findByGroupIdAndPlayerId(1L, 1L);
+    }
+
     private Player player(Long id, Group group, String nickname, String race, int mmr, boolean active) {
         Player player = new Player();
         player.setId(id);
@@ -175,6 +221,25 @@ class PlayerRaceStatsQueryServiceTest {
         PlayerGameTypeStats stats = new PlayerGameTypeStats();
         stats.setPlayerId(playerId);
         stats.setGroupId(groupId);
+        stats.setGameType(gameType);
+        stats.setWins(wins);
+        stats.setLosses(losses);
+        stats.setGames(wins + losses);
+        return stats;
+    }
+
+    private PlayerMonthlyGameTypeStats monthlyGameTypeStats(
+        Long playerId,
+        Long groupId,
+        LocalDate statMonth,
+        String gameType,
+        int wins,
+        int losses
+    ) {
+        PlayerMonthlyGameTypeStats stats = new PlayerMonthlyGameTypeStats();
+        stats.setPlayerId(playerId);
+        stats.setGroupId(groupId);
+        stats.setStatMonth(statMonth);
         stats.setGameType(gameType);
         stats.setWins(wins);
         stats.setLosses(losses);

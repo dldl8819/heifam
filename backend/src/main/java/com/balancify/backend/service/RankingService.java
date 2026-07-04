@@ -2,10 +2,14 @@ package com.balancify.backend.service;
 
 import com.balancify.backend.api.group.dto.RankingItemResponse;
 import com.balancify.backend.domain.Player;
-import com.balancify.backend.domain.PlayerStats;
+import com.balancify.backend.domain.PlayerMonthlyStats;
 import com.balancify.backend.domain.PlayerTierPolicy;
+import com.balancify.backend.repository.PlayerMonthlyStatsRepository;
 import com.balancify.backend.repository.PlayerRepository;
-import com.balancify.backend.repository.PlayerStatsRepository;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -16,26 +20,40 @@ import org.springframework.stereotype.Service;
 @Service
 public class RankingService {
 
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
     private final PlayerRepository playerRepository;
-    private final PlayerStatsRepository playerStatsRepository;
+    private final PlayerMonthlyStatsRepository playerMonthlyStatsRepository;
     private final GroupReadCacheService groupReadCacheService;
+    private final Clock clock;
 
     public RankingService(
         PlayerRepository playerRepository,
-        PlayerStatsRepository playerStatsRepository,
+        PlayerMonthlyStatsRepository playerMonthlyStatsRepository,
         GroupReadCacheService groupReadCacheService
     ) {
+        this(playerRepository, playerMonthlyStatsRepository, groupReadCacheService, Clock.system(KST));
+    }
+
+    RankingService(
+        PlayerRepository playerRepository,
+        PlayerMonthlyStatsRepository playerMonthlyStatsRepository,
+        GroupReadCacheService groupReadCacheService,
+        Clock clock
+    ) {
         this.playerRepository = playerRepository;
-        this.playerStatsRepository = playerStatsRepository;
+        this.playerMonthlyStatsRepository = playerMonthlyStatsRepository;
         this.groupReadCacheService = groupReadCacheService;
+        this.clock = clock == null ? Clock.system(KST) : clock;
     }
 
     public List<RankingItemResponse> getGroupRanking(Long groupId) {
-        String cacheKey = "ranking:group:%d:".formatted(groupId);
-        return groupReadCacheService.get(cacheKey, () -> List.copyOf(loadGroupRanking(groupId)));
+        LocalDate statMonth = currentStatMonth();
+        String cacheKey = "ranking:group:%d:month:%s".formatted(groupId, statMonth);
+        return groupReadCacheService.get(cacheKey, () -> List.copyOf(loadGroupRanking(groupId, statMonth)));
     }
 
-    private List<RankingItemResponse> loadGroupRanking(Long groupId) {
+    private List<RankingItemResponse> loadGroupRanking(Long groupId, LocalDate statMonth) {
         List<Player> players = playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId)
             .stream()
             .filter(Player::isActive)
@@ -45,7 +63,7 @@ public class RankingService {
         }
 
         Map<Long, RankingStats> statsByPlayerId = new HashMap<>();
-        for (PlayerStats stats : playerStatsRepository.findByGroupId(groupId)) {
+        for (PlayerMonthlyStats stats : playerMonthlyStatsRepository.findByGroupIdAndStatMonth(groupId, statMonth)) {
             if (stats.getPlayerId() == null) {
                 continue;
             }
@@ -100,7 +118,11 @@ public class RankingService {
         return ranking;
     }
 
-    private RankingStats toRankingStats(PlayerStats stats) {
+    private LocalDate currentStatMonth() {
+        return YearMonth.now(clock.withZone(KST)).atDay(1);
+    }
+
+    private RankingStats toRankingStats(PlayerMonthlyStats stats) {
         int wins = safeInt(stats.getWins());
         int losses = safeInt(stats.getLosses());
         int games = Math.max(0, safeInt(stats.getGames()));

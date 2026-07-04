@@ -72,6 +72,18 @@ function formatTier(value: string): string {
   return value === 'UNASSIGNED' ? t('common.tierBoard.unassigned') : value
 }
 
+function resolveCurrentKstMonthLabel(): string {
+  const parts = new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: 'numeric',
+  }).formatToParts(new Date())
+  const year = parts.find((part) => part.type === 'year')?.value ?? ''
+  const month = parts.find((part) => part.type === 'month')?.value ?? ''
+
+  return t('ranking.monthlyPeriod', { year, month })
+}
+
 export default function RankingPage() {
   const { isSuperAdmin, isLoading: authLoading } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
@@ -86,6 +98,11 @@ export default function RankingPage() {
   const [gameTypeStats, setGameTypeStats] = useState<GroupPlayerRaceStatsItem | null>(null)
   const [gameTypeStatsLoading, setGameTypeStatsLoading] = useState<boolean>(false)
   const [gameTypeStatsError, setGameTypeStatsError] = useState<string | null>(null)
+  const [monthlyPeriodLabel, setMonthlyPeriodLabel] = useState<string>('')
+
+  useEffect(() => {
+    setMonthlyPeriodLabel(resolveCurrentKstMonthLabel())
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -203,7 +220,7 @@ export default function RankingPage() {
 
     setGameTypeStatsLoading(true)
     try {
-      const response = await apiClient.getGroupPlayerRaceStatsForPlayer(TEMP_GROUP_ID, playerId)
+      const response = await apiClient.getGroupPlayerMonthlyRaceStatsForPlayer(TEMP_GROUP_ID, playerId)
       setGameTypeStats(response)
     } catch {
       setGameTypeStatsError(t('statsModal.loadError'))
@@ -231,6 +248,11 @@ export default function RankingPage() {
       />
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+        {monthlyPeriodLabel.length > 0 && (
+          <div className="min-w-full border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-700">
+            {monthlyPeriodLabel}
+          </div>
+        )}
         <table className="min-w-full text-left text-sm">
           <thead className="bg-slate-50 text-xs tracking-wide text-slate-500">
             <tr>
