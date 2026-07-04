@@ -5,6 +5,7 @@ import { useAdminAuth } from '@/lib/admin-auth'
 import { apiClient, isApiConflictError, isApiForbiddenError, isApiNotFoundError, isApiUnauthorizedError } from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
+import { PlayerGameTypeStatsModal } from '@/components/player-game-type-stats-modal'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
 import { toTierOrder } from '@/lib/player-tier'
@@ -13,7 +14,7 @@ import {
   resolveDefaultMmrForTier,
   resolveEditableMmrValue,
 } from '@/lib/player-edit'
-import type { PlayerRace, PlayerRosterItem, PlayerTierStatus } from '@/types/api'
+import type { GroupPlayerRaceStatsItem, PlayerRace, PlayerRosterItem, PlayerTierStatus } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
 
@@ -295,6 +296,11 @@ export default function PlayersPage() {
   const [showInactive, setShowInactive] = useState<boolean>(false)
   const [playerActionError, setPlayerActionError] = useState<string | null>(null)
   const [playerActionSuccess, setPlayerActionSuccess] = useState<string | null>(null)
+  const [gameTypeStatsPlayer, setGameTypeStatsPlayer] =
+    useState<{ id: number; nickname: string } | null>(null)
+  const [gameTypeStats, setGameTypeStats] = useState<GroupPlayerRaceStatsItem | null>(null)
+  const [gameTypeStatsLoading, setGameTypeStatsLoading] = useState<boolean>(false)
+  const [gameTypeStatsError, setGameTypeStatsError] = useState<string | null>(null)
 
   const fetchRoster = useCallback(async () => {
     setLoading(true)
@@ -656,6 +662,29 @@ export default function PlayersPage() {
     }
   }
 
+  const handleOpenGameTypeStats = useCallback(async (player: PlayerRosterItem) => {
+    setGameTypeStatsPlayer({ id: player.id, nickname: player.nickname })
+    setGameTypeStats(null)
+    setGameTypeStatsError(null)
+    setGameTypeStatsLoading(true)
+
+    try {
+      const response = await apiClient.getGroupPlayerRaceStatsForPlayer(TEMP_GROUP_ID, player.id)
+      setGameTypeStats(response)
+    } catch {
+      setGameTypeStatsError(t('statsModal.loadError'))
+    } finally {
+      setGameTypeStatsLoading(false)
+    }
+  }, [])
+
+  const handleCloseGameTypeStats = useCallback(() => {
+    setGameTypeStatsPlayer(null)
+    setGameTypeStats(null)
+    setGameTypeStatsError(null)
+    setGameTypeStatsLoading(false)
+  }, [])
+
   const filteredRows = useMemo(() => {
     const searchText = search.trim().toLowerCase()
     return rows.filter((row) => {
@@ -679,7 +708,7 @@ export default function PlayersPage() {
   const showDormancyFloorColumn = isSuperAdmin
   const showActionsColumn = isAdmin
   const tableColumnCount =
-    6 +
+    7 +
     (showStatusColumn ? 1 : 0) +
     (showDormancyFloorColumn ? 1 : 0) +
     (showMmrColumn ? 1 : 0) +
@@ -946,6 +975,15 @@ export default function PlayersPage() {
         </div>
       )}
 
+      <PlayerGameTypeStatsModal
+        open={gameTypeStatsPlayer !== null}
+        playerName={gameTypeStatsPlayer?.nickname ?? ''}
+        stats={gameTypeStats}
+        loading={gameTypeStatsLoading}
+        error={gameTypeStatsError}
+        onClose={handleCloseGameTypeStats}
+      />
+
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         {isAdmin && (
           <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -1027,6 +1065,7 @@ export default function PlayersPage() {
               <th className="px-4 py-3">{t('players.table.wins')}</th>
               <th className="px-4 py-3">{t('players.table.losses')}</th>
               <th className="px-4 py-3">{t('players.table.games')}</th>
+              <th className="px-4 py-3">{t('players.table.gameTypeStats')}</th>
               {showActionsColumn && <th className="px-4 py-3">{t('players.table.actions')}</th>}
             </tr>
           </thead>
@@ -1214,6 +1253,18 @@ export default function PlayersPage() {
                     <td className={`px-4 py-3 ${isActive ? 'text-slate-700' : 'text-slate-600'}`}>{row.wins}</td>
                     <td className={`px-4 py-3 ${isActive ? 'text-slate-700' : 'text-slate-600'}`}>{row.losses}</td>
                     <td className={`px-4 py-3 ${isActive ? 'text-slate-700' : 'text-slate-600'}`}>{row.games}</td>
+                    <td className="px-4 py-3">
+                      <button
+                        type="button"
+                        disabled={gameTypeStatsLoading && gameTypeStatsPlayer?.id === row.id}
+                        onClick={() => handleOpenGameTypeStats(row)}
+                        className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-emerald-600 hover:bg-emerald-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {gameTypeStatsLoading && gameTypeStatsPlayer?.id === row.id
+                          ? t('statsModal.buttonLoading')
+                          : t('statsModal.button')}
+                      </button>
+                    </td>
                     {showActionsColumn && (
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-2">

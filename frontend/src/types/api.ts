@@ -348,6 +348,34 @@ export type GroupDashboardResponse = {
   myTeammateSummary: GroupDashboardMyTeammateSummary
 }
 
+export type GroupPlayerRaceStat = {
+  race: PlayerRace
+  wins: number
+  losses: number
+  games: number
+  winRate: number
+}
+
+export type GroupPlayerGameTypeStat = {
+  gameType: string
+  wins: number
+  losses: number
+  games: number
+  winRate: number
+}
+
+export type GroupPlayerRaceStatsItem = {
+  playerId: number
+  nickname: string
+  race: PlayerRace
+  wins: number
+  losses: number
+  games: number
+  winRate: number
+  byRace: GroupPlayerRaceStat[]
+  byGameType: GroupPlayerGameTypeStat[]
+}
+
 export type CaptainDraftTeam = 'HOME' | 'AWAY' | 'UNASSIGNED'
 
 export type CaptainDraftCreateRequest = {

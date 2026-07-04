@@ -32,6 +32,25 @@ describe('route access', () => {
     })
   })
 
+  it('allows stats page for logged-in members only', () => {
+    const allowed = getRouteAccessDecision('/stats', {
+      isLoggedIn: true,
+      canAccess: true,
+      isAdmin: false,
+      isSuperAdmin: false,
+    })
+    const anonymous = getRouteAccessDecision('/stats', {
+      isLoggedIn: false,
+      canAccess: false,
+      isAdmin: false,
+      isSuperAdmin: false,
+    })
+
+    expect(allowed.allowed).toBe(true)
+    expect(anonymous.allowed).toBe(false)
+    expect(anonymous.redirectTo).toBe('/')
+  })
+
   it('redirects admins away from temporarily disabled dashboard', () => {
     const decision = getRouteAccessDecision('/dashboard', {
       isLoggedIn: true,

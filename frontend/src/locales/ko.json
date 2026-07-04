@@ -19,7 +19,8 @@
     "auditLogs": "운영 로그",
     "ads": "파트너스",
     "results": "경기 결과",
-    "ranking": "랭킹"
+    "ranking": "랭킹",
+    "stats": "종족 통계"
   },
   "landing": {
     "title": "Hei`Fam 내전 운영 플랫폼",
@@ -565,6 +566,7 @@
       "wins": "승",
       "losses": "패",
       "games": "경기수",
+      "gameTypeStats": "종족전 승률",
       "actions": "관리",
       "empty": "조건에 맞는 선수가 없습니다.",
       "unassigned": "배정 필요",
@@ -972,6 +974,39 @@
       "away": "어웨이"
     }
   },
+  "stats": {
+    "title": "종족 통계",
+    "description": "선수별 출전 종족과 팀 종족 조합 기준 전적을 확인합니다.",
+    "loadError": "종족 통계를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    "empty": "표시할 종족 통계가 없습니다.",
+    "emptyStat": "전적 없음",
+    "searchLabel": "검색",
+    "searchPlaceholder": "닉네임, 종족, 조합 검색",
+    "table": {
+      "nickname": "닉네임",
+      "race": "주종",
+      "total": "전체 전적",
+      "byRace": "출전 종족별",
+      "byGameType": "팀 조합별"
+    }
+  },
+  "statsModal": {
+    "eyebrow": "종족전별 승률",
+    "title": "{nickname} 종족전별 승률",
+    "button": "보기",
+    "buttonLoading": "불러오는 중",
+    "close": "닫기",
+    "loading": "종족전 승률을 불러오는 중...",
+    "loadError": "종족전 승률을 불러오지 못했습니다.",
+    "playerNotFound": "선수 정보를 찾지 못했습니다.",
+    "table": {
+      "gameType": "종족전",
+      "wins": "승",
+      "losses": "패",
+      "games": "경기수",
+      "winRate": "승률"
+    }
+  },
   "ranking": {
     "title": "랭킹",
     "description": "현재 그룹 상위권을 MMR 기준으로 확인합니다.",
@@ -987,6 +1022,7 @@
       "losses": "패",
       "games": "경기수",
       "winRate": "승률",
+      "gameTypeStats": "종족전 승률",
       "streak": "연속 기록",
       "last10": "최근 10경기",
       "mmrDelta": "MMR 변동"

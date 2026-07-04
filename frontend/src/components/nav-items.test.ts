@@ -24,6 +24,7 @@ describe('navigation items', () => {
 
     expect(items.map((item) => item.href)).not.toContain('/dashboard')
     expect(items.map((item) => item.href)).toContain('/players')
+    expect(items.map((item) => item.href)).toContain('/stats')
     expect(items.map((item) => item.href)).toContain('/events')
     expect(items.map((item) => item.href)).toContain('/ads')
     expect(items.map((item) => item.href)).not.toContain('/admin/access')

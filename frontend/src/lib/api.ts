@@ -10,6 +10,7 @@ import type {
   CaptainDraftPickRequest,
   CaptainDraftResponse,
   GroupDashboardResponse,
+  GroupPlayerRaceStatsItem,
   GroupPlayerMmrUpdateRequest,
   GroupPlayerUpdateRequest,
   GroupPlayerTierBoardItem,
@@ -614,6 +615,89 @@ function normalizeOperationAuditLogPage(value: unknown): OperationAuditLogPage {
   }
 }
 
+function normalizePlayerRaceStat(value: unknown) {
+  if (value === null || typeof value !== 'object') {
+    return null
+  }
+
+  const source = value as Record<string, unknown>
+  const wins = Math.max(0, Math.floor(toNumber(source.wins) ?? 0))
+  const losses = Math.max(0, Math.floor(toNumber(source.losses) ?? 0))
+  const games = Math.max(0, Math.floor(toNumber(source.games) ?? wins + losses))
+  const winRate = toNumber(source.winRate)
+
+  return {
+    race: normalizeRace(source.race),
+    wins,
+    losses,
+    games,
+    winRate: winRate ?? (games > 0 ? Math.round((wins * 10000) / games) / 100 : 0),
+  }
+}
+
+function normalizePlayerGameTypeStat(value: unknown) {
+  if (value === null || typeof value !== 'object') {
+    return null
+  }
+
+  const source = value as Record<string, unknown>
+  const gameType = typeof source.gameType === 'string' ? source.gameType.trim().toUpperCase() : ''
+  const wins = Math.max(0, Math.floor(toNumber(source.wins) ?? 0))
+  const losses = Math.max(0, Math.floor(toNumber(source.losses) ?? 0))
+  const games = Math.max(0, Math.floor(toNumber(source.games) ?? wins + losses))
+  const winRate = toNumber(source.winRate)
+
+  if (gameType.length === 0) {
+    return null
+  }
+
+  return {
+    gameType,
+    wins,
+    losses,
+    games,
+    winRate: winRate ?? (games > 0 ? Math.round((wins * 10000) / games) / 100 : 0),
+  }
+}
+
+function normalizePlayerRaceStatsItem(value: unknown): GroupPlayerRaceStatsItem | null {
+  if (value === null || typeof value !== 'object') {
+    return null
+  }
+
+  const source = value as Record<string, unknown>
+  const playerId = toNumber(source.playerId)
+  const nickname = typeof source.nickname === 'string' ? source.nickname : null
+  const wins = Math.max(0, Math.floor(toNumber(source.wins) ?? 0))
+  const losses = Math.max(0, Math.floor(toNumber(source.losses) ?? 0))
+  const games = Math.max(0, Math.floor(toNumber(source.games) ?? wins + losses))
+  const winRate = toNumber(source.winRate)
+
+  if (playerId === null || nickname === null) {
+    return null
+  }
+
+  return {
+    playerId,
+    nickname,
+    race: normalizeRace(source.race),
+    wins,
+    losses,
+    games,
+    winRate: winRate ?? (games > 0 ? Math.round((wins * 10000) / games) / 100 : 0),
+    byRace: Array.isArray(source.byRace)
+      ? source.byRace
+          .map(normalizePlayerRaceStat)
+          .filter((item): item is NonNullable<ReturnType<typeof normalizePlayerRaceStat>> => item !== null)
+      : [],
+    byGameType: Array.isArray(source.byGameType)
+      ? source.byGameType
+          .map(normalizePlayerGameTypeStat)
+          .filter((item): item is NonNullable<ReturnType<typeof normalizePlayerGameTypeStat>> => item !== null)
+      : [],
+  }
+}
+
 export const apiClient = {
   getHealth: () => apiRequest<HealthResponse>('/api/health'),
   balanceMatch: (payload: BalanceRequest) =>
@@ -736,6 +820,36 @@ export const apiClient = {
     return payload
       .map(normalizePlayerTierBoardItem)
       .filter((item): item is GroupPlayerTierBoardItem => item !== null)
+  },
+  getGroupPlayerRaceStats: async (groupId: number): Promise<GroupPlayerRaceStatsItem[]> => {
+    const payload = await apiRequest<unknown>(`/api/groups/${groupId}/players/race-stats`, undefined, {
+      includeUserEmail: true,
+    })
+    if (!Array.isArray(payload)) {
+      throw new Error('Invalid player race stats response format')
+    }
+
+    return payload
+      .map(normalizePlayerRaceStatsItem)
+      .filter((item): item is GroupPlayerRaceStatsItem => item !== null)
+  },
+  getGroupPlayerRaceStatsForPlayer: async (
+    groupId: number,
+    playerId: number
+  ): Promise<GroupPlayerRaceStatsItem> => {
+    const payload = await apiRequest<unknown>(
+      `/api/groups/${groupId}/players/${playerId}/race-stats`,
+      undefined,
+      {
+        includeUserEmail: true,
+      }
+    )
+    const item = normalizePlayerRaceStatsItem(payload)
+    if (item === null) {
+      throw new Error('Invalid player race stats response format')
+    }
+
+    return item
   },
   getGroupDashboard: (groupId: number) =>
     apiRequest<GroupDashboardResponse>(`/api/groups/${groupId}/dashboard`, undefined, {

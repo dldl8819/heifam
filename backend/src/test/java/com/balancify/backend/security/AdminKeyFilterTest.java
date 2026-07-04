@@ -35,6 +35,9 @@ import com.balancify.backend.api.group.dto.DashboardRecentBalancePreviewResponse
 import com.balancify.backend.api.group.dto.DashboardRecentBalanceTeamPlayerResponse;
 import com.balancify.backend.api.group.dto.DashboardTopRankingPreviewItemResponse;
 import com.balancify.backend.api.group.dto.GroupPlayerResponse;
+import com.balancify.backend.api.group.dto.GroupPlayerGameTypeStatResponse;
+import com.balancify.backend.api.group.dto.GroupPlayerRaceStatResponse;
+import com.balancify.backend.api.group.dto.GroupPlayerRaceStatsResponse;
 import com.balancify.backend.api.group.dto.GroupPlayerTierBoardResponse;
 import com.balancify.backend.api.group.dto.GroupPlayerImportResponse;
 import com.balancify.backend.api.group.dto.GroupRecentMatchPlayerResponse;
@@ -66,6 +69,7 @@ import com.balancify.backend.service.MultiMatchBalancingService;
 import com.balancify.backend.service.OperationAuditLogService;
 import com.balancify.backend.service.PlayerAdminService;
 import com.balancify.backend.service.PlayerQueryService;
+import com.balancify.backend.service.PlayerRaceStatsQueryService;
 import com.balancify.backend.service.PlayerImportService;
 import com.balancify.backend.service.RankingService;
 import com.balancify.backend.service.RatingRecalculationService;
@@ -140,6 +144,9 @@ class AdminKeyFilterTest {
 
     @MockBean
     private PlayerQueryService playerQueryService;
+
+    @MockBean
+    private PlayerRaceStatsQueryService playerRaceStatsQueryService;
 
     @MockBean
     private RankingService rankingService;
@@ -1044,6 +1051,46 @@ class AdminKeyFilterTest {
             .andExpect(status().isForbidden());
 
         verify(playerQueryService, never()).getGroupPlayerTierBoard(any());
+    }
+
+    @Test
+    void returnsSinglePlayerRaceStatsForAllowedMember() throws Exception {
+        when(playerRaceStatsQueryService.getGroupPlayerRaceStats(eq(1L), eq(2L)))
+            .thenReturn(new GroupPlayerRaceStatsResponse(
+                2L,
+                "alpha",
+                "P",
+                3,
+                1,
+                4,
+                75.0,
+                List.of(new GroupPlayerRaceStatResponse("P", 3, 1, 4, 75.0)),
+                List.of(new GroupPlayerGameTypeStatResponse("PPP", 2, 1, 3, 66.67))
+            ));
+
+        mockMvc
+            .perform(
+                get("/api/groups/1/players/2/race-stats")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.playerId").value(2))
+            .andExpect(jsonPath("$.nickname").value("alpha"))
+            .andExpect(jsonPath("$.byGameType[0].gameType").value("PPP"));
+
+        verify(playerRaceStatsQueryService).getGroupPlayerRaceStats(eq(1L), eq(2L));
+    }
+
+    @Test
+    void rejectsSinglePlayerRaceStatsForBlockedRequester() throws Exception {
+        mockMvc
+            .perform(
+                get("/api/groups/1/players/2/race-stats")
+                    .header("X-USER-EMAIL", "blocked@hei.gg")
+            )
+            .andExpect(status().isForbidden());
+
+        verify(playerRaceStatsQueryService, never()).getGroupPlayerRaceStats(any(), any());
     }
 
     @Test

@@ -26,6 +26,7 @@ export function getVisibleNavItems(context: NavVisibilityContext): NavItem[] {
     const adminItems: NavItem[] = [
       { label: t('nav.players'), href: '/players' },
       { label: t('nav.ranking'), href: '/ranking' },
+      { label: t('nav.stats'), href: '/stats' },
       { label: t('nav.balance'), href: '/balance' },
       { label: t('nav.captainDraft'), href: '/captain-draft' },
       { label: t('nav.multiBalance'), href: '/balance/multi' },
@@ -45,6 +46,7 @@ export function getVisibleNavItems(context: NavVisibilityContext): NavItem[] {
   return [
     { label: t('nav.players'), href: '/players' },
     { label: t('nav.ranking'), href: '/ranking' },
+    { label: t('nav.stats'), href: '/stats' },
     { label: t('nav.balance'), href: '/balance' },
     { label: t('nav.events'), href: '/events' },
     { label: t('nav.ads'), href: '/ads' },

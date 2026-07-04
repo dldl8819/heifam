@@ -1,13 +1,14 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAdminAuth } from '@/lib/admin-auth'
 import { apiClient } from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
+import { PlayerGameTypeStatsModal } from '@/components/player-game-type-stats-modal'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
-import type { PlayerTierStatus, RankingItem } from '@/types/api'
+import type { GroupPlayerRaceStatsItem, PlayerTierStatus, RankingItem } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
 
@@ -68,8 +69,14 @@ export default function RankingPage() {
   const showMmr = isSuperAdmin && mmrVisible
   const [rows, setRows] = useState<RankingItem[]>([])
   const [tierByNickname, setTierByNickname] = useState<Map<string, PlayerTierStatus>>(new Map())
+  const [playerIdByNickname, setPlayerIdByNickname] = useState<Map<string, number>>(new Map())
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+  const [gameTypeStatsPlayer, setGameTypeStatsPlayer] =
+    useState<{ id: number; nickname: string } | null>(null)
+  const [gameTypeStats, setGameTypeStats] = useState<GroupPlayerRaceStatsItem | null>(null)
+  const [gameTypeStatsLoading, setGameTypeStatsLoading] = useState<boolean>(false)
+  const [gameTypeStatsError, setGameTypeStatsError] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -100,6 +107,14 @@ export default function RankingPage() {
             rosterResponse.map((player) => [
               player.nickname,
               player.tier,
+            ])
+          )
+        )
+        setPlayerIdByNickname(
+          new Map(
+            rosterResponse.map((player) => [
+              player.nickname,
+              player.id,
             ])
           )
         )
@@ -162,8 +177,50 @@ export default function RankingPage() {
   const resolveDisplayTier = (row: RankingItem): PlayerTierStatus =>
     tierByNickname.get(row.nickname) ?? row.tier
 
+  const tableColumnCount = showMmr ? 13 : 11
+
+  const handleOpenGameTypeStats = useCallback(async (row: RankingItem) => {
+    const playerId = playerIdByNickname.get(row.nickname)
+
+    setGameTypeStatsPlayer({ id: playerId ?? -1, nickname: row.nickname })
+    setGameTypeStats(null)
+    setGameTypeStatsError(null)
+
+    if (typeof playerId !== 'number') {
+      setGameTypeStatsError(t('statsModal.playerNotFound'))
+      setGameTypeStatsLoading(false)
+      return
+    }
+
+    setGameTypeStatsLoading(true)
+    try {
+      const response = await apiClient.getGroupPlayerRaceStatsForPlayer(TEMP_GROUP_ID, playerId)
+      setGameTypeStats(response)
+    } catch {
+      setGameTypeStatsError(t('statsModal.loadError'))
+    } finally {
+      setGameTypeStatsLoading(false)
+    }
+  }, [playerIdByNickname])
+
+  const handleCloseGameTypeStats = useCallback(() => {
+    setGameTypeStatsPlayer(null)
+    setGameTypeStats(null)
+    setGameTypeStatsError(null)
+    setGameTypeStatsLoading(false)
+  }, [])
+
   return (
     <section className="space-y-6">
+      <PlayerGameTypeStatsModal
+        open={gameTypeStatsPlayer !== null}
+        playerName={gameTypeStatsPlayer?.nickname ?? ''}
+        stats={gameTypeStats}
+        loading={gameTypeStatsLoading}
+        error={gameTypeStatsError}
+        onClose={handleCloseGameTypeStats}
+      />
+
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="min-w-full text-left text-sm">
           <thead className="bg-slate-50 text-xs tracking-wide text-slate-500">
@@ -177,6 +234,7 @@ export default function RankingPage() {
               <th className="px-4 py-3">{t('ranking.table.losses')}</th>
               <th className="px-4 py-3">{t('ranking.table.games')}</th>
               <th className="px-4 py-3">{t('ranking.table.winRate')}</th>
+              <th className="px-4 py-3">{t('ranking.table.gameTypeStats')}</th>
               <th className="px-4 py-3">{t('ranking.table.streak')}</th>
               <th className="px-4 py-3">{t('ranking.table.last10')}</th>
               {showMmr && <th className="px-4 py-3">{t('ranking.table.mmrDelta')}</th>}
@@ -187,7 +245,7 @@ export default function RankingPage() {
             {loading &&
               (
                 <tr className="border-t border-slate-100">
-                  <td className="px-4 py-3" colSpan={showMmr ? 12 : 10}>
+                  <td className="px-4 py-3" colSpan={tableColumnCount}>
                     <LoadingIndicator label={t('common.loading')} />
                   </td>
                 </tr>
@@ -195,7 +253,7 @@ export default function RankingPage() {
 
             {!loading && error && (
               <tr className="border-t border-slate-100">
-                <td className="px-4 py-8 text-center text-sm text-slate-500" colSpan={showMmr ? 12 : 10}>
+                <td className="px-4 py-8 text-center text-sm text-slate-500" colSpan={tableColumnCount}>
                   <Alert variant="destructive" appearance="light">
                     <AlertIcon icon="destructive">!</AlertIcon>
                     <AlertContent>
@@ -209,7 +267,7 @@ export default function RankingPage() {
 
             {!loading && !error && sortedRows.length === 0 && (
               <tr className="border-t border-slate-100">
-                <td className="px-4 py-8 text-center text-sm text-slate-500" colSpan={showMmr ? 12 : 10}>
+                <td className="px-4 py-8 text-center text-sm text-slate-500" colSpan={tableColumnCount}>
                   {t('ranking.empty')}
                 </td>
               </tr>
@@ -220,6 +278,9 @@ export default function RankingPage() {
               sortedRows.map((row) => {
                 const rowMmrDelta =
                   typeof row.mmrDelta === 'number' ? row.mmrDelta : null
+                const playerId = playerIdByNickname.get(row.nickname) ?? null
+                const isStatsLoadingForRow =
+                  gameTypeStatsLoading && gameTypeStatsPlayer?.id === playerId
 
                 return (
                   <tr
@@ -239,6 +300,16 @@ export default function RankingPage() {
                     <td className="px-4 py-3 text-slate-700">{row.losses}</td>
                     <td className="px-4 py-3 text-slate-700">{row.games}</td>
                     <td className="px-4 py-3 text-slate-700">{formatWinRate(row.winRate)}</td>
+                    <td className="px-4 py-3">
+                      <button
+                        type="button"
+                        disabled={typeof playerId !== 'number' || isStatsLoadingForRow}
+                        onClick={() => handleOpenGameTypeStats(row)}
+                        className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-emerald-600 hover:bg-emerald-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {isStatsLoadingForRow ? t('statsModal.buttonLoading') : t('statsModal.button')}
+                      </button>
+                    </td>
                     <td className="px-4 py-3 text-slate-700">{formatStreak(row.streak)}</td>
                     <td className="px-4 py-3 text-xs text-slate-700">{formatLast10(row.last10)}</td>
                     {showMmr && rowMmrDelta !== null ? (

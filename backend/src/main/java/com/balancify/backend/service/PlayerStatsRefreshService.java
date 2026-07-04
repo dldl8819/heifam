@@ -1,6 +1,8 @@
 package com.balancify.backend.service;
 
 import com.balancify.backend.repository.PlayerStatsRepository;
+import com.balancify.backend.repository.PlayerGameTypeStatsRepository;
+import com.balancify.backend.repository.PlayerRaceStatsRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -8,9 +10,17 @@ import org.springframework.transaction.annotation.Transactional;
 public class PlayerStatsRefreshService {
 
     private final PlayerStatsRepository playerStatsRepository;
+    private final PlayerRaceStatsRepository playerRaceStatsRepository;
+    private final PlayerGameTypeStatsRepository playerGameTypeStatsRepository;
 
-    public PlayerStatsRefreshService(PlayerStatsRepository playerStatsRepository) {
+    public PlayerStatsRefreshService(
+        PlayerStatsRepository playerStatsRepository,
+        PlayerRaceStatsRepository playerRaceStatsRepository,
+        PlayerGameTypeStatsRepository playerGameTypeStatsRepository
+    ) {
         this.playerStatsRepository = playerStatsRepository;
+        this.playerRaceStatsRepository = playerRaceStatsRepository;
+        this.playerGameTypeStatsRepository = playerGameTypeStatsRepository;
     }
 
     @Transactional
@@ -19,5 +29,9 @@ public class PlayerStatsRefreshService {
             return;
         }
         playerStatsRepository.rebuildGroupStats(groupId);
+        playerRaceStatsRepository.deleteByGroupIdForRebuild(groupId);
+        playerRaceStatsRepository.insertGroupRaceStats(groupId);
+        playerGameTypeStatsRepository.deleteByGroupIdForRebuild(groupId);
+        playerGameTypeStatsRepository.insertGroupGameTypeStats(groupId);
     }
 }
