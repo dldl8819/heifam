@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -34,6 +35,7 @@ public class PlayerRaceStatsQueryService {
     private final GroupReadCacheService groupReadCacheService;
     private final Clock clock;
 
+    @Autowired
     public PlayerRaceStatsQueryService(
         PlayerRepository playerRepository,
         PlayerRaceStatsRepository playerRaceStatsRepository,
