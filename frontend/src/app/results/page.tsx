@@ -62,6 +62,10 @@ function formatOptionalDate(value: string | null): string {
   return formatPlayedAt(value)
 }
 
+function formatMatchInputAt(match: RecentMatchItem): string {
+  return formatOptionalDate(match.resultRecordedAt ?? match.playedAt)
+}
+
 function formatRecordedBy(value: string | null): string {
   if (!value || value.trim().length === 0) {
     return '-'
@@ -1052,8 +1056,7 @@ export default function ResultsPage() {
                 <tr>
                   <th className="px-3 py-2">{t('results.recent.table.displayOrder')}</th>
                   {isSuperAdmin && <th className="px-3 py-2">{t('results.recent.table.matchId')}</th>}
-                  <th className="px-3 py-2">{t('results.recent.table.playedAt')}</th>
-                  <th className="px-3 py-2">{t('results.recent.table.recordedAt')}</th>
+                  <th className="px-3 py-2">{t('results.recent.table.matchInputAt')}</th>
                   <th className="px-3 py-2">{t('results.recent.table.recordedBy')}</th>
                   <th className="px-3 py-2">{t('results.recent.table.winner')}</th>
                   <th className="px-3 py-2">{t('results.recent.table.raceComposition')}</th>
@@ -1077,8 +1080,7 @@ export default function ResultsPage() {
                     {isSuperAdmin && (
                       <td className="px-3 py-2 font-medium text-slate-900">{recentMatch.matchId}</td>
                     )}
-                    <td className="px-3 py-2 text-slate-700">{formatPlayedAt(recentMatch.playedAt)}</td>
-                    <td className="px-3 py-2 text-slate-700">{formatOptionalDate(recentMatch.resultRecordedAt)}</td>
+                    <td className="px-3 py-2 text-slate-700">{formatMatchInputAt(recentMatch)}</td>
                     <td className="px-3 py-2 text-slate-700">{formatRecordedBy(recentMatch.resultRecordedByNickname)}</td>
                     <td className="px-3 py-2 text-slate-700">
                       {selectedRecentMatchId === recentMatch.matchId && isAdmin ? (

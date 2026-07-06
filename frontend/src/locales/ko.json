@@ -910,6 +910,7 @@
       "table": {
         "displayOrder": "순번",
         "matchId": "매치 ID",
+        "matchInputAt": "경기 입력 시각",
         "playedAt": "경기 시각",
         "recordedAt": "입력 시각",
         "recordedBy": "입력자",
