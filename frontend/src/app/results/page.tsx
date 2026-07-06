@@ -19,7 +19,11 @@ import type {
 } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
-const RECENT_MATCH_PAGE_SIZE = 20
+const RECENT_MATCH_MEMBER_INITIAL_LIMIT = 10
+const RECENT_MATCH_ADMIN_INITIAL_LIMIT = 20
+const RECENT_MATCH_LOAD_MORE_LIMIT = 10
+const RECENT_MATCH_MEMBER_MAX_LIMIT = 20
+const RECENT_MATCH_ADMIN_MAX_LIMIT = 30
 const winnerTeamOptions: TeamSide[] = ['HOME', 'AWAY']
 const manualTeamSizeOptions = [3, 2] as const
 type OperatorEntryMode = 'existing' | 'manual'
@@ -172,7 +176,7 @@ function findManualPlayerByInput(
 
 export default function ResultsPage() {
   const searchParams = useSearchParams()
-  const { canAccess, isAdmin, isSuperAdmin, canViewMmr } = useAdminAuth()
+  const { canAccess, isAdmin, isSuperAdmin, canViewMmr, isLoading: adminAuthLoading } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
   const showMmr = canViewMmr && mmrVisible
   const canUseManualEntry = canAccess
@@ -210,6 +214,7 @@ export default function ResultsPage() {
   const [recentMatchesLoading, setRecentMatchesLoading] = useState<boolean>(true)
   const [recentMatchesLoadingMore, setRecentMatchesLoadingMore] = useState<boolean>(false)
   const [recentMatchesHasMore, setRecentMatchesHasMore] = useState<boolean>(false)
+  const [recentMatchesFetchedCount, setRecentMatchesFetchedCount] = useState<number>(0)
   const [recentMatchesError, setRecentMatchesError] = useState<string | null>(null)
   const [appliedSearchSelection, setAppliedSearchSelection] = useState<boolean>(false)
   const manualHomeInputRefs = useRef<Array<HTMLInputElement | null>>([])
@@ -269,7 +274,19 @@ export default function ResultsPage() {
 
   const loadRecentMatches = async (options: { append?: boolean } = {}) => {
     const append = options.append ?? false
-    const offset = append ? recentMatches.length : 0
+    const initialLimit = isAdmin ? RECENT_MATCH_ADMIN_INITIAL_LIMIT : RECENT_MATCH_MEMBER_INITIAL_LIMIT
+    const maxLimit = isAdmin ? RECENT_MATCH_ADMIN_MAX_LIMIT : RECENT_MATCH_MEMBER_MAX_LIMIT
+    const offset = append ? recentMatchesFetchedCount : 0
+    const remainingCount = Math.max(0, maxLimit - offset)
+    const requestedLimit = Math.min(
+      append ? RECENT_MATCH_LOAD_MORE_LIMIT : initialLimit,
+      remainingCount,
+    )
+
+    if (requestedLimit <= 0) {
+      setRecentMatchesHasMore(false)
+      return
+    }
 
     if (append) {
       setRecentMatchesLoadingMore(true)
@@ -281,13 +298,17 @@ export default function ResultsPage() {
     try {
       const response = await apiClient.getRecentMatches(
         TEMP_GROUP_ID,
-        RECENT_MATCH_PAGE_SIZE,
+        requestedLimit,
         offset,
       )
       const completedMatches = response.filter(
         (match) => match.winningTeam === 'HOME' || match.winningTeam === 'AWAY',
       )
-      setRecentMatchesHasMore(completedMatches.length === RECENT_MATCH_PAGE_SIZE)
+      const fetchedCount = append ? offset + response.length : response.length
+      setRecentMatchesFetchedCount(fetchedCount)
+      setRecentMatchesHasMore(
+        fetchedCount < maxLimit && response.length === requestedLimit,
+      )
       if (append) {
         setRecentMatches((previousMatches) =>
           appendUniqueRecentMatches(previousMatches, completedMatches),
@@ -309,6 +330,7 @@ export default function ResultsPage() {
       if (!append) {
         setRecentMatches([])
         setRecentMatchesHasMore(false)
+        setRecentMatchesFetchedCount(0)
       }
       setRecentMatchesError(t('results.recent.loadError'))
     } finally {
@@ -321,7 +343,13 @@ export default function ResultsPage() {
   }
 
   const handleLoadMoreRecentMatches = async () => {
-    if (!isAdmin || recentMatchesLoadingMore || !recentMatchesHasMore) {
+    const maxLimit = isAdmin ? RECENT_MATCH_ADMIN_MAX_LIMIT : RECENT_MATCH_MEMBER_MAX_LIMIT
+    if (
+      !canAccess ||
+      recentMatchesLoadingMore ||
+      !recentMatchesHasMore ||
+      recentMatchesFetchedCount >= maxLimit
+    ) {
       return
     }
 
@@ -329,9 +357,13 @@ export default function ResultsPage() {
   }
 
   useEffect(() => {
+    if (adminAuthLoading) {
+      return
+    }
+
     void loadRecentMatches()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [adminAuthLoading, isAdmin])
 
   useEffect(() => {
     setAppliedSearchSelection(false)
@@ -1161,7 +1193,7 @@ export default function ResultsPage() {
                 ))}
               </tbody>
             </table>
-            {isAdmin && recentMatchesHasMore && (
+            {canAccess && recentMatchesHasMore && (
               <div className="border-t border-slate-100 bg-white px-3 py-3 text-center">
                 <button
                   type="button"
