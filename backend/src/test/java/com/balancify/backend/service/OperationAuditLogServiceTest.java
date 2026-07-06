@@ -98,6 +98,27 @@ class OperationAuditLogServiceTest {
     }
 
     @Test
+    void recordsMatchResultUpdateAuditLog() {
+        operationAuditLogService.recordMatchResultUpdate(
+            "ops@example.com",
+            "OpsUser",
+            new MatchResultService.MatchResultUpdateAuditSnapshot(99L, 1L, "HOME", "AWAY")
+        );
+
+        ArgumentCaptor<OperationAuditLog> logCaptor = ArgumentCaptor.forClass(OperationAuditLog.class);
+        verify(operationAuditLogRepository).save(logCaptor.capture());
+        OperationAuditLog log = logCaptor.getValue();
+
+        assertThat(log.getAction()).isEqualTo(OperationAuditLogService.ACTION_MATCH_RESULT_UPDATED);
+        assertThat(log.getTargetType()).isEqualTo("MATCH");
+        assertThat(log.getTargetId()).isEqualTo(99L);
+        assertThat(log.getTargetLabel()).isEqualTo("#99");
+        assertThat(log.getGroupId()).isEqualTo(1L);
+        assertThat(log.getSummary()).isEqualTo("경기 결과 수정");
+        assertThat(log.getDetails()).isEqualTo("winner=HOME -> AWAY");
+    }
+
+    @Test
     void recordsPlayerProfileUpdateAuditLogWithChangedFields() {
         Player player = new Player();
         player.setId(10L);

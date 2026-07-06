@@ -185,6 +185,37 @@ class MatchResultServiceTest {
     }
 
     @Test
+    void updateMatchResultReturnsAuditSnapshotWithPreviousAndNextWinner() {
+        Match match = new Match();
+        match.setId(55L);
+        match.setStatus(MatchStatus.COMPLETED);
+        match.setWinningTeam("HOME");
+
+        List<MatchParticipant> participants = buildParticipants(match);
+
+        when(matchRepository.findByIdForUpdate(55L)).thenReturn(Optional.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(55L)).thenReturn(participants);
+        when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(playerRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(mmrHistoryRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MatchResultService.MatchResultUpdateOutcome outcome = matchResultService.updateMatchResult(
+            55L,
+            new MatchResultRequest("AWAY"),
+            "ops@example.com",
+            "OpsUser"
+        );
+
+        assertThat(outcome.response().winnerTeam()).isEqualTo("AWAY");
+        assertThat(outcome.auditSnapshot()).isNotNull();
+        assertThat(outcome.auditSnapshot().matchId()).isEqualTo(55L);
+        assertThat(outcome.auditSnapshot().groupId()).isEqualTo(7L);
+        assertThat(outcome.auditSnapshot().previousWinnerTeam()).isEqualTo("HOME");
+        assertThat(outcome.auditSnapshot().nextWinnerTeam()).isEqualTo("AWAY");
+    }
+
+    @Test
     void reducesKFactorWhenLowTierPlayerIsIncluded() {
         Match match = new Match();
         match.setId(2L);

@@ -401,15 +401,20 @@ class AdminKeyFilterTest {
 
     @Test
     void allowsMatchResultPatchWhenAdminEmailHeaderIsValid() throws Exception {
-        when(matchResultService.processMatchResult(eq(1L), any(MatchResultRequest.class), any(), any(), anyBoolean()))
+        MatchResultService.MatchResultUpdateAuditSnapshot auditSnapshot =
+            new MatchResultService.MatchResultUpdateAuditSnapshot(1L, 1L, "HOME", "AWAY");
+        when(matchResultService.updateMatchResult(eq(1L), any(MatchResultRequest.class), any(), any()))
             .thenReturn(
-                new MatchResultResponse(
-                    1L,
-                    "AWAY",
-                    32,
-                    0.5,
-                    0.5,
-                    List.of()
+                new MatchResultService.MatchResultUpdateOutcome(
+                    new MatchResultResponse(
+                        1L,
+                        "AWAY",
+                        32,
+                        0.5,
+                        0.5,
+                        List.of()
+                    ),
+                    auditSnapshot
                 )
             );
         mockMvc
@@ -420,6 +425,18 @@ class AdminKeyFilterTest {
                     .content("{\"winnerTeam\":\"AWAY\"}")
             )
             .andExpect(status().isOk());
+
+        verify(matchResultService).updateMatchResult(
+            eq(1L),
+            any(MatchResultRequest.class),
+            eq("admin@hei.gg"),
+            eq("admin")
+        );
+        verify(operationAuditLogService).recordMatchResultUpdate(
+            eq("admin@hei.gg"),
+            eq("admin"),
+            eq(auditSnapshot)
+        );
     }
 
     @Test

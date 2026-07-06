@@ -120,10 +120,39 @@ public class MatchResultService {
         String recordedByNickname,
         boolean allowReprocess
     ) {
+        return processMatchResultInternal(matchId, request, recordedByEmail, recordedByNickname, allowReprocess)
+            .response();
+    }
+
+    @Transactional
+    public MatchResultUpdateOutcome updateMatchResult(
+        Long matchId,
+        MatchResultRequest request,
+        String recordedByEmail,
+        String recordedByNickname
+    ) {
+        MatchResultProcessOutcome outcome = processMatchResultInternal(
+            matchId,
+            request,
+            recordedByEmail,
+            recordedByNickname,
+            true
+        );
+        return new MatchResultUpdateOutcome(outcome.response(), outcome.updateAuditSnapshot());
+    }
+
+    private MatchResultProcessOutcome processMatchResultInternal(
+        Long matchId,
+        MatchResultRequest request,
+        String recordedByEmail,
+        String recordedByNickname,
+        boolean allowReprocess
+    ) {
         Match match = matchRepository.findByIdForUpdate(matchId)
             .orElseThrow(() -> new NoSuchElementException("Match not found: " + matchId));
 
         String winnerTeam = normalizeTeam(request == null ? null : request.winnerTeam());
+        String previousWinnerTeam = normalizeOptionalTeam(match.getWinningTeam());
         String normalizedRecordedByEmail = normalizeRecordedByEmail(recordedByEmail);
         String normalizedRecordedByNickname = normalizeRecordedByNickname(recordedByNickname);
         MatchStatus currentStatus = normalizeMatchStatus(match);
@@ -254,7 +283,7 @@ public class MatchResultService {
         playerStatsRefreshService.rebuildGroupStats(groupId);
         evictGroupReadCache(groupId);
 
-        return new MatchResultResponse(
+        MatchResultResponse response = new MatchResultResponse(
             match.getId(),
             winnerTeam,
             effectiveKFactor,
@@ -262,6 +291,11 @@ public class MatchResultService {
             round4(awayExpectedWinRate),
             responseParticipants
         );
+        MatchResultUpdateAuditSnapshot updateAuditSnapshot = allowReprocess
+            ? new MatchResultUpdateAuditSnapshot(match.getId(), groupId, previousWinnerTeam, winnerTeam)
+            : null;
+
+        return new MatchResultProcessOutcome(response, updateAuditSnapshot);
     }
 
     private double calculateAverageMmr(List<MatchParticipant> participants) {
@@ -476,6 +510,18 @@ public class MatchResultService {
         return normalized;
     }
 
+    private String normalizeOptionalTeam(String team) {
+        if (team == null || team.isBlank()) {
+            return null;
+        }
+
+        String normalized = team.trim().toUpperCase(Locale.ROOT);
+        if (!TEAM_HOME.equals(normalized) && !TEAM_AWAY.equals(normalized)) {
+            return null;
+        }
+        return normalized;
+    }
+
     private String normalizeRecordedByEmail(String value) {
         if (value == null || value.isBlank()) {
             return null;
@@ -564,6 +610,26 @@ public class MatchResultService {
         Long groupId,
         OffsetDateTime playedAt,
         boolean hadResult
+    ) {
+    }
+
+    public record MatchResultUpdateOutcome(
+        MatchResultResponse response,
+        MatchResultUpdateAuditSnapshot auditSnapshot
+    ) {
+    }
+
+    public record MatchResultUpdateAuditSnapshot(
+        Long matchId,
+        Long groupId,
+        String previousWinnerTeam,
+        String nextWinnerTeam
+    ) {
+    }
+
+    private record MatchResultProcessOutcome(
+        MatchResultResponse response,
+        MatchResultUpdateAuditSnapshot updateAuditSnapshot
     ) {
     }
 

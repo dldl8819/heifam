@@ -27,6 +27,7 @@ public class OperationAuditLogService {
     public static final String ACTION_PLAYER_REACTIVATED_BY_REGISTRATION = "PLAYER_REACTIVATED_BY_REGISTRATION";
     public static final String ACTION_PLAYER_TIER_UPDATED = "PLAYER_TIER_UPDATED";
     public static final String ACTION_MATCH_DELETED = "MATCH_DELETED";
+    public static final String ACTION_MATCH_RESULT_UPDATED = "MATCH_RESULT_UPDATED";
 
     private static final int MAX_PAGE_SIZE = 200;
 
@@ -254,6 +255,35 @@ public class OperationAuditLogService {
         operationAuditLogRepository.save(log);
     }
 
+    @Transactional
+    public void recordMatchResultUpdate(
+        String actorEmail,
+        String actorNickname,
+        MatchResultService.MatchResultUpdateAuditSnapshot snapshot
+    ) {
+        if (snapshot == null) {
+            return;
+        }
+
+        OperationAuditLog log = baseLog(
+            actorEmail,
+            actorNickname,
+            ACTION_MATCH_RESULT_UPDATED,
+            "MATCH",
+            snapshot.matchId(),
+            snapshot.matchId() == null ? null : "#" + snapshot.matchId(),
+            snapshot.groupId()
+        );
+        log.setSummary("경기 결과 수정");
+        log.setDetails(
+            "winner="
+                + formatTeamForAudit(snapshot.previousWinnerTeam())
+                + " -> "
+                + formatTeamForAudit(snapshot.nextWinnerTeam())
+        );
+        operationAuditLogRepository.save(log);
+    }
+
     private OperationAuditLog baseLog(
         String actorEmail,
         String actorNickname,
@@ -356,6 +386,11 @@ public class OperationAuditLogService {
 
     private String formatMmrForAudit(Integer value) {
         return String.valueOf(Math.max(0, value == null ? 0 : value));
+    }
+
+    private String formatTeamForAudit(String value) {
+        String normalized = trimToNull(value);
+        return normalized == null ? "-" : normalized.toUpperCase(Locale.ROOT);
     }
 
     private OperationAuditLogResponse toResponse(OperationAuditLog log) {

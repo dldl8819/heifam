@@ -240,7 +240,7 @@
   },
   "audit": {
     "title": "운영 로그",
-    "description": "운영진이 처리한 선수 등록, 경기 삭제 등 주요 운영 작업을 확인합니다.",
+    "description": "운영진이 처리한 선수 등록, 경기 결과 수정, 경기 삭제 등 주요 운영 작업을 확인합니다.",
     "superOnly": "최상위 관리자만 운영 로그를 볼 수 있습니다.",
     "loadError": "운영 로그를 불러오지 못했습니다. 백엔드 상태를 확인해 주세요.",
     "recentTitle": "최근 운영 작업",
@@ -266,7 +266,8 @@
       "playerRegistrationUpdated": "종족 수정",
       "playerReactivatedByRegistration": "선수 재등록",
       "playerTierUpdated": "티어 수정",
-      "matchDeleted": "경기 삭제"
+      "matchDeleted": "경기 삭제",
+      "matchResultUpdated": "경기 결과 수정"
     },
     "pagination": {
       "status": "{page} / {totalPages} 페이지",

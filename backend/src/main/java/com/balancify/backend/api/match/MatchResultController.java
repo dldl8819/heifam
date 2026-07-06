@@ -111,13 +111,20 @@ public class MatchResultController {
         HttpServletRequest httpRequest
     ) {
         try {
-            MatchResultResponse response = matchResultService.processMatchResult(
+            String actorEmail = extractRequestEmail(httpRequest);
+            String actorNickname = resolveRecordedByNickname(httpRequest);
+            MatchResultService.MatchResultUpdateOutcome outcome = matchResultService.updateMatchResult(
                 matchId,
                 request,
-                extractRequestEmail(httpRequest),
-                resolveRecordedByNickname(httpRequest),
-                true
+                actorEmail,
+                actorNickname
             );
+            operationAuditLogService.recordMatchResultUpdate(
+                actorEmail,
+                actorNickname,
+                outcome.auditSnapshot()
+            );
+            MatchResultResponse response = outcome.response();
             if (mmrAccessRequestResolver.canViewMmr(httpRequest)) {
                 return response;
             }

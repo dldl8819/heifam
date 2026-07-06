@@ -16,6 +16,7 @@ const AUDIT_ACTION_FILTER_OPTIONS = [
   'PLAYER_REACTIVATED_BY_REGISTRATION',
   'PLAYER_TIER_UPDATED',
   'MATCH_DELETED',
+  'MATCH_RESULT_UPDATED',
 ] as const
 
 type AuditActionFilter = (typeof AUDIT_ACTION_FILTER_OPTIONS)[number]
@@ -91,6 +92,8 @@ function getActionLabel(action: string): string {
       return t('audit.actions.playerTierUpdated')
     case 'MATCH_DELETED':
       return t('audit.actions.matchDeleted')
+    case 'MATCH_RESULT_UPDATED':
+      return t('audit.actions.matchResultUpdated')
     default:
       return action
   }
