@@ -17,6 +17,7 @@ public class MatchQueryService {
 
     private static final int DEFAULT_LIMIT = 10;
     private static final int MAX_LIMIT = 50;
+    private static final int DEFAULT_OFFSET = 0;
 
     private final MatchRepository matchRepository;
     private final MatchParticipantRepository matchParticipantRepository;
@@ -33,10 +34,16 @@ public class MatchQueryService {
     }
 
     public List<GroupRecentMatchResponse> getRecentMatches(Long groupId, Integer limit) {
+        return getRecentMatches(groupId, limit, DEFAULT_OFFSET);
+    }
+
+    public List<GroupRecentMatchResponse> getRecentMatches(Long groupId, Integer limit, Integer offset) {
         int normalizedLimit = normalizeLimit(limit);
+        int normalizedOffset = normalizeOffset(offset);
+        int page = normalizedOffset / normalizedLimit;
         List<Match> matches = matchRepository.findRecentByGroupId(
             groupId,
-            PageRequest.of(0, normalizedLimit)
+            PageRequest.of(page, normalizedLimit)
         );
 
         List<GroupRecentMatchResponse> responses = new ArrayList<>();
@@ -104,6 +111,13 @@ public class MatchQueryService {
             return DEFAULT_LIMIT;
         }
         return Math.min(limit, MAX_LIMIT);
+    }
+
+    private int normalizeOffset(Integer offset) {
+        if (offset == null || offset <= 0) {
+            return DEFAULT_OFFSET;
+        }
+        return offset;
     }
 
     private String normalizeTeam(String team) {

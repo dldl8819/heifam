@@ -1362,7 +1362,7 @@ class AdminKeyFilterTest {
 
     @Test
     void returnsMmrFieldsForMmrAllowedAdminForRecentMatches() throws Exception {
-        when(matchQueryService.getRecentMatches(eq(1L), any()))
+        when(matchQueryService.getRecentMatches(eq(1L), any(), any()))
             .thenReturn(
                 List.of(
                     new GroupRecentMatchResponse(
@@ -1397,7 +1397,7 @@ class AdminKeyFilterTest {
 
     @Test
     void hidesMmrFieldsFromAdminWithoutMmrAccessForRecentMatches() throws Exception {
-        when(matchQueryService.getRecentMatches(eq(1L), any()))
+        when(matchQueryService.getRecentMatches(eq(1L), any(), any()))
             .thenReturn(
                 List.of(
                     new GroupRecentMatchResponse(
@@ -1774,7 +1774,7 @@ class AdminKeyFilterTest {
 
     @Test
     void allowsRecentMatchesEndpointWithoutUserEmailHeader() throws Exception {
-        when(matchQueryService.getRecentMatches(eq(1L), any())).thenReturn(List.of());
+        when(matchQueryService.getRecentMatches(eq(1L), any(), any())).thenReturn(List.of());
         mockMvc
             .perform(get("/api/groups/1/matches/recent"))
             .andExpect(status().isOk());

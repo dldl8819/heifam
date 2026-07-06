@@ -19,6 +19,7 @@ import type {
 } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
+const RECENT_MATCH_PAGE_SIZE = 20
 const winnerTeamOptions: TeamSide[] = ['HOME', 'AWAY']
 const manualTeamSizeOptions = [3, 2] as const
 type OperatorEntryMode = 'existing' | 'manual'
@@ -88,6 +89,21 @@ function formatRaceMatchup(match: RecentMatchItem): string {
     return home === away ? home : `${home} / ${away}`
   }
   return home.length > 0 ? home : away
+}
+
+function appendUniqueRecentMatches(
+  previousMatches: RecentMatchItem[],
+  nextMatches: RecentMatchItem[],
+): RecentMatchItem[] {
+  const seenMatchIds = new Set(previousMatches.map((match) => match.matchId))
+  const uniqueNextMatches = nextMatches.filter((match) => {
+    if (seenMatchIds.has(match.matchId)) {
+      return false
+    }
+    seenMatchIds.add(match.matchId)
+    return true
+  })
+  return [...previousMatches, ...uniqueNextMatches]
 }
 
 function isWinningTeam(team: TeamSide, winningTeam: TeamSide | null): boolean {
@@ -188,6 +204,8 @@ export default function ResultsPage() {
   const [importSuccess, setImportSuccess] = useState<string | null>(null)
   const [recentMatches, setRecentMatches] = useState<RecentMatchItem[]>([])
   const [recentMatchesLoading, setRecentMatchesLoading] = useState<boolean>(true)
+  const [recentMatchesLoadingMore, setRecentMatchesLoadingMore] = useState<boolean>(false)
+  const [recentMatchesHasMore, setRecentMatchesHasMore] = useState<boolean>(false)
   const [recentMatchesError, setRecentMatchesError] = useState<string | null>(null)
   const [appliedSearchSelection, setAppliedSearchSelection] = useState<boolean>(false)
   const manualHomeInputRefs = useRef<Array<HTMLInputElement | null>>([])
@@ -245,15 +263,34 @@ export default function ResultsPage() {
     [isSuperAdmin, recentMatchDisplayOrderMap],
   )
 
-  const loadRecentMatches = async () => {
-    setRecentMatchesLoading(true)
+  const loadRecentMatches = async (options: { append?: boolean } = {}) => {
+    const append = options.append ?? false
+    const offset = append ? recentMatches.length : 0
+
+    if (append) {
+      setRecentMatchesLoadingMore(true)
+    } else {
+      setRecentMatchesLoading(true)
+    }
     setRecentMatchesError(null)
 
     try {
-      const response = await apiClient.getRecentMatches(TEMP_GROUP_ID, 20)
+      const response = await apiClient.getRecentMatches(
+        TEMP_GROUP_ID,
+        RECENT_MATCH_PAGE_SIZE,
+        offset,
+      )
       const completedMatches = response.filter(
         (match) => match.winningTeam === 'HOME' || match.winningTeam === 'AWAY',
       )
+      setRecentMatchesHasMore(completedMatches.length === RECENT_MATCH_PAGE_SIZE)
+      if (append) {
+        setRecentMatches((previousMatches) =>
+          appendUniqueRecentMatches(previousMatches, completedMatches),
+        )
+        return
+      }
+
       setRecentMatches(completedMatches)
       if (selectedRecentMatchId !== null) {
         const selectedMatch = completedMatches.find((match) => match.matchId === selectedRecentMatchId)
@@ -265,11 +302,26 @@ export default function ResultsPage() {
         }
       }
     } catch {
-      setRecentMatches([])
+      if (!append) {
+        setRecentMatches([])
+        setRecentMatchesHasMore(false)
+      }
       setRecentMatchesError(t('results.recent.loadError'))
     } finally {
-      setRecentMatchesLoading(false)
+      if (append) {
+        setRecentMatchesLoadingMore(false)
+      } else {
+        setRecentMatchesLoading(false)
+      }
     }
+  }
+
+  const handleLoadMoreRecentMatches = async () => {
+    if (!isAdmin || recentMatchesLoadingMore || !recentMatchesHasMore) {
+      return
+    }
+
+    await loadRecentMatches({ append: true })
   }
 
   useEffect(() => {
@@ -1107,6 +1159,20 @@ export default function ResultsPage() {
                 ))}
               </tbody>
             </table>
+            {isAdmin && recentMatchesHasMore && (
+              <div className="border-t border-slate-100 bg-white px-3 py-3 text-center">
+                <button
+                  type="button"
+                  onClick={handleLoadMoreRecentMatches}
+                  disabled={recentMatchesLoadingMore}
+                  className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-slate-900 hover:bg-slate-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {recentMatchesLoadingMore
+                    ? t('results.recent.loadingMore')
+                    : t('results.recent.loadMore')}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </article>

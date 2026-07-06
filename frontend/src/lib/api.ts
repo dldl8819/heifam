@@ -866,9 +866,15 @@ export const apiClient = {
     apiRequest<RankingResponse>(`/api/groups/${groupId}/ranking`, undefined, {
       includeUserEmail: true,
     }),
-  getRecentMatches: async (groupId: number, limit = 10): Promise<RecentMatchItem[]> => {
+  getRecentMatches: async (groupId: number, limit = 10, offset = 0): Promise<RecentMatchItem[]> => {
+    const safeLimit = Math.max(1, Math.floor(Number.isFinite(limit) ? limit : 10))
+    const safeOffset = Math.max(0, Math.floor(Number.isFinite(offset) ? offset : 0))
+    const params = new URLSearchParams({ limit: String(safeLimit) })
+    if (safeOffset > 0) {
+      params.set('offset', String(safeOffset))
+    }
     const payload = await apiRequest<unknown>(
-      `/api/groups/${groupId}/matches/recent?limit=${limit}`,
+      `/api/groups/${groupId}/matches/recent?${params.toString()}`,
       undefined,
       { includeUserEmail: true }
     )

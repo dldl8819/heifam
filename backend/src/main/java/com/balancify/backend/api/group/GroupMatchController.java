@@ -31,9 +31,10 @@ public class GroupMatchController {
     public List<GroupRecentMatchResponse> getRecentMatches(
         @PathVariable Long groupId,
         @RequestParam(required = false) Integer limit,
+        @RequestParam(required = false) Integer offset,
         HttpServletRequest request
     ) {
-        List<GroupRecentMatchResponse> response = matchQueryService.getRecentMatches(groupId, limit);
+        List<GroupRecentMatchResponse> response = matchQueryService.getRecentMatches(groupId, limit, offset);
         if (mmrAccessRequestResolver.canViewMmr(request)) {
             return response;
         }

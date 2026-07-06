@@ -19,8 +19,10 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 
 @ExtendWith(MockitoExtension.class)
 class MatchQueryServiceTest {
@@ -263,6 +265,18 @@ class MatchQueryServiceTest {
         assertThat(responses).hasSize(1);
         assertThat(responses.get(0).resultRecordedByNickname()).isNull();
         verify(accessControlService, never()).resolveAccessProfile(any());
+    }
+
+    @Test
+    void appliesRecentMatchOffsetForIncrementalLoading() {
+        when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of());
+
+        matchQueryService.getRecentMatches(1L, 20, 40);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(matchRepository).findRecentByGroupId(eq(1L), pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(20);
+        assertThat(pageableCaptor.getValue().getOffset()).isEqualTo(40);
     }
 
     private Player player(Long id, Group group, String nickname, int mmr) {
