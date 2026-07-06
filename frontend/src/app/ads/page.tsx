@@ -23,17 +23,12 @@ type Promotion = {
 const promotions: Promotion[] = [
   {
     title: '김해 창민 블루베리',
-    eyebrow: '시즌 상품',
-    description: 'Hei 유튜브 보고 연락 시 모든 상품 1kg당 2,000원 할인, 한정 수량 100kg까지',
+    eyebrow: '판매 종료',
+    description: '장마 영향으로 이번 시즌 블루베리 주문 접수를 종료했습니다.',
     imageSrc: '/promotions/blueberry-card.png',
     imageAlt: '김해 창민 블루베리 할인 안내 배너',
-    imageHref: '/promotions/blueberry-flyer.png',
-    highlights: ['모든 상품 1kg당 2,000원 할인', '한정 수량 100kg', '김해 대동농장'],
-    note: '상품별 재고와 배송 가능 지역은 주문 시 확인해 주세요.',
-    orderHref: 'https://forms.gle/dmjsyBw1kzWLAd6C7',
-    orderCtaLabel: '블루베리 주문',
-    qrImageSrc: '/promotions/blueberry-order-qr.jpg',
-    qrImageAlt: '블루베리 주문 QR 코드',
+    highlights: ['주문 접수 마감', '김해 대동농장', '다음 판매 일정 추후 안내'],
+    note: '기존 주문 건은 판매자 안내에 따라 확인해 주세요.',
   },
   {
     title: '창원 솜솜 장수돼지',
