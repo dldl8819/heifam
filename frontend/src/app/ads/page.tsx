@@ -22,13 +22,18 @@ type Promotion = {
 
 const promotions: Promotion[] = [
   {
-    title: '김해 창민 블루베리',
-    eyebrow: '판매 종료',
-    description: '장마 영향으로 이번 시즌 블루베리 주문 접수를 종료했습니다.',
-    imageSrc: '/promotions/blueberry-card.png',
-    imageAlt: '김해 창민 블루베리 할인 안내 배너',
-    highlights: ['주문 접수 마감', '김해 대동농장', '다음 판매 일정 추후 안내'],
-    note: '기존 주문 건은 판매자 안내에 따라 확인해 주세요.',
+    title: '가이드런프로젝트',
+    eyebrow: '러닝 프로젝트',
+    description: '시각장애 러너와 가이드러너가 함께 달리는 러닝 모임입니다.',
+    imageSrc: '/promotions/guiderun-project-logo.png',
+    imageAlt: '가이드런프로젝트 로고',
+    imageFit: 'contain',
+    highlights: ['시각장애 러너 동행', '가이드러너 참여 가능', '함께 달리는 프로젝트'],
+    note: '참여 방법과 활동 안내는 프로젝트 소개와 신청 페이지에서 확인해 주세요.',
+    href: 'https://about.guiderun.org/',
+    ctaLabel: '프로젝트 소개',
+    orderHref: 'https://guiderun.org/intro',
+    orderCtaLabel: '참여 신청',
   },
   {
     title: '창원 솜솜 장수돼지',
@@ -75,6 +80,15 @@ const promotions: Promotion[] = [
     orderCtaLabel: '디스커버리 주문',
     qrImageSrc: '/promotions/mokpo-discovery-order-qr.jpg',
     qrImageAlt: '디스커버리 주문 QR 코드',
+  },
+  {
+    title: '김해 창민 블루베리',
+    eyebrow: '판매 종료',
+    description: '장마 영향으로 이번 시즌 블루베리 주문 접수를 종료했습니다.',
+    imageSrc: '/promotions/blueberry-card.png',
+    imageAlt: '김해 창민 블루베리 할인 안내 배너',
+    highlights: ['주문 접수 마감', '김해 대동농장', '다음 판매 일정 추후 안내'],
+    note: '기존 주문 건은 판매자 안내에 따라 확인해 주세요.',
   },
 ]
 
