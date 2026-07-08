@@ -62,6 +62,7 @@ public class PlayerAdminService {
         String previousRace = PlayerRacePolicy.toDisplayRace(player.getRace());
         String previousTier = normalizeAuditTier(player.getTier());
         Integer previousMmr = player.getMmr();
+        boolean previousActive = player.isActive();
         String nickname = safeTrim(request == null ? null : request.nickname());
         String race = safeTrim(request == null ? null : request.race());
         String tier = normalizeEditableTier(request == null ? null : request.tier());
@@ -189,6 +190,16 @@ public class PlayerAdminService {
                 tier,
                 previousMmr,
                 player.getMmr()
+            );
+        }
+        if (active != null && previousActive != player.isActive()) {
+            operationAuditLogService.recordPlayerActivityUpdate(
+                actorEmail,
+                actorNickname,
+                groupId,
+                player,
+                previousActive,
+                player.isActive()
             );
         }
     }

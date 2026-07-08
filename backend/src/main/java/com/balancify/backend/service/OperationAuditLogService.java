@@ -26,6 +26,8 @@ public class OperationAuditLogService {
     public static final String ACTION_PLAYER_REGISTRATION_UPDATED = "PLAYER_REGISTRATION_UPDATED";
     public static final String ACTION_PLAYER_REACTIVATED_BY_REGISTRATION = "PLAYER_REACTIVATED_BY_REGISTRATION";
     public static final String ACTION_PLAYER_TIER_UPDATED = "PLAYER_TIER_UPDATED";
+    public static final String ACTION_PLAYER_DEACTIVATED = "PLAYER_DEACTIVATED";
+    public static final String ACTION_PLAYER_REACTIVATED = "PLAYER_REACTIVATED";
     public static final String ACTION_MATCH_DELETED = "MATCH_DELETED";
     public static final String ACTION_MATCH_RESULT_UPDATED = "MATCH_RESULT_UPDATED";
 
@@ -232,6 +234,34 @@ public class OperationAuditLogService {
     }
 
     @Transactional
+    public void recordPlayerActivityUpdate(
+        String actorEmail,
+        String actorNickname,
+        Long groupId,
+        Player player,
+        boolean previousActive,
+        boolean nextActive
+    ) {
+        if (player == null || previousActive == nextActive) {
+            return;
+        }
+
+        String action = nextActive ? ACTION_PLAYER_REACTIVATED : ACTION_PLAYER_DEACTIVATED;
+        OperationAuditLog log = baseLog(
+            actorEmail,
+            actorNickname,
+            action,
+            "PLAYER",
+            player.getId(),
+            player.getNickname(),
+            groupId
+        );
+        log.setSummary(nextActive ? "복구" : "비활성");
+        log.setDetails("status=" + formatActiveStatus(previousActive) + " -> " + formatActiveStatus(nextActive));
+        operationAuditLogRepository.save(log);
+    }
+
+    @Transactional
     public void recordMatchDeletion(
         String actorEmail,
         String actorNickname,
@@ -386,6 +416,10 @@ public class OperationAuditLogService {
 
     private String formatMmrForAudit(Integer value) {
         return String.valueOf(Math.max(0, value == null ? 0 : value));
+    }
+
+    private String formatActiveStatus(boolean active) {
+        return active ? "활성" : "비활성";
     }
 
     private String formatTeamForAudit(String value) {

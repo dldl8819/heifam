@@ -178,6 +178,58 @@ class OperationAuditLogServiceTest {
     }
 
     @Test
+    void recordsPlayerDeactivationAuditLog() {
+        Player player = new Player();
+        player.setId(10L);
+        player.setNickname("PlayerAlpha");
+
+        operationAuditLogService.recordPlayerActivityUpdate(
+            "ops@example.com",
+            "OpsUser",
+            1L,
+            player,
+            true,
+            false
+        );
+
+        ArgumentCaptor<OperationAuditLog> logCaptor = ArgumentCaptor.forClass(OperationAuditLog.class);
+        verify(operationAuditLogRepository).save(logCaptor.capture());
+        OperationAuditLog log = logCaptor.getValue();
+
+        assertThat(log.getAction()).isEqualTo(OperationAuditLogService.ACTION_PLAYER_DEACTIVATED);
+        assertThat(log.getTargetType()).isEqualTo("PLAYER");
+        assertThat(log.getTargetId()).isEqualTo(10L);
+        assertThat(log.getTargetLabel()).isEqualTo("PlayerAlpha");
+        assertThat(log.getGroupId()).isEqualTo(1L);
+        assertThat(log.getSummary()).isEqualTo("비활성");
+        assertThat(log.getDetails()).isEqualTo("status=활성 -> 비활성");
+    }
+
+    @Test
+    void recordsPlayerReactivationAuditLog() {
+        Player player = new Player();
+        player.setId(10L);
+        player.setNickname("PlayerAlpha");
+
+        operationAuditLogService.recordPlayerActivityUpdate(
+            "ops@example.com",
+            "OpsUser",
+            1L,
+            player,
+            false,
+            true
+        );
+
+        ArgumentCaptor<OperationAuditLog> logCaptor = ArgumentCaptor.forClass(OperationAuditLog.class);
+        verify(operationAuditLogRepository).save(logCaptor.capture());
+        OperationAuditLog log = logCaptor.getValue();
+
+        assertThat(log.getAction()).isEqualTo(OperationAuditLogService.ACTION_PLAYER_REACTIVATED);
+        assertThat(log.getSummary()).isEqualTo("복구");
+        assertThat(log.getDetails()).isEqualTo("status=비활성 -> 활성");
+    }
+
+    @Test
     void returnsPagedAuditLogs() {
         OperationAuditLog log = new OperationAuditLog();
         log.setAction(OperationAuditLogService.ACTION_PLAYER_TIER_UPDATED);

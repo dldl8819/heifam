@@ -361,6 +361,31 @@ class PlayerAdminServiceTest {
     }
 
     @Test
+    void recordsActivityAuditLogWhenDeactivating() {
+        Player player = player(10L, 1L, "PlayerAlpha");
+        OffsetDateTime chatLeftAt = OffsetDateTime.parse("2026-05-02T12:41:00+09:00");
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+        when(playerRepository.save(any(Player.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        playerAdminService.updatePlayer(
+            1L,
+            10L,
+            new GroupPlayerUpdateRequest(null, null, false, chatLeftAt, "개인 사정", null, null),
+            "ops@example.com",
+            "OpsUser"
+        );
+
+        verify(operationAuditLogService).recordPlayerActivityUpdate(
+            eq("ops@example.com"),
+            eq("OpsUser"),
+            eq(1L),
+            eq(player),
+            eq(true),
+            eq(false)
+        );
+    }
+
+    @Test
     void throwsWhenDeactivatingWithoutChatLeftAt() {
         Player player = player(10L, 1L, "기존닉");
         when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
@@ -459,6 +484,35 @@ class PlayerAdminServiceTest {
         assertThat(player.getChatLeftReason()).isEqualTo("개인 사정");
         assertThat(player.getChatRejoinedAt()).isEqualTo(chatRejoinedAt);
         verify(playerRepository).save(player);
+    }
+
+    @Test
+    void recordsActivityAuditLogWhenReactivating() {
+        Player player = player(10L, 1L, "PlayerAlpha");
+        OffsetDateTime chatLeftAt = OffsetDateTime.parse("2026-05-02T12:41:00+09:00");
+        OffsetDateTime chatRejoinedAt = OffsetDateTime.parse("2026-05-03T13:42:00+09:00");
+        player.setActive(false);
+        player.setChatLeftAt(chatLeftAt);
+        player.setChatLeftReason("개인 사정");
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+        when(playerRepository.save(any(Player.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        playerAdminService.updatePlayer(
+            1L,
+            10L,
+            new GroupPlayerUpdateRequest(null, null, true, null, null, chatRejoinedAt, null),
+            "ops@example.com",
+            "OpsUser"
+        );
+
+        verify(operationAuditLogService).recordPlayerActivityUpdate(
+            eq("ops@example.com"),
+            eq("OpsUser"),
+            eq(1L),
+            eq(player),
+            eq(false),
+            eq(true)
+        );
     }
 
     @Test
