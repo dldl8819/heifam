@@ -18,6 +18,7 @@ type Promotion = {
   orderCtaLabel?: string
   qrImageSrc?: string
   qrImageAlt?: string
+  qrCtaLabel?: string
 }
 
 const promotions: Promotion[] = [
@@ -34,6 +35,9 @@ const promotions: Promotion[] = [
     ctaLabel: '프로젝트 소개',
     orderHref: 'https://guiderun.org/intro',
     orderCtaLabel: '참여 신청',
+    qrImageSrc: '/promotions/guiderun-project-apply-qr.jpg',
+    qrImageAlt: '가이드런프로젝트 참여 신청 QR 코드',
+    qrCtaLabel: 'QR로 신청 페이지 열기',
   },
   {
     title: '창원 솜솜 장수돼지',
@@ -222,7 +226,7 @@ export default function AdsPage() {
                       sizes="144px"
                     />
                   </span>
-                  <span>QR로 주문서 열기</span>
+                  <span>{promotion.qrCtaLabel ?? 'QR로 주문서 열기'}</span>
                 </a>
               )}
 
