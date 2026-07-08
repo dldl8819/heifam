@@ -22,13 +22,13 @@ type Promotion = {
 
 const promotions: Promotion[] = [
   {
-    title: '가이드런프로젝트',
+    title: '서울 민식 가이드런프로젝트',
     eyebrow: '러닝 프로젝트',
-    description: '시각장애 러너와 가이드러너가 함께 달리는 러닝 모임입니다.',
+    description: '시각장애러너와 가이드러너가 함께 달리는 러닝 모임입니다.',
     imageSrc: '/promotions/guiderun-project-logo.png',
     imageAlt: '가이드런프로젝트 로고',
     imageFit: 'contain',
-    highlights: ['시각장애 러너 동행', '가이드러너 참여 가능', '함께 달리는 프로젝트'],
+    highlights: ['시각장애러너 동행', '가이드러너 참여 가능', '함께 달리는 프로젝트'],
     note: '참여 방법과 활동 안내는 프로젝트 소개와 신청 페이지에서 확인해 주세요.',
     href: 'https://about.guiderun.org/',
     ctaLabel: '프로젝트 소개',
@@ -51,9 +51,9 @@ const promotions: Promotion[] = [
     qrImageAlt: '장수돼지 고기 주문 QR 코드',
   },
   {
-    title: '경성참기름집',
+    title: '서울 유니버 경성참기름집',
     eyebrow: '국산 참기름',
-    description: '스마트스토어에서 주문 가능한 국산 참기름',
+    description: '헤이 팸원 10% 할인',
     imageSrc: '/promotions/gyeongseong-sesame-oil-photo.png',
     imageAlt: '경성참기름집 매장 사진',
     imageFit: 'contain',
@@ -82,7 +82,7 @@ const promotions: Promotion[] = [
     qrImageAlt: '디스커버리 주문 QR 코드',
   },
   {
-    title: '로카 대운각',
+    title: '양주 로카 대운각',
     eyebrow: '중화요리',
     description: '경기 양주 광적면에 있는 전통 중화요리 전문점',
     imageSrc: '/promotions/daewungak-photo.png',
