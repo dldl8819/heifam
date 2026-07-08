@@ -82,6 +82,17 @@ const promotions: Promotion[] = [
     qrImageAlt: '디스커버리 주문 QR 코드',
   },
   {
+    title: '로카 대운각',
+    eyebrow: '중화요리',
+    description: '경기 양주 광적면에 있는 전통 중화요리 전문점',
+    imageSrc: '/promotions/daewungak-photo.png',
+    imageAlt: '로카 대운각 매장 외관',
+    highlights: ['경기 양주시 광적면 가래비길 181', '전통 중화요리 전문점', '양주 방문 시 추천'],
+    note: '방문 전 영업 여부는 지도 앱 또는 매장 안내를 확인해 주세요.',
+    href: 'https://naver.me/GbAypLnG',
+    ctaLabel: '네이버 지도 보기',
+  },
+  {
     title: '김해 창민 블루베리',
     eyebrow: '판매 종료',
     description: '장마 영향으로 이번 시즌 블루베리 주문 접수를 종료했습니다.',
