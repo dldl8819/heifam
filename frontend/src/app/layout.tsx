@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
@@ -10,16 +10,40 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
+  applicationName: '헤이팸',
   title: t('meta.title'),
   description: t('meta.description'),
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    title: '헤이팸',
+    statusBarStyle: 'black',
+  },
+  other: {
+    'apple-mobile-web-app-capable': 'yes',
+  },
   icons: {
     icon: [
-      { url: '/logo.jpg', type: 'image/jpeg' },
-      { url: '/icon.jpg', type: 'image/jpeg' },
+      {
+        url: '/icons/icon-192x192.png',
+        type: 'image/png',
+        sizes: '192x192',
+      },
     ],
-    shortcut: '/logo.jpg',
-    apple: '/logo.jpg',
+    apple: [
+      {
+        url: '/apple-touch-icon.png',
+        type: 'image/png',
+        sizes: '180x180',
+      },
+    ],
   },
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: '#0f172a',
 }
 
 export default function RootLayout({
