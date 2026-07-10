@@ -23,8 +23,8 @@ type Promotion = {
 
 const promotions: Promotion[] = [
   {
-    title: '서울 민식 가이드런프로젝트',
-    eyebrow: '러닝 프로젝트',
+    title: '가이드런프로젝트',
+    eyebrow: '서울 민식',
     description: '시각장애러너와 가이드러너가 함께 달리는 러닝 모임입니다.',
     imageSrc: '/promotions/guiderun-project-logo.png',
     imageAlt: '가이드런프로젝트 로고',
@@ -40,8 +40,8 @@ const promotions: Promotion[] = [
     qrCtaLabel: 'QR로 신청 페이지 열기',
   },
   {
-    title: '창원 솜솜 장수돼지',
-    eyebrow: '고기 맛집',
+    title: '장수돼지',
+    eyebrow: '창원 솜솜',
     description: '창원 진해 숙성 고기와 고기 주문 상담 가능',
     imageSrc: '/promotions/jangsudaeji-photo.png',
     imageAlt: '창원 솜솜 장수돼지 매장 외관',
@@ -55,8 +55,8 @@ const promotions: Promotion[] = [
     qrImageAlt: '장수돼지 고기 주문 QR 코드',
   },
   {
-    title: '서울 유니버 경성참기름집',
-    eyebrow: '국산 참기름',
+    title: '경성참기름집',
+    eyebrow: '서울 유니버',
     description: '헤이 팸원 10% 할인',
     imageSrc: '/promotions/gyeongseong-sesame-oil-photo.png',
     imageAlt: '경성참기름집 매장 사진',
@@ -71,8 +71,8 @@ const promotions: Promotion[] = [
     qrImageAlt: '경성참기름집 주문 QR 코드',
   },
   {
-    title: '목포 정은 디스커버리',
-    eyebrow: 'Discovery',
+    title: '디스커버리',
+    eyebrow: '목포 정은',
     description: '헤이 팸원이면 택배비 무료',
     imageSrc: '/promotions/mokpo-discovery-photo.png',
     imageAlt: '목포 정은 디스커버리 매장 외관',
@@ -86,8 +86,8 @@ const promotions: Promotion[] = [
     qrImageAlt: '디스커버리 주문 QR 코드',
   },
   {
-    title: '양주 로카 대운각',
-    eyebrow: '중화요리',
+    title: '대운각',
+    eyebrow: '양주 로카',
     description: '경기 양주 광적면에 있는 전통 중화요리 전문점',
     imageSrc: '/promotions/daewungak-photo.png',
     imageAlt: '로카 대운각 매장 외관',
@@ -97,8 +97,8 @@ const promotions: Promotion[] = [
     ctaLabel: '네이버 지도 보기',
   },
   {
-    title: '김해 창민 블루베리',
-    eyebrow: '판매 종료',
+    title: '블루베리',
+    eyebrow: '김해 창민',
     description: '장마 영향으로 이번 시즌 블루베리 주문 접수를 종료했습니다.',
     imageSrc: '/promotions/blueberry-card.png',
     imageAlt: '김해 창민 블루베리 할인 안내 배너',
