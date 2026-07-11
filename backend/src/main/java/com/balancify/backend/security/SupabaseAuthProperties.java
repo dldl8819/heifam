@@ -10,8 +10,10 @@ public class SupabaseAuthProperties {
     private boolean requireJwt = true;
     private boolean allowEmailHeaderFallback = false;
     private String supabaseUrl;
+    private String apiKey;
     private int verifyTimeoutMs = 3000;
-    private int verificationCacheTtlSeconds = 15;
+    private int verificationCacheTtlSeconds = 0;
+    private String serviceRoleKey;
 
     public boolean isRequireJwt() {
         return requireJwt;
@@ -50,7 +52,23 @@ public class SupabaseAuthProperties {
     }
 
     public void setVerificationCacheTtlSeconds(int verificationCacheTtlSeconds) {
-        this.verificationCacheTtlSeconds = Math.max(0, verificationCacheTtlSeconds);
+        this.verificationCacheTtlSeconds = 0;
+    }
+
+    public String getApiKey() {
+        return apiKey;
+    }
+
+    public void setApiKey(String apiKey) {
+        this.apiKey = safeTrim(apiKey);
+    }
+
+    public String getServiceRoleKey() {
+        return serviceRoleKey;
+    }
+
+    public void setServiceRoleKey(String serviceRoleKey) {
+        this.serviceRoleKey = safeTrim(serviceRoleKey);
     }
 
     private String safeTrim(String value) {

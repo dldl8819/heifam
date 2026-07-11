@@ -38,6 +38,7 @@ public class CaptainDraftService {
     private static final String TEAM_UNASSIGNED = "UNASSIGNED";
     private static final String STATUS_DRAFTING = "DRAFTING";
     private static final String STATUS_READY = "READY";
+    private static final String DELETED_MEMBER_LABEL = "\uD0C8\uD1F4\uD55C \uD68C\uC6D0";
     private static final List<String> ROUND_CODES = List.of("PPP", "PPT", "PPZ", "PTZ");
 
     private final GroupRepository groupRepository;
@@ -398,8 +399,8 @@ public class CaptainDraftService {
                     )
             )
             .map(participant -> new CaptainDraftParticipantResponse(
-                participant.getPlayer().getId(),
-                participant.getPlayer().getNickname(),
+                responsePlayerId(participant.getPlayer()),
+                responseNickname(participant.getPlayer()),
                 normalizeRace(participant.getPlayer().getRace()),
                 normalizeTeam(participant.getTeam()),
                 participant.isCaptain(),
@@ -421,10 +422,10 @@ public class CaptainDraftService {
                 Player captain = captainByTeam.get(team);
                 return new CaptainDraftPickLogResponse(
                     participant.getPickOrder(),
-                    captain == null ? null : captain.getId(),
-                    captain == null ? "-" : captain.getNickname(),
-                    participant.getPlayer().getId(),
-                    participant.getPlayer().getNickname(),
+                    responsePlayerId(captain),
+                    captain == null ? "-" : responseNickname(captain),
+                    responsePlayerId(participant.getPlayer()),
+                    responseNickname(participant.getPlayer()),
                     team
                 );
             })
@@ -441,10 +442,10 @@ public class CaptainDraftService {
                 safeInt(entry.getRoundNumber()),
                 safeTrim(entry.getRoundCode()),
                 safeInt(entry.getSetNumber()),
-                entry.getHomePlayer() == null ? null : entry.getHomePlayer().getId(),
-                entry.getHomePlayer() == null ? null : entry.getHomePlayer().getNickname(),
-                entry.getAwayPlayer() == null ? null : entry.getAwayPlayer().getId(),
-                entry.getAwayPlayer() == null ? null : entry.getAwayPlayer().getNickname(),
+                responsePlayerId(entry.getHomePlayer()),
+                responseNickname(entry.getHomePlayer()),
+                responsePlayerId(entry.getAwayPlayer()),
+                responseNickname(entry.getAwayPlayer()),
                 normalizeWinnerTeam(entry.getWinnerTeam())
             ))
             .toList();
@@ -457,10 +458,10 @@ public class CaptainDraftService {
             safeInt(draft.getSetsPerRound()),
             participants.size(),
             normalizeTeam(draft.getCurrentTurnTeam()),
-            draft.getHomeCaptain().getId(),
-            draft.getHomeCaptain().getNickname(),
-            draft.getAwayCaptain().getId(),
-            draft.getAwayCaptain().getNickname(),
+            responsePlayerId(draft.getHomeCaptain()),
+            responseNickname(draft.getHomeCaptain()),
+            responsePlayerId(draft.getAwayCaptain()),
+            responseNickname(draft.getAwayCaptain()),
             participantResponses,
             pickResponses,
             entryResponses
@@ -473,6 +474,17 @@ public class CaptainDraftService {
             case TEAM_AWAY -> 1;
             default -> 2;
         };
+    }
+
+    private Long responsePlayerId(Player player) {
+        return player == null || player.isAnonymized() ? null : player.getId();
+    }
+
+    private String responseNickname(Player player) {
+        if (player == null) {
+            return null;
+        }
+        return player.isAnonymized() ? DELETED_MEMBER_LABEL : player.getNickname();
     }
 
     private String normalizeTeam(String team) {

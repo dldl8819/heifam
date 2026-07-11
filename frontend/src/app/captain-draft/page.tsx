@@ -17,6 +17,7 @@ import {
   updateParticipantSlotInput,
 } from '@/lib/participant-slots'
 import type {
+  CaptainDraftParticipant,
   CaptainDraftResponse,
   CaptainDraftTeam,
   PlayerRosterItem,
@@ -29,6 +30,27 @@ const winnerTeamOptions = [
   { value: 'AWAY' as const, label: 'captainDraft.entry.awayWin' },
 ]
 type DraftWinnerSelection = '' | 'HOME' | 'AWAY'
+
+type IdentifiedCaptainDraftParticipant = CaptainDraftParticipant & { playerId: number }
+
+function hasPlayerId(
+  participant: CaptainDraftParticipant,
+): participant is IdentifiedCaptainDraftParticipant {
+  return typeof participant.playerId === 'number' && Number.isFinite(participant.playerId)
+}
+
+function createParticipantSlotsFromDraft(draft: CaptainDraftResponse): ParticipantSlotState[] {
+  const participants = draft.participants.filter(hasPlayerId)
+  return createParticipantSlotsFromIds(
+    participants.map((participant) => ({
+      id: participant.playerId,
+      nickname: participant.nickname,
+      race: participant.race,
+    })),
+    participants.map((participant) => participant.playerId),
+    MINIMUM_PARTICIPANT_SLOTS,
+  )
+}
 
 function teamLabel(team: CaptainDraftTeam): string {
   if (team === 'HOME') {
@@ -136,13 +158,15 @@ export default function CaptainDraftPage() {
   )
 
   const availablePickParticipants = useMemo(
-    () => unassignedParticipants.filter((participant) => !participant.captain),
+    () => unassignedParticipants
+      .filter(hasPlayerId)
+      .filter((participant) => !participant.captain),
     [unassignedParticipants],
   )
 
   const actingTeamParticipants = useMemo(
     () =>
-      (draft?.participants ?? []).filter(
+      (draft?.participants ?? []).filter(hasPlayerId).filter(
         (participant) => participant.team === actingCaptainTeam,
       ),
     [draft, actingCaptainTeam],
@@ -266,17 +290,7 @@ export default function CaptainDraftPage() {
           return
         }
         setDraft(response)
-        setParticipantSlots(
-          createParticipantSlotsFromIds(
-            response.participants.map((participant) => ({
-              id: participant.playerId,
-              nickname: participant.nickname,
-              race: participant.race,
-            })),
-            response.participants.map((participant) => participant.playerId),
-            MINIMUM_PARTICIPANT_SLOTS,
-          ),
-        )
+        setParticipantSlots(createParticipantSlotsFromDraft(response))
         setHomeCaptainId(response.homeCaptainPlayerId)
         setAwayCaptainId(response.awayCaptainPlayerId)
         setActingCaptainId((current) => current ?? response.homeCaptainPlayerId)
@@ -508,17 +522,7 @@ export default function CaptainDraftPage() {
     try {
       const refreshed = await apiClient.getLatestCaptainDraft(TEMP_GROUP_ID)
       setDraft(refreshed)
-      setParticipantSlots(
-        createParticipantSlotsFromIds(
-          refreshed.participants.map((participant) => ({
-            id: participant.playerId,
-            nickname: participant.nickname,
-            race: participant.race,
-          })),
-          refreshed.participants.map((participant) => participant.playerId),
-          MINIMUM_PARTICIPANT_SLOTS,
-        ),
-      )
+      setParticipantSlots(createParticipantSlotsFromDraft(refreshed))
       setHomeCaptainId(refreshed.homeCaptainPlayerId)
       setAwayCaptainId(refreshed.awayCaptainPlayerId)
       setActingCaptainId(refreshed.homeCaptainPlayerId)
@@ -802,12 +806,16 @@ export default function CaptainDraftPage() {
                 className="w-full max-w-sm rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
               >
                 <option value="">-</option>
-                <option value={draft.homeCaptainPlayerId}>
-                  {draft.homeCaptainNickname} ({t('captainDraft.teams.home')})
-                </option>
-                <option value={draft.awayCaptainPlayerId}>
-                  {draft.awayCaptainNickname} ({t('captainDraft.teams.away')})
-                </option>
+                {typeof draft.homeCaptainPlayerId === 'number' && (
+                  <option value={draft.homeCaptainPlayerId}>
+                    {draft.homeCaptainNickname} ({t('captainDraft.teams.home')})
+                  </option>
+                )}
+                {typeof draft.awayCaptainPlayerId === 'number' && (
+                  <option value={draft.awayCaptainPlayerId}>
+                    {draft.awayCaptainNickname} ({t('captainDraft.teams.away')})
+                  </option>
+                )}
               </select>
             </div>
           </article>
@@ -931,7 +939,9 @@ export default function CaptainDraftPage() {
                         )}
                       </td>
                       <td className="border border-slate-300 px-2 py-2 text-center font-semibold text-slate-700">
-                        {row.home ? (homePlayerSetWins.get(row.home.playerId) ?? 0) : 0}
+                        {row.home && typeof row.home.playerId === 'number'
+                          ? (homePlayerSetWins.get(row.home.playerId) ?? 0)
+                          : 0}
                       </td>
                       <td className="border border-slate-300 px-3 py-2 text-center font-medium text-slate-800">
                         {row.away ? (
@@ -944,7 +954,9 @@ export default function CaptainDraftPage() {
                         )}
                       </td>
                       <td className="border border-slate-300 px-2 py-2 text-center font-semibold text-slate-700">
-                        {row.away ? (awayPlayerSetWins.get(row.away.playerId) ?? 0) : 0}
+                        {row.away && typeof row.away.playerId === 'number'
+                          ? (awayPlayerSetWins.get(row.away.playerId) ?? 0)
+                          : 0}
                       </td>
                     </tr>
                   ))}

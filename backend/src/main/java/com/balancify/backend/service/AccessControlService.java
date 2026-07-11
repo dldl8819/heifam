@@ -368,6 +368,10 @@ public class AccessControlService {
         return new AccessState(superAdmin, admin, allowed, canViewMmr, nickname, preferredRace);
     }
 
+    public void evictAccountCache(String email) {
+        invalidateAccessState(normalizeEmail(email));
+    }
+
     private void invalidateAccessState(String normalizedEmail) {
         if (normalizedEmail == null || normalizedEmail.isBlank()) {
             return;

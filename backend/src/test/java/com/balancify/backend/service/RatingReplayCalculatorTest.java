@@ -129,6 +129,31 @@ class RatingReplayCalculatorTest {
             });
     }
 
+    @Test
+    void sampleChangesMaskAnonymizedPlayerWhileReplayKeepsInternalReferences() {
+        RatingReplayCalculator calculator = new RatingReplayCalculator(36, 800, 300, 900, 0.6, 0.7);
+        ReplayFixture fixture = standardFixture();
+        Player anonymizedPlayer = fixture.players().get(0);
+        anonymizedPlayer.setAnonymizedAt(OffsetDateTime.parse("2026-01-01T00:00:00Z"));
+
+        RatingReplayPlan plan = calculator.calculate(
+            fixture.players(),
+            List.of(fixture.match1()),
+            fixture.participantsByMatchId()
+        );
+
+        assertThat(plan.samplePlayerChanges())
+            .filteredOn(change -> "\uD0C8\uD1F4\uD55C \uD68C\uC6D0".equals(change.nickname()))
+            .singleElement()
+            .satisfies(change -> assertThat(change.playerId()).isNull());
+        assertThat(plan.players()).anySatisfy(player ->
+            assertThat(player.playerId()).isEqualTo(anonymizedPlayer.getId())
+        );
+        assertThat(plan.participants()).anySatisfy(participant ->
+            assertThat(participant.playerId()).isEqualTo(anonymizedPlayer.getId())
+        );
+    }
+
     private Map<Long, Integer> finalMmrByPlayerId(RatingReplayPlan plan) {
         Map<Long, Integer> values = new LinkedHashMap<>();
         for (RatingReplayPlan.PlayerResult player : plan.players()) {

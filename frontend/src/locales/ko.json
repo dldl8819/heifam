@@ -1,4 +1,4 @@
-﻿{
+{
   "meta": {
     "title": "Hei",
     "description": "Hei`Fam 스타크래프트 내전 운영을 위한 밸런스 매치 및 랭킹 도구"
@@ -34,7 +34,7 @@
     "privacy": "개인정보처리방침",
     "terms": "이용약관",
     "supportLabel": "후원:",
-    "supportAccount": "카카오뱅크 79422998398",
+    "supportAccount": "후원 정보는 운영자에게 문의해 주세요.",
     "youtubeLabel": "YouTube:",
     "youtubeLinkText": "https://www.youtube.com/@Hei-minsik",
     "instagramLabel": "Instagram:",
@@ -325,6 +325,12 @@
     "loginGoogle": "Google 로그인",
     "loginGooglePending": "로그인 이동 중...",
     "logout": "로그아웃",
+    "deleteAccount": {
+      "action": "회원 탈퇴",
+      "pending": "탈퇴 처리 중...",
+      "confirm": "회원 탈퇴 시 계정 정보와 로그인 권한이 삭제되고 현재 기기에서 로그아웃됩니다. 경기 기록과 MMR 이력은 개인 식별 정보를 제거한 형태로 보관될 수 있습니다. 이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?",
+      "error": "회원 탈퇴를 완료하지 못했습니다. 잠시 후 다시 시도해 주세요."
+    },
     "mmrToggle": "MMR 표시",
     "loading": "로그인 상태 확인 중...",
     "noProfile": "사용자",

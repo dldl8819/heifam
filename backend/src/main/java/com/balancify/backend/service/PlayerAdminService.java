@@ -57,6 +57,7 @@ public class PlayerAdminService {
     ) {
         Player player = playerRepository.findByIdAndGroup_Id(playerId, groupId)
             .orElseThrow(() -> new NoSuchElementException("Player not found"));
+        requireMutablePlayer(player);
 
         String previousNickname = safeTrim(player.getNickname());
         String previousRace = PlayerRacePolicy.toDisplayRace(player.getRace());
@@ -212,6 +213,7 @@ public class PlayerAdminService {
     ) {
         Player player = playerRepository.findByIdAndGroup_Id(playerId, groupId)
             .orElseThrow(() -> new NoSuchElementException("Player not found"));
+        requireMutablePlayer(player);
 
         Integer nextMmr = request == null ? null : request.mmr();
         if (nextMmr == null) {
@@ -230,6 +232,7 @@ public class PlayerAdminService {
     public void deletePlayer(Long groupId, Long playerId) {
         Player player = playerRepository.findByIdAndGroup_Id(playerId, groupId)
             .orElseThrow(() -> new NoSuchElementException("Player not found"));
+        requireMutablePlayer(player);
         try {
             playerRepository.delete(player);
             playerRepository.flush();
@@ -239,6 +242,12 @@ public class PlayerAdminService {
                 "매치 또는 드래프트 기록이 남아 있는 선수는 삭제할 수 없습니다.",
                 exception
             );
+        }
+    }
+
+    private void requireMutablePlayer(Player player) {
+        if (player != null && player.isAnonymized()) {
+            throw new NoSuchElementException("Player not found");
         }
     }
 

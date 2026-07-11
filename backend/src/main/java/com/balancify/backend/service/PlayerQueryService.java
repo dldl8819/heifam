@@ -39,7 +39,10 @@ public class PlayerQueryService {
     }
 
     private List<GroupPlayerResponse> loadGroupPlayers(Long groupId, boolean includeInactive) {
-        List<Player> players = new ArrayList<>(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId));
+        List<Player> players = new ArrayList<>(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId)
+            .stream()
+            .filter(player -> !player.isAnonymized())
+            .toList());
         if (!includeInactive) {
             players = new ArrayList<>(players.stream().filter(Player::isActive).toList());
         }

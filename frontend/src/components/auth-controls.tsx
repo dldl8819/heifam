@@ -18,11 +18,13 @@ function buildIdentityLabel(value?: string | null): string {
 }
 
 export function AuthControls() {
-  const { user, loading, signOut } = useAuth()
+  const { user, loading, signOut, deleteAccount } = useAuth()
   const { nickname, canViewMmr } = useAdminAuth()
   const { mmrVisible, setMmrVisible } = useMmrVisibility()
   const [warningMessage, setWarningMessage] = useState<string | null>(null)
   const [oauthInProgress, setOauthInProgress] = useState<boolean>(false)
+  const [deleteInProgress, setDeleteInProgress] = useState<boolean>(false)
+  const [accountError, setAccountError] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState<boolean>(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
 
@@ -89,6 +91,28 @@ export function AuthControls() {
     if (error) {
       setWarningMessage(t('auth.error.default'))
       setOauthInProgress(false)
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    if (deleteInProgress) {
+      return
+    }
+
+    const confirmed = window.confirm(t('auth.deleteAccount.confirm'))
+    if (!confirmed) {
+      return
+    }
+
+    setDeleteInProgress(true)
+    setAccountError(null)
+    try {
+      await deleteAccount()
+      setMenuOpen(false)
+    } catch {
+      setAccountError(t('auth.deleteAccount.error'))
+    } finally {
+      setDeleteInProgress(false)
     }
   }
 
@@ -178,6 +202,23 @@ export function AuthControls() {
             >
               {t('auth.logout')}
             </button>
+            <div className="mt-1 border-t border-slate-700 pt-1">
+              <button
+                type="button"
+                onClick={() => void handleDeleteAccount()}
+                disabled={deleteInProgress}
+                className="w-full rounded-lg px-3 py-2 text-left text-xs text-red-300 transition-colors hover:bg-red-950/40 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {deleteInProgress
+                  ? t('auth.deleteAccount.pending')
+                  : t('auth.deleteAccount.action')}
+              </button>
+              {accountError && (
+                <p role="alert" className="px-3 pb-1 pt-2 text-xs leading-relaxed text-amber-300">
+                  {accountError}
+                </p>
+              )}
+            </div>
           </div>
         )}
       </div>

@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { isPublicRoute } from '@/lib/route-access'
+import { apiClient, clearSessionIdentityCache } from '@/lib/api'
 
 export type AuthUser = {
   email: string | null
@@ -16,6 +17,7 @@ type AuthContextType = {
   accessToken: string | null
   loading: boolean
   signOut: () => Promise<void>
+  deleteAccount: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -78,6 +80,29 @@ function hasStoredSupabaseSession(): boolean {
   }
 
   return false
+}
+
+function removeStoredSupabaseSession(): void {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  try {
+    const authStorageKeys: string[] = []
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index)
+      if (
+        key?.startsWith(SUPABASE_AUTH_STORAGE_KEY_PREFIX) &&
+        key.endsWith(SUPABASE_AUTH_STORAGE_KEY_SUFFIX)
+      ) {
+        authStorageKeys.push(key)
+      }
+    }
+
+    authStorageKeys.forEach((key) => window.localStorage.removeItem(key))
+  } catch {
+    // The in-memory auth state is still cleared below when storage is unavailable.
+  }
 }
 
 function shouldHydrateAuthSession(pathname: string | null): boolean {
@@ -152,7 +177,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return
         }
         if (!isSupabaseLockContentionError(error)) {
-          console.error('Failed to load auth session:', error)
+          console.error('Failed to load auth session')
         }
         setAccessToken(null)
         setUser(null)
@@ -185,7 +210,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [pathname])
 
   const signOut = async () => {
+    clearSessionIdentityCache()
     await supabase.auth.signOut()
+  }
+
+  const deleteAccount = async () => {
+    const currentAccessToken = accessToken?.trim() ?? ''
+    if (currentAccessToken.length === 0) {
+      throw new Error('An active session is required to delete the account')
+    }
+
+    await apiClient.deleteMyAccount({
+      accessToken: currentAccessToken,
+    })
+
+    clearSessionIdentityCache()
+    try {
+      const { error } = await supabase.auth.signOut({ scope: 'local' })
+      if (error) {
+        removeStoredSupabaseSession()
+      }
+    } catch {
+      removeStoredSupabaseSession()
+    }
+    setAccessToken(null)
+    setUser(null)
   }
 
   const value = {
@@ -193,6 +242,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     accessToken,
     loading,
     signOut,
+    deleteAccount,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
@@ -211,9 +261,9 @@ async function saveUserToDatabase(user: User) {
       })
 
     if (error) {
-      console.error('Error saving user to database:', error)
+      console.error('Error saving user to database')
     }
-  } catch (error) {
-    console.error('Error saving user to database:', error)
+  } catch {
+    console.error('Error saving user to database')
   }
 }

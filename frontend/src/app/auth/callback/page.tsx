@@ -88,7 +88,7 @@ export default function AuthCallbackPage() {
             isPkceVerifierMissingError(exchangeError) || isFlowStateNotFoundError(exchangeError)
 
           if (!recoverableFlowError) {
-            console.error('Error exchanging auth code:', exchangeError)
+            console.error('Error exchanging auth code')
             await supabase.auth.signOut()
             router.replace('/')
             return
@@ -97,7 +97,7 @@ export default function AuthCallbackPage() {
           session = await waitForSessionWithRetry()
 
           if (!session) {
-            console.error('Error exchanging auth code:', exchangeError)
+            console.error('Error exchanging auth code')
             router.replace('/auth?retry=1')
             return
           }
@@ -168,7 +168,7 @@ export default function AuthCallbackPage() {
           return
         }
 
-        console.error('Error verifying access during auth callback:', callbackError)
+        console.error('Error verifying access during auth callback')
         router.replace('/players')
       }
     }

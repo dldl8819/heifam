@@ -147,7 +147,7 @@ function buildForwardHeaders(request: NextRequest): Headers {
   return headers
 }
 
-async function buildProxyResponse(upstream: Response, baseUrl: string): Promise<NextResponse> {
+async function buildProxyResponse(upstream: Response): Promise<NextResponse> {
   const responseHeaders = new Headers()
   upstream.headers.forEach((value, key) => {
     const normalizedKey = key.toLowerCase()
@@ -161,8 +161,6 @@ async function buildProxyResponse(upstream: Response, baseUrl: string): Promise<
   responseHeaders.delete('content-encoding')
   responseHeaders.delete('content-length')
   responseHeaders.delete('transfer-encoding')
-  responseHeaders.set('x-proxy-upstream', baseUrl)
-  responseHeaders.set('x-proxy-upstream-status', String(upstream.status))
 
   const upstreamBodyText = upstream.status === 204 ? null : await upstream.text()
   return new NextResponse(upstreamBodyText, {
@@ -171,16 +169,21 @@ async function buildProxyResponse(upstream: Response, baseUrl: string): Promise<
   })
 }
 
-function buildUnavailableResponse(baseUrls: string[], reason: string): NextResponse {
+function buildUnavailableResponse(): NextResponse {
   return NextResponse.json(
     {
-      message:
-        'Failed to connect to all configured backend endpoints. Check backend DNS and deployment status.',
-      reason,
-      attemptedBaseUrls: baseUrls,
+      message: 'Backend service is temporarily unavailable.',
     },
     { status: 502 }
   )
+}
+
+function isAccountDeletionRequest(method: string, path: string[]): boolean {
+  return method === 'DELETE'
+    && path.length === 3
+    && path[0] === 'api'
+    && path[1] === 'access'
+    && path[2] === 'me'
 }
 
 async function proxyRequest(
@@ -200,14 +203,15 @@ async function proxyRequest(
   const search = request.nextUrl.search ?? ''
   const headers = buildForwardHeaders(request)
   const upstreamTimeoutMs = resolveUpstreamTimeoutMs()
+  const requestBaseUrls = isAccountDeletionRequest(request.method, path)
+    ? baseUrls.slice(0, 1)
+    : baseUrls
   const body =
     request.method === 'GET' || request.method === 'HEAD'
       ? undefined
       : await request.arrayBuffer()
 
-  let lastError: unknown = null
-
-  for (const [index, baseUrl] of baseUrls.entries()) {
+  for (const [index, baseUrl] of requestBaseUrls.entries()) {
     const targetUrl = buildTargetUrl(baseUrl, path, search)
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), upstreamTimeoutMs)
@@ -222,22 +226,21 @@ async function proxyRequest(
         signal: controller.signal,
       })
 
-      const hasNextCandidate = index < baseUrls.length - 1
+      const hasNextCandidate = index < requestBaseUrls.length - 1
       if (RETRYABLE_UPSTREAM_STATUSES.has(upstream.status) && hasNextCandidate) {
         await upstream.body?.cancel()
         continue
       }
 
-      return await buildProxyResponse(upstream, baseUrl)
-    } catch (error) {
-      lastError = error
+      return await buildProxyResponse(upstream)
+    } catch {
+      // The response intentionally omits upstream addresses and raw network errors.
     } finally {
       clearTimeout(timeoutId)
     }
   }
 
-  const reason = lastError instanceof Error ? lastError.message : 'Unknown network error'
-  return buildUnavailableResponse(baseUrls, reason)
+  return buildUnavailableResponse()
 }
 
 export async function GET(

@@ -63,32 +63,46 @@ public class SupabaseJwtVerifier {
         }
 
         long now = System.currentTimeMillis();
-        CachedVerification cachedVerification = verificationCache.get(normalizedToken);
-        if (cachedVerification != null && cachedVerification.expiresAtEpochMs() > now) {
-            return Optional.of(cachedVerification.user());
-        }
 
         if (expectedIssuer.isEmpty()) {
             verificationCache.remove(normalizedToken);
             return Optional.empty();
         }
 
-        if (jwtProcessor != null) {
-            Optional<VerifiedUser> jwksVerifiedUser = verifyWithJwks(normalizedToken, now);
-            if (jwksVerifiedUser.isPresent()) {
-                cacheVerification(normalizedToken, jwksVerifiedUser.get(), now, 0L);
-                return jwksVerifiedUser;
-            }
-        }
-
+        Optional<VerifiedUser> jwksVerifiedUser = jwtProcessor == null
+            ? Optional.empty()
+            : verifyWithJwks(normalizedToken, now);
         Optional<VerifiedUser> authApiVerifiedUser = verifyWithSupabaseAuthApi(normalizedToken);
         if (authApiVerifiedUser.isPresent()) {
-            cacheVerification(normalizedToken, authApiVerifiedUser.get(), now, 0L);
-            return authApiVerifiedUser;
+            VerifiedUser activeUser = authApiVerifiedUser.get();
+            if (jwksVerifiedUser.isPresent()) {
+                VerifiedUser signedUser = jwksVerifiedUser.get();
+                if (!signedUser.userId().equals(activeUser.userId())
+                    || !signedUser.email().equals(activeUser.email())) {
+                    verificationCache.remove(normalizedToken);
+                    return Optional.empty();
+                }
+                activeUser = new VerifiedUser(
+                    signedUser.userId(),
+                    activeUser.email(),
+                    signedUser.nickname(),
+                    signedUser.sessionId()
+                );
+            }
+            cacheVerification(normalizedToken, activeUser, now, 0L);
+            return Optional.of(activeUser);
         }
 
         verificationCache.remove(normalizedToken);
         return Optional.empty();
+    }
+
+    public void invalidateUser(String userId) {
+        String normalizedUserId = safeTrim(userId);
+        if (normalizedUserId.isEmpty()) {
+            return;
+        }
+        verificationCache.entrySet().removeIf(entry -> normalizedUserId.equals(entry.getValue().user().userId()));
     }
 
     private Optional<VerifiedUser> verifyWithJwks(String normalizedToken, long now) {
@@ -98,13 +112,15 @@ public class SupabaseJwtVerifier {
                 return Optional.empty();
             }
 
+            String userId = safeTrim(claims.getSubject());
             String email = normalizeEmail(claims.getStringClaim("email"));
-            if (email.isEmpty()) {
+            if (userId.isEmpty() || email.isEmpty()) {
                 return Optional.empty();
             }
 
             String nickname = resolveNickname(claims.getClaim("user_metadata"));
-            return Optional.of(new VerifiedUser(email, nickname));
+            String sessionId = safeTrim(claims.getStringClaim("session_id"));
+            return Optional.of(new VerifiedUser(userId, email, nickname, sessionId));
         } catch (BadJOSEException | JOSEException | ParseException exception) {
             return Optional.empty();
         }
@@ -115,11 +131,17 @@ public class SupabaseJwtVerifier {
             return Optional.empty();
         }
 
+        String apiKey = supabaseAuthProperties.getApiKey();
+        if (apiKey.isEmpty()) {
+            return Optional.empty();
+        }
+
         try {
             HttpRequest request = HttpRequest
                 .newBuilder(URI.create(expectedIssuer + "/user"))
                 .timeout(Duration.ofMillis(supabaseAuthProperties.getVerifyTimeoutMs()))
                 .header("Authorization", "Bearer " + normalizedToken)
+                .header("apikey", apiKey)
                 .header("Accept", "application/json")
                 .GET()
                 .build();
@@ -136,12 +158,13 @@ public class SupabaseJwtVerifier {
                 new TypeReference<>() {
                 }
             );
+            String userId = safeTrim(asString(payload.get("id")));
             String email = normalizeEmail(asString(payload.get("email")));
-            if (email.isEmpty()) {
+            if (userId.isEmpty() || email.isEmpty()) {
                 return Optional.empty();
             }
             String nickname = resolveNickname(payload.get("user_metadata"));
-            return Optional.of(new VerifiedUser(email, nickname));
+            return Optional.of(new VerifiedUser(userId, email, nickname, ""));
         } catch (InterruptedException interruptedException) {
             Thread.currentThread().interrupt();
             return Optional.empty();
@@ -276,9 +299,14 @@ public class SupabaseJwtVerifier {
     }
 
     public record VerifiedUser(
+        String userId,
         String email,
-        String nickname
+        String nickname,
+        String sessionId
     ) {
+        public VerifiedUser(String email, String nickname) {
+            this("", email, nickname, "");
+        }
     }
 
     private record CachedVerification(

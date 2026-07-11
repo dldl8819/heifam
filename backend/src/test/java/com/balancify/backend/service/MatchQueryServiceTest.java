@@ -268,6 +268,36 @@ class MatchQueryServiceTest {
     }
 
     @Test
+    void hidesAnonymizedParticipantIdentityWhileRetainingHistoricalMmr() {
+        Group group = new Group();
+        group.setId(1L);
+
+        Match match = new Match();
+        match.setId(205L);
+        match.setGroup(group);
+        match.setWinningTeam("HOME");
+        match.setPlayedAt(OffsetDateTime.parse("2026-03-23T13:00:00Z"));
+
+        Player anonymizedPlayer = player(17L, group, "PreviouslyIdentifyingNickname", 1200);
+        anonymizedPlayer.setAnonymizedAt(OffsetDateTime.parse("2026-07-12T03:00:00Z"));
+        MatchParticipant participant = participant(match, anonymizedPlayer, "HOME", 1180);
+
+        when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(205L))
+            .thenReturn(List.of(participant));
+
+        List<GroupRecentMatchResponse> responses = matchQueryService.getRecentMatches(1L, 10);
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).homeTeam()).hasSize(1);
+        assertThat(responses.get(0).homeTeam().get(0).playerId()).isNull();
+        assertThat(responses.get(0).homeTeam().get(0).nickname())
+            .isEqualTo("\uD0C8\uD1F4\uD55C \uD68C\uC6D0");
+        assertThat(responses.get(0).homeTeam().get(0).mmr()).isEqualTo(1180);
+        verify(accessControlService, never()).resolveAccessProfile(any());
+    }
+
+    @Test
     void appliesRecentMatchOffsetForIncrementalLoading() {
         when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of());
 

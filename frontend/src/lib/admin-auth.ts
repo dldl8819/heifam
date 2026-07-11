@@ -61,7 +61,6 @@ export function useAdminAuth(): AdminAuthState {
 
     setAccessLoading(true)
     setAccessError(false)
-    let lastError: unknown = null
 
     try {
       for (let attempt = 0; attempt <= ACCESS_FETCH_RETRY_DELAYS_MS.length; attempt += 1) {
@@ -96,7 +95,6 @@ export function useAdminAuth(): AdminAuthState {
             return
           }
 
-          lastError = error
           if (attempt < ACCESS_FETCH_RETRY_DELAYS_MS.length) {
             const delayMs = ACCESS_FETCH_RETRY_DELAYS_MS[attempt]
             await new Promise((resolve) => setTimeout(resolve, delayMs))
@@ -121,7 +119,7 @@ export function useAdminAuth(): AdminAuthState {
         })
       }
       setAccessError(true)
-      console.error('Failed to load access profile after retries:', lastError)
+      console.error('Failed to load access profile after retries')
     } finally {
       setAccessLoading(false)
     }

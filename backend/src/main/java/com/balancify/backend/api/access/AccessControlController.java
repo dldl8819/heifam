@@ -9,12 +9,15 @@ import com.balancify.backend.api.access.dto.AccessMmrPermissionUpdateRequest;
 import com.balancify.backend.api.access.dto.AccessRaceUpdateRequest;
 import com.balancify.backend.security.AuthenticatedRequestResolver;
 import com.balancify.backend.service.AccessControlService;
+import com.balancify.backend.service.AccountDeletionService;
 import com.balancify.backend.service.AccessControlService.AccessProfile;
+import com.balancify.backend.service.exception.AccountDeletionException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,19 +34,23 @@ public class AccessControlController {
 
     private final AccessControlService accessControlService;
     private final AuthenticatedRequestResolver authenticatedRequestResolver;
+    private final AccountDeletionService accountDeletionService;
 
     public AccessControlController(
         AccessControlService accessControlService,
-        AuthenticatedRequestResolver authenticatedRequestResolver
+        AuthenticatedRequestResolver authenticatedRequestResolver,
+        AccountDeletionService accountDeletionService
     ) {
         this.accessControlService = accessControlService;
         this.authenticatedRequestResolver = authenticatedRequestResolver;
+        this.accountDeletionService = accountDeletionService;
     }
 
     @GetMapping("/me")
     public AccessMeResponse getMyAccess(HttpServletRequest request) {
         String requestEmail = requireRequestEmail(request);
         AccessProfile profile = accessControlService.resolveAccessProfile(requestEmail);
+        accountDeletionService.linkAuthenticatedPlayers(authenticatedRequestResolver.resolve(request));
         return new AccessMeResponse(
             profile.email(),
             profile.nickname(),
@@ -69,6 +76,7 @@ public class AccessControlController {
 
         try {
             AccessProfile profile = accessControlService.upsertPreferredRace(requestEmail, race);
+            accountDeletionService.linkAuthenticatedPlayers(authenticatedRequestResolver.resolve(request));
             return new AccessMeResponse(
                 profile.email(),
                 profile.nickname(),
@@ -84,6 +92,34 @@ public class AccessControlController {
                 HttpStatus.BAD_REQUEST,
                 illegalArgumentException.getMessage(),
                 illegalArgumentException
+            );
+        }
+    }
+
+    @DeleteMapping("/me")
+    public ResponseEntity<Void> deleteMyAccount(HttpServletRequest request) {
+        AuthenticatedRequestResolver.ResolvedRequestIdentity identity = authenticatedRequestResolver.resolve(request);
+        if (!identity.isAuthenticated() || !identity.jwtVerified() || identity.userId().isBlank()) {
+            throw new ResponseStatusException(
+                HttpStatus.UNAUTHORIZED,
+                "Valid Supabase bearer token is required"
+            );
+        }
+
+        try {
+            accountDeletionService.deleteAccount(identity);
+            return ResponseEntity.noContent().build();
+        } catch (IllegalArgumentException illegalArgumentException) {
+            throw new ResponseStatusException(
+                HttpStatus.UNAUTHORIZED,
+                "Valid Supabase bearer token is required",
+                illegalArgumentException
+            );
+        } catch (AccountDeletionException accountDeletionException) {
+            throw new ResponseStatusException(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "Account deletion could not be completed",
+                accountDeletionException
             );
         }
     }

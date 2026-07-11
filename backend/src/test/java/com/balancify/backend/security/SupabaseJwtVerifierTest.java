@@ -29,6 +29,10 @@ import org.junit.jupiter.api.Test;
 
 class SupabaseJwtVerifierTest {
 
+    private static final String PLACEHOLDER_API_KEY = "YOUR_SUPABASE_PUBLISHABLE_KEY";
+    private static final String PLACEHOLDER_USER_ID =
+        "00000000-0000-0000-0000-000000000001";
+
     private HttpServer jwksServer;
     private final AtomicInteger jwksRequestCount = new AtomicInteger();
     private final AtomicInteger authUserRequestCount = new AtomicInteger();
@@ -46,9 +50,11 @@ class SupabaseJwtVerifierTest {
             .keyID("hei-test-key")
             .generate();
         String baseUrl = startJwksServer(new JWKSet(signingKey.toPublicJWK()).toString());
+        registerActiveUserEndpoint();
 
         SupabaseAuthProperties properties = new SupabaseAuthProperties();
         properties.setSupabaseUrl(baseUrl);
+        properties.setApiKey(PLACEHOLDER_API_KEY);
         properties.setVerifyTimeoutMs(1000);
         properties.setVerificationCacheTtlSeconds(60);
 
@@ -57,16 +63,18 @@ class SupabaseJwtVerifierTest {
         String token = createToken(
             signingKey,
             baseUrl + "/auth/v1",
-            "member@hei.gg",
+            "member@example.test",
             Map.of("nickname", "민식")
         );
 
         Optional<SupabaseJwtVerifier.VerifiedUser> verifiedUser = verifier.verify(token);
 
         assertThat(verifiedUser).isPresent();
-        assertThat(verifiedUser.orElseThrow().email()).isEqualTo("member@hei.gg");
+        assertThat(verifiedUser.orElseThrow().userId()).isEqualTo(PLACEHOLDER_USER_ID);
+        assertThat(verifiedUser.orElseThrow().email()).isEqualTo("member@example.test");
         assertThat(verifiedUser.orElseThrow().nickname()).isEqualTo("민식");
         assertThat(jwksRequestCount.get()).isEqualTo(1);
+        assertThat(authUserRequestCount.get()).isEqualTo(1);
     }
 
     @Test
@@ -78,6 +86,7 @@ class SupabaseJwtVerifierTest {
 
         SupabaseAuthProperties properties = new SupabaseAuthProperties();
         properties.setSupabaseUrl(baseUrl);
+        properties.setApiKey(PLACEHOLDER_API_KEY);
         properties.setVerifyTimeoutMs(1000);
         properties.setVerificationCacheTtlSeconds(60);
 
@@ -86,7 +95,7 @@ class SupabaseJwtVerifierTest {
         String token = createToken(
             signingKey,
             "https://wrong.example.com/auth/v1",
-            "member@hei.gg",
+            "member@example.test",
             Map.of("nickname", "민식")
         );
 
@@ -102,6 +111,7 @@ class SupabaseJwtVerifierTest {
 
         SupabaseAuthProperties properties = new SupabaseAuthProperties();
         properties.setSupabaseUrl(baseUrl);
+        properties.setApiKey(PLACEHOLDER_API_KEY);
         properties.setVerifyTimeoutMs(1000);
         properties.setVerificationCacheTtlSeconds(60);
 
@@ -110,7 +120,7 @@ class SupabaseJwtVerifierTest {
         String token = createToken(
             signingKey,
             baseUrl + "/auth/v1",
-            "member@hei.gg",
+            "member@example.test",
             Map.of("nickname", "민식"),
             Instant.now().minusSeconds(120)
         );
@@ -130,6 +140,7 @@ class SupabaseJwtVerifierTest {
 
         SupabaseAuthProperties properties = new SupabaseAuthProperties();
         properties.setSupabaseUrl(baseUrl);
+        properties.setApiKey(PLACEHOLDER_API_KEY);
         properties.setVerifyTimeoutMs(1000);
         properties.setVerificationCacheTtlSeconds(60);
 
@@ -138,7 +149,7 @@ class SupabaseJwtVerifierTest {
         String token = createToken(
             attackerKey,
             baseUrl + "/auth/v1",
-            "member@hei.gg",
+            "member@example.test",
             Map.of("nickname", "민식")
         );
 
@@ -147,14 +158,16 @@ class SupabaseJwtVerifierTest {
     }
 
     @Test
-    void cachesVerifiedTokenToAvoidRepeatedJwksLookups() throws Exception {
+    void checksActiveUserOnEveryRequestWhileReusingJwks() throws Exception {
         ECKey signingKey = new ECKeyGenerator(Curve.P_256)
             .keyID("hei-test-key")
             .generate();
         String baseUrl = startJwksServer(new JWKSet(signingKey.toPublicJWK()).toString());
+        registerActiveUserEndpoint();
 
         SupabaseAuthProperties properties = new SupabaseAuthProperties();
         properties.setSupabaseUrl(baseUrl);
+        properties.setApiKey(PLACEHOLDER_API_KEY);
         properties.setVerifyTimeoutMs(1000);
         properties.setVerificationCacheTtlSeconds(60);
 
@@ -163,13 +176,14 @@ class SupabaseJwtVerifierTest {
         String token = createToken(
             signingKey,
             baseUrl + "/auth/v1",
-            "member@hei.gg",
+            "member@example.test",
             Map.of("nickname", "민식")
         );
 
         assertThat(verifier.verify(token)).isPresent();
         assertThat(verifier.verify(token)).isPresent();
         assertThat(jwksRequestCount.get()).isEqualTo(1);
+        assertThat(authUserRequestCount.get()).isEqualTo(2);
     }
 
     @Test
@@ -180,6 +194,7 @@ class SupabaseJwtVerifierTest {
             new StaticBodyHandler(
                 """
                     {
+                      "id": "00000000-0000-0000-0000-000000000001",
                       "email": "player@example.test",
                       "user_metadata": {
                         "nickname": "PlayerAlpha"
@@ -192,6 +207,7 @@ class SupabaseJwtVerifierTest {
 
         SupabaseAuthProperties properties = new SupabaseAuthProperties();
         properties.setSupabaseUrl(baseUrl);
+        properties.setApiKey(PLACEHOLDER_API_KEY);
         properties.setVerifyTimeoutMs(1000);
         properties.setVerificationCacheTtlSeconds(60);
 
@@ -200,9 +216,71 @@ class SupabaseJwtVerifierTest {
         Optional<SupabaseJwtVerifier.VerifiedUser> verifiedUser = verifier.verify("opaque-token");
 
         assertThat(verifiedUser).isPresent();
+        assertThat(verifiedUser.orElseThrow().userId()).isEqualTo(PLACEHOLDER_USER_ID);
         assertThat(verifiedUser.orElseThrow().email()).isEqualTo("player@example.test");
         assertThat(verifiedUser.orElseThrow().nickname()).isEqualTo("PlayerAlpha");
         assertThat(authUserRequestCount.get()).isEqualTo(1);
+    }
+
+    @Test
+    void rejectsCachedTokenWhenAuthUserBecomesUnavailable() throws Exception {
+        String baseUrl = startJwksServer(new JWKSet().toString());
+        jwksServer.createContext(
+            "/auth/v1/user",
+            exchange -> {
+                int requestNumber = authUserRequestCount.incrementAndGet();
+                if (requestNumber > 1) {
+                    exchange.sendResponseHeaders(401, -1);
+                    exchange.close();
+                    return;
+                }
+
+                byte[] activeUserBody = """
+                    {
+                      "id": "00000000-0000-0000-0000-000000000001",
+                      "email": "placeholder.user@example.test",
+                      "user_metadata": {
+                        "nickname": "PlaceholderNickname"
+                      }
+                    }
+                    """.getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().add("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, activeUserBody.length);
+                try (OutputStream outputStream = exchange.getResponseBody()) {
+                    outputStream.write(activeUserBody);
+                }
+            }
+        );
+
+        SupabaseAuthProperties properties = new SupabaseAuthProperties();
+        properties.setSupabaseUrl(baseUrl);
+        properties.setApiKey(PLACEHOLDER_API_KEY);
+        properties.setVerifyTimeoutMs(1000);
+        properties.setVerificationCacheTtlSeconds(60);
+
+        SupabaseJwtVerifier verifier = new SupabaseJwtVerifier(properties);
+
+        assertThat(verifier.verify("placeholder-access-token")).isPresent();
+        assertThat(verifier.verify("placeholder-access-token")).isEmpty();
+        assertThat(authUserRequestCount.get()).isEqualTo(2);
+    }
+
+    private void registerActiveUserEndpoint() {
+        jwksServer.createContext(
+            "/auth/v1/user",
+            new StaticBodyHandler(
+                """
+                    {
+                      "id": "00000000-0000-0000-0000-000000000001",
+                      "email": "member@example.test",
+                      "user_metadata": {
+                        "nickname": "PlaceholderNickname"
+                      }
+                    }
+                    """,
+                authUserRequestCount
+            )
+        );
     }
 
     private String startJwksServer(String responseBody) throws IOException {
@@ -238,7 +316,7 @@ class SupabaseJwtVerifierTest {
                 .build(),
             new JWTClaimsSet.Builder()
                 .issuer(issuer)
-                .subject("test-user-id")
+                .subject(PLACEHOLDER_USER_ID)
                 .audience("authenticated")
                 .issueTime(Date.from(Instant.now()))
                 .expirationTime(Date.from(expirationTime))
@@ -263,6 +341,13 @@ class SupabaseJwtVerifierTest {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             requestCount.incrementAndGet();
+            if (exchange.getRequestURI().getPath().endsWith("/user")
+                && !PLACEHOLDER_API_KEY.equals(exchange.getRequestHeaders().getFirst("apikey"))) {
+                exchange.sendResponseHeaders(401, -1);
+                exchange.close();
+                return;
+            }
+
             exchange.getResponseHeaders().add("Content-Type", "application/json");
             exchange.sendResponseHeaders(200, responseBody.length);
             try (OutputStream outputStream = exchange.getResponseBody()) {

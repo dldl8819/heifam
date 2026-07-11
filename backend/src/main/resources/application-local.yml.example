@@ -32,5 +32,7 @@ balancify:
     require-jwt: ${AUTH_REQUIRE_JWT:false}
     allow-email-header-fallback: ${AUTH_ALLOW_EMAIL_HEADER_FALLBACK:true}
     supabase-url: ${SUPABASE_URL:https://YOUR_SUPABASE_PROJECT_URL}
+    api-key: ${SUPABASE_PUBLISHABLE_KEY:YOUR_SUPABASE_PUBLISHABLE_KEY}
+    service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:YOUR_SECRET_KEY}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}

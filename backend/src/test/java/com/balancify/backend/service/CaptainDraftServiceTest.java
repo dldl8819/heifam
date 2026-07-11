@@ -20,6 +20,7 @@ import com.balancify.backend.repository.CaptainDraftParticipantRepository;
 import com.balancify.backend.repository.CaptainDraftRepository;
 import com.balancify.backend.repository.GroupRepository;
 import com.balancify.backend.repository.PlayerRepository;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -203,6 +204,62 @@ class CaptainDraftServiceTest {
             assertThat(updatedEntry.awayPlayerId()).isEqualTo(4L);
             assertThat(updatedEntry.winnerTeam()).isEqualTo("HOME");
         });
+    }
+
+    @Test
+    void responseMasksAnonymizedPlayersWithoutChangingDraftReferences() {
+        Group group = group(1L);
+        Player anonymizedCaptain = player(group, 1L);
+        anonymizedCaptain.setAnonymizedAt(OffsetDateTime.parse("2026-01-01T00:00:00Z"));
+        Player awayCaptain = player(group, 2L);
+        Player pickedPlayer = player(group, 3L);
+
+        CaptainDraft draft = draft(group, 100L, "READY", 4, null, 1L, 2L);
+        draft.setHomeCaptain(anonymizedCaptain);
+        draft.setAwayCaptain(awayCaptain);
+
+        List<CaptainDraftParticipant> participants = List.of(
+            participant(draft, anonymizedCaptain, true, "HOME", null),
+            participant(draft, awayCaptain, true, "AWAY", null),
+            participant(draft, pickedPlayer, false, "HOME", 1)
+        );
+        CaptainDraftEntry entry = entry(draft, 1, "PPP", 1);
+        entry.setHomePlayer(anonymizedCaptain);
+        entry.setAwayPlayer(pickedPlayer);
+
+        when(captainDraftRepository.findByIdAndGroup_Id(100L, 1L)).thenReturn(Optional.of(draft));
+        when(captainDraftParticipantRepository.findByDraftIdWithPlayer(100L)).thenReturn(participants);
+        when(captainDraftEntryRepository.findByDraftIdWithPlayers(100L)).thenReturn(List.of(entry));
+
+        CaptainDraftResponse response = captainDraftService.getDraft(1L, 100L);
+
+        assertThat(response.homeCaptainPlayerId()).isNull();
+        assertThat(response.homeCaptainNickname())
+            .isEqualTo("\uD0C8\uD1F4\uD55C \uD68C\uC6D0");
+        assertThat(response.participants())
+            .filteredOn(participantResponse -> participantResponse.captain()
+                && "HOME".equals(participantResponse.team()))
+            .singleElement()
+            .satisfies(participantResponse -> {
+                assertThat(participantResponse.playerId()).isNull();
+                assertThat(participantResponse.nickname())
+                    .isEqualTo("\uD0C8\uD1F4\uD55C \uD68C\uC6D0");
+            });
+        assertThat(response.picks()).singleElement().satisfies(pick -> {
+            assertThat(pick.captainPlayerId()).isNull();
+            assertThat(pick.captainNickname())
+                .isEqualTo("\uD0C8\uD1F4\uD55C \uD68C\uC6D0");
+            assertThat(pick.pickedPlayerId()).isEqualTo(3L);
+        });
+        assertThat(response.entries()).singleElement().satisfies(responseEntry -> {
+            assertThat(responseEntry.homePlayerId()).isNull();
+            assertThat(responseEntry.homePlayerNickname())
+                .isEqualTo("\uD0C8\uD1F4\uD55C \uD68C\uC6D0");
+            assertThat(responseEntry.awayPlayerId()).isEqualTo(3L);
+        });
+
+        assertThat(anonymizedCaptain.getId()).isEqualTo(1L);
+        assertThat(entry.getHomePlayer()).isSameAs(anonymizedCaptain);
     }
 
     private Group group(Long id) {

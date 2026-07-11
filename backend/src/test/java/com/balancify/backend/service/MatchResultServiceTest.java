@@ -87,6 +87,8 @@ class MatchResultServiceTest {
         match.setStatus(MatchStatus.CONFIRMED);
 
         List<MatchParticipant> participants = buildParticipants(match);
+        Player anonymizedPlayer = participants.get(0).getPlayer();
+        anonymizedPlayer.setAnonymizedAt(OffsetDateTime.parse("2026-01-01T00:00:00Z"));
         participants.get(0).setAssignedRace("P");
         participants.get(1).setAssignedRace("P");
         participants.get(2).setAssignedRace("T");
@@ -119,7 +121,11 @@ class MatchResultServiceTest {
         assertThat(response.participants())
             .extracting(MatchResultParticipantResponse::assignedRace)
             .containsExactly("P", "P", "T", "P", "P", "T");
+        assertThat(response.participants().get(0).playerId()).isNull();
+        assertThat(response.participants().get(0).nickname())
+            .isEqualTo("\uD0C8\uD1F4\uD55C \uD68C\uC6D0");
 
+        assertThat(anonymizedPlayer.getId()).isEqualTo(1L);
         participants.stream()
             .filter(participant -> "HOME".equals(participant.getTeam()))
             .forEach(participant -> {

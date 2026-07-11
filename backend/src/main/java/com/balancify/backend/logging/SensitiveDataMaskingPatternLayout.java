@@ -11,7 +11,9 @@ public class SensitiveDataMaskingPatternLayout extends PatternLayout {
     private static final List<Pattern> MASK_PATTERNS = List.of(
         Pattern.compile("(?i)(authorization\\s*[:=]\\s*bearer\\s+)([^\\s,;]+)"),
         Pattern.compile("(?i)((?:api[-_ ]?key|access[-_ ]?key|secret[-_ ]?key|client[-_ ]?secret|password|passwd|token|jwt)\\s*[:=]\\s*)([^\\s,;]+)"),
-        Pattern.compile("(?i)((?:spring\\.datasource\\.password|upbit\\.secret[-_ ]?key|jwt\\.secret)\\s*[:=]\\s*)([^\\s,;]+)")
+        Pattern.compile("(?i)((?:spring\\.datasource\\.password|upbit\\.secret[-_ ]?key|jwt\\.secret)\\s*[:=]\\s*)([^\\s,;]+)"),
+        Pattern.compile("(?i)(\\b)[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}\\b"),
+        Pattern.compile("(\\b)(?:[0-9]{1,3}\\.){3}[0-9]{1,3}\\b")
     );
 
     @Override

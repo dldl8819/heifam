@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 public class AuthenticatedRequestResolver {
 
     public static final String AUTHENTICATED_EMAIL_ATTRIBUTE = "balancify.auth.email";
+    public static final String AUTHENTICATED_USER_ID_ATTRIBUTE = "balancify.auth.userId";
     public static final String AUTHENTICATED_NICKNAME_ATTRIBUTE = "balancify.auth.nickname";
     public static final String AUTHENTICATED_JWT_VERIFIED_ATTRIBUTE = "balancify.auth.jwtVerified";
 
@@ -34,24 +35,27 @@ public class AuthenticatedRequestResolver {
             return ResolvedRequestIdentity.empty();
         }
 
+        String cachedUserId = safeTrim(asString(request.getAttribute(AUTHENTICATED_USER_ID_ATTRIBUTE)));
         String cachedEmail = normalizeEmail(asString(request.getAttribute(AUTHENTICATED_EMAIL_ATTRIBUTE)));
         String cachedNickname = safeTrim(asString(request.getAttribute(AUTHENTICATED_NICKNAME_ATTRIBUTE)));
         boolean cachedJwtVerified = asBoolean(request.getAttribute(AUTHENTICATED_JWT_VERIFIED_ATTRIBUTE));
         if (!cachedEmail.isEmpty()) {
-            return new ResolvedRequestIdentity(cachedEmail, cachedNickname, cachedJwtVerified);
+            return new ResolvedRequestIdentity(cachedEmail, cachedNickname, cachedJwtVerified, cachedUserId);
         }
 
         String bearerToken = extractBearerToken(request.getHeader(AUTHORIZATION_HEADER));
         if (!bearerToken.isEmpty()) {
             Optional<SupabaseJwtVerifier.VerifiedUser> verifiedUser = supabaseJwtVerifier.verify(bearerToken);
             if (verifiedUser.isPresent()) {
+                String userId = safeTrim(verifiedUser.get().userId());
                 String email = normalizeEmail(verifiedUser.get().email());
                 String nickname = safeTrim(verifiedUser.get().nickname());
                 if (!email.isEmpty()) {
+                    request.setAttribute(AUTHENTICATED_USER_ID_ATTRIBUTE, userId);
                     request.setAttribute(AUTHENTICATED_EMAIL_ATTRIBUTE, email);
                     request.setAttribute(AUTHENTICATED_NICKNAME_ATTRIBUTE, nickname);
                     request.setAttribute(AUTHENTICATED_JWT_VERIFIED_ATTRIBUTE, true);
-                    return new ResolvedRequestIdentity(email, nickname, true);
+                    return new ResolvedRequestIdentity(email, nickname, true, userId);
                 }
             }
 
@@ -129,8 +133,12 @@ public class AuthenticatedRequestResolver {
     public record ResolvedRequestIdentity(
         String email,
         String nickname,
-        boolean jwtVerified
+        boolean jwtVerified,
+        String userId
     ) {
+        public ResolvedRequestIdentity(String email, String nickname, boolean jwtVerified) {
+            this(email, nickname, jwtVerified, "");
+        }
         public static ResolvedRequestIdentity empty() {
             return new ResolvedRequestIdentity("", "", false);
         }

@@ -58,13 +58,14 @@ import com.balancify.backend.api.match.dto.MultiBalancePenaltySummaryResponse;
 import com.balancify.backend.api.match.dto.MultiBalanceRaceSummaryResponse;
 import com.balancify.backend.api.match.dto.MultiBalanceResponse;
 import com.balancify.backend.api.match.dto.MultiBalanceWaitingPlayerResponse;
+import com.balancify.backend.service.AccessControlService;
+import com.balancify.backend.service.AccountDeletionService;
+import com.balancify.backend.service.DashboardQueryService;
 import com.balancify.backend.service.GroupMatchAdminService;
 import com.balancify.backend.service.MatchQueryService;
 import com.balancify.backend.service.MatchImportService;
 import com.balancify.backend.service.MatchResultService;
 import com.balancify.backend.service.ManualMatchService;
-import com.balancify.backend.service.AccessControlService;
-import com.balancify.backend.service.DashboardQueryService;
 import com.balancify.backend.service.MultiMatchBalancingService;
 import com.balancify.backend.service.OperationAuditLogService;
 import com.balancify.backend.service.PlayerAdminService;
@@ -174,6 +175,9 @@ class AdminKeyFilterTest {
 
     @MockBean
     private AccessControlService accessControlService;
+
+    @MockBean
+    private AccountDeletionService accountDeletionService;
 
     @MockBean
     private AuthenticatedRequestResolver authenticatedRequestResolver;

@@ -64,6 +64,13 @@ type SessionIdentity = {
 
 let cachedSessionIdentity: (SessionIdentity & { resolvedAt: number }) | null = null
 let sessionIdentityPromise: Promise<SessionIdentity> | null = null
+let sessionIdentityCacheGeneration = 0
+
+export function clearSessionIdentityCache(): void {
+  sessionIdentityCacheGeneration += 1
+  cachedSessionIdentity = null
+  sessionIdentityPromise = null
+}
 
 function createUrl(path: string, baseUrlOverride?: string): string {
   const baseUrl = baseUrlOverride && baseUrlOverride.trim().length > 0
@@ -154,6 +161,7 @@ async function resolveSessionUserIdentity(): Promise<SessionIdentity> {
     return sessionIdentityPromise
   }
 
+  const cacheGeneration = sessionIdentityCacheGeneration
   sessionIdentityPromise = (async () => {
     try {
       const { data } = await supabase.auth.getSession()
@@ -171,7 +179,9 @@ async function resolveSessionUserIdentity(): Promise<SessionIdentity> {
         nickname,
         accessToken,
       }
-      cachedSessionIdentity = { ...identity, resolvedAt: Date.now() }
+      if (cacheGeneration === sessionIdentityCacheGeneration) {
+        cachedSessionIdentity = { ...identity, resolvedAt: Date.now() }
+      }
       return identity
     } catch {
       return { email: '', nickname: '', accessToken: '' }
@@ -398,7 +408,7 @@ function normalizeRecentMatchPlayer(value: unknown) {
   const playerId = toNumber(source.playerId)
   const nickname = typeof source.nickname === 'string' ? source.nickname : null
   const mmr = toNumber(source.mmr)
-  if (playerId === null || nickname === null) {
+  if (nickname === null) {
     return null
   }
 
@@ -935,6 +945,18 @@ export const apiClient = {
       timeoutMs: ACCESS_API_REQUEST_TIMEOUT_MS,
       baseUrlOverride: ACCESS_API_BASE_URL,
     }),
+  deleteMyAccount: (identity: { accessToken: string }) =>
+    apiRequest<void>(
+      '/api/access/me',
+      {
+        method: 'DELETE',
+      },
+      {
+        accessToken: identity.accessToken,
+        timeoutMs: ACCESS_API_REQUEST_TIMEOUT_MS,
+        baseUrlOverride: ACCESS_API_BASE_URL,
+      }
+    ),
   getAdminEmailList: () =>
     apiRequest<AccessAdminListResponse>('/api/access/admins', undefined, {
       requireUserEmail: true,

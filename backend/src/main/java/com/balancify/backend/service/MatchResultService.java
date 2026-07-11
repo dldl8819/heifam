@@ -31,6 +31,7 @@ public class MatchResultService {
 
     private static final String TEAM_HOME = "HOME";
     private static final String TEAM_AWAY = "AWAY";
+    private static final String DELETED_MEMBER_LABEL = "\uD0C8\uD1F4\uD55C \uD68C\uC6D0";
 
     private final MatchRepository matchRepository;
     private final MatchParticipantRepository matchParticipantRepository;
@@ -256,8 +257,8 @@ public class MatchResultService {
             mmrHistories.add(mmrHistory);
 
             responseParticipants.add(new MatchResultParticipantResponse(
-                player.getId(),
-                player.getNickname(),
+                responsePlayerId(player),
+                responseNickname(player),
                 normalizeTeam(participant.getTeam()),
                 resolveAssignedRace(participant),
                 baseMmrBefore,
@@ -296,6 +297,17 @@ public class MatchResultService {
             : null;
 
         return new MatchResultProcessOutcome(response, updateAuditSnapshot);
+    }
+
+    private Long responsePlayerId(Player player) {
+        return player == null || player.isAnonymized() ? null : player.getId();
+    }
+
+    private String responseNickname(Player player) {
+        if (player == null) {
+            return null;
+        }
+        return player.isAnonymized() ? DELETED_MEMBER_LABEL : player.getNickname();
     }
 
     private double calculateAverageMmr(List<MatchParticipant> participants) {

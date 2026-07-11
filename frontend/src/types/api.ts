@@ -110,7 +110,7 @@ export type RatingRecalculationRequest = {
 }
 
 export type RatingRecalculationPlayerChangeResponse = {
-  playerId: number
+  playerId: number | null
   nickname: string
   beforeMmr: number
   afterMmr: number
@@ -139,7 +139,7 @@ export type CreateGroupMatchResponse = {
 }
 
 export type MatchResultParticipant = {
-  playerId: number
+  playerId: number | null
   nickname: string
   team: MatchTeamSide
   assignedRace?: AssignedRace
@@ -158,7 +158,7 @@ export type MatchResultResponse = {
 }
 
 export type RecentMatchPlayer = {
-  playerId: number
+  playerId: number | null
   nickname: string
   team: MatchTeamSide
   mmr?: number
@@ -403,7 +403,7 @@ export type CaptainDraftEntriesUpdateRequest = {
 }
 
 export type CaptainDraftParticipant = {
-  playerId: number
+  playerId: number | null
   nickname: string
   race: PlayerRace
   team: CaptainDraftTeam
@@ -415,7 +415,7 @@ export type CaptainDraftPickLog = {
   pickOrder: number
   captainPlayerId: number | null
   captainNickname: string
-  pickedPlayerId: number
+  pickedPlayerId: number | null
   pickedPlayerNickname: string
   team: CaptainDraftTeam
 }
@@ -439,9 +439,9 @@ export type CaptainDraftResponse = {
   setsPerRound: number
   participantCount: number
   currentTurnTeam: CaptainDraftTeam
-  homeCaptainPlayerId: number
+  homeCaptainPlayerId: number | null
   homeCaptainNickname: string
-  awayCaptainPlayerId: number
+  awayCaptainPlayerId: number | null
   awayCaptainNickname: string
   participants: CaptainDraftParticipant[]
   picks: CaptainDraftPickLog[]

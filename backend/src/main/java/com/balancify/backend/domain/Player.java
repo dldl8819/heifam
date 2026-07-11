@@ -13,6 +13,7 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import com.balancify.backend.service.PlayerRacePolicy;
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "players")
@@ -25,6 +26,9 @@ public class Player {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "group_id", nullable = false)
     private Group group;
+
+    @Column(name = "auth_user_id")
+    private UUID authUserId;
 
     @Column(nullable = false, length = 50)
     private String nickname;
@@ -64,6 +68,9 @@ public class Player {
 
     @Column(nullable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
+
+    @Column(name = "anonymized_at")
+    private OffsetDateTime anonymizedAt;
 
     @Column(name = "last_dormancy_mmr_decay_at")
     private OffsetDateTime lastDormancyMmrDecayAt;
@@ -106,6 +113,14 @@ public class Player {
 
     public void setGroup(Group group) {
         this.group = group;
+    }
+
+    public UUID getAuthUserId() {
+        return authUserId;
+    }
+
+    public void setAuthUserId(UUID authUserId) {
+        this.authUserId = authUserId;
     }
 
     public String getNickname() {
@@ -214,6 +229,18 @@ public class Player {
 
     public void setCreatedAt(OffsetDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public OffsetDateTime getAnonymizedAt() {
+        return anonymizedAt;
+    }
+
+    public void setAnonymizedAt(OffsetDateTime anonymizedAt) {
+        this.anonymizedAt = anonymizedAt;
+    }
+
+    public boolean isAnonymized() {
+        return anonymizedAt != null;
     }
 
     public OffsetDateTime getLastDormancyMmrDecayAt() {
