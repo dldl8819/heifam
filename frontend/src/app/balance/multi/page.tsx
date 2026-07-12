@@ -35,32 +35,32 @@ const MODE_OPTIONS: MultiBalanceMode[] = [...MULTI_BALANCE_MODE_OPTIONS]
 const MINIMUM_SELECTION_SLOTS = 4
 const TEAM_CARD_THEMES = [
   {
-    card: 'border-emerald-200',
-    header: 'border-emerald-200 bg-emerald-50',
-    label: 'text-emerald-700',
-    metric: 'border-emerald-100 bg-emerald-50/70',
-    player: 'border-emerald-100 bg-emerald-50 text-slate-900',
+    card: 'border-emerald-200 dark:border-emerald-800',
+    header: 'border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/40',
+    label: 'text-emerald-700 dark:text-emerald-300',
+    metric: 'border-emerald-100 bg-emerald-50/70 dark:border-emerald-900 dark:bg-emerald-950/30',
+    player: 'border-emerald-100 bg-emerald-50 text-slate-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-slate-100',
   },
   {
-    card: 'border-amber-200',
-    header: 'border-amber-200 bg-amber-50',
-    label: 'text-amber-700',
-    metric: 'border-amber-100 bg-amber-50/70',
-    player: 'border-amber-100 bg-amber-50 text-slate-900',
+    card: 'border-amber-200 dark:border-amber-800',
+    header: 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/40',
+    label: 'text-amber-700 dark:text-amber-300',
+    metric: 'border-amber-100 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/30',
+    player: 'border-amber-100 bg-amber-50 text-slate-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-slate-100',
   },
   {
-    card: 'border-rose-200',
-    header: 'border-rose-200 bg-rose-50',
-    label: 'text-rose-700',
-    metric: 'border-rose-100 bg-rose-50/70',
-    player: 'border-rose-100 bg-rose-50 text-slate-900',
+    card: 'border-rose-200 dark:border-rose-800',
+    header: 'border-rose-200 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/40',
+    label: 'text-rose-700 dark:text-rose-300',
+    metric: 'border-rose-100 bg-rose-50/70 dark:border-rose-900 dark:bg-rose-950/30',
+    player: 'border-rose-100 bg-rose-50 text-slate-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-slate-100',
   },
   {
-    card: 'border-teal-200',
-    header: 'border-teal-200 bg-teal-50',
-    label: 'text-teal-700',
-    metric: 'border-teal-100 bg-teal-50/70',
-    player: 'border-teal-100 bg-teal-50 text-slate-900',
+    card: 'border-teal-200 dark:border-teal-800',
+    header: 'border-teal-200 bg-teal-50 dark:border-teal-800 dark:bg-teal-950/40',
+    label: 'text-teal-700 dark:text-teal-300',
+    metric: 'border-teal-100 bg-teal-50/70 dark:border-teal-900 dark:bg-teal-950/30',
+    player: 'border-teal-100 bg-teal-50 text-slate-900 dark:border-teal-900 dark:bg-teal-950/40 dark:text-slate-100',
   },
 ]
 
@@ -354,12 +354,12 @@ export default function MultiBalancePage() {
 
   return (
     <section className="space-y-6">
-      <header className="space-y-1 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+      <header className="space-y-1 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <h2 className="text-2xl font-semibold tracking-tight">{t('multiBalance.title')}</h2>
-        <p className="text-sm text-slate-600">{t('multiBalance.description')}</p>
-        <p className="text-xs text-slate-500">{t('multiBalance.helper.defaultPriority')}</p>
-        <p className="text-xs text-slate-500">{t('multiBalance.helper.addTwoVsTwo')}</p>
-        <p className="text-xs text-slate-500">{t('multiBalance.helper.waiting')}</p>
+        <p className="text-sm text-slate-600 dark:text-slate-300">{t('multiBalance.description')}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">{t('multiBalance.helper.defaultPriority')}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">{t('multiBalance.helper.addTwoVsTwo')}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">{t('multiBalance.helper.waiting')}</p>
       </header>
 
       {playersError && (
@@ -392,21 +392,21 @@ export default function MultiBalancePage() {
           />
         </div>
 
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-900">{t('multiBalance.summary.title')}</h3>
-          <p className="mt-1 text-xs text-slate-500">
+        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('multiBalance.summary.title')}</h3>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
             {t('multiBalance.summary.selectedCount', { count: selectedIds.length })}
           </p>
 
           {showMmr && (
-            <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">
               {t('multiBalance.summary.totalMmr')}:{' '}
               <span className="font-semibold">{selectedTotalMmr}</span>
             </div>
           )}
 
           <div className="mt-4 space-y-2">
-            <p className="text-xs font-semibold text-slate-700">{t('multiBalance.mode.title')}</p>
+            <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">{t('multiBalance.mode.title')}</p>
             <div className="grid gap-2">
               {MODE_OPTIONS.map((mode) => {
                 const selected = balanceMode === mode
@@ -417,8 +417,8 @@ export default function MultiBalancePage() {
                     onClick={() => setBalanceMode(mode)}
                     className={`rounded-lg border px-3 py-2 text-left transition-colors ${
                       selected
-                        ? 'border-indigo-500 bg-indigo-50 text-indigo-900'
-                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                      ? 'border-indigo-500 bg-indigo-50 text-indigo-900 dark:border-indigo-400 dark:bg-indigo-950/40 dark:text-indigo-200'
+                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-800'
                     }`}
                   >
                     <p className="text-sm font-semibold">{t(getMultiBalanceModeLabelKey(mode))}</p>
@@ -430,7 +430,7 @@ export default function MultiBalancePage() {
           </div>
 
           {balanceMode !== 'RANDOM' && (
-            <label className="mt-4 block space-y-1 text-xs font-medium text-slate-500">
+          <label className="mt-4 block space-y-1 text-xs font-medium text-slate-500 dark:text-slate-400">
               {t('multiBalance.raceComposition.label')}
               <select
                 value={raceComposition ?? ''}
@@ -442,7 +442,7 @@ export default function MultiBalancePage() {
                   )
                 }
                 disabled={raceCompositionOptions.length === 0}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:bg-slate-100"
+              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700 dark:disabled:bg-slate-800 dark:disabled:text-slate-400"
               >
                 <option value="">{t('multiBalance.raceComposition.placeholder')}</option>
                 {raceCompositionOptions.map((option) => (
@@ -452,7 +452,7 @@ export default function MultiBalancePage() {
                 ))}
               </select>
               {raceCompositionOptions.length === 0 && selectedIds.length >= 4 && (
-                <p className="text-[11px] text-slate-500">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
                   {t('multiBalance.raceComposition.unavailable')}
                 </p>
               )}
@@ -460,7 +460,7 @@ export default function MultiBalancePage() {
           )}
 
           {validationMessage && (
-            <p className="mt-3 text-xs text-amber-700">{validationMessage}</p>
+            <p className="mt-3 text-xs text-amber-700 dark:text-amber-300">{validationMessage}</p>
           )}
           {submitError && (
             <Alert variant="destructive" appearance="light" size="sm" className="mt-2">
@@ -475,7 +475,7 @@ export default function MultiBalancePage() {
             type="button"
             onClick={handleGenerateMultiBalance}
             disabled={!canSubmit}
-            className="mt-4 w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="mt-4 w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
           >
             {submitting ? t('multiBalance.summary.submitting') : t('multiBalance.summary.submit')}
           </button>
@@ -484,46 +484,46 @@ export default function MultiBalancePage() {
 
       {result && (
         <section className="space-y-4">
-          <header className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-200 px-4 py-3">
-              <p className="text-xs font-semibold text-emerald-700">{t('multiBalance.result.title')}</p>
-              <h3 className="mt-1 text-lg font-semibold text-slate-950">
+          <header className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-700">
+              <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">{t('multiBalance.result.title')}</p>
+              <h3 className="mt-1 text-lg font-semibold text-slate-950 dark:text-slate-100">
                 {t('multiBalance.result.summary', {
                   totalPlayers: result.totalPlayers,
                   teamCount: displayTeams.length,
                 })}
               </h3>
-              <p className="mt-2 text-xs text-slate-600">
+              <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
                 {t('multiBalance.result.selectedMode')}:{' '}
-                <span className="font-semibold text-emerald-700">
+                <span className="font-semibold text-emerald-700 dark:text-emerald-300">
                   {t(getMultiBalanceModeLabelKey(result.balanceMode))}
                 </span>
               </p>
             </div>
-            <div className="grid divide-y divide-slate-200 bg-slate-50 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-              <div className="px-4 py-3 text-xs text-slate-600">
+            <div className="grid divide-y divide-slate-200 bg-slate-50 dark:divide-slate-700 dark:bg-slate-800 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+              <div className="px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
                 <p>{t('multiBalance.result.teamCount')}</p>
-                <p className="mt-1 text-lg font-semibold text-slate-950">{displayTeams.length}</p>
+                <p className="mt-1 text-lg font-semibold text-slate-950 dark:text-slate-100">{displayTeams.length}</p>
               </div>
-              <div className="px-4 py-3 text-xs text-slate-600">
+              <div className="px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
                 <p>{t('multiBalance.result.assignedPlayers')}</p>
-                <p className="mt-1 text-lg font-semibold text-slate-950">{result.assignedPlayers}</p>
+                <p className="mt-1 text-lg font-semibold text-slate-950 dark:text-slate-100">{result.assignedPlayers}</p>
               </div>
-              <div className="px-4 py-3 text-xs text-slate-600">
+              <div className="px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
                 <p>{t('multiBalance.result.waitingPlayers')}</p>
-                <p className="mt-1 text-lg font-semibold text-slate-950">{result.waitingPlayers.length}</p>
+                <p className="mt-1 text-lg font-semibold text-slate-950 dark:text-slate-100">{result.waitingPlayers.length}</p>
               </div>
             </div>
           </header>
 
           {result.waitingPlayers.length > 0 && (
-            <article className="rounded-lg border border-amber-200 bg-white p-4 shadow-sm">
-              <h4 className="text-sm font-semibold text-slate-900">{t('multiBalance.result.waitingTitle')}</h4>
+            <article className="rounded-lg border border-amber-200 bg-white p-4 shadow-sm dark:border-amber-800 dark:bg-slate-900">
+              <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('multiBalance.result.waitingTitle')}</h4>
               <ul className="mt-3 flex flex-wrap gap-2">
                 {result.waitingPlayers.map((player) => (
                   <li
                     key={`waiting-${player.id}`}
-                    className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900"
+                    className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
                   >
                     {player.nickname}
                   </li>
@@ -539,23 +539,23 @@ export default function MultiBalancePage() {
               return (
                 <article
                   key={team.key}
-                  className={`overflow-hidden rounded-lg border bg-white shadow-sm ${theme.card}`}
+                className={`overflow-hidden rounded-lg border bg-white shadow-sm dark:bg-slate-900 ${theme.card}`}
                 >
                   <header className={`border-b px-4 py-3 ${theme.header}`}>
                     <div>
                       <p className={`text-xs font-semibold ${theme.label}`}>
                         {t('multiBalance.result.teamLabel', { number: team.teamNumber })}
                       </p>
-                      <h4 className="mt-1 text-base font-semibold text-slate-950">
+                    <h4 className="mt-1 text-base font-semibold text-slate-950 dark:text-slate-100">
                         {t('multiBalance.result.teamMemberCount', { count: team.players.length })}
                       </h4>
                     </div>
                   </header>
 
                   {showMmr && (
-                    <div className={`border-b px-4 py-2 text-xs text-slate-700 ${theme.metric}`}>
+                  <div className={`border-b px-4 py-2 text-xs text-slate-700 dark:text-slate-300 ${theme.metric}`}>
                       {t('multiBalance.result.teamTotalMmr')}:{' '}
-                      <span className="font-semibold text-slate-950">
+                      <span className="font-semibold text-slate-950 dark:text-slate-100">
                         {typeof team.totalMmr === 'number' ? team.totalMmr : '-'}
                       </span>
                     </div>

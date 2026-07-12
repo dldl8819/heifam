@@ -708,23 +708,23 @@ export default function BalancePage() {
       )}
 
       <div className="grid gap-4 xl:grid-cols-3">
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm xl:col-span-2">
+      <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 xl:col-span-2">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-900">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                 {t('balance.selection.title', { count: requiredPlayerCount })}
               </h3>
               <button
                 type="button"
                 onClick={() => clearSelectionAndResult()}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
+              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
               >
                 {t('balance.selection.reset')}
               </button>
             </div>
 
             <div className="space-y-2">
-              <p className="text-xs font-semibold text-slate-700">{t('balance.mode.title')}</p>
+            <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">{t('balance.mode.title')}</p>
               <div className="grid gap-2 sm:grid-cols-2">
                 {teamSizeOptions.map((option) => {
                   const selected = teamSize === option.value
@@ -735,8 +735,8 @@ export default function BalancePage() {
                       onClick={() => handleTeamSizeChange(option.value)}
                       className={`rounded-lg border px-3 py-2 text-left transition-colors ${
                         selected
-                          ? 'border-indigo-500 bg-indigo-50 text-indigo-900'
-                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                      ? 'border-indigo-500 bg-indigo-50 text-indigo-900 dark:border-indigo-400 dark:bg-indigo-950/40 dark:text-indigo-200'
+                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-800'
                       }`}
                     >
                       <span className="text-sm font-semibold">{t(option.labelKey)}</span>
@@ -746,12 +746,12 @@ export default function BalancePage() {
               </div>
             </div>
 
-            <label className="space-y-1 text-xs font-medium text-slate-500">
+            <label className="space-y-1 text-xs font-medium text-slate-500 dark:text-slate-400">
               {t('balance.raceComposition.label')}
               <select
                 value={raceComposition ?? ''}
                 onChange={(event) => handleRaceCompositionChange(event.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
               >
                 <option value="">{t('balance.raceComposition.placeholder')}</option>
                 {getRaceCompositionOptions(teamSize).map((option) => (
@@ -785,7 +785,7 @@ export default function BalancePage() {
                 return (
                   <label
                     key={`slot-${index}`}
-                    className="space-y-1 text-xs font-medium text-slate-500"
+                  className="space-y-1 text-xs font-medium text-slate-500 dark:text-slate-400"
                   >
                     {t('balance.selection.slot', { index: index + 1 })}
                     <input
@@ -799,14 +799,14 @@ export default function BalancePage() {
                           event.preventDefault()
                         }
                       }}
-                      className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                       placeholder={t('balance.selection.placeholder')}
                     />
                     {inputMatchedPlayer && (
-                      <p className="text-[11px] text-slate-500">{toPlayerLabel(inputMatchedPlayer, showMmr)}</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">{toPlayerLabel(inputMatchedPlayer, showMmr)}</p>
                     )}
                     {isDuplicateSelection && (
-                      <p className="text-[11px] text-rose-700">{t('balance.validation.duplicate')}</p>
+                    <p className="text-[11px] text-rose-700 dark:text-rose-300">{t('balance.validation.duplicate')}</p>
                     )}
                   </label>
                 )
@@ -816,7 +816,7 @@ export default function BalancePage() {
         </article>
 
         <article
-          className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${
+          className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 ${
             showMmr ? 'select-none' : ''
           }`}
           onCopy={handleProtectedClipboard}
@@ -826,8 +826,8 @@ export default function BalancePage() {
           onKeyDown={handleProtectedKeyDown}
           style={protectedMmrStyle}
         >
-          <h3 className="text-sm font-semibold text-slate-900">{t('balance.summary.title')}</h3>
-          <p className="mt-1 text-xs text-slate-500">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('balance.summary.title')}</h3>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
             {t('balance.summary.selectedCount', {
               count: selectedPlayers.length,
               required: requiredPlayerCount,
@@ -838,27 +838,27 @@ export default function BalancePage() {
             {selectedPlayers.map((player) => (
               <li
                 key={`summary-${player.id}`}
-                className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700"
               >
-                <span className="font-medium text-slate-800">
+                  <span className="font-medium text-slate-800 dark:text-slate-200">
                   {player.nickname} ({player.race})
                 </span>
                 {showMmr && (
-                  <span className="text-slate-600">
+                  <span className="text-slate-600 dark:text-slate-400">
                     {typeof player.currentMmr === 'number' ? player.currentMmr : '-'}
                   </span>
                 )}
               </li>
             ))}
             {selectedPlayers.length === 0 && (
-              <li className="rounded-lg border border-dashed border-slate-200 px-3 py-6 text-center text-sm text-slate-500">
+              <li className="rounded-lg border border-dashed border-slate-200 px-3 py-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
                 {t('balance.summary.empty')}
               </li>
             )}
           </ul>
 
           {showMmr && (
-            <div className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            <div className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">
               {t('balance.summary.totalMmr')}: <span className="font-semibold">{totalSelectedMmr}</span>
             </div>
           )}
@@ -867,24 +867,24 @@ export default function BalancePage() {
             type="button"
             onClick={handleGenerate}
             disabled={!canSubmit}
-            className="mt-4 w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="mt-4 w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
           >
             {submitting ? t('balance.summary.submitting') : t('balance.summary.submit')}
           </button>
 
           {!allSelected && !playersLoading && (
-            <p className="mt-2 text-xs text-amber-700">
+            <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
               {t('balance.validation.needExact', { count: requiredPlayerCount })}
             </p>
           )}
           {!playersLoading && players.length === 0 && (
-            <p className="mt-2 text-xs text-rose-700">{t('balance.validation.noPlayers')}</p>
+            <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">{t('balance.validation.noPlayers')}</p>
           )}
           {hasDuplicates && (
-            <p className="mt-2 text-xs text-rose-700">{t('balance.validation.duplicate')}</p>
+            <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">{t('balance.validation.duplicate')}</p>
           )}
           {!raceComposition && (
-            <p className="mt-2 text-xs text-rose-700">
+            <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">
               {t('balance.validation.raceCompositionRequired')}
             </p>
           )}
@@ -903,13 +903,13 @@ export default function BalancePage() {
         <>
           <div className="flex flex-wrap items-center justify-end gap-2">
             {copyStatus === 'failed' && (
-              <p className="text-xs text-rose-700">{t('balance.copy.failed')}</p>
+            <p className="text-xs text-rose-700 dark:text-rose-300">{t('balance.copy.failed')}</p>
             )}
             <button
               type="button"
               onClick={handleCopyBalanceChatText}
               aria-label={t('balance.copy.ariaLabel')}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
             >
               {copyStatus === 'copied' ? t('balance.copy.copiedButton') : t('balance.copy.button')}
             </button>
@@ -917,7 +917,7 @@ export default function BalancePage() {
 
           <section className="grid gap-4 lg:grid-cols-2">
             <article
-              className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${
+            className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 ${
                 showMmr ? 'select-none' : ''
               }`}
               onCopy={handleProtectedClipboard}
@@ -927,19 +927,19 @@ export default function BalancePage() {
               onKeyDown={handleProtectedKeyDown}
               style={protectedMmrStyle}
             >
-            <h3 className="text-sm font-semibold text-slate-900">{t('balance.result.homeTeam')}</h3>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('balance.result.homeTeam')}</h3>
             <ul className="mt-3 space-y-2">
               {result.homeTeam.map((player) => (
                 <li
                   key={`home-${player.name}`}
-                  className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                    className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700"
                 >
-                  <span className="font-medium text-slate-800">
+                    <span className="font-medium text-slate-800 dark:text-slate-200">
                     {player.name}
                     {formatAssignedRace(player.assignedRace)}
                   </span>
                   {showMmr && (
-                    <span className="text-slate-600">
+                    <span className="text-slate-600 dark:text-slate-400">
                       {typeof player.mmr === 'number' ? `${player.mmr} MMR` : '-'}
                     </span>
                   )}
@@ -947,7 +947,7 @@ export default function BalancePage() {
               ))}
             </ul>
             {showMmr && (
-              <p className="mt-3 text-sm text-slate-700">
+              <p className="mt-3 text-sm text-slate-700 dark:text-slate-300">
                 {t('balance.result.homeMmr')}:{' '}
                 <span className="font-semibold">{result.homeMmr ?? '-'}</span>
               </p>
@@ -955,7 +955,7 @@ export default function BalancePage() {
           </article>
 
           <article
-            className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${
+            className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 ${
               showMmr ? 'select-none' : ''
             }`}
             onCopy={handleProtectedClipboard}
@@ -965,19 +965,19 @@ export default function BalancePage() {
             onKeyDown={handleProtectedKeyDown}
             style={protectedMmrStyle}
           >
-            <h3 className="text-sm font-semibold text-slate-900">{t('balance.result.awayTeam')}</h3>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('balance.result.awayTeam')}</h3>
             <ul className="mt-3 space-y-2">
               {result.awayTeam.map((player) => (
                 <li
                   key={`away-${player.name}`}
-                  className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                    className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700"
                 >
-                  <span className="font-medium text-slate-800">
+                    <span className="font-medium text-slate-800 dark:text-slate-200">
                     {player.name}
                     {formatAssignedRace(player.assignedRace)}
                   </span>
                   {showMmr && (
-                    <span className="text-slate-600">
+                    <span className="text-slate-600 dark:text-slate-400">
                       {typeof player.mmr === 'number' ? `${player.mmr} MMR` : '-'}
                     </span>
                   )}
@@ -985,7 +985,7 @@ export default function BalancePage() {
               ))}
             </ul>
             {showMmr && (
-              <p className="mt-3 text-sm text-slate-700">
+              <p className="mt-3 text-sm text-slate-700 dark:text-slate-300">
                 {t('balance.result.awayMmr')}:{' '}
                 <span className="font-semibold">{result.awayMmr ?? '-'}</span>
               </p>
@@ -993,7 +993,7 @@ export default function BalancePage() {
           </article>
 
           <article
-            className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-2 ${
+            className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 lg:col-span-2 ${
               showMmr ? 'select-none' : ''
             }`}
             onCopy={handleProtectedClipboard}
@@ -1003,15 +1003,15 @@ export default function BalancePage() {
             onKeyDown={handleProtectedKeyDown}
             style={protectedMmrStyle}
           >
-            <h3 className="text-sm font-semibold text-slate-900">{t('balance.result.metricsTitle')}</h3>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('balance.result.metricsTitle')}</h3>
             <div className={`mt-3 grid gap-3 ${showMmr ? 'sm:grid-cols-3' : 'sm:grid-cols-1'}`}>
               {showMmr && (
-                <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                   {t('balance.result.mmrDiff')}:{' '}
                   <span className="font-semibold">{result.mmrDiff ?? '-'}</span>
                 </div>
               )}
-              <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                 {t('balance.result.expectedHomeWinRate')}:{' '}
                 <span className="font-semibold">
                   {typeof result.expectedHomeWinRate === 'number'
@@ -1020,7 +1020,7 @@ export default function BalancePage() {
                 </span>
               </div>
               {showMmr && (
-                <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                   {t('balance.result.averageTeamMmr')}:{' '}
                   <span className="font-semibold">
                     {typeof result.homeMmr === 'number' && typeof result.awayMmr === 'number'
@@ -1035,10 +1035,10 @@ export default function BalancePage() {
         </>
       )}
 
-      <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h3 className="text-sm font-semibold text-slate-900">{t('balance.quickResult.title')}</h3>
-        <p className="mt-1 text-xs text-slate-500">{t('balance.quickResult.description')}</p>
-        <p className="mt-3 text-xs text-slate-600">
+      <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('balance.quickResult.title')}</h3>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('balance.quickResult.description')}</p>
+        <p className="mt-3 text-xs text-slate-600 dark:text-slate-300">
           {hasGeneratedMatchId
             ? isSuperAdmin
               ? t('balance.quickResult.autoMatchId', { matchId: resultMatchId })
@@ -1048,12 +1048,12 @@ export default function BalancePage() {
               : t('balance.quickResult.matchNotReady')}
         </p>
         <div className="mt-3 grid gap-3 md:grid-cols-1">
-          <label className="space-y-1 text-xs font-medium text-slate-500">
+          <label className="space-y-1 text-xs font-medium text-slate-500 dark:text-slate-400">
             {t('results.form.winnerTeam')}
             <select
               value={resultWinnerTeam}
               onChange={(event) => setResultWinnerTeam(event.target.value as WinnerTeamSelection)}
-              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
             >
               <option value="">{t('balance.quickResult.winnerPlaceholder')}</option>
               {winnerTeamOptions.map((team) => (
@@ -1070,14 +1070,14 @@ export default function BalancePage() {
             type="button"
             onClick={handleSubmitResult}
             disabled={!canSubmitQuickResult}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
           >
             {resultSubmitting ? t('balance.quickResult.submitting') : t('balance.quickResult.submit')}
           </button>
         </div>
 
         {matchCreateMessage && (
-          <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+          <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
             {matchCreateMessage}
           </p>
         )}
@@ -1091,7 +1091,7 @@ export default function BalancePage() {
           </Alert>
         )}
         {resultSubmitSuccess && (
-          <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+          <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
             {isSuperAdmin
               ? t('balance.quickResult.success', { matchId: resultSubmitSuccess.matchId })
               : t('balance.quickResult.successGeneric')}

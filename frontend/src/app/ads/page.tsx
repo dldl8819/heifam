@@ -110,28 +110,28 @@ const promotions: Promotion[] = [
 export default function AdsPage() {
   return (
     <section className="space-y-6">
-      <div className="rounded-lg border border-emerald-100 bg-white px-5 py-6 shadow-sm sm:px-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
+      <div className="rounded-lg border border-emerald-100 bg-white px-5 py-6 shadow-sm dark:border-emerald-900 dark:bg-slate-900 sm:px-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">
           Hei`Fam Local
         </p>
-        <div className="mt-3 max-w-3xl space-y-2">
+        <div className="mt-3 max-w-3xl space-y-2 dark:[&>h2]:text-slate-100">
           <h2 className="text-3xl font-bold tracking-tight text-slate-950">파트너스</h2>
-          <p className="text-sm leading-6 text-slate-600">
+          <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
             Hei`Fam과 연결된 가게, 상품, 프로젝트를 소개하는 공개 파트너스 공간입니다.
           </p>
         </div>
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white px-5 py-4 shadow-sm sm:px-6">
+      <div className="rounded-lg border border-slate-200 bg-white px-5 py-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:[&>p:first-child]:text-slate-100 sm:px-6">
         <p className="text-sm font-semibold text-slate-950">광고 문의는 운영진에게 연락해 주세요.</p>
-        <p className="mt-1 text-sm leading-6 text-slate-600">
+        <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
           가게, 상품, 프로젝트 홍보를 함께 진행해드립니다.
         </p>
         <a
           href="https://www.youtube.com/@Hei-minsik"
           target="_blank"
           rel="noreferrer"
-          className="mt-3 inline-flex rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition-colors hover:border-red-500 hover:bg-red-100"
+          className="mt-3 inline-flex rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition-colors hover:border-red-500 hover:bg-red-100 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200 dark:hover:border-red-600 dark:hover:bg-red-950/70"
         >
           유튜브 채널 보기
         </a>
@@ -141,7 +141,7 @@ export default function AdsPage() {
         {promotions.map((promotion) => (
           <article
             key={promotion.title}
-            className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+            className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900"
           >
             {promotion.imageHref ? (
               <a
@@ -149,7 +149,7 @@ export default function AdsPage() {
                 target="_blank"
                 rel="noreferrer"
                 aria-label={`${promotion.title} 상세 이미지 보기`}
-                className="relative block aspect-[16/9] w-full bg-slate-100"
+                className="relative block aspect-[16/9] w-full bg-slate-100 dark:bg-slate-800"
               >
                 <Image
                   src={promotion.imageSrc}
@@ -161,7 +161,7 @@ export default function AdsPage() {
                 />
               </a>
             ) : (
-              <div className="relative aspect-[16/9] w-full bg-slate-100">
+              <div className="relative aspect-[16/9] w-full bg-slate-100 dark:bg-slate-800">
                 <Image
                   src={promotion.imageSrc}
                   alt={promotion.imageAlt}
@@ -174,38 +174,38 @@ export default function AdsPage() {
             )}
             <div className="space-y-4 p-5">
               <div className="space-y-2">
-                <span className="inline-flex rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                <span className="inline-flex rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200">
                   {promotion.eyebrow}
                 </span>
                 {promotion.href ? (
-                  <h3 className="text-xl font-bold text-slate-950">
+                  <h3 className="text-xl font-bold text-slate-950 dark:text-slate-100">
                     <a
                       href={promotion.href}
                       target="_blank"
                       rel="noreferrer"
-                      className="transition-colors hover:text-emerald-700"
+                      className="transition-colors hover:text-emerald-700 dark:hover:text-emerald-300"
                     >
                       {promotion.title}
                     </a>
                   </h3>
                 ) : (
-                  <h3 className="text-xl font-bold text-slate-950">{promotion.title}</h3>
+                  <h3 className="text-xl font-bold text-slate-950 dark:text-slate-100">{promotion.title}</h3>
                 )}
-                <p className="text-sm leading-6 text-slate-600">{promotion.description}</p>
+                <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">{promotion.description}</p>
               </div>
 
-              <ul className="grid gap-2 text-sm text-slate-700 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+              <ul className="grid gap-2 text-sm text-slate-700 dark:text-slate-300 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
                 {promotion.highlights.map((highlight) => (
                   <li
                     key={highlight}
-                    className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 font-medium"
+                    className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 font-medium dark:border-slate-600 dark:bg-slate-800"
                   >
                     {highlight}
                   </li>
                 ))}
               </ul>
 
-              <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+              <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-700/70 dark:bg-amber-950/40 dark:text-amber-200">
                 {promotion.note}
               </p>
 
@@ -214,9 +214,9 @@ export default function AdsPage() {
                   href={promotion.orderHref}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex flex-col items-center gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800 transition-colors hover:border-emerald-500 hover:bg-emerald-100 sm:flex-row"
+                  className="inline-flex flex-col items-center gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800 transition-colors hover:border-emerald-500 hover:bg-emerald-100 dark:border-emerald-700/70 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:border-emerald-600 dark:hover:bg-emerald-950/70 sm:flex-row"
                 >
-                  <span className="relative h-36 w-36 shrink-0 overflow-hidden rounded-md bg-white">
+                  <span className="relative h-36 w-36 shrink-0 overflow-hidden rounded-md bg-white dark:ring-1 dark:ring-slate-600">
                     <Image
                       src={promotion.qrImageSrc}
                       alt={promotion.qrImageAlt}
@@ -237,7 +237,7 @@ export default function AdsPage() {
                       href={promotion.href}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
+                      className="inline-flex rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600"
                     >
                       {promotion.ctaLabel}
                     </a>
@@ -247,7 +247,7 @@ export default function AdsPage() {
                       href={promotion.secondaryHref}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition-colors hover:border-slate-900 hover:bg-slate-50"
+                      className="inline-flex rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition-colors hover:border-slate-900 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-400 dark:hover:bg-slate-800"
                     >
                       {promotion.secondaryCtaLabel}
                     </a>
@@ -257,7 +257,7 @@ export default function AdsPage() {
                       href={promotion.orderHref}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-800"
+                      className="inline-flex rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500"
                     >
                       {promotion.orderCtaLabel}
                     </a>

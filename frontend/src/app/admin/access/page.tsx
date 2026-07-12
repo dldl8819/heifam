@@ -225,9 +225,9 @@ export default function AccessControlPage() {
 
   return (
     <section className="space-y-6">
-      <header className="space-y-1 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+      <header className="space-y-1 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <h2 className="text-2xl font-semibold tracking-tight">{t('access.title')}</h2>
-        <p className="text-sm text-slate-600">{t('access.description')}</p>
+        <p className="text-sm text-slate-600 dark:text-slate-300">{t('access.description')}</p>
       </header>
 
       <AdminOnlyContent>
@@ -241,36 +241,36 @@ export default function AccessControlPage() {
           </Alert>
         )}
         {message && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
             {message}
           </div>
         )}
 
         {loading && <LoadingIndicator label={t('common.loading')} />}
 
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-900">{t('access.sections.me')}</h3>
-          <div className="mt-3 grid gap-2 text-sm text-slate-700 sm:grid-cols-2 lg:grid-cols-5">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-              <p className="text-xs text-slate-500">{t('access.me.email')}</p>
+        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('access.sections.me')}</h3>
+          <div className="mt-3 grid gap-2 text-sm text-slate-700 dark:text-slate-300 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-950/60">
+              <p className="text-xs text-slate-500 dark:text-slate-400">{t('access.me.email')}</p>
               <p className="mt-1 font-medium">{email ?? '-'}</p>
             </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-              <p className="text-xs text-slate-500">{t('access.me.nickname')}</p>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-950/60">
+              <p className="text-xs text-slate-500 dark:text-slate-400">{t('access.me.nickname')}</p>
               <p className="mt-1 font-medium">{nickname ?? t('access.labels.nicknameNotSet')}</p>
             </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-              <p className="text-xs text-slate-500">{t('access.me.role')}</p>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-950/60">
+              <p className="text-xs text-slate-500 dark:text-slate-400">{t('access.me.role')}</p>
               <p className="mt-1 font-medium">{role}</p>
             </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-              <p className="text-xs text-slate-500">{t('access.me.access')}</p>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-950/60">
+              <p className="text-xs text-slate-500 dark:text-slate-400">{t('access.me.access')}</p>
               <p className="mt-1 font-medium">
                 {canAccess ? t('access.me.yes') : t('access.me.no')}
               </p>
             </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-              <p className="text-xs text-slate-500">{t('access.me.mmrAccess')}</p>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-950/60">
+              <p className="text-xs text-slate-500 dark:text-slate-400">{t('access.me.mmrAccess')}</p>
               <p className="mt-1 font-medium">
                 {canViewMmr ? t('access.me.yes') : t('access.me.no')}
               </p>
@@ -279,23 +279,23 @@ export default function AccessControlPage() {
         </article>
 
         <div className="grid gap-4 xl:grid-cols-2">
-          <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h3 className="text-sm font-semibold text-slate-900">{t('access.sections.superAdmins')}</h3>
+          <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('access.sections.superAdmins')}</h3>
             <ul className="mt-3 space-y-2">
               {(adminList?.superAdmins ?? []).map((superAdminUser) => (
                 <li
                   key={`super-admin-${superAdminUser.email}`}
-                  className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800"
+                  className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-200"
                 >
                   <span>
                     <span className="font-medium">{superAdminUser.nickname ?? t('access.labels.nicknameNotSet')}</span>
-                    <span className="ml-2 text-xs text-slate-500">({superAdminUser.email})</span>
+                    <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">({superAdminUser.email})</span>
                   </span>
                   <div className="flex flex-wrap items-center justify-end gap-2">
-                    <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                    <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300">
                       {t('access.actions.mmrAlwaysAllowed')}
                     </span>
-                    <span className="rounded-md bg-slate-900 px-2 py-0.5 text-xs font-medium text-white">
+                    <span className="rounded-md bg-slate-900 px-2 py-0.5 text-xs font-medium text-white dark:bg-slate-700 dark:text-slate-100">
                       {t('access.actions.fixed')}
                     </span>
                   </div>
@@ -304,10 +304,10 @@ export default function AccessControlPage() {
             </ul>
           </article>
 
-          <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h3 className="text-sm font-semibold text-slate-900">{t('access.sections.admins')}</h3>
+          <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('access.sections.admins')}</h3>
             {!isSuperAdmin && (
-              <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
                 {t('access.superOnly')}
               </p>
             )}
@@ -318,19 +318,19 @@ export default function AccessControlPage() {
                   value={newAdminEmail}
                   onChange={(event) => setNewAdminEmail(event.target.value)}
                   placeholder={t('access.form.emailPlaceholder')}
-                  className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                  className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
                 />
                 <input
                   type="text"
                   value={newAdminNickname}
                   onChange={(event) => setNewAdminNickname(event.target.value)}
                   placeholder={t('access.form.nicknamePlaceholder')}
-                  className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                  className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
                 />
                 <button
                   type="submit"
                   disabled={saving}
-                  className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
                 >
                   {saving ? t('access.actions.saving') : t('access.form.addAdmin')}
                 </button>
@@ -341,21 +341,21 @@ export default function AccessControlPage() {
               {(adminList?.admins ?? []).map((adminUser) => (
                 <li
                   key={`admin-${adminUser.email}`}
-                  className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800"
+                  className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-200"
                 >
                   <span>
                     <span className="font-medium">{adminUser.nickname ?? t('access.labels.nicknameNotSet')}</span>
-                    <span className="ml-2 text-xs text-slate-500">({adminUser.email})</span>
+                    <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">({adminUser.email})</span>
                   </span>
                   {isSuperAdmin ? (
                     <div className="flex flex-wrap items-center justify-end gap-2">
-                      <label className="flex cursor-pointer items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700">
+                      <label className="flex cursor-pointer items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300">
                         <input
                           type="checkbox"
                           checked={adminUser.canViewMmr}
                           disabled={saving}
                           onChange={(event) => void handleToggleAdminMmrAccess(adminUser.email, event.target.checked)}
-                          className="h-3.5 w-3.5 accent-slate-900"
+                          className="h-3.5 w-3.5 accent-slate-900 dark:accent-amber-400"
                         />
                         {t('access.actions.mmrAccess')}
                       </label>
@@ -363,7 +363,7 @@ export default function AccessControlPage() {
                         type="button"
                         disabled={saving}
                         onClick={() => handleRemoveAdmin(adminUser)}
-                        className="rounded-md border border-rose-300 bg-white px-2 py-1 text-xs font-medium text-rose-700 transition-colors hover:border-rose-500 hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                        className="rounded-md border border-rose-300 bg-white px-2 py-1 text-xs font-medium text-rose-700 transition-colors hover:border-rose-500 hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 dark:border-rose-800 dark:bg-slate-900 dark:text-rose-300 dark:hover:border-rose-600 dark:hover:bg-rose-950/40 dark:disabled:border-slate-700 dark:disabled:text-slate-500"
                       >
                         {t('access.actions.remove')}
                       </button>
@@ -372,14 +372,14 @@ export default function AccessControlPage() {
                     <div className="flex flex-wrap items-center justify-end gap-2">
                       <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${
                         adminUser.canViewMmr
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-slate-100 text-slate-500'
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300'
+                          : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
                       }`}>
                         {adminUser.canViewMmr
                           ? t('access.actions.mmrAllowed')
                           : t('access.actions.mmrDenied')}
                       </span>
-                      <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
+                      <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                         {t('common.readOnly')}
                       </span>
                     </div>
@@ -390,27 +390,27 @@ export default function AccessControlPage() {
           </article>
         </div>
 
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-900">{t('access.sections.allowlist')}</h3>
+        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('access.sections.allowlist')}</h3>
           <form className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]" onSubmit={handleAddAllowed}>
             <input
               type="email"
               value={newAllowedEmail}
               onChange={(event) => setNewAllowedEmail(event.target.value)}
               placeholder={t('access.form.emailPlaceholder')}
-              className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
             />
             <input
               type="text"
               value={newAllowedNickname}
               onChange={(event) => setNewAllowedNickname(event.target.value)}
               placeholder={t('access.form.nicknamePlaceholder')}
-              className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
             />
             <button
               type="submit"
               disabled={saving || loading}
-              className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
             >
               {saving ? t('access.actions.saving') : t('access.form.addAllowed')}
             </button>
@@ -420,17 +420,17 @@ export default function AccessControlPage() {
             {(allowedList?.allowedUsers ?? []).map((allowedUser) => (
               <li
                 key={`allowed-${allowedUser.email}`}
-                className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800"
+                className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-200"
               >
                 <span>
                   <span className="font-medium">{allowedUser.nickname ?? t('access.labels.nicknameNotSet')}</span>
-                  <span className="ml-2 text-xs text-slate-500">({allowedUser.email})</span>
+                  <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">({allowedUser.email})</span>
                 </span>
                 <button
                   type="button"
                   disabled={saving}
                   onClick={() => handleRemoveAllowed(allowedUser)}
-                  className="rounded-md border border-rose-300 bg-white px-2 py-1 text-xs font-medium text-rose-700 transition-colors hover:border-rose-500 hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                  className="rounded-md border border-rose-300 bg-white px-2 py-1 text-xs font-medium text-rose-700 transition-colors hover:border-rose-500 hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 dark:border-rose-800 dark:bg-slate-900 dark:text-rose-300 dark:hover:border-rose-600 dark:hover:bg-rose-950/40 dark:disabled:border-slate-700 dark:disabled:text-slate-500"
                 >
                   {t('access.actions.remove')}
                 </button>

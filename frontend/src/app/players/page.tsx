@@ -246,24 +246,24 @@ function formatImportFailureMessage(result: PlayerImportResult): string {
 function getTierBadgeClass(tier: PlayerTierStatus): string {
   switch (tier) {
     case 'S':
-      return 'bg-amber-100 text-amber-800'
+      return 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200'
     case 'A+':
     case 'A':
     case 'A-':
-      return 'bg-indigo-100 text-indigo-800'
+      return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-200'
     case 'B+':
     case 'B':
     case 'B-':
-      return 'bg-blue-100 text-blue-800'
+      return 'bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-200'
     case 'C+':
     case 'C':
     case 'C-':
     case 'D':
-      return 'bg-emerald-100 text-emerald-800'
+      return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200'
     case 'UNASSIGNED':
-      return 'bg-rose-100 text-rose-800'
+      return 'bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-200'
     default:
-      return 'bg-slate-100 text-slate-700'
+      return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'
   }
 }
 
@@ -780,30 +780,30 @@ export default function PlayersPage() {
       )}
 
       {isAdmin && (
-        <article id="player-import" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-900">{t('players.import.title')}</h3>
-          <p className="mt-1 text-xs text-slate-500">{t('players.import.description')}</p>
+        <article id="player-import" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('players.import.title')}</h3>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('players.import.description')}</p>
           <form className="mt-3 space-y-3" onSubmit={handleRegisterPlayer}>
             <div className="grid gap-3 md:grid-cols-[minmax(0,1.5fr)_minmax(9rem,0.75fr)_minmax(9rem,0.75fr)]">
-              <label className="space-y-1 text-xs font-medium text-slate-500">
+              <label className="space-y-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 {t('players.import.nicknameLabel')}
                 <input
                   type="text"
                   value={registrationNickname}
                   onChange={(event) => setRegistrationNickname(event.target.value)}
                   placeholder={t('players.import.nicknamePlaceholder')}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                 />
               </label>
 
-              <label className="space-y-1 text-xs font-medium text-slate-500">
+              <label className="space-y-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 {t('players.import.tierLabel')}
                 <select
                   value={registrationTier}
                   onChange={(event) =>
                     setRegistrationTier(event.target.value as PlayerRegistrationTier | '')
                   }
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                 >
                   <option value="">{t('players.import.tierPlaceholder')}</option>
                   {PLAYER_REGISTRATION_TIER_OPTIONS.map((tierOption) => (
@@ -816,12 +816,12 @@ export default function PlayersPage() {
                 </select>
               </label>
 
-              <label className="space-y-1 text-xs font-medium text-slate-500">
+              <label className="space-y-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 {t('players.import.raceLabel')}
                 <select
                   value={registrationRace}
                   onChange={(event) => setRegistrationRace(event.target.value as PlayerRace | '')}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                 >
                   <option value="">{t('players.import.racePlaceholder')}</option>
                   {PLAYER_RACE_OPTIONS.map((raceOption) => (
@@ -842,7 +842,7 @@ export default function PlayersPage() {
               </Alert>
             )}
             {importSuccess && (
-              <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+              <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
                 {importSuccess}
               </p>
             )}
@@ -850,7 +850,7 @@ export default function PlayersPage() {
             <button
               type="submit"
               disabled={importing}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
             >
               {importing ? t('players.import.loading') : t('players.import.button')}
             </button>
@@ -869,7 +869,7 @@ export default function PlayersPage() {
             </Alert>
           )}
           {playerActionSuccess && (
-            <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+          <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
               {playerActionSuccess}
             </p>
           )}
@@ -877,24 +877,24 @@ export default function PlayersPage() {
       )}
 
       {activityForm !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 px-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 px-4 dark:bg-black/70">
           <form
-            className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-xl"
+            className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-700 dark:bg-slate-900"
             onSubmit={handleSubmitActivityForm}
           >
             <div className="space-y-1">
-              <h3 className="text-base font-semibold text-slate-900">
+                <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
                 {activityForm.mode === 'deactivate'
                   ? t('players.activityForm.deactivateTitle')
                   : t('players.activityForm.reactivateTitle')}
               </h3>
-              <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                 {t('players.activityForm.target', { nickname: activityForm.player.nickname })}
               </p>
             </div>
 
             {playerActionError && (
-              <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+              <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300">
                 {playerActionError}
               </p>
             )}
@@ -902,7 +902,7 @@ export default function PlayersPage() {
             <div className="mt-4 space-y-3">
               {activityForm.mode === 'deactivate' ? (
                 <>
-                  <label className="block space-y-1 text-xs font-medium text-slate-600">
+                <label className="block space-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
                     {t('players.activityForm.chatLeftAtLabel')}
                     <input
                       type="datetime-local"
@@ -913,10 +913,10 @@ export default function PlayersPage() {
                           current === null ? current : { ...current, chatLeftAt: event.target.value }
                         )
                       }
-                      className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                     />
                   </label>
-                  <label className="block space-y-1 text-xs font-medium text-slate-600">
+                <label className="block space-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
                     {t('players.activityForm.chatLeftReasonLabel')}
                     <textarea
                       required
@@ -927,15 +927,15 @@ export default function PlayersPage() {
                           current === null ? current : { ...current, chatLeftReason: event.target.value }
                         )
                       }
-                      className="mt-1 h-24 w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                    className="mt-1 h-24 w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                     />
-                    <span className="block text-right text-[11px] text-slate-400">
+                  <span className="block text-right text-[11px] text-slate-400 dark:text-slate-500">
                       {activityForm.chatLeftReason.length}/500
                     </span>
                   </label>
                 </>
               ) : (
-                <label className="block space-y-1 text-xs font-medium text-slate-600">
+                <label className="block space-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
                   {t('players.activityForm.chatRejoinedAtLabel')}
                   <input
                     type="datetime-local"
@@ -946,7 +946,7 @@ export default function PlayersPage() {
                         current === null ? current : { ...current, chatRejoinedAt: event.target.value }
                       )
                     }
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                   />
                 </label>
               )}
@@ -957,14 +957,14 @@ export default function PlayersPage() {
                 type="button"
                 disabled={togglingPlayerId !== null}
                 onClick={handleCancelActivityForm}
-                className="rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 {t('players.actions.cancel')}
               </button>
               <button
                 type="submit"
                 disabled={togglingPlayerId !== null}
-                className="rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  className="rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
               >
                 {togglingPlayerId !== null
                   ? t('players.actions.toggling')
@@ -984,38 +984,38 @@ export default function PlayersPage() {
         onClose={handleCloseGameTypeStats}
       />
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {isAdmin && (
           <div className="mb-3 flex flex-wrap items-center gap-2">
             {showInactive ? (
-              <span className="rounded-md border border-slate-300 bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+          <span className="rounded-md border border-slate-300 bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
                 {t('players.filters.inactiveCount', { count: inactivePlayerCount })}
               </span>
             ) : (
-              <span className="rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-800">
+            <span className="rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-800 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200">
                 {t('players.filters.activeCount', { count: activePlayerCount })}
               </span>
             )}
           </div>
         )}
         <div className="grid gap-3 md:grid-cols-3">
-          <label className="space-y-1 text-xs font-medium text-slate-500 md:col-span-2">
+          <label className="space-y-1 text-xs font-medium text-slate-500 dark:text-slate-400 md:col-span-2">
             {t('players.filters.searchLabel')}
             <input
               type="text"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder={t('players.filters.searchPlaceholder')}
-              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
             />
           </label>
 
-          <label className="space-y-1 text-xs font-medium text-slate-500">
+          <label className="space-y-1 text-xs font-medium text-slate-500 dark:text-slate-400">
             {t('players.filters.raceLabel')}
             <select
               value={raceFilter}
               onChange={(event) => setRaceFilter(event.target.value as RaceFilter)}
-              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
             >
               <option value="ALL">{t('common.all')}</option>
               {PLAYER_RACE_OPTIONS.map((raceOption) => (
@@ -1027,12 +1027,12 @@ export default function PlayersPage() {
           </label>
         </div>
         {isAdmin && (
-          <label className="mt-3 inline-flex items-center gap-2 text-xs font-medium text-slate-600">
+          <label className="mt-3 inline-flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
             <input
               type="checkbox"
               checked={showInactive}
               onChange={(event) => setShowInactive(event.target.checked)}
-              className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
+              className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
             />
             <span>{t('players.filters.includeInactive')}</span>
           </label>
@@ -1042,7 +1042,7 @@ export default function PlayersPage() {
             <button
               type="button"
               onClick={handleDownloadTierSortedRoster}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:border-slate-900 hover:bg-slate-900 hover:text-white"
+            className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:border-slate-900 hover:bg-slate-900 hover:text-white dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-300 dark:hover:bg-slate-100 dark:hover:text-slate-900"
             >
               {t('players.download.button')}
             </button>
@@ -1050,9 +1050,9 @@ export default function PlayersPage() {
         )}
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <table className="min-w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs tracking-wide text-slate-500">
+          <thead className="bg-slate-50 text-xs tracking-wide text-slate-500 dark:bg-slate-800/80 dark:text-slate-300">
             <tr>
               <th className="px-4 py-3">{t('players.table.nickname')}</th>
               <th className="px-4 py-3">{t('players.table.race')}</th>
@@ -1072,7 +1072,7 @@ export default function PlayersPage() {
           <tbody>
             {loading &&
               (
-                <tr className="border-t border-slate-100">
+              <tr className="border-t border-slate-100 dark:border-slate-800">
                   <td
                     className="px-4 py-3"
                     colSpan={tableColumnCount}
@@ -1083,9 +1083,9 @@ export default function PlayersPage() {
               )}
 
             {!loading && filteredRows.length === 0 && (
-              <tr className="border-t border-slate-100">
+              <tr className="border-t border-slate-100 dark:border-slate-800">
                   <td
-                    className="px-4 py-8 text-center text-sm text-slate-500"
+                    className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400"
                     colSpan={tableColumnCount}
                   >
                   {t('players.table.empty')}
@@ -1105,37 +1105,37 @@ export default function PlayersPage() {
                 return (
                   <tr
                     key={row.id}
-                    className={`border-t border-slate-100 transition-colors ${
+                    className={`border-t border-slate-100 transition-colors dark:border-slate-800 ${
                       isActive
-                        ? 'hover:bg-slate-50/70'
-                        : 'bg-slate-100/90 hover:bg-slate-200/70'
+                        ? 'hover:bg-slate-50/70 dark:hover:bg-slate-800/60'
+                        : 'bg-slate-100/90 hover:bg-slate-200/70 dark:bg-slate-800/80 dark:hover:bg-slate-700/80'
                     }`}
                   >
-                    <td className={`px-4 py-3 font-medium ${isActive ? 'text-slate-900' : 'text-slate-700'}`}>
+                    <td className={`px-4 py-3 font-medium ${isActive ? 'text-slate-900 dark:text-slate-100' : 'text-slate-700 dark:text-slate-200'}`}>
                       {isEditing ? (
                         <input
                           type="text"
                           value={editingNickname}
                           onChange={(event) => setEditingNickname(event.target.value)}
-                          className="w-full rounded-md border border-slate-200 px-2 py-1 text-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                          className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                         />
                       ) : (
                         <div className="flex flex-wrap items-center gap-2">
                           <span>{row.nickname}</span>
                           {!isActive && (
-                            <span className="rounded-md border border-slate-300 bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                            <span className="rounded-md border border-slate-300 bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100">
                               {t('players.table.inactive')}
                             </span>
                           )}
                         </div>
                       )}
                     </td>
-                    <td className={`px-4 py-3 ${isActive ? 'text-slate-700' : 'text-slate-600'}`}>
+                    <td className={`px-4 py-3 ${isActive ? 'text-slate-700 dark:text-slate-300' : 'text-slate-600 dark:text-slate-300'}`}>
                       {isEditing ? (
                         <select
                           value={editingRace}
                           onChange={(event) => setEditingRace(event.target.value as PlayerRace)}
-                          className="w-full rounded-md border border-slate-200 px-2 py-1 text-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                          className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                         >
                           {PLAYER_RACE_OPTIONS.map((raceOption) => (
                             <option key={raceOption} value={raceOption}>
@@ -1158,7 +1158,7 @@ export default function PlayersPage() {
                               setEditingInlineMmrValue(String(resolveDefaultMmrForTier(nextTier)))
                             }
                           }}
-                          className="w-full rounded-md border border-slate-200 px-2 py-1 text-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                            className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                         >
                           {PLAYER_EDIT_TIER_OPTIONS.map((tierOption) => (
                             <option key={tierOption} value={tierOption}>
@@ -1182,26 +1182,26 @@ export default function PlayersPage() {
                           <span
                             className={`rounded-md px-2 py-1 text-xs font-semibold ${
                               isActive
-                                ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
-                                : 'border border-slate-300 bg-slate-200 text-slate-700'
+                                ? 'border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                                : 'border border-slate-300 bg-slate-200 text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100'
                             }`}
                           >
                             {isActive ? t('players.table.active') : t('players.table.inactive')}
                           </span>
                           {!isActive && row.chatLeftAt && (
-                            <div className="text-[11px] text-slate-500">
+                              <div className="text-[11px] text-slate-500 dark:text-slate-400">
                               {t('players.table.chatLeftAt', {
                                 value: formatChatRecordDisplay(row.chatLeftAt),
                               })}
                             </div>
                           )}
                           {!isActive && row.chatLeftReason && (
-                            <div className="max-w-52 text-[11px] leading-4 text-slate-500">
+                              <div className="max-w-52 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
                               {t('players.table.chatLeftReason', { value: row.chatLeftReason })}
                             </div>
                           )}
                           {isActive && row.chatRejoinedAt && (
-                            <div className="text-[11px] text-emerald-700">
+                              <div className="text-[11px] text-emerald-700 dark:text-emerald-300">
                               {t('players.table.chatRejoinedAt', {
                                 value: formatChatRecordDisplay(row.chatRejoinedAt),
                               })}
@@ -1218,7 +1218,7 @@ export default function PlayersPage() {
                             onChange={(event) =>
                               setEditingDormancyFloorTier(event.target.value as PlayerTierStatus)
                             }
-                            className="w-32 rounded-md border border-slate-200 px-2 py-1 text-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                            className="w-32 rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                           >
                             {PLAYER_DORMANCY_FLOOR_TIER_OPTIONS.map((tierOption) => (
                               <option key={`dormancy-floor-option-${tierOption}`} value={tierOption}>
@@ -1227,14 +1227,14 @@ export default function PlayersPage() {
                             ))}
                           </select>
                         ) : (
-                          <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700">
+                          <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
                             {formatTierOption(row.dormancyMmrFloorTier)}
                           </span>
                         )}
                       </td>
                     )}
                     {showMmrColumn && (
-                      <td className={`px-4 py-3 ${isActive ? 'text-slate-700' : 'text-slate-600'}`}>
+                    <td className={`px-4 py-3 ${isActive ? 'text-slate-700 dark:text-slate-300' : 'text-slate-600 dark:text-slate-300'}`}>
                         {isEditing && isSuperAdmin ? (
                           <input
                             type="number"
@@ -1243,22 +1243,22 @@ export default function PlayersPage() {
                             step={1}
                             value={editingInlineMmrValue}
                             onChange={(event) => setEditingInlineMmrValue(event.target.value)}
-                            className="w-24 rounded-md border border-slate-200 px-2 py-1 text-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                            className="w-24 rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                           />
                         ) : (
                           formatMmrValue(row.currentMmr)
                         )}
                       </td>
                     )}
-                    <td className={`px-4 py-3 ${isActive ? 'text-slate-700' : 'text-slate-600'}`}>{row.wins}</td>
-                    <td className={`px-4 py-3 ${isActive ? 'text-slate-700' : 'text-slate-600'}`}>{row.losses}</td>
-                    <td className={`px-4 py-3 ${isActive ? 'text-slate-700' : 'text-slate-600'}`}>{row.games}</td>
+                    <td className={`px-4 py-3 ${isActive ? 'text-slate-700 dark:text-slate-300' : 'text-slate-600 dark:text-slate-300'}`}>{row.wins}</td>
+                    <td className={`px-4 py-3 ${isActive ? 'text-slate-700 dark:text-slate-300' : 'text-slate-600 dark:text-slate-300'}`}>{row.losses}</td>
+                    <td className={`px-4 py-3 ${isActive ? 'text-slate-700 dark:text-slate-300' : 'text-slate-600 dark:text-slate-300'}`}>{row.games}</td>
                     <td className="px-4 py-3">
                       <button
                         type="button"
                         disabled={gameTypeStatsLoading && gameTypeStatsPlayer?.id === row.id}
                         onClick={() => handleOpenGameTypeStats(row)}
-                        className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-emerald-600 hover:bg-emerald-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                        className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-emerald-600 hover:bg-emerald-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:border-emerald-400 dark:hover:bg-emerald-700"
                       >
                         {gameTypeStatsLoading && gameTypeStatsPlayer?.id === row.id
                           ? t('statsModal.buttonLoading')
@@ -1274,7 +1274,7 @@ export default function PlayersPage() {
                                 type="button"
                                 disabled={busy}
                                 onClick={() => handleSaveEdit(row.id)}
-                                className="rounded-md bg-slate-900 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                            className="rounded-md bg-slate-900 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
                               >
                                 {isSaving ? t('players.actions.saving') : t('players.actions.save')}
                               </button>
@@ -1282,7 +1282,7 @@ export default function PlayersPage() {
                                 type="button"
                                 disabled={busy}
                                 onClick={handleCancelEdit}
-                                className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
                               >
                                 {t('players.actions.cancel')}
                               </button>
@@ -1296,7 +1296,7 @@ export default function PlayersPage() {
                                 activityForm !== null
                               }
                               onClick={() => handleStartEdit(row)}
-                              className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-indigo-600 hover:bg-indigo-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                          className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-indigo-600 hover:bg-indigo-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:border-indigo-400 dark:hover:bg-indigo-700"
                             >
                               {t('players.actions.edit')}
                             </button>
@@ -1308,8 +1308,8 @@ export default function PlayersPage() {
                             onClick={() => handleTogglePlayerActive(row)}
                             className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                               isActive
-                                ? 'border border-slate-300 text-slate-700 hover:border-slate-900 hover:bg-slate-900 hover:text-white'
-                                : 'border border-emerald-300 text-emerald-700 hover:border-emerald-600 hover:bg-emerald-600 hover:text-white'
+                                ? 'border border-slate-300 text-slate-700 hover:border-slate-900 hover:bg-slate-900 hover:text-white dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-300 dark:hover:bg-slate-100 dark:hover:text-slate-900'
+                                : 'border border-emerald-300 text-emerald-700 hover:border-emerald-600 hover:bg-emerald-600 hover:text-white dark:border-emerald-700 dark:text-emerald-300 dark:hover:border-emerald-400 dark:hover:bg-emerald-700'
                             }`}
                           >
                             {isToggling
@@ -1323,7 +1323,7 @@ export default function PlayersPage() {
                             type="button"
                             disabled={busy || editingPlayerId !== null || activityForm !== null}
                             onClick={() => handleDeletePlayer(row)}
-                            className="rounded-md border border-rose-300 px-2.5 py-1 text-xs font-medium text-rose-700 transition-colors hover:border-rose-600 hover:bg-rose-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                            className="rounded-md border border-rose-300 px-2.5 py-1 text-xs font-medium text-rose-700 transition-colors hover:border-rose-600 hover:bg-rose-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-700 dark:text-rose-300 dark:hover:border-rose-400 dark:hover:bg-rose-700"
                           >
                             {isDeleting ? t('players.actions.deleting') : t('players.actions.delete')}
                           </button>

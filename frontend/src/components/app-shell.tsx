@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import Image from 'next/image'
 import { AuthControls } from '@/components/auth-controls'
 import { AccessGate } from '@/components/access-gate'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { SiteFooter } from '@/components/site-footer'
 import { TopNavDesktop, TopNavMobile } from '@/components/top-nav'
 import { UserRaceSetupModal } from '@/components/user-race-setup-modal'
@@ -17,7 +18,7 @@ type AppShellProps = {
 export function AppShell({ children }: AppShellProps) {
   return (
     <MmrVisibilityProvider>
-      <div className="min-h-screen bg-slate-100 text-slate-900">
+      <div className="min-h-screen bg-slate-100 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
         <header className="sticky top-0 z-30 border-b border-slate-700 bg-slate-900/95 text-white backdrop-blur">
           <div className="mx-auto flex max-w-screen-2xl flex-col gap-3 px-4 py-4 sm:px-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -38,6 +39,7 @@ export function AppShell({ children }: AppShellProps) {
                 </div>
               </div>
               <div className="flex items-start gap-2">
+                <ThemeToggle />
                 <TopNavMobile />
                 <div className="hidden w-full max-w-sm md:block">
                   <AuthControls />

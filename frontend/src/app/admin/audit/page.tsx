@@ -265,9 +265,9 @@ export default function OperationAuditPage() {
 
   return (
     <section className="space-y-6">
-      <header className="space-y-1 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-        <h2 className="text-2xl font-semibold tracking-tight text-slate-950">{t('audit.title')}</h2>
-        <p className="text-sm text-slate-600">{t('audit.description')}</p>
+      <header className="space-y-1 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <h2 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-slate-100">{t('audit.title')}</h2>
+        <p className="text-sm text-slate-600 dark:text-slate-300">{t('audit.description')}</p>
       </header>
 
       {error && (
@@ -280,54 +280,54 @@ export default function OperationAuditPage() {
         </Alert>
       )}
 
-      <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h3 className="text-sm font-semibold text-slate-900">{t('audit.recentTitle')}</h3>
-            <p className="mt-1 text-xs text-slate-500">{t('audit.recentDescription')}</p>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('audit.recentTitle')}</h3>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('audit.recentDescription')}</p>
           </div>
-          <span className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
+          <span className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-300">
             {t('audit.count', { count: totalElements })}
           </span>
         </div>
 
-        <form onSubmit={handleFilterSubmit} className="mt-4 grid gap-3 border-t border-slate-100 pt-4 sm:grid-cols-2 lg:grid-cols-6">
-          <label className="space-y-1 text-xs font-medium text-slate-600">
+        <form onSubmit={handleFilterSubmit} className="mt-4 grid gap-3 border-t border-slate-100 pt-4 dark:border-slate-800 sm:grid-cols-2 lg:grid-cols-6">
+          <label className="space-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
             <span>{t('audit.filters.fromDate')}</span>
             <input
               type="date"
               value={draftFilters.fromDate}
               onChange={(event) => setDraftFilters((current) => ({ ...current, fromDate: event.target.value }))}
-              className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
             />
           </label>
-          <label className="space-y-1 text-xs font-medium text-slate-600">
+          <label className="space-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
             <span>{t('audit.filters.toDate')}</span>
             <input
               type="date"
               value={draftFilters.toDate}
               onChange={(event) => setDraftFilters((current) => ({ ...current, toDate: event.target.value }))}
-              className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
             />
           </label>
-          <label className="space-y-1 text-xs font-medium text-slate-600">
+          <label className="space-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
             <span>{t('audit.filters.actor')}</span>
             <input
               type="search"
               value={draftFilters.actor}
               onChange={(event) => setDraftFilters((current) => ({ ...current, actor: event.target.value }))}
               placeholder={t('audit.filters.actorPlaceholder')}
-              className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
             />
           </label>
-          <label className="space-y-1 text-xs font-medium text-slate-600">
+          <label className="space-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
             <span>{t('audit.filters.action')}</span>
             <select
               value={draftFilters.action}
               onChange={(event) =>
                 setDraftFilters((current) => ({ ...current, action: event.target.value as AuditActionFilter }))
               }
-              className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
             >
               {AUDIT_ACTION_FILTER_OPTIONS.map((action) => (
                 <option key={action} value={action}>
@@ -336,37 +336,37 @@ export default function OperationAuditPage() {
               ))}
             </select>
           </label>
-          <label className="space-y-1 text-xs font-medium text-slate-600">
+          <label className="space-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
             <span>{t('audit.filters.content')}</span>
             <input
               type="search"
               value={draftFilters.content}
               onChange={(event) => setDraftFilters((current) => ({ ...current, content: event.target.value }))}
               placeholder={t('audit.filters.contentPlaceholder')}
-              className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
             />
           </label>
-          <label className="space-y-1 text-xs font-medium text-slate-600">
+          <label className="space-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
             <span>{t('audit.filters.target')}</span>
             <input
               type="search"
               value={draftFilters.target}
               onChange={(event) => setDraftFilters((current) => ({ ...current, target: event.target.value }))}
               placeholder={t('audit.filters.targetPlaceholder')}
-              className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
             />
           </label>
           <div className="flex gap-2 sm:col-span-2 lg:col-span-6">
             <button
               type="submit"
-              className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-700"
+              className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
             >
               {t('audit.filters.apply')}
             </button>
             <button
               type="button"
               onClick={handleFilterReset}
-              className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               {t('audit.filters.reset')}
             </button>
@@ -378,14 +378,14 @@ export default function OperationAuditPage() {
             <LoadingIndicator label={t('common.loading')} />
           </div>
         ) : logs.length === 0 ? (
-          <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+          <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-300">
             {t('audit.empty')}
           </p>
         ) : (
           <>
             <div className="mt-4 overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+              <table className="min-w-full divide-y divide-slate-200 text-left text-sm dark:divide-slate-700">
+                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-950/60 dark:text-slate-400">
                   <tr>
                     <th className="px-3 py-2">{t('audit.table.seq')}</th>
                     <th className="px-3 py-2">{t('audit.table.createdAt')}</th>
@@ -395,21 +395,21 @@ export default function OperationAuditPage() {
                     <th className="px-3 py-2">{t('audit.table.details')}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {logs.map((log, index) => (
                     <tr key={log.id} className="align-top">
-                      <td className="whitespace-nowrap px-3 py-2 text-slate-500">{index + 1}</td>
-                      <td className="whitespace-nowrap px-3 py-2 text-slate-600">
+                      <td className="whitespace-nowrap px-3 py-2 text-slate-500 dark:text-slate-400">{index + 1}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-300">
                         {formatDateTime(log.createdAt)}
                       </td>
                       <td className="whitespace-nowrap px-3 py-2">
-                        <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                        <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                           {getActionLabel(log.action)}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-slate-700">{formatActor(log)}</td>
-                      <td className="px-3 py-2 text-slate-700">{formatTarget(log)}</td>
-                      <td className="px-3 py-2 text-xs text-slate-500">{log.details ?? '-'}</td>
+                      <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{formatActor(log)}</td>
+                      <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{formatTarget(log)}</td>
+                      <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{log.details ?? '-'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -417,7 +417,7 @@ export default function OperationAuditPage() {
             </div>
             {(hasMoreLogs || logs.length > 0) && (
               <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   {t('audit.pagination.status', {
                     shown: logs.length,
                     max: Math.min(totalElements, AUDIT_MAX_VISIBLE_LOGS),
@@ -428,7 +428,7 @@ export default function OperationAuditPage() {
                     type="button"
                     disabled={loading || loadingMore}
                     onClick={handleLoadMore}
-                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
                   >
                     {loadingMore ? t('audit.pagination.loadingMore') : t('audit.pagination.loadMore')}
                   </button>

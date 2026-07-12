@@ -112,11 +112,11 @@ export function AccessGate({ children }: AccessGateProps) {
   }
 
   return (
-    <section className="rounded-xl border border-rose-200 bg-rose-50 px-5 py-4 text-rose-800 shadow-sm">
+    <section className="rounded-xl border border-rose-200 bg-rose-50 px-5 py-4 text-rose-800 shadow-sm dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200">
       <h2 className="text-lg font-semibold">{t('access.blockedTitle')}</h2>
       <p className="mt-1 text-sm">{t('access.blockedDescription')}</p>
       {email && (
-        <p className="mt-2 text-xs text-rose-700">
+        <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">
           {t('access.blockedEmail', { email })}
         </p>
       )}

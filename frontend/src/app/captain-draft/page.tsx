@@ -648,9 +648,9 @@ export default function CaptainDraftPage() {
 
   return (
     <section className="space-y-6">
-      <header className="space-y-1 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+      <header className="space-y-1 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <h2 className="text-2xl font-semibold tracking-tight">{t('captainDraft.title')}</h2>
-        <p className="text-sm text-slate-600">{t('captainDraft.description')}</p>
+        <p className="text-sm text-slate-600 dark:text-slate-300">{t('captainDraft.description')}</p>
       </header>
 
       {(playersError || error) && (
@@ -663,7 +663,7 @@ export default function CaptainDraftPage() {
         </Alert>
       )}
       {message && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
           {message}
         </div>
       )}
@@ -688,16 +688,16 @@ export default function CaptainDraftPage() {
           />
         </div>
 
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-900">{t('captainDraft.captain.title')}</h3>
+        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('captainDraft.captain.title')}</h3>
 
           <div className="mt-3 space-y-2">
-            <label className="block text-xs font-medium text-slate-500">
+              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">
               {t('captainDraft.captain.home')}
               <select
                 value={homeCaptainId ?? ''}
                 onChange={(event) => handleHomeCaptainChange(event.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
               >
                 <option value="">-</option>
                 {homeCaptainOptions.map((participant) => (
@@ -708,12 +708,12 @@ export default function CaptainDraftPage() {
               </select>
             </label>
 
-            <label className="block text-xs font-medium text-slate-500">
+              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">
               {t('captainDraft.captain.away')}
               <select
                 value={awayCaptainId ?? ''}
                 onChange={(event) => handleAwayCaptainChange(event.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
               >
                 <option value="">-</option>
                 {awayCaptainOptions.map((participant) => (
@@ -726,8 +726,8 @@ export default function CaptainDraftPage() {
           </div>
 
           <div className="mt-4">
-            <h4 className="text-xs font-semibold text-slate-700">{t('captainDraft.settings.title')}</h4>
-            <label className="mt-2 block text-xs font-medium text-slate-500">
+            <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-300">{t('captainDraft.settings.title')}</h4>
+            <label className="mt-2 block text-xs font-medium text-slate-500 dark:text-slate-400">
               {t('captainDraft.settings.setsPerRound')}
               <input
                 type="number"
@@ -741,17 +741,17 @@ export default function CaptainDraftPage() {
                   }
                   setSetsPerRound(Math.max(1, Math.min(8, value)))
                 }}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
               />
             </label>
-            <p className="mt-1 text-xs text-slate-500">{t('captainDraft.settings.helper')}</p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('captainDraft.settings.helper')}</p>
           </div>
 
           <div className="mt-4 flex gap-2">
             <button
               type="button"
               onClick={handleResetDraftSetup}
-              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               {t('captainDraft.actions.reset')}
             </button>
@@ -759,7 +759,7 @@ export default function CaptainDraftPage() {
               type="button"
               onClick={handleCreateDraft}
               disabled={isCreatingDraft}
-              className="flex-1 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="flex-1 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
             >
               {isCreatingDraft ? t('captainDraft.actions.creating') : t('captainDraft.actions.create')}
             </button>
@@ -767,14 +767,14 @@ export default function CaptainDraftPage() {
               type="button"
               onClick={handleRefreshDraft}
               disabled={draftLoading}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 dark:disabled:border-slate-700 dark:disabled:text-slate-500"
             >
               {t('captainDraft.actions.refresh')}
             </button>
           </div>
 
           {draft && (
-            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
               <p>
                 {t('captainDraft.status.label')}:{' '}
                 {draft.status === 'READY'
@@ -794,16 +794,16 @@ export default function CaptainDraftPage() {
 
       {draft && (
         <>
-          <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
-                <h3 className="text-sm font-semibold text-slate-900">{t('captainDraft.captain.acting')}</h3>
-                <p className="mt-1 text-xs text-slate-500">{t('captainDraft.captain.actingHelper')}</p>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('captainDraft.captain.acting')}</h3>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('captainDraft.captain.actingHelper')}</p>
               </div>
               <select
                 value={actingCaptainId ?? ''}
                 onChange={(event) => setActingCaptainId(normalizeSelectionValue(event.target.value))}
-                className="w-full max-w-sm rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              className="w-full max-w-sm rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
               >
                 <option value="">-</option>
                 {typeof draft.homeCaptainPlayerId === 'number' && (
@@ -821,28 +821,28 @@ export default function CaptainDraftPage() {
           </article>
 
           <div className="grid gap-4 xl:grid-cols-3">
-            <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm xl:col-span-2">
-              <h3 className="text-sm font-semibold text-slate-900">{t('captainDraft.pick.title')}</h3>
-              <p className="mt-1 text-xs text-slate-500">{t('captainDraft.pick.helper')}</p>
+        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 xl:col-span-2">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('captainDraft.pick.title')}</h3>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('captainDraft.pick.helper')}</p>
 
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <label className="block text-xs font-medium text-slate-500">
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">
                   {t('captainDraft.pick.turnTeam')}
                   <input
                     type="text"
                     value={teamLabel(draft.currentTurnTeam)}
                     disabled
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-700"
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
                   />
                 </label>
-                <label className="block text-xs font-medium text-slate-500">
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">
                   {t('captainDraft.pick.selectPlayer')}
                   <select
                     value={selectedPickPlayerId ?? ''}
                     onChange={(event) =>
                       setSelectedPickPlayerId(normalizeSelectionValue(event.target.value))
                     }
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                   >
                     <option value="">-</option>
                     {availablePickParticipants.map((participant) => (
@@ -859,20 +859,20 @@ export default function CaptainDraftPage() {
                   type="button"
                   onClick={handlePickPlayer}
                   disabled={!canPick}
-                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
                 >
                   {isPicking ? t('captainDraft.actions.picking') : t('captainDraft.actions.pick')}
                 </button>
               </div>
             </article>
 
-            <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h3 className="text-sm font-semibold text-slate-900">{t('captainDraft.pickLog.title')}</h3>
+        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('captainDraft.pickLog.title')}</h3>
               <div className="mt-3 space-y-2">
                 {draft.picks.map((pick) => (
                   <div
                     key={`pick-log-${pick.pickOrder}`}
-                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+                  className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
                   >
                     <p className="font-medium">#{pick.pickOrder}</p>
                     <p className="mt-1 text-xs">
@@ -881,7 +881,7 @@ export default function CaptainDraftPage() {
                   </div>
                 ))}
                 {draft.picks.length === 0 && (
-                  <div className="rounded-lg border border-dashed border-slate-200 px-3 py-6 text-center text-xs text-slate-500">
+              <div className="rounded-lg border border-dashed border-slate-200 px-3 py-6 text-center text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
                     {t('captainDraft.pickLog.empty')}
                   </div>
                 )}
@@ -889,71 +889,71 @@ export default function CaptainDraftPage() {
             </article>
           </div>
 
-          <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h3 className="text-sm font-semibold text-slate-900">{t('captainDraft.scoreboard.title')}</h3>
-            <p className="mt-1 text-xs text-slate-500">{t('captainDraft.scoreboard.helper')}</p>
+      <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('captainDraft.scoreboard.title')}</h3>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('captainDraft.scoreboard.helper')}</p>
 
-            <div className="mt-4 overflow-x-auto rounded-xl border border-slate-300 bg-white">
+        <div className="mt-4 overflow-x-auto rounded-xl border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-950">
               <table className="min-w-[520px] table-fixed border-collapse text-sm">
                 <thead>
-                  <tr className="bg-white">
-                    <th className="border border-slate-400 px-3 py-2 text-center text-lg font-semibold text-sky-700">
+              <tr className="bg-white dark:bg-slate-900">
+                <th className="border border-slate-400 px-3 py-2 text-center text-lg font-semibold text-sky-700 dark:border-slate-600 dark:text-sky-300">
                       {t('captainDraft.scoreboard.homeHeader')}
                     </th>
-                    <th className="w-16 border border-slate-400 px-2 py-2 text-center text-xs font-semibold text-slate-500">
+                <th className="w-16 border border-slate-400 px-2 py-2 text-center text-xs font-semibold text-slate-500 dark:border-slate-600 dark:text-slate-400">
                       {t('captainDraft.scoreboard.setWinsShort')}
                     </th>
-                    <th className="border border-slate-400 px-3 py-2 text-center text-lg font-semibold text-rose-700">
+                <th className="border border-slate-400 px-3 py-2 text-center text-lg font-semibold text-rose-700 dark:border-slate-600 dark:text-rose-300">
                       {t('captainDraft.scoreboard.awayHeader')}
                     </th>
-                    <th className="w-16 border border-slate-400 px-2 py-2 text-center text-xs font-semibold text-slate-500">
+                <th className="w-16 border border-slate-400 px-2 py-2 text-center text-xs font-semibold text-slate-500 dark:border-slate-600 dark:text-slate-400">
                       {t('captainDraft.scoreboard.setWinsShort')}
                     </th>
                   </tr>
-                  <tr className="bg-slate-50">
-                    <th className="border border-slate-400 px-3 py-3 text-center text-4xl font-bold text-slate-900">
+              <tr className="bg-slate-50 dark:bg-slate-800">
+                <th className="border border-slate-400 px-3 py-3 text-center text-4xl font-bold text-slate-900 dark:border-slate-600 dark:text-slate-100">
                       {homeTeamSetWins}
                     </th>
-                    <th className="border border-slate-400 px-2 py-3 text-center text-xs font-semibold text-slate-500">
+                <th className="border border-slate-400 px-2 py-3 text-center text-xs font-semibold text-slate-500 dark:border-slate-600 dark:text-slate-400">
                       &nbsp;
                     </th>
-                    <th className="border border-slate-400 px-3 py-3 text-center text-4xl font-bold text-slate-900">
+                <th className="border border-slate-400 px-3 py-3 text-center text-4xl font-bold text-slate-900 dark:border-slate-600 dark:text-slate-100">
                       {awayTeamSetWins}
                     </th>
-                    <th className="border border-slate-400 px-2 py-3 text-center text-xs font-semibold text-slate-500">
+                <th className="border border-slate-400 px-2 py-3 text-center text-xs font-semibold text-slate-500 dark:border-slate-600 dark:text-slate-400">
                       &nbsp;
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {compactTeamRows.map((row, index) => (
-                    <tr key={`scoreboard-row-${index}`} className="bg-white">
-                      <td className="border border-slate-300 px-3 py-2 text-center font-medium text-slate-800">
+                <tr key={`scoreboard-row-${index}`} className="bg-white dark:bg-slate-900">
+                  <td className="border border-slate-300 px-3 py-2 text-center font-medium text-slate-800 dark:border-slate-700 dark:text-slate-200">
                         {row.home ? (
                           <span>
                             {row.home.nickname}
                             {row.home.captain ? ` ${t('captainDraft.teams.captainBadge')}` : ''}
                           </span>
                         ) : (
-                          <span className="text-slate-400">-</span>
+                      <span className="text-slate-400 dark:text-slate-500">-</span>
                         )}
                       </td>
-                      <td className="border border-slate-300 px-2 py-2 text-center font-semibold text-slate-700">
+                  <td className="border border-slate-300 px-2 py-2 text-center font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-300">
                         {row.home && typeof row.home.playerId === 'number'
                           ? (homePlayerSetWins.get(row.home.playerId) ?? 0)
                           : 0}
                       </td>
-                      <td className="border border-slate-300 px-3 py-2 text-center font-medium text-slate-800">
+                  <td className="border border-slate-300 px-3 py-2 text-center font-medium text-slate-800 dark:border-slate-700 dark:text-slate-200">
                         {row.away ? (
                           <span>
                             {row.away.nickname}
                             {row.away.captain ? ` ${t('captainDraft.teams.captainBadge')}` : ''}
                           </span>
                         ) : (
-                          <span className="text-slate-400">-</span>
+                      <span className="text-slate-400 dark:text-slate-500">-</span>
                         )}
                       </td>
-                      <td className="border border-slate-300 px-2 py-2 text-center font-semibold text-slate-700">
+                  <td className="border border-slate-300 px-2 py-2 text-center font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-300">
                         {row.away && typeof row.away.playerId === 'number'
                           ? (awayPlayerSetWins.get(row.away.playerId) ?? 0)
                           : 0}
@@ -965,13 +965,13 @@ export default function CaptainDraftPage() {
             </div>
 
             {unassignedParticipants.length > 0 && (
-              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <h4 className="text-sm font-semibold text-slate-900">{t('captainDraft.teams.unassigned')}</h4>
+        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
+          <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('captainDraft.teams.unassigned')}</h4>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {unassignedParticipants.map((participant) => (
                     <span
                       key={`unassigned-chip-${participant.playerId}`}
-                      className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700"
+                className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
                     >
                       {participant.nickname} ({participant.race})
                     </span>
@@ -981,34 +981,34 @@ export default function CaptainDraftPage() {
             )}
           </article>
 
-          <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h3 className="text-sm font-semibold text-slate-900">{t('captainDraft.entry.title')}</h3>
-            <p className="mt-1 text-xs text-slate-500">{t('captainDraft.entry.helper')}</p>
+      <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('captainDraft.entry.title')}</h3>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('captainDraft.entry.helper')}</p>
 
             <div className="mt-4 space-y-4">
-              <div className="overflow-x-auto rounded-xl border border-slate-300 bg-white">
+          <div className="overflow-x-auto rounded-xl border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-950">
                 <table className="min-w-[980px] table-fixed border-collapse text-sm">
                   <thead>
-                    <tr className="bg-[#f4eadf] text-slate-900">
-                      <th className="w-24 border border-slate-400 px-3 py-2 text-center font-semibold">
+                <tr className="bg-[#f4eadf] text-slate-900 dark:bg-[#5b4438] dark:text-slate-100">
+                  <th className="w-24 border border-slate-400 px-3 py-2 text-center font-semibold dark:border-slate-600">
                         {t('captainDraft.entry.roundLabel')}
                       </th>
-                      <th className="w-24 border border-slate-400 px-3 py-2 text-center font-semibold">
+                  <th className="w-24 border border-slate-400 px-3 py-2 text-center font-semibold dark:border-slate-600">
                         {t('captainDraft.entry.raceLabel')}
                       </th>
-                      <th className="w-24 border border-slate-400 px-3 py-2 text-center font-semibold">
+                  <th className="w-24 border border-slate-400 px-3 py-2 text-center font-semibold dark:border-slate-600">
                         {t('captainDraft.entry.requiredTierLabel')}
                       </th>
-                      <th className="w-56 border border-slate-400 px-3 py-2 text-center font-semibold text-sky-700">
+                  <th className="w-56 border border-slate-400 px-3 py-2 text-center font-semibold text-sky-700 dark:border-slate-600 dark:text-sky-300">
                         {t('captainDraft.entry.homeSheetLabel')}
                       </th>
-                      <th className="w-56 border border-slate-400 px-3 py-2 text-center font-semibold text-rose-700">
+                  <th className="w-56 border border-slate-400 px-3 py-2 text-center font-semibold text-rose-700 dark:border-slate-600 dark:text-rose-300">
                         {t('captainDraft.entry.awaySheetLabel')}
                       </th>
-                      <th className="w-24 border border-slate-400 px-3 py-2 text-center font-semibold">
+                  <th className="w-24 border border-slate-400 px-3 py-2 text-center font-semibold dark:border-slate-600">
                         {t('captainDraft.entry.resultLabel')}
                       </th>
-                      <th className="w-24 border border-slate-400 px-3 py-2 text-center font-semibold">
+                  <th className="w-24 border border-slate-400 px-3 py-2 text-center font-semibold dark:border-slate-600">
                         {t('captainDraft.entry.finalWinLabel')}
                       </th>
                     </tr>
@@ -1045,23 +1045,23 @@ export default function CaptainDraftPage() {
                         return (
                           <tr
                             key={`entry-${key}`}
-                            className={`bg-white ${dividerClass}`.trim()}
+                    className={`bg-white dark:bg-slate-900 ${dividerClass}`.trim()}
                           >
                             {entryIndex === 0 && (
                               <th
                                 rowSpan={roundGroup.entries.length}
-                                className={`border border-slate-400 bg-white px-3 py-2 text-center align-middle text-base font-semibold text-slate-900 ${dividerClass}`.trim()}
+                      className={`border border-slate-400 bg-white px-3 py-2 text-center align-middle text-base font-semibold text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 ${dividerClass}`.trim()}
                               >
                                 {t('captainDraft.entry.roundOnly', { round: roundGroup.roundNumber })}
                               </th>
                             )}
-                            <td className={`border border-slate-300 bg-slate-50 px-3 py-2 text-center font-medium text-slate-800 ${dividerClass}`.trim()}>
+                    <td className={`border border-slate-300 bg-slate-50 px-3 py-2 text-center font-medium text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 ${dividerClass}`.trim()}>
                               {entry.roundCode}
                             </td>
-                            <td className={`border border-slate-300 px-3 py-2 text-center text-slate-500 ${dividerClass}`.trim()}>
+                    <td className={`border border-slate-300 px-3 py-2 text-center text-slate-500 dark:border-slate-700 dark:text-slate-400 ${dividerClass}`.trim()}>
                               &nbsp;
                             </td>
-                            <td className={`border border-slate-300 px-2 py-1 ${dividerClass}`.trim()}>
+                    <td className={`border border-slate-300 px-2 py-1 dark:border-slate-700 ${dividerClass}`.trim()}>
                               {actingCaptainTeam === 'HOME' ? (
                                 <select
                                   value={selectedPlayerId === '' ? '' : selectedPlayerId ?? ''}
@@ -1071,7 +1071,7 @@ export default function CaptainDraftPage() {
                                       normalizeSelectionValue(event.target.value),
                                     )
                                   }
-                                  className="w-full border-0 bg-transparent px-2 py-2 text-sm font-medium text-sky-700 outline-none focus:bg-sky-50"
+                        className="w-full border-0 bg-transparent px-2 py-2 text-sm font-medium text-sky-700 outline-none focus:bg-sky-50 dark:text-sky-300 dark:focus:bg-sky-950/50"
                                 >
                                   <option value="">{t('captainDraft.entry.notSet')}</option>
                                   {actingTeamParticipants.map((participant) => (
@@ -1084,12 +1084,12 @@ export default function CaptainDraftPage() {
                                   ))}
                                 </select>
                               ) : (
-                                <div className="px-2 py-2 text-sm font-medium text-sky-700">
+                        <div className="px-2 py-2 text-sm font-medium text-sky-700 dark:text-sky-300">
                                   {entry.homePlayerNickname ?? t('captainDraft.entry.notSet')}
                                 </div>
                               )}
                             </td>
-                            <td className={`border border-slate-300 px-2 py-1 ${dividerClass}`.trim()}>
+                    <td className={`border border-slate-300 px-2 py-1 dark:border-slate-700 ${dividerClass}`.trim()}>
                               {actingCaptainTeam === 'AWAY' ? (
                                 <select
                                   value={selectedPlayerId === '' ? '' : selectedPlayerId ?? ''}
@@ -1099,7 +1099,7 @@ export default function CaptainDraftPage() {
                                       normalizeSelectionValue(event.target.value),
                                     )
                                   }
-                                  className="w-full border-0 bg-transparent px-2 py-2 text-sm font-medium text-rose-700 outline-none focus:bg-rose-50"
+                        className="w-full border-0 bg-transparent px-2 py-2 text-sm font-medium text-rose-700 outline-none focus:bg-rose-50 dark:text-rose-300 dark:focus:bg-rose-950/50"
                                 >
                                   <option value="">{t('captainDraft.entry.notSet')}</option>
                                   {actingTeamParticipants.map((participant) => (
@@ -1112,12 +1112,12 @@ export default function CaptainDraftPage() {
                                   ))}
                                 </select>
                               ) : (
-                                <div className="px-2 py-2 text-sm font-medium text-rose-700">
+                        <div className="px-2 py-2 text-sm font-medium text-rose-700 dark:text-rose-300">
                                   {entry.awayPlayerNickname ?? t('captainDraft.entry.notSet')}
                                 </div>
                               )}
                             </td>
-                            <td className={`border border-slate-300 px-2 py-1 text-center ${dividerClass}`.trim()}>
+                    <td className={`border border-slate-300 px-2 py-1 text-center dark:border-slate-700 ${dividerClass}`.trim()}>
                               <select
                                 value={selectedWinnerTeam}
                                 onChange={(event) =>
@@ -1126,7 +1126,7 @@ export default function CaptainDraftPage() {
                                     event.target.value as DraftWinnerSelection,
                                   )
                                 }
-                                className="w-full border-0 bg-transparent px-2 py-2 text-sm font-medium text-slate-700 outline-none focus:bg-slate-50"
+                        className="w-full border-0 bg-transparent px-2 py-2 text-sm font-medium text-slate-700 outline-none focus:bg-slate-50 dark:text-slate-200 dark:focus:bg-slate-800"
                               >
                                 <option value="">{t('captainDraft.entry.notSet')}</option>
                                 {winnerTeamOptions.map((option) => (
@@ -1136,7 +1136,7 @@ export default function CaptainDraftPage() {
                                 ))}
                               </select>
                             </td>
-                            <td className={`border border-slate-300 px-3 py-2 text-center text-slate-700 ${dividerClass}`.trim()}>
+                    <td className={`border border-slate-300 px-3 py-2 text-center text-slate-700 dark:border-slate-700 dark:text-slate-300 ${dividerClass}`.trim()}>
                               {entryIndex === 0
                                 ? `${roundHomeWins} : ${roundAwayWins}`
                                 : ''}
@@ -1154,7 +1154,7 @@ export default function CaptainDraftPage() {
                   type="button"
                   onClick={handleSaveEntries}
                   disabled={isSavingEntries || !actingCaptainId || actingCaptainTeam === 'UNASSIGNED'}
-                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
                 >
                   {isSavingEntries
                     ? t('captainDraft.actions.savingEntries')
@@ -1167,7 +1167,7 @@ export default function CaptainDraftPage() {
       )}
 
       {!draftLoading && !draft && (
-        <article className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-10 text-center text-sm text-slate-600">
+        <article className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-10 text-center text-sm text-slate-600 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300">
           {t('captainDraft.emptyDraft')}
         </article>
       )}

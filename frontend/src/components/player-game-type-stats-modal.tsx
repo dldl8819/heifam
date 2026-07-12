@@ -52,22 +52,22 @@ export function PlayerGameTypeStatsModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6 dark:bg-black/70"
       role="dialog"
       aria-modal="true"
       aria-labelledby="player-game-type-stats-title"
     >
-      <article className="w-full max-w-xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+      <article className="w-full max-w-xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
           <div>
-            <h2 id="player-game-type-stats-title" className="text-lg font-bold text-slate-950">
+            <h2 id="player-game-type-stats-title" className="text-lg font-bold text-slate-950 dark:text-slate-100">
               {t('statsModal.title', { nickname: playerName })}
             </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+            className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             {t('statsModal.close')}
           </button>
@@ -77,13 +77,13 @@ export function PlayerGameTypeStatsModal({
           {loading ? (
             <LoadingIndicator label={t('statsModal.loading')} className="py-8" />
           ) : error ? (
-            <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+            <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300">
               {error}
             </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">
-                <thead className="bg-slate-50 text-xs text-slate-500">
+                <thead className="bg-slate-50 text-xs text-slate-500 dark:bg-slate-800/80 dark:text-slate-300">
                   <tr>
                     <th className="px-3 py-2">{t('statsModal.table.gameType')}</th>
                     <th className="px-3 py-2">{t('statsModal.table.wins')}</th>
@@ -96,12 +96,12 @@ export function PlayerGameTypeStatsModal({
                   {DISPLAY_GAME_TYPES.map((gameType) => {
                     const stat = resolveStat(stats, gameType)
                     return (
-                      <tr key={gameType} className="border-t border-slate-100">
-                        <td className="px-3 py-2 font-semibold text-slate-900">{gameType}</td>
-                        <td className="px-3 py-2 text-slate-700">{stat.wins}</td>
-                        <td className="px-3 py-2 text-slate-700">{stat.losses}</td>
-                        <td className="px-3 py-2 text-slate-700">{stat.games}</td>
-                        <td className="px-3 py-2 text-slate-700">{formatWinRate(stat.winRate)}</td>
+                    <tr key={gameType} className="border-t border-slate-100 dark:border-slate-800">
+                      <td className="px-3 py-2 font-semibold text-slate-900 dark:text-slate-100">{gameType}</td>
+                      <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{stat.wins}</td>
+                      <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{stat.losses}</td>
+                      <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{stat.games}</td>
+                      <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{formatWinRate(stat.winRate)}</td>
                       </tr>
                     )
                   })}

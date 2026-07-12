@@ -20,47 +20,47 @@ const sizeClassMap: Record<AlertSize, string> = {
 
 const appearanceClassMap: Record<AlertAppearance, string> = {
   solid: 'border-transparent',
-  outline: 'border-slate-200 bg-white text-slate-900',
+  outline: 'border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
   light: 'border-slate-200 bg-slate-50 text-slate-900',
-  stroke: 'border-slate-300 bg-transparent text-slate-900',
+  stroke: 'border-slate-300 bg-transparent text-slate-900 dark:border-slate-600 dark:text-slate-100',
 }
 
 const solidVariantClassMap: Record<AlertVariant, string> = {
-  secondary: 'bg-slate-100 text-slate-900',
+  secondary: 'bg-slate-100 text-slate-900 dark:bg-slate-700 dark:text-slate-100',
   primary: 'bg-indigo-600 text-white',
   destructive: 'bg-rose-600 text-white',
   success: 'bg-emerald-600 text-white',
   info: 'bg-sky-600 text-white',
   warning: 'bg-amber-500 text-slate-900',
-  mono: 'bg-slate-950 text-white',
+  mono: 'bg-slate-950 text-white dark:bg-slate-800',
 }
 
 const lightVariantClassMap: Record<AlertVariant, string> = {
-  secondary: 'bg-slate-50 border-slate-200 text-slate-900',
-  primary: 'bg-indigo-50 border-indigo-200 text-slate-900',
-  destructive: 'bg-rose-50 border-rose-200 text-slate-900',
-  success: 'bg-emerald-50 border-emerald-200 text-slate-900',
-  info: 'bg-sky-50 border-sky-200 text-slate-900',
-  warning: 'bg-amber-50 border-amber-200 text-slate-900',
-  mono: 'bg-slate-100 border-slate-200 text-slate-900',
+  secondary: 'bg-slate-50 border-slate-200 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100',
+  primary: 'bg-indigo-50 border-indigo-200 text-slate-900 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-200',
+  destructive: 'bg-rose-50 border-rose-200 text-slate-900 dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-200',
+  success: 'bg-emerald-50 border-emerald-200 text-slate-900 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200',
+  info: 'bg-sky-50 border-sky-200 text-slate-900 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-200',
+  warning: 'bg-amber-50 border-amber-200 text-slate-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200',
+  mono: 'bg-slate-100 border-slate-200 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100',
 }
 
 const outlineToneClassMap: Record<AlertVariant, string> = {
-  secondary: 'text-slate-900',
-  primary: 'text-indigo-700',
-  destructive: 'text-rose-700',
-  success: 'text-emerald-700',
-  info: 'text-sky-700',
-  warning: 'text-amber-700',
-  mono: 'text-slate-900',
+  secondary: 'text-slate-900 dark:text-slate-100',
+  primary: 'text-indigo-700 dark:text-indigo-300',
+  destructive: 'text-rose-700 dark:text-rose-300',
+  success: 'text-emerald-700 dark:text-emerald-300',
+  info: 'text-sky-700 dark:text-sky-300',
+  warning: 'text-amber-700 dark:text-amber-300',
+  mono: 'text-slate-900 dark:text-slate-100',
 }
 
 const iconToneClassMap: Record<AlertIconTone, string> = {
-  primary: 'text-indigo-600',
-  destructive: 'text-rose-600',
-  success: 'text-emerald-600',
-  info: 'text-sky-600',
-  warning: 'text-amber-600',
+  primary: 'text-indigo-600 dark:text-indigo-300',
+  destructive: 'text-rose-600 dark:text-rose-300',
+  success: 'text-emerald-600 dark:text-emerald-300',
+  info: 'text-sky-600 dark:text-sky-300',
+  warning: 'text-amber-600 dark:text-amber-300',
 }
 
 function getAlertToneClass(variant: AlertVariant, appearance: AlertAppearance): string {

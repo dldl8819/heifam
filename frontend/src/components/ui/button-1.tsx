@@ -19,8 +19,8 @@ const sizeClassMap: Record<ButtonSize, string> = {
 }
 
 const variantClassMap: Record<ButtonVariant, string> = {
-  default: 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
-  inverse: 'border border-slate-200/70 bg-transparent text-current hover:bg-black/5',
+  default: 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800',
+  inverse: 'border border-slate-200/70 bg-transparent text-current hover:bg-black/5 dark:hover:bg-white/10',
 }
 
 const modeClassMap: Record<ButtonMode, string> = {
@@ -40,7 +40,7 @@ export function Button({
     <button
       type={type}
       className={cn(
-        'inline-flex items-center justify-center rounded-md font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+        'inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-slate-900',
         sizeClassMap[size],
         variantClassMap[variant],
         modeClassMap[mode],

@@ -36,21 +36,21 @@ type TierRow = {
 }
 
 const TIER_ROWS: TierRow[] = [
-  { key: 'S', label: 'S', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950' },
-  { key: 'A+', label: 'A+', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950' },
-  { key: 'A', label: 'A', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950' },
-  { key: 'A-', label: 'A-', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950' },
-  { key: 'B+', label: 'B+', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950' },
-  { key: 'B', label: 'B', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950' },
-  { key: 'B-', label: 'B-', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950' },
-  { key: 'C+', label: 'C+', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950' },
-  { key: 'C', label: 'C', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950' },
-  { key: 'C-', label: 'C-', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950' },
-  { key: 'D', label: 'D', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950' },
+  { key: 'S', label: 'S', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950 dark:bg-[#5b4438] dark:text-slate-100' },
+  { key: 'A+', label: 'A+', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950 dark:bg-[#5b4438] dark:text-slate-100' },
+  { key: 'A', label: 'A', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950 dark:bg-[#5b4438] dark:text-slate-100' },
+  { key: 'A-', label: 'A-', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950 dark:bg-[#5b4438] dark:text-slate-100' },
+  { key: 'B+', label: 'B+', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950 dark:bg-[#5b4438] dark:text-slate-100' },
+  { key: 'B', label: 'B', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950 dark:bg-[#5b4438] dark:text-slate-100' },
+  { key: 'B-', label: 'B-', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950 dark:bg-[#5b4438] dark:text-slate-100' },
+  { key: 'C+', label: 'C+', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950 dark:bg-[#5b4438] dark:text-slate-100' },
+  { key: 'C', label: 'C', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950 dark:bg-[#5b4438] dark:text-slate-100' },
+  { key: 'C-', label: 'C-', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950 dark:bg-[#5b4438] dark:text-slate-100' },
+  { key: 'D', label: 'D', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950 dark:bg-[#5b4438] dark:text-slate-100' },
   {
     key: 'UNASSIGNED',
     label: t('common.tierBoard.unassigned'),
-    rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950',
+    rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950 dark:bg-[#5b4438] dark:text-slate-100',
   },
 ]
 
@@ -129,29 +129,29 @@ export function TierParticipantBoard({
   }
 
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-          <p className="mt-1 text-xs text-slate-500">{helper}</p>
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h3>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{helper}</p>
         </div>
         <button
           type="button"
           onClick={onReset}
-          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
+          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
         >
           {resetLabel}
         </button>
       </div>
 
-      <p className="mt-3 text-xs font-medium text-slate-500">{selectedCountLabel}</p>
+      <p className="mt-3 text-xs font-medium text-slate-500 dark:text-slate-400">{selectedCountLabel}</p>
 
       {loading ? (
-        <div className="mt-4 rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-500">
+        <div className="mt-4 rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
           {t('common.loading')}
         </div>
       ) : players.length === 0 ? (
-        <div className="mt-4 rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-500">
+        <div className="mt-4 rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
           {emptyMessage}
         </div>
       ) : (
@@ -173,7 +173,7 @@ export function TierParticipantBoard({
               return (
                 <label
                   key={`tier-board-slot-${index}`}
-                  className="space-y-1 text-xs font-medium text-slate-500"
+                  className="space-y-1 text-xs font-medium text-slate-500 dark:text-slate-400"
                 >
                   {t('common.tierBoard.slot', { index: index + 1 })}
                   <input
@@ -186,31 +186,31 @@ export function TierParticipantBoard({
                     value={slot.inputValue}
                     onChange={(event) => onSlotInputChange(index, event.target.value)}
                     onKeyDown={(event) => handleSlotKeyDown(event, index)}
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                     placeholder={t('common.tierBoard.placeholder')}
                   />
                   {selectedPlayer && (
-                    <p className="text-[11px] text-slate-500">
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
                       {formatParticipantSlotLabel(selectedPlayer, showMmr)}
                     </p>
                   )}
                   {isDuplicateSelection && (
-                    <p className="text-[11px] text-rose-700">{duplicateMessage}</p>
+                    <p className="text-[11px] text-rose-700 dark:text-rose-300">{duplicateMessage}</p>
                   )}
                 </label>
               )
             })}
           </div>
 
-          <div className="mt-5 rounded-[24px] border border-[#d5c4ab] bg-[#fbf4e8] p-4 shadow-sm sm:p-5">
+          <div className="mt-5 rounded-[24px] border border-[#d5c4ab] bg-[#fbf4e8] p-4 shadow-sm dark:border-[#6f5b3c] dark:bg-slate-950 sm:p-5">
             <div className="text-center">
-              <h4 className="text-2xl font-semibold tracking-tight text-[#6f5b3c] sm:text-4xl">
+              <h4 className="text-2xl font-semibold tracking-tight text-[#6f5b3c] dark:text-amber-200 sm:text-4xl">
                 {t('common.tierBoard.title')}
               </h4>
-              <p className="mt-2 text-xs text-[#8b7551]">{selectedCountLabel}</p>
+              <p className="mt-2 text-xs text-[#8b7551] dark:text-amber-300/80">{selectedCountLabel}</p>
             </div>
 
-            <div className="mt-4 overflow-x-auto rounded-xl border border-[#8d7760] bg-white/90">
+            <div className="mt-4 overflow-x-auto rounded-xl border border-[#8d7760] bg-white/90 dark:border-slate-600 dark:bg-slate-950/90">
               <table
                 className="w-full border-collapse text-xs sm:text-sm"
                 style={{ minWidth: `${Math.max(520, 96 + boardColumnCount * 104)}px` }}
@@ -220,7 +220,7 @@ export function TierParticipantBoard({
                     <tr key={`tier-board-row-${row.key}`} className="text-center">
                       <th
                         className={cn(
-                          'w-20 border border-[#8d7760] px-2 py-2 font-semibold',
+                          'w-20 border border-[#8d7760] px-2 py-2 font-semibold dark:border-slate-600',
                           row.rowHeaderClassName,
                         )}
                       >
@@ -232,12 +232,12 @@ export function TierParticipantBoard({
                           <td
                             key={`tier-board-cell-${row.key}-${columnIndex}`}
                             className={cn(
-                              'h-10 border border-[#8d7760] px-2 py-1.5 align-middle',
-                              player ? 'bg-[#dff0f7]' : 'bg-white',
+                              'h-10 border border-[#8d7760] px-2 py-1.5 align-middle dark:border-slate-600',
+                              player ? 'bg-[#dff0f7] dark:bg-sky-950/60' : 'bg-white dark:bg-slate-950',
                             )}
                           >
                             {player ? (
-                              <span className="block truncate text-sm font-medium text-slate-900">
+                              <span className="block truncate text-sm font-medium text-slate-900 dark:text-slate-100">
                                 {player.nickname}
                               </span>
                             ) : (

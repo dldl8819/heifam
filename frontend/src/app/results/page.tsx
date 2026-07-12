@@ -829,7 +829,7 @@ export default function ResultsPage() {
   return (
     <section className="space-y-6">
       {canUseManualEntry && (
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <button
             type="button"
             onClick={() => setManualEntryOpen((previous) => !previous)}
@@ -838,12 +838,12 @@ export default function ResultsPage() {
             className="flex w-full items-center justify-between gap-4 text-left"
           >
             <span className="block space-y-1">
-              <span className="block text-sm font-semibold text-slate-900">{t('results.operator.title')}</span>
-              <span className="block text-xs text-slate-500">{t('results.operator.description')}</span>
+              <span className="block text-sm font-semibold text-slate-900 dark:text-slate-100">{t('results.operator.title')}</span>
+              <span className="block text-xs text-slate-500 dark:text-slate-400">{t('results.operator.description')}</span>
             </span>
             <span
               aria-hidden="true"
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-base font-semibold text-slate-700"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-base font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             >
               {manualEntryOpen ? '-' : '+'}
             </span>
@@ -852,7 +852,7 @@ export default function ResultsPage() {
           {manualEntryOpen && (
             <div id="manual-match-entry-panel" className="mt-4 space-y-4">
               {isAdmin && (
-                <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+              <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-950">
                   {(['existing', 'manual'] as const).map((mode) => {
                     const selected = operatorEntryMode === mode
                     return (
@@ -862,8 +862,8 @@ export default function ResultsPage() {
                         onClick={() => setOperatorEntryMode(mode)}
                         className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                           selected
-                            ? 'bg-slate-900 text-white'
-                            : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                          ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                          : 'text-slate-600 hover:bg-white hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'
                         }`}
                       >
                         {mode === 'existing'
@@ -876,18 +876,18 @@ export default function ResultsPage() {
               )}
 
               {isAdmin && operatorEntryMode === 'existing' ? (
-                <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300">
                   {t('results.operator.existingHelper')}
                 </p>
               ) : (
                 <form className="space-y-4" onSubmit={handleManualSubmit}>
               <div className="grid gap-4 lg:grid-cols-2">
                 <label className="space-y-1 text-sm">
-                  <span className="font-medium text-slate-700">{t('results.manual.teamSizeLabel')}</span>
+                  <span className="font-medium text-slate-700 dark:text-slate-300">{t('results.manual.teamSizeLabel')}</span>
                   <select
                     value={manualTeamSize}
                     onChange={(event) => setManualTeamSize(event.target.value === '2' ? 2 : 3)}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                   >
                     {manualTeamSizeOptions.map((teamSizeOption) => (
                       <option key={teamSizeOption} value={teamSizeOption}>
@@ -900,13 +900,13 @@ export default function ResultsPage() {
                 </label>
 
                 <label className="space-y-1 text-sm">
-                  <span className="font-medium text-slate-700">{t('results.manual.raceCompositionLabel')}</span>
+                  <span className="font-medium text-slate-700 dark:text-slate-300">{t('results.manual.raceCompositionLabel')}</span>
                   <select
                     value={manualRaceComposition ?? ''}
                     onChange={(event) =>
                       setManualRaceComposition(normalizeRaceComposition(manualTeamSize, event.target.value))
                     }
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                   >
                     <option value="">{t('results.manual.raceCompositionPlaceholder')}</option>
                     {getRaceCompositionOptions(manualTeamSize).map((option) => (
@@ -920,12 +920,12 @@ export default function ResultsPage() {
 
               <div className="grid gap-4 lg:grid-cols-1">
                 <label className="space-y-1 text-sm">
-                  <span className="font-medium text-slate-700">{t('results.manual.winnerLabel')}</span>
+                  <span className="font-medium text-slate-700 dark:text-slate-300">{t('results.manual.winnerLabel')}</span>
                   <select
                     ref={manualWinnerTeamRef}
                     value={manualWinnerTeam}
                     onChange={(event) => setManualWinnerTeam(event.target.value as ManualWinnerTeam)}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                   >
                     <option value="">{t('results.manual.validation.winnerRequired')}</option>
                     {winnerTeamOptions.map((team) => (
@@ -952,8 +952,8 @@ export default function ResultsPage() {
                     ['HOME', manualHomeSlots, manualHomeInputs, t('results.manual.homeTitle')],
                     ['AWAY', manualAwaySlots, manualAwayInputs, t('results.manual.awayTitle')],
                   ] as const).map(([team, slots, inputs, title]) => (
-                    <div key={team} className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-                      <h4 className="text-sm font-semibold text-slate-900">{title}</h4>
+                    <div key={team} className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-800/60">
+                      <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h4>
                       <div className="space-y-2">
                         {slots.map((selectedPlayerId, slotIndex) => {
                           const selectedPlayer =
@@ -967,7 +967,7 @@ export default function ResultsPage() {
                           return (
                             <label
                               key={`${team}-slot-${slotIndex}`}
-                              className="space-y-1 text-xs font-medium text-slate-500"
+                            className="space-y-1 text-xs font-medium text-slate-500 dark:text-slate-400"
                             >
                               {t('results.manual.playerPlaceholder', { slot: slotIndex + 1 })}
                               <input
@@ -991,16 +991,16 @@ export default function ResultsPage() {
                                     event.preventDefault()
                                   }
                                 }}
-                                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                                 placeholder={t('results.manual.playerInputPlaceholder')}
                               />
                               {selectedPlayer && (
-                                <p className="text-[11px] text-slate-500">
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400">
                                   {formatManualPlayerLabel(selectedPlayer, showMmr)}
                                 </p>
                               )}
                               {isDuplicateSelection && (
-                                <p className="text-[11px] text-rose-700">
+                              <p className="text-[11px] text-rose-700 dark:text-rose-300">
                                   {t('results.manual.validation.duplicatePlayers')}
                                 </p>
                               )}
@@ -1022,7 +1022,7 @@ export default function ResultsPage() {
                 </Alert>
               )}
               {manualSubmitSuccess && (
-                <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
                   {manualSubmitSuccess}
                 </p>
               )}
@@ -1030,12 +1030,12 @@ export default function ResultsPage() {
               <button
                 type="submit"
                 disabled={manualSubmitting || manualPlayersLoading || manualRaceComposition === null}
-                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
               >
                 {manualSubmitting ? t('results.manual.submitting') : t('results.manual.submit')}
               </button>
               {!manualRaceComposition && (
-                <p className="text-xs text-rose-700">
+                <p className="text-xs text-rose-700 dark:text-rose-300">
                   {t('results.manual.validation.raceCompositionRequired')}
                 </p>
               )}
@@ -1046,11 +1046,11 @@ export default function ResultsPage() {
         </article>
       )}
 
-      <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h3 className="text-sm font-semibold text-slate-900">{t('results.recent.title')}</h3>
-        <p className="mt-1 text-xs text-slate-500">{t('results.recent.description')}</p>
+      <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('results.recent.title')}</h3>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('results.recent.description')}</p>
         {recentActionMessage && (
-          <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+          <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
             {recentActionMessage}
           </p>
         )}
@@ -1076,15 +1076,15 @@ export default function ResultsPage() {
         )}
 
         {!recentMatchesLoading && !recentMatchesError && recentMatches.length === 0 && (
-          <div className="mt-3 rounded-lg border border-dashed border-slate-200 px-3 py-8 text-center text-sm text-slate-500">
+          <div className="mt-3 rounded-lg border border-dashed border-slate-200 px-3 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
             {t('results.recent.empty')}
           </div>
         )}
 
         {!recentMatchesLoading && !recentMatchesError && recentMatches.length > 0 && (
-          <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200">
+          <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
             <table className="min-w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs tracking-wide text-slate-500">
+              <thead className="bg-slate-50 text-xs tracking-wide text-slate-500 dark:bg-slate-800/80 dark:text-slate-300">
                 <tr>
                   <th className="px-3 py-2">{t('results.recent.table.displayOrder')}</th>
                   {isSuperAdmin && <th className="px-3 py-2">{t('results.recent.table.matchId')}</th>}
@@ -1102,24 +1102,24 @@ export default function ResultsPage() {
                 {recentMatches.map((recentMatch) => (
                   <tr
                     key={`recent-match-${recentMatch.matchId}`}
-                    className={`border-t border-slate-100 transition-colors hover:bg-slate-50 ${
-                      selectedRecentMatchId === recentMatch.matchId ? 'bg-amber-50/60' : ''
+                    className={`border-t border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/60 ${
+                      selectedRecentMatchId === recentMatch.matchId ? 'bg-amber-50/60 dark:bg-amber-950/30' : ''
                     }`}
                   >
-                    <td className="px-3 py-2 font-medium text-slate-900">
+                    <td className="px-3 py-2 font-medium text-slate-900 dark:text-slate-100">
                       {recentMatchDisplayOrderMap.get(recentMatch.matchId) ?? '-'}
                     </td>
                     {isSuperAdmin && (
-                      <td className="px-3 py-2 font-medium text-slate-900">{recentMatch.matchId}</td>
+                      <td className="px-3 py-2 font-medium text-slate-900 dark:text-slate-100">{recentMatch.matchId}</td>
                     )}
-                    <td className="px-3 py-2 text-slate-700">{formatMatchInputAt(recentMatch)}</td>
-                    <td className="px-3 py-2 text-slate-700">{formatRecordedBy(recentMatch.resultRecordedByNickname)}</td>
-                    <td className="px-3 py-2 text-slate-700">
+                    <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{formatMatchInputAt(recentMatch)}</td>
+                    <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{formatRecordedBy(recentMatch.resultRecordedByNickname)}</td>
+                    <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
                       {selectedRecentMatchId === recentMatch.matchId && isAdmin ? (
                         <select
                           value={selectedRecentWinnerTeam}
                           onChange={(event) => setSelectedRecentWinnerTeam(event.target.value as TeamSide)}
-                          className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+                          className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                         >
                           {winnerTeamOptions.map((team) => (
                             <option key={`${recentMatch.matchId}-${team}`} value={team}>
@@ -1131,14 +1131,14 @@ export default function ResultsPage() {
                         formatTeamLabel(recentMatch.winningTeam)
                       )}
                     </td>
-                    <td className="px-3 py-2 text-slate-700">
+                    <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
                       {formatRaceMatchup(recentMatch)}
                     </td>
                     <td
                       className={`px-3 py-2 ${
                         isWinningTeam('HOME', recentMatch.winningTeam)
-                          ? 'font-medium text-emerald-700'
-                          : 'text-slate-700'
+                          ? 'font-medium text-emerald-700 dark:text-emerald-300'
+                          : 'text-slate-700 dark:text-slate-300'
                       }`}
                     >
                       {formatTeamPlayers(recentMatch, 'HOME')}
@@ -1146,14 +1146,14 @@ export default function ResultsPage() {
                     <td
                       className={`px-3 py-2 ${
                         isWinningTeam('AWAY', recentMatch.winningTeam)
-                          ? 'font-medium text-emerald-700'
-                          : 'text-slate-700'
+                          ? 'font-medium text-emerald-700 dark:text-emerald-300'
+                          : 'text-slate-700 dark:text-slate-300'
                       }`}
                     >
                       {formatTeamPlayers(recentMatch, 'AWAY')}
                     </td>
                     {showMmr && (
-                      <td className="px-3 py-2 text-slate-700">
+                      <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
                         {typeof recentMatch.mmrDiff === 'number' ? recentMatch.mmrDiff : '-'}
                       </td>
                     )}
@@ -1165,7 +1165,7 @@ export default function ResultsPage() {
                             type="button"
                             onClick={handleUpdateRecentMatch}
                             disabled={isRecentSaving || isRecentDeleting}
-                            className="rounded-md border border-slate-900 bg-slate-900 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-300"
+                            className="rounded-md border border-slate-900 bg-slate-900 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-300 dark:border-slate-100 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:border-slate-700 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
                           >
                             {isRecentSaving ? t('results.recent.saving') : t('results.recent.save')}
                           </button>
@@ -1173,7 +1173,7 @@ export default function ResultsPage() {
                             type="button"
                             onClick={handleDeleteRecentMatch}
                             disabled={isRecentSaving || isRecentDeleting}
-                            className="rounded-md border border-rose-300 bg-white px-2.5 py-1 text-xs font-medium text-rose-700 transition-colors hover:border-rose-500 hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                            className="rounded-md border border-rose-300 bg-white px-2.5 py-1 text-xs font-medium text-rose-700 transition-colors hover:border-rose-500 hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 dark:border-rose-700 dark:bg-slate-900 dark:text-rose-300 dark:hover:border-rose-400 dark:hover:bg-rose-950/40 dark:disabled:border-slate-700 dark:disabled:text-slate-500"
                           >
                             {isRecentDeleting ? t('results.recent.deleting') : t('results.recent.delete')}
                           </button>
@@ -1182,7 +1182,7 @@ export default function ResultsPage() {
                           <button
                             type="button"
                             onClick={() => handlePickRecentMatch(recentMatch)}
-                            className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-slate-900 hover:bg-slate-900 hover:text-white"
+                            className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-slate-900 hover:bg-slate-900 hover:text-white dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-300 dark:hover:bg-slate-100 dark:hover:text-slate-900"
                           >
                             {t('results.recent.pick')}
                           </button>
@@ -1194,12 +1194,12 @@ export default function ResultsPage() {
               </tbody>
             </table>
             {canAccess && recentMatchesHasMore && (
-              <div className="border-t border-slate-100 bg-white px-3 py-3 text-center">
+              <div className="border-t border-slate-100 bg-white px-3 py-3 text-center dark:border-slate-800 dark:bg-slate-900">
                 <button
                   type="button"
                   onClick={handleLoadMoreRecentMatches}
                   disabled={recentMatchesLoadingMore}
-                  className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-slate-900 hover:bg-slate-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-slate-900 hover:bg-slate-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-300 dark:hover:bg-slate-100 dark:hover:text-slate-900"
                 >
                   {recentMatchesLoadingMore
                     ? t('results.recent.loadingMore')
@@ -1212,12 +1212,12 @@ export default function ResultsPage() {
       </article>
 
       {result && (
-        <article className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-          <h3 className="border-b border-slate-200 px-4 py-3 text-sm font-semibold text-slate-900">
+      <article className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <h3 className="border-b border-slate-200 px-4 py-3 text-sm font-semibold text-slate-900 dark:border-slate-700 dark:text-slate-100">
             {t('results.participants.title')}
           </h3>
           <table className="min-w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs tracking-wide text-slate-500">
+            <thead className="bg-slate-50 text-xs tracking-wide text-slate-500 dark:bg-slate-800/80 dark:text-slate-300">
               <tr>
                 <th className="px-4 py-3">{t('results.participants.nickname')}</th>
                 <th className="px-4 py-3">{t('results.participants.team')}</th>
@@ -1241,13 +1241,13 @@ export default function ResultsPage() {
                 return (
                   <tr
                     key={`${participant.playerId}-${participant.nickname}`}
-                    className="border-t border-slate-100"
+                    className="border-t border-slate-100 dark:border-slate-800"
                   >
                     <td
                       className={`px-4 py-3 font-medium ${
                         participant.team === result.winnerTeam
-                          ? 'text-emerald-700'
-                          : 'text-slate-900'
+                          ? 'text-emerald-700 dark:text-emerald-300'
+                          : 'text-slate-900 dark:text-slate-100'
                       }`}
                     >
                       {participant.nickname}
@@ -1255,37 +1255,37 @@ export default function ResultsPage() {
                     <td
                       className={`px-4 py-3 ${
                         participant.team === result.winnerTeam
-                          ? 'font-medium text-emerald-700'
-                          : 'text-slate-700'
+                          ? 'font-medium text-emerald-700 dark:text-emerald-300'
+                          : 'text-slate-700 dark:text-slate-300'
                       }`}
                     >
                       {formatTeamLabel(participant.team)}
                     </td>
                     {showAssignedRaceColumn && (
-                      <td className="px-4 py-3 text-slate-700">
+                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
                         {participant.assignedRace ?? '-'}
                       </td>
                     )}
                     {showMmr && (
-                      <td className="px-4 py-3 text-slate-700">
+                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
                         {participantMmrBefore !== null ? participantMmrBefore : '-'}
                       </td>
                     )}
                     {showMmr && (
-                      <td className="px-4 py-3 text-slate-700">
+                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
                         {participantMmrAfter !== null ? participantMmrAfter : '-'}
                       </td>
                     )}
                     {showMmr && participantMmrDelta !== null ? (
                       <td
                         className={`px-4 py-3 font-medium ${
-                          participantMmrDelta >= 0 ? 'text-emerald-600' : 'text-rose-600'
+                          participantMmrDelta >= 0 ? 'text-emerald-600 dark:text-emerald-300' : 'text-rose-600 dark:text-rose-300'
                         }`}
                       >
                         {participantMmrDelta >= 0 ? `+${participantMmrDelta}` : participantMmrDelta}
                       </td>
                     ) : showMmr ? (
-                      <td className="px-4 py-3 text-slate-700">-</td>
+                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">-</td>
                     ) : null}
                   </tr>
                 )
@@ -1296,14 +1296,14 @@ export default function ResultsPage() {
       )}
 
       {isSuperAdmin && (
-        <article id="match-import" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-900">{t('results.import.title')}</h3>
-          <p className="mt-1 text-xs text-slate-500">{t('results.import.description')}</p>
+      <article id="match-import" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('results.import.title')}</h3>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('results.import.description')}</p>
           <form className="mt-3 space-y-3" onSubmit={handleImportMatches}>
             <textarea
               value={matchImportPayload}
               onChange={(event) => setMatchImportPayload(event.target.value)}
-              className="h-32 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+            className="h-32 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
               placeholder={t('results.import.placeholder')}
             />
 
@@ -1316,7 +1316,7 @@ export default function ResultsPage() {
               </Alert>
             )}
             {importSuccess && (
-              <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+            <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
                 {importSuccess}
               </p>
             )}
@@ -1324,7 +1324,7 @@ export default function ResultsPage() {
             <button
               type="submit"
               disabled={isImporting}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
             >
               {isImporting ? t('results.import.loading') : t('results.import.button')}
             </button>

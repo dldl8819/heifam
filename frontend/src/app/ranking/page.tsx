@@ -19,18 +19,18 @@ function formatWinRate(value: number): string {
 
 function getRankClass(rank: number): string {
   if (rank === 1) {
-    return 'bg-amber-50'
+    return 'bg-amber-50 dark:bg-amber-950/30'
   }
 
   if (rank === 2) {
-    return 'bg-slate-100'
+    return 'bg-slate-100 dark:bg-slate-800'
   }
 
   if (rank === 3) {
-    return 'bg-orange-50'
+    return 'bg-orange-50 dark:bg-orange-950/30'
   }
 
-  return 'bg-white'
+  return 'bg-white dark:bg-slate-900'
 }
 
 function formatStreak(value: string): string {
@@ -247,14 +247,14 @@ export default function RankingPage() {
         onClose={handleCloseGameTypeStats}
       />
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {monthlyPeriodLabel.length > 0 && (
-          <div className="min-w-full border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-700">
+          <div className="min-w-full border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 dark:border-slate-800 dark:text-slate-200">
             {monthlyPeriodLabel}
           </div>
         )}
         <table className="min-w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs tracking-wide text-slate-500">
+            <thead className="bg-slate-50 text-xs tracking-wide text-slate-500 dark:bg-slate-800/80 dark:text-slate-300">
             <tr>
               <th className="px-4 py-3">{t('ranking.table.rank')}</th>
               <th className="px-4 py-3">{t('ranking.table.nickname')}</th>
@@ -275,7 +275,7 @@ export default function RankingPage() {
           <tbody>
             {loading &&
               (
-                <tr className="border-t border-slate-100">
+              <tr className="border-t border-slate-100 dark:border-slate-800">
                   <td className="px-4 py-3" colSpan={tableColumnCount}>
                     <LoadingIndicator label={t('common.loading')} />
                   </td>
@@ -283,8 +283,8 @@ export default function RankingPage() {
               )}
 
             {!loading && error && (
-              <tr className="border-t border-slate-100">
-                <td className="px-4 py-8 text-center text-sm text-slate-500" colSpan={tableColumnCount}>
+              <tr className="border-t border-slate-100 dark:border-slate-800">
+                <td className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400" colSpan={tableColumnCount}>
                   <Alert variant="destructive" appearance="light">
                     <AlertIcon icon="destructive">!</AlertIcon>
                     <AlertContent>
@@ -297,8 +297,8 @@ export default function RankingPage() {
             )}
 
             {!loading && !error && sortedRows.length === 0 && (
-              <tr className="border-t border-slate-100">
-                <td className="px-4 py-8 text-center text-sm text-slate-500" colSpan={tableColumnCount}>
+              <tr className="border-t border-slate-100 dark:border-slate-800">
+                <td className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400" colSpan={tableColumnCount}>
                   {t('ranking.empty')}
                 </td>
               </tr>
@@ -317,10 +317,10 @@ export default function RankingPage() {
                 return (
                   <tr
                     key={`${row.rank}-${row.nickname}`}
-                    className={`border-t border-slate-100 ${getRankClass(row.rank)}`}
+                    className={`border-t border-slate-100 dark:border-slate-800 ${getRankClass(row.rank)}`}
                   >
-                    <td className="px-4 py-3 font-semibold text-slate-900">{row.rank}</td>
-                    <td className="px-4 py-3 font-medium text-slate-900">
+                    <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">{row.rank}</td>
+                    <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">
                       {hotStreak && (
                         <span
                           className="mr-1.5 inline-block"
@@ -333,39 +333,39 @@ export default function RankingPage() {
                       )}
                       {row.nickname}
                     </td>
-                    <td className="px-4 py-3 text-slate-700">{row.race}</td>
-                    <td className="px-4 py-3 text-slate-700">{formatTier(resolveDisplayTier(row))}</td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{row.race}</td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{formatTier(resolveDisplayTier(row))}</td>
                     {showMmr && (
-                      <td className="px-4 py-3 text-slate-700">
+                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
                         {typeof row.currentMmr === 'number' ? row.currentMmr : '-'}
                       </td>
                     )}
-                    <td className="px-4 py-3 text-slate-700">{row.wins}</td>
-                    <td className="px-4 py-3 text-slate-700">{row.losses}</td>
-                    <td className="px-4 py-3 text-slate-700">{row.games}</td>
-                    <td className="px-4 py-3 text-slate-700">{formatWinRate(row.winRate)}</td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{row.wins}</td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{row.losses}</td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{row.games}</td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{formatWinRate(row.winRate)}</td>
                     <td className="px-4 py-3">
                       <button
                         type="button"
                         disabled={typeof playerId !== 'number' || isStatsLoadingForRow}
                         onClick={() => handleOpenGameTypeStats(row)}
-                        className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-emerald-600 hover:bg-emerald-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                        className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-emerald-600 hover:bg-emerald-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:border-emerald-400 dark:hover:bg-emerald-700"
                       >
                         {isStatsLoadingForRow ? t('statsModal.buttonLoading') : t('statsModal.button')}
                       </button>
                     </td>
-                    <td className="px-4 py-3 text-slate-700">{formatStreak(row.streak)}</td>
-                    <td className="px-4 py-3 text-xs text-slate-700">{formatLast10(row.last10)}</td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{formatStreak(row.streak)}</td>
+                    <td className="px-4 py-3 text-xs text-slate-700 dark:text-slate-300">{formatLast10(row.last10)}</td>
                     {showMmr && rowMmrDelta !== null ? (
                       <td
                         className={`px-4 py-3 font-medium ${
-                          rowMmrDelta >= 0 ? 'text-emerald-600' : 'text-rose-600'
+                          rowMmrDelta >= 0 ? 'text-emerald-600 dark:text-emerald-300' : 'text-rose-600 dark:text-rose-300'
                         }`}
                       >
                         {rowMmrDelta >= 0 ? `+${rowMmrDelta}` : rowMmrDelta}
                       </td>
                     ) : showMmr ? (
-                      <td className="px-4 py-3 text-slate-700">-</td>
+                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">-</td>
                     ) : null}
                   </tr>
                 )
