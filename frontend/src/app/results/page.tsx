@@ -1083,7 +1083,7 @@ export default function ResultsPage() {
 
         {!recentMatchesLoading && !recentMatchesError && recentMatches.length > 0 && (
           <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
-            <table className="min-w-full text-left text-sm">
+            <table className="min-w-[48rem] text-left text-sm">
               <thead className="bg-slate-50 text-xs tracking-wide text-slate-500 dark:bg-slate-800/80 dark:text-slate-300">
                 <tr>
                   <th className="px-3 py-2">{t('results.recent.table.displayOrder')}</th>
@@ -1092,8 +1092,8 @@ export default function ResultsPage() {
                   <th className="px-3 py-2">{t('results.recent.table.recordedBy')}</th>
                   <th className="px-3 py-2">{t('results.recent.table.winner')}</th>
                   <th className="px-3 py-2">{t('results.recent.table.raceComposition')}</th>
-                  <th className="px-3 py-2">{t('results.recent.table.homeTeam')}</th>
-                  <th className="px-3 py-2">{t('results.recent.table.awayTeam')}</th>
+                  <th className="min-w-[8rem] break-keep px-3 py-2">{t('results.recent.table.homeTeam')}</th>
+                  <th className="min-w-[8rem] break-keep px-3 py-2">{t('results.recent.table.awayTeam')}</th>
                   {showMmr && <th className="px-3 py-2">{t('results.recent.table.mmrDiff')}</th>}
                   {isAdmin && <th className="px-3 py-2">{t('results.recent.table.action')}</th>}
                 </tr>
@@ -1135,7 +1135,7 @@ export default function ResultsPage() {
                       {formatRaceMatchup(recentMatch)}
                     </td>
                     <td
-                      className={`px-3 py-2 ${
+                      className={`min-w-[8rem] break-keep px-3 py-2 ${
                         isWinningTeam('HOME', recentMatch.winningTeam)
                           ? 'font-medium text-emerald-700 dark:text-emerald-300'
                           : 'text-slate-700 dark:text-slate-300'
@@ -1144,7 +1144,7 @@ export default function ResultsPage() {
                       {formatTeamPlayers(recentMatch, 'HOME')}
                     </td>
                     <td
-                      className={`px-3 py-2 ${
+                      className={`min-w-[8rem] break-keep px-3 py-2 ${
                         isWinningTeam('AWAY', recentMatch.winningTeam)
                           ? 'font-medium text-emerald-700 dark:text-emerald-300'
                           : 'text-slate-700 dark:text-slate-300'
