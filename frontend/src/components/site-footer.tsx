@@ -3,6 +3,7 @@ import { t } from '@/lib/i18n'
 
 const YOUTUBE_URL = 'https://www.youtube.com/@Hei-minsik'
 const INSTAGRAM_URL = 'https://www.instagram.com/hei.minsik'
+const SUPPORT_ACCOUNT = process.env.NEXT_PUBLIC_FOOTER_SUPPORT_ACCOUNT?.trim()
 
 export function SiteFooter() {
   return (
@@ -13,7 +14,7 @@ export function SiteFooter() {
             <div className="space-y-2 text-sm text-slate-700 dark:text-slate-300">
               <p>
                 <span className="font-semibold text-slate-900 dark:text-slate-100">{t('footer.supportLabel')}</span>
-                <span className="ml-2">{t('footer.supportAccount')}</span>
+                <span className="ml-2">{SUPPORT_ACCOUNT || t('footer.supportAccount')}</span>
               </p>
               <p>
                 <span className="font-semibold text-slate-900 dark:text-slate-100">{t('footer.youtubeLabel')}</span>
