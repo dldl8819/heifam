@@ -51,8 +51,7 @@ public class ManualMatchService {
             request.teamSize(),
             MatchSource.MANUAL,
             request.note(),
-            request.raceComposition(),
-            false
+            request.raceComposition()
         );
 
         return matchResultService.processMatchResult(

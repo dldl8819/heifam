@@ -19,6 +19,7 @@ import com.balancify.backend.repository.GroupRepository;
 import com.balancify.backend.repository.MatchParticipantRepository;
 import com.balancify.backend.repository.MatchRepository;
 import com.balancify.backend.repository.PlayerRepository;
+import com.balancify.backend.service.exception.MatchConflictException;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -79,7 +80,7 @@ class GroupMatchAdminServiceTest {
         when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
         when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L, 5L, 6L)))
             .thenReturn(players);
-        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any(), any()))
+        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any()))
             .thenReturn(List.of());
         when(matchRepository.save(any(Match.class))).thenReturn(savedMatch);
 
@@ -93,9 +94,8 @@ class GroupMatchAdminServiceTest {
         verify(matchRepository).findRecentDuplicateCandidates(
             eq(1L),
             eq(3),
-            eq(MatchSource.BALANCED),
             eq("1-2-3-4-5-6"),
-            any(),
+            eq((String) null),
             any()
         );
         verify(matchParticipantRepository).saveAll(any());
@@ -121,7 +121,7 @@ class GroupMatchAdminServiceTest {
         when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
         when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L)))
             .thenReturn(players);
-        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any(), any()))
+        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any()))
             .thenReturn(List.of());
         when(matchRepository.save(any(Match.class))).thenReturn(savedMatch);
 
@@ -135,9 +135,8 @@ class GroupMatchAdminServiceTest {
         verify(matchRepository).findRecentDuplicateCandidates(
             eq(1L),
             eq(2),
-            eq(MatchSource.BALANCED),
             eq("1-2-3-4"),
-            any(),
+            eq((String) null),
             any()
         );
         verify(matchParticipantRepository).saveAll(any());
@@ -163,7 +162,7 @@ class GroupMatchAdminServiceTest {
         when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
         when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L)))
             .thenReturn(players);
-        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any(), any()))
+        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any()))
             .thenReturn(List.of());
         when(matchRepository.save(any(Match.class))).thenReturn(savedMatch);
 
@@ -225,7 +224,7 @@ class GroupMatchAdminServiceTest {
         when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
         when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L, 5L, 6L)))
             .thenReturn(players);
-        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any(), any()))
+        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any()))
             .thenReturn(List.of(existing));
 
         CreateGroupMatchResponse response = groupMatchAdminService.createMatch(
@@ -238,48 +237,36 @@ class GroupMatchAdminServiceTest {
     }
 
     @Test
-    void reusesExistingMatchWhenSameParticipantsButDifferentTeamsExist() {
+    void allowsSameParticipantsWhenTeamPartitionDiffers() {
         Group group = new Group();
         group.setId(1L);
-
         List<Player> players = List.of(
-            player(1L, group),
-            player(2L, group),
-            player(3L, group),
-            player(4L, group),
-            player(5L, group),
-            player(6L, group)
+            player(1L, group), player(2L, group), player(3L, group),
+            player(4L, group), player(5L, group), player(6L, group)
         );
-
         Match existing = new Match();
         existing.setId(778L);
         existing.setGroup(group);
-        existing.setPlayedAt(OffsetDateTime.now());
         existing.setStatus(MatchStatus.CONFIRMED);
-
+        existing.setTeamSize(3);
+        existing.setParticipantSignature("1-2-3-4-5-6");
+        existing.setTeamSignature("HOME:1-4-5|AWAY:2-3-6");
+        Match savedMatch = new Match();
+        savedMatch.setId(779L);
+        savedMatch.setGroup(group);
         when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
         when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L, 5L, 6L)))
             .thenReturn(players);
-        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any(), any()))
+        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any()))
             .thenReturn(List.of(existing));
-        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(778L)).thenReturn(List.of(
-            participant(existing, players.get(0), "HOME"),
-            participant(existing, players.get(3), "HOME"),
-            participant(existing, players.get(4), "HOME"),
-            participant(existing, players.get(1), "AWAY"),
-            participant(existing, players.get(2), "AWAY"),
-            participant(existing, players.get(5), "AWAY")
-        ));
-
+        when(matchRepository.save(any(Match.class))).thenReturn(savedMatch);
         CreateGroupMatchResponse response = groupMatchAdminService.createMatch(
             1L,
             new CreateGroupMatchRequest(List.of(1L, 2L, 3L), List.of(4L, 5L, 6L))
         );
-
-        assertThat(response.matchId()).isEqualTo(778L);
-        assertThat(response.confirmationStatus()).isEqualTo("REUSED_EXISTING");
+        assertThat(response.matchId()).isEqualTo(779L);
+        assertThat(response.confirmationStatus()).isEqualTo("CREATED");
     }
-
     @Test
     void allowsDifferentParticipantsEvenAtSameTimestamp() {
         Group group = new Group();
@@ -310,7 +297,7 @@ class GroupMatchAdminServiceTest {
         when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
         when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(7L, 8L, 9L, 10L, 11L, 12L)))
             .thenReturn(requestedPlayers);
-        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any(), any()))
+        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any()))
             .thenReturn(List.of(existing));
         when(matchRepository.save(any(Match.class))).thenReturn(savedMatch);
 
@@ -340,7 +327,7 @@ class GroupMatchAdminServiceTest {
         Match oldMatch = new Match();
         oldMatch.setId(900L);
         oldMatch.setGroup(group);
-        oldMatch.setPlayedAt(OffsetDateTime.now().minusMinutes(10));
+        oldMatch.setCreatedAt(OffsetDateTime.now().minusMinutes(10));
         oldMatch.setStatus(MatchStatus.CONFIRMED);
         oldMatch.setTeamSize(3);
         oldMatch.setParticipantSignature("1-2-3-4-5-6");
@@ -353,9 +340,9 @@ class GroupMatchAdminServiceTest {
         when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
         when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L, 5L, 6L)))
             .thenReturn(players);
-        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any(), any())).thenAnswer(invocation -> {
-            OffsetDateTime fromInclusive = invocation.getArgument(5);
-            if (oldMatch.getPlayedAt().isBefore(fromInclusive)) {
+        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any())).thenAnswer(invocation -> {
+            OffsetDateTime fromInclusive = invocation.getArgument(4);
+            if (oldMatch.getCreatedAt().isBefore(fromInclusive)) {
                 return List.of();
             }
             return List.of(oldMatch);
@@ -401,7 +388,7 @@ class GroupMatchAdminServiceTest {
         when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
         when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L, 5L, 6L)))
             .thenReturn(players);
-        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any(), any()))
+        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any()))
             .thenReturn(List.of(existing));
         when(matchRepository.save(any(Match.class))).thenReturn(savedMatch);
 
@@ -415,7 +402,7 @@ class GroupMatchAdminServiceTest {
     }
 
     @Test
-    void allowsNewConfirmationWhenExistingMatchIsCompleted() {
+    void rejectsNewConfirmationWhenExistingMatchIsRecentlyCompleted() {
         Group group = new Group();
         group.setId(1L);
 
@@ -437,24 +424,20 @@ class GroupMatchAdminServiceTest {
         completed.setParticipantSignature("1-2-3-4-5-6");
         completed.setTeamSignature("HOME:1-2-3|AWAY:4-5-6");
 
-        Match savedMatch = new Match();
-        savedMatch.setId(921L);
-        savedMatch.setGroup(group);
 
         when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
         when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L, 5L, 6L)))
             .thenReturn(players);
-        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any(), any()))
+        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any()))
             .thenReturn(List.of(completed));
-        when(matchRepository.save(any(Match.class))).thenReturn(savedMatch);
 
         CreateGroupMatchResponse response = groupMatchAdminService.createMatch(
             1L,
             new CreateGroupMatchRequest(List.of(1L, 2L, 3L), List.of(4L, 5L, 6L))
         );
 
-        assertThat(response.matchId()).isEqualTo(921L);
-        assertThat(response.confirmationStatus()).isEqualTo("CREATED");
+        assertThat(response.matchId()).isNull();
+        assertThat(response.confirmationStatus()).isEqualTo("DUPLICATE_REJECTED");
     }
 
     @Test
@@ -487,7 +470,7 @@ class GroupMatchAdminServiceTest {
         when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
         when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L, 5L, 6L)))
             .thenReturn(players);
-        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any(), any()))
+        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any()))
             .thenReturn(List.of(cancelled));
         when(matchRepository.save(any(Match.class))).thenReturn(savedMatch);
 
@@ -524,14 +507,14 @@ class GroupMatchAdminServiceTest {
         existing.setTeamSignature("HOME:1-2-3|AWAY:4-5-6");
 
         when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
-        when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(6L, 5L, 4L, 3L, 2L, 1L)))
+        when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(3L, 2L, 1L, 6L, 5L, 4L)))
             .thenReturn(players);
-        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any(), any()))
+        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any()))
             .thenReturn(List.of(existing));
 
         CreateGroupMatchResponse response = groupMatchAdminService.createMatch(
             1L,
-            new CreateGroupMatchRequest(List.of(6L, 5L, 4L), List.of(3L, 2L, 1L))
+            new CreateGroupMatchRequest(List.of(3L, 2L, 1L), List.of(6L, 5L, 4L))
         );
 
         assertThat(response.matchId()).isEqualTo(940L);
@@ -539,7 +522,7 @@ class GroupMatchAdminServiceTest {
     }
 
     @Test
-    void createsManualTwoVsTwoMatchWithoutDuplicateProtection() {
+    void createsManualTwoVsTwoMatchWithDuplicateProtection() {
         Group group = new Group();
         group.setId(1L);
 
@@ -566,8 +549,7 @@ class GroupMatchAdminServiceTest {
             2,
             MatchSource.MANUAL,
             "리겜 수동 입력",
-            null,
-            false
+            null
         );
 
         assertThat(created.getId()).isEqualTo(950L);
@@ -583,58 +565,7 @@ class GroupMatchAdminServiceTest {
     }
 
     @Test
-    void allowsManualRematchForSameParticipantsAndSameTeams() {
-        Group group = new Group();
-        group.setId(1L);
-
-        List<Player> players = List.of(
-            player(1L, group),
-            player(2L, group),
-            player(3L, group),
-            player(4L, group),
-            player(5L, group),
-            player(6L, group)
-        );
-
-        Match firstSavedMatch = new Match();
-        firstSavedMatch.setId(960L);
-        firstSavedMatch.setGroup(group);
-        Match secondSavedMatch = new Match();
-        secondSavedMatch.setId(961L);
-        secondSavedMatch.setGroup(group);
-
-        when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
-        when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L, 5L, 6L)))
-            .thenReturn(players);
-        when(matchRepository.save(any(Match.class))).thenReturn(firstSavedMatch, secondSavedMatch);
-
-        Match firstCreated = groupMatchAdminService.createConfirmedMatch(
-            1L,
-            List.of(1L, 2L, 3L),
-            List.of(4L, 5L, 6L),
-            3,
-            MatchSource.MANUAL,
-            null,
-            null,
-            false
-        );
-        Match secondCreated = groupMatchAdminService.createConfirmedMatch(
-            1L,
-            List.of(1L, 2L, 3L),
-            List.of(4L, 5L, 6L),
-            3,
-            MatchSource.MANUAL,
-            null,
-            null,
-            false
-        );
-
-        assertThat(firstCreated.getId()).isEqualTo(960L);
-        assertThat(secondCreated.getId()).isEqualTo(961L);
-    }
-
-    @Test
-    void allowsManualRematchForSameParticipantsWithDifferentTeams() {
+    void allowsManualMatchWhenTeamPartitionDiffers() {
         Group group = new Group();
         group.setId(1L);
 
@@ -663,8 +594,7 @@ class GroupMatchAdminServiceTest {
             3,
             MatchSource.MANUAL,
             null,
-            null,
-            false
+            null
         );
 
         assertThat(created.getId()).isEqualTo(970L);
@@ -701,8 +631,7 @@ class GroupMatchAdminServiceTest {
             3,
             MatchSource.MANUAL,
             null,
-            "PPT",
-            false
+            "PPT"
         );
 
         assertThat(created.getId()).isEqualTo(980L);
@@ -742,8 +671,7 @@ class GroupMatchAdminServiceTest {
             3,
             MatchSource.MANUAL,
             null,
-            "PPT",
-            false
+            "PPT"
         );
 
         @SuppressWarnings("unchecked")
@@ -783,12 +711,71 @@ class GroupMatchAdminServiceTest {
                 3,
                 MatchSource.MANUAL,
                 null,
-                "PPT",
-                false
+                "PPT"
             )
         )
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("선택한 종족 조합으로 매치를 구성할 수 없습니다");
+    }
+
+    @Test
+    void treatsGlobalHomeAwaySwapAsSameDuplicateIdentity() {
+        Group group = new Group();
+        group.setId(1L);
+        List<Player> players = List.of(
+            player(1L, group), player(2L, group), player(3L, group),
+            player(4L, group), player(5L, group), player(6L, group)
+        );
+        Match existing = new Match();
+        existing.setId(982L);
+        existing.setGroup(group);
+        existing.setStatus(MatchStatus.CONFIRMED);
+        existing.setTeamSize(3);
+        existing.setParticipantSignature("1-2-3-4-5-6");
+        existing.setTeamSignature("HOME:1-2-3|AWAY:4-5-6");
+        when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
+        when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(4L, 5L, 6L, 1L, 2L, 3L)))
+            .thenReturn(players);
+        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any()))
+            .thenReturn(List.of(existing));
+        CreateGroupMatchResponse response = groupMatchAdminService.createMatch(
+            1L,
+            new CreateGroupMatchRequest(List.of(4L, 5L, 6L), List.of(1L, 2L, 3L))
+        );
+        assertThat(response.matchId()).isEqualTo(982L);
+        assertThat(response.confirmationStatus()).isEqualTo("REUSED_EXISTING");
+    }
+
+    @Test
+    void rejectsManualDuplicateRegardlessOfExistingSourceAndTeamOrder() {
+        Group group = new Group();
+        group.setId(1L);
+        List<Player> players = List.of(
+            player(1L, group, "P"), player(2L, group, "P"), player(3L, group, "T"),
+            player(4L, group, "P"), player(5L, group, "P"), player(6L, group, "T")
+        );
+        Match existing = new Match();
+        existing.setId(983L);
+        existing.setGroup(group);
+        existing.setStatus(MatchStatus.COMPLETED);
+        existing.setTeamSize(3);
+        existing.setParticipantSignature("1-2-3-4-5-6");
+        existing.setTeamSignature("HOME:1-2-3|AWAY:4-5-6");
+        existing.setRaceComposition("PPT");
+        when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
+        when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(3L, 2L, 1L, 6L, 5L, 4L)))
+            .thenReturn(players);
+        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any()))
+            .thenReturn(List.of(existing));
+        for (MatchSource existingSource : List.of(MatchSource.BALANCED, MatchSource.MANUAL)) {
+            existing.setSource(existingSource);
+            assertThatThrownBy(() -> groupMatchAdminService.createConfirmedMatch(
+                1L, List.of(3L, 2L, 1L), List.of(6L, 5L, 4L), 3,
+                MatchSource.MANUAL, null, "PPT"
+            ))
+                .isInstanceOf(MatchConflictException.class)
+                .hasMessageContaining("last 5 minutes");
+        }
     }
 
     private Player player(Long id, Group group) {

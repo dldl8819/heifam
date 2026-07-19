@@ -1,7 +1,6 @@
 package com.balancify.backend.repository;
 
 import com.balancify.backend.domain.Match;
-import com.balancify.backend.domain.MatchSource;
 import com.balancify.backend.domain.MatchStatus;
 import jakarta.persistence.LockModeType;
 import java.time.OffsetDateTime;
@@ -55,18 +54,20 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
         from Match m
         where m.group.id = :groupId
           and m.teamSize = :teamSize
-          and m.source = :source
           and m.participantSignature = :participantSignature
-          and m.status in :statuses
+          and (
+            (:raceComposition is null and m.raceComposition is null)
+            or m.raceComposition = :raceComposition
+          )
+          and m.status <> com.balancify.backend.domain.MatchStatus.CANCELLED
           and m.createdAt >= :fromInclusive
         order by m.createdAt desc, m.id desc
         """)
     List<Match> findRecentDuplicateCandidates(
         @Param("groupId") Long groupId,
         @Param("teamSize") Integer teamSize,
-        @Param("source") MatchSource source,
         @Param("participantSignature") String participantSignature,
-        @Param("statuses") List<MatchStatus> statuses,
+        @Param("raceComposition") String raceComposition,
         @Param("fromInclusive") OffsetDateTime fromInclusive
     );
 }

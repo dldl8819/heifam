@@ -46,8 +46,7 @@ class ManualMatchServiceTest {
             eq(3),
             eq(MatchSource.MANUAL),
             eq("리겜 수동 입력"),
-            eq("PPT"),
-            eq(false)
+            eq("PPT")
         )).thenReturn(match);
         when(matchResultService.processMatchResult(
             eq(500L),
