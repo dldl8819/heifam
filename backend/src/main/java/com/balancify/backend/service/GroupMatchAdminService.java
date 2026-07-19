@@ -202,11 +202,13 @@ public class GroupMatchAdminService {
 
         Map<Long, Player> playersById = players.stream()
             .collect(Collectors.toMap(Player::getId, Function.identity()));
+        MatchSource normalizedSource = source == null ? MatchSource.BALANCED : source;
         MatchRaceAssignments raceAssignments = assignRaceComposition(
             homePlayerIds,
             awayPlayerIds,
             playersById,
-            normalizedRaceComposition
+            normalizedRaceComposition,
+            normalizedSource == MatchSource.MANUAL
         );
 
         Signature requestedSignature = buildRequestedSignature(homePlayerIds, awayPlayerIds);
@@ -257,7 +259,7 @@ public class GroupMatchAdminService {
         match.setGroup(group);
         match.setPlayedAt(OffsetDateTime.now());
         match.setStatus(MatchStatus.CONFIRMED);
-        match.setSource(source == null ? MatchSource.BALANCED : source);
+        match.setSource(normalizedSource);
         match.setTeamSize(normalizedTeamSize);
         match.setParticipantSignature(requestedSignature.participantSignature());
         match.setTeamSignature(requestedSignature.teamSignature());
@@ -293,7 +295,8 @@ public class GroupMatchAdminService {
         List<Long> homePlayerIds,
         List<Long> awayPlayerIds,
         Map<Long, Player> playersById,
-        String raceComposition
+        String raceComposition,
+        boolean allowManualOverride
     ) {
         if (raceComposition == null) {
             return MatchRaceAssignments.none(homePlayerIds.size(), awayPlayerIds.size());
@@ -311,11 +314,17 @@ public class GroupMatchAdminService {
         PlayerRacePolicy.TeamRaceAssignment awayAssignment =
             PlayerRacePolicy.assignToComposition(awayCapabilities, raceComposition);
 
-        if (homeAssignment == null || awayAssignment == null) {
+        if (!allowManualOverride && (homeAssignment == null || awayAssignment == null)) {
             throw new IllegalArgumentException("선택한 종족 조합으로 매치를 구성할 수 없습니다");
         }
 
-        return new MatchRaceAssignments(homeAssignment.assignedRaces(), awayAssignment.assignedRaces());
+        List<String> manualAssignedRaces = raceComposition.chars()
+            .mapToObj(race -> String.valueOf((char) race))
+            .toList();
+        return new MatchRaceAssignments(
+            homeAssignment == null ? manualAssignedRaces : homeAssignment.assignedRaces(),
+            awayAssignment == null ? manualAssignedRaces : awayAssignment.assignedRaces()
+        );
     }
 
     private String resolveCapability(Map<Long, Player> playersById, Long playerId) {

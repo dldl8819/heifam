@@ -686,7 +686,7 @@ class GroupMatchAdminServiceTest {
     }
 
     @Test
-    void rejectsManualMatchWhenTeamRaceCompositionDoesNotMatchSelection() {
+    void allowsManualMatchWhenRaceCompositionDoesNotMatchRegisteredRaces() {
         Group group = new Group();
         group.setId(1L);
 
@@ -695,25 +695,61 @@ class GroupMatchAdminServiceTest {
             player(2L, group, "P"),
             player(3L, group, "P"),
             player(4L, group, "P"),
-            player(5L, group, "T"),
-            player(6L, group, "T")
+            player(5L, group, "P"),
+            player(6L, group, "P")
         );
+        Match savedMatch = new Match();
+        savedMatch.setId(982L);
+        savedMatch.setGroup(group);
 
         when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
         when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L, 5L, 6L)))
             .thenReturn(players);
+        when(matchRepository.save(any(Match.class))).thenReturn(savedMatch);
 
-        assertThatThrownBy(() ->
-            groupMatchAdminService.createConfirmedMatch(
-                1L,
+        groupMatchAdminService.createConfirmedMatch(
+            1L,
+            List.of(1L, 2L, 3L),
+            List.of(4L, 5L, 6L),
+            3,
+            MatchSource.MANUAL,
+            null,
+            "PPT"
+        );
+
+        ArgumentCaptor<Match> matchCaptor = ArgumentCaptor.forClass(Match.class);
+        verify(matchRepository).save(matchCaptor.capture());
+        assertThat(matchCaptor.getValue().getRaceComposition()).isEqualTo("PPT");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<MatchParticipant>> participantsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(matchParticipantRepository).saveAll(participantsCaptor.capture());
+        assertThat(participantsCaptor.getValue())
+            .extracting(MatchParticipant::getAssignedRace)
+            .containsExactly("P", "P", "T", "P", "P", "T");
+    }
+
+    @Test
+    void rejectsBalancedMatchWhenRaceCompositionDoesNotMatchRegisteredRaces() {
+        Group group = new Group();
+        group.setId(1L);
+        List<Player> players = List.of(
+            player(1L, group, "P"), player(2L, group, "P"), player(3L, group, "P"),
+            player(4L, group, "P"), player(5L, group, "P"), player(6L, group, "P")
+        );
+        when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
+        when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L, 5L, 6L)))
+            .thenReturn(players);
+
+        assertThatThrownBy(() -> groupMatchAdminService.createMatch(
+            1L,
+            new CreateGroupMatchRequest(
                 List.of(1L, 2L, 3L),
                 List.of(4L, 5L, 6L),
                 3,
-                MatchSource.MANUAL,
-                null,
                 "PPT"
             )
-        )
+        ))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("선택한 종족 조합으로 매치를 구성할 수 없습니다");
     }
