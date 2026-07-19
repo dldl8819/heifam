@@ -20,8 +20,6 @@ import org.springframework.stereotype.Component;
 @Component
 class RatingReplayCalculator {
 
-    private static final String DELETED_MEMBER_LABEL = "\uD0C8\uD1F4\uD55C \uD68C\uC6D0";
-
     private static final String TEAM_HOME = "HOME";
     private static final String TEAM_AWAY = "AWAY";
 
@@ -167,8 +165,8 @@ class RatingReplayCalculator {
                 .thenComparing(PlayerState::playerId))
             .limit(5)
             .map(state -> new RatingRecalculationPlayerChangeResponse(
-                state.anonymized() ? null : state.playerId(),
-                state.anonymized() ? DELETED_MEMBER_LABEL : state.nickname(),
+                state.identityHidden() ? null : state.playerId(),
+                state.nickname(),
                 state.originalMmr(),
                 state.currentMmr()
             ))
@@ -229,8 +227,8 @@ class RatingReplayCalculator {
                     player.getId(),
                     new PlayerState(
                         player.getId(),
-                        player.getNickname(),
-                        player.isAnonymized(),
+                        PlayerIdentityPolicy.responseNickname(player),
+                        PlayerIdentityPolicy.isIdentityHidden(player),
                         floorMmr(player.getMmr()),
                         seedMmr,
                         PlayerTierPolicy.resolveTier(seedMmr),
@@ -334,7 +332,7 @@ class RatingReplayCalculator {
         private final Long playerId;
         private final String nickname;
         private final int originalMmr;
-        private final boolean anonymized;
+        private final boolean identityHidden;
         private int currentMmr;
         private String currentTier;
         private int completedGames;
@@ -342,7 +340,7 @@ class RatingReplayCalculator {
         private PlayerState(
             Long playerId,
             String nickname,
-            boolean anonymized,
+            boolean identityHidden,
             int originalMmr,
             int currentMmr,
             String currentTier,
@@ -352,7 +350,7 @@ class RatingReplayCalculator {
             this.nickname = nickname;
             this.originalMmr = originalMmr;
             this.currentMmr = currentMmr;
-            this.anonymized = anonymized;
+            this.identityHidden = identityHidden;
             this.currentTier = currentTier;
             this.completedGames = completedGames;
         }
@@ -365,8 +363,8 @@ class RatingReplayCalculator {
             return nickname;
         }
 
-        private boolean anonymized() {
-            return anonymized;
+        private boolean identityHidden() {
+            return identityHidden;
         }
 
         private int originalMmr() {

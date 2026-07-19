@@ -250,7 +250,7 @@ class PlayerImportServiceTest {
     }
 
     @Test
-    void reactivatesInactivePlayerWhenImportingExistingNickname() {
+    void createsNewPlayerInsteadOfRestoringIdentityHiddenPlayer() {
         Group group = new Group();
         group.setId(9L);
         group.setName("Group 9");
@@ -275,13 +275,15 @@ class PlayerImportServiceTest {
         GroupPlayerImportResponse response = playerImportService.importPlayers(9L, request);
 
         assertThat(response.failedCount()).isZero();
-        assertThat(response.updatedCount()).isEqualTo(1);
+        assertThat(response.createdCount()).isEqualTo(1);
+        assertThat(response.updatedCount()).isZero();
 
         ArgumentCaptor<Player> playerCaptor = ArgumentCaptor.forClass(Player.class);
         verify(playerRepository).save(playerCaptor.capture());
         Player savedPlayer = playerCaptor.getValue();
         assertThat(savedPlayer.isActive()).isTrue();
-        assertThat(savedPlayer.getChatRejoinedAt()).isNotNull();
+        assertThat(savedPlayer).isNotSameAs(existing);
+        assertThat(existing.isActive()).isFalse();
         assertThat(savedPlayer.getTier()).isEqualTo("B");
         assertThat(savedPlayer.getRace()).isEqualTo("T");
         verify(operationAuditLogService).recordPlayerRegistration(
@@ -289,8 +291,8 @@ class PlayerImportServiceTest {
             null,
             9L,
             savedPlayer,
-            false,
-            true
+            true,
+            false
         );
     }
 }

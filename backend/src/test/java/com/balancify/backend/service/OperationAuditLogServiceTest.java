@@ -198,11 +198,11 @@ class OperationAuditLogServiceTest {
 
         assertThat(log.getAction()).isEqualTo(OperationAuditLogService.ACTION_PLAYER_DEACTIVATED);
         assertThat(log.getTargetType()).isEqualTo("PLAYER");
-        assertThat(log.getTargetId()).isEqualTo(10L);
-        assertThat(log.getTargetLabel()).isEqualTo("PlayerAlpha");
+        assertThat(log.getTargetId()).isNull();
+        assertThat(log.getTargetLabel()).isEqualTo(PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL);
         assertThat(log.getGroupId()).isEqualTo(1L);
         assertThat(log.getSummary()).isEqualTo("비활성");
-        assertThat(log.getDetails()).isEqualTo("status=활성 -> 비활성");
+        assertThat(log.getDetails()).isNull();
     }
 
     @Test

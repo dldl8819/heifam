@@ -1,5 +1,6 @@
 package com.balancify.backend.repository;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -16,6 +17,23 @@ public class AccountPersonalDataRepository {
     public AccountPersonalDataRepository(NamedParameterJdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
+    public Optional<String> findAccountEmail(UUID authUserId) {
+        if (authUserId == null) {
+            return Optional.empty();
+        }
+        List<String> emails = jdbcTemplate.query(
+            """
+            SELECT LOWER(BTRIM(email)) AS normalized_email
+            FROM public.users
+            WHERE id = :authUserId
+              AND NULLIF(BTRIM(email), '') IS NOT NULL
+            """,
+            Map.of("authUserId", authUserId),
+            (resultSet, rowNumber) -> resultSet.getString("normalized_email")
+        );
+        return emails.stream().findFirst().map(String::trim).filter(value -> !value.isEmpty());
+    }
+
 
     public Optional<String> findLinkedNickname(String normalizedEmail) {
         List<String> nicknames = jdbcTemplate.query(
@@ -79,63 +97,157 @@ public class AccountPersonalDataRepository {
             identityParameters
         );
 
-        if (playerIds != null && !playerIds.isEmpty()) {
+        anonymizeHistoricalPlayerIdentity(playerIds, deletedMemberLabel);
+    }
+
+    public void anonymizeHistoricalIdentityInGroup(
+        String normalizedEmail,
+        Long groupId,
+        List<Long> playerIds,
+        String deletedMemberLabel
+    ) {
+        if (normalizedEmail != null && !normalizedEmail.isBlank() && groupId != null) {
+            MapSqlParameterSource identityParameters = new MapSqlParameterSource()
+                .addValue("email", normalizedEmail)
+                .addValue("groupId", groupId)
+                .addValue("deletedMemberLabel", deletedMemberLabel);
+            jdbcTemplate.update(
+                """
+                UPDATE matches
+                SET result_recorded_by_email = NULL,
+                    result_recorded_by_nickname = :deletedMemberLabel
+                WHERE group_id = :groupId
+                  AND LOWER(BTRIM(result_recorded_by_email)) = :email
+                """,
+                identityParameters
+            );
             jdbcTemplate.update(
                 """
                 UPDATE operation_audit_logs
-                SET target_id = NULL,
-                    target_label = :deletedMemberLabel,
-                    details = NULL
-                WHERE target_type = 'PLAYER'
-                  AND target_id IN (:playerIds)
+                SET actor_email = NULL,
+                    actor_nickname = :deletedMemberLabel
+                WHERE group_id = :groupId
+                  AND LOWER(BTRIM(actor_email)) = :email
                 """,
-                new MapSqlParameterSource()
-                    .addValue("deletedMemberLabel", deletedMemberLabel)
-                    .addValue("playerIds", playerIds)
+                identityParameters
             );
         }
+        anonymizeHistoricalPlayerIdentity(playerIds, deletedMemberLabel);
+    }
+
+    public void anonymizeHistoricalPlayerIdentity(
+        List<Long> playerIds,
+        String deletedMemberLabel
+    ) {
+        if (playerIds == null || playerIds.isEmpty()) {
+            return;
+        }
+        jdbcTemplate.update(
+            """
+            UPDATE operation_audit_logs
+            SET target_id = NULL,
+                target_label = :deletedMemberLabel,
+                details = NULL
+            WHERE target_type = 'PLAYER'
+              AND target_id IN (:playerIds)
+            """,
+            new MapSqlParameterSource()
+                .addValue("deletedMemberLabel", deletedMemberLabel)
+                .addValue("playerIds", playerIds)
+        );
     }
 
     public void deleteAccountIdentity(UUID authUserId, String normalizedEmail) {
         MapSqlParameterSource parameters = new MapSqlParameterSource()
-            .addValue("authUserId", authUserId)
-            .addValue("email", normalizedEmail);
+            .addValue("authUserId", authUserId);
 
-        for (String table : List.of(
-            "managed_admin_emails",
-            "allowed_user_emails",
-            "admin_mmr_access_emails"
-        )) {
+        if (normalizedEmail != null && !normalizedEmail.isBlank()) {
+            parameters.addValue("email", normalizedEmail);
+            for (String table : List.of(
+                "managed_admin_emails",
+                "allowed_user_emails",
+                "admin_mmr_access_emails"
+            )) {
+                jdbcTemplate.update(
+                    "UPDATE " + table + " SET created_by_email = NULL "
+                        + "WHERE LOWER(BTRIM(created_by_email)) = :email",
+                    parameters
+                );
+            }
             jdbcTemplate.update(
-                "UPDATE " + table + " SET created_by_email = NULL "
-                    + "WHERE LOWER(BTRIM(created_by_email)) = :email",
+                "DELETE FROM admin_mmr_access_emails WHERE normalized_email = :email",
+                parameters
+            );
+            jdbcTemplate.update(
+                "DELETE FROM managed_admin_emails WHERE normalized_email = :email",
+                parameters
+            );
+            jdbcTemplate.update(
+                "DELETE FROM allowed_user_emails WHERE normalized_email = :email",
+                parameters
+            );
+            jdbcTemplate.update(
+                "DELETE FROM user_race_preferences WHERE normalized_email = :email",
                 parameters
             );
         }
+        if (authUserId != null) {
+            jdbcTemplate.update("DELETE FROM public.users WHERE id = :authUserId", parameters);
+        }
+    }
 
-        jdbcTemplate.update(
-            "DELETE FROM admin_mmr_access_emails WHERE normalized_email = :email",
-            parameters
-        );
-        jdbcTemplate.update(
-            "DELETE FROM managed_admin_emails WHERE normalized_email = :email",
-            parameters
-        );
-        jdbcTemplate.update(
-            "DELETE FROM allowed_user_emails WHERE normalized_email = :email",
-            parameters
-        );
-        jdbcTemplate.update(
-            "DELETE FROM user_race_preferences WHERE normalized_email = :email",
-            parameters
-        );
+    public void enqueuePendingAuthDeletion(UUID authUserId, OffsetDateTime createdAt) {
+        if (authUserId == null) {
+            return;
+        }
         jdbcTemplate.update(
             """
-            DELETE FROM public.users
-            WHERE id = :authUserId
-               OR LOWER(BTRIM(email)) = :email
+            INSERT INTO pending_auth_user_deletions (auth_user_id, created_at, last_attempt_at)
+            VALUES (:authUserId, :createdAt, NULL)
+            ON CONFLICT (auth_user_id) DO NOTHING
             """,
-            parameters
+            new MapSqlParameterSource()
+                .addValue("authUserId", authUserId)
+                .addValue("createdAt", createdAt)
+        );
+    }
+
+    public List<UUID> claimPendingAuthDeletions(
+        OffsetDateTime claimedAt,
+        OffsetDateTime retryBefore,
+        int batchSize
+    ) {
+        return jdbcTemplate.query(
+            """
+            WITH candidates AS (
+                SELECT auth_user_id
+                FROM pending_auth_user_deletions
+                WHERE last_attempt_at IS NULL OR last_attempt_at < :retryBefore
+                ORDER BY created_at, auth_user_id
+                LIMIT :batchSize
+                FOR UPDATE SKIP LOCKED
+            )
+            UPDATE pending_auth_user_deletions pending
+            SET last_attempt_at = :claimedAt
+            FROM candidates
+            WHERE pending.auth_user_id = candidates.auth_user_id
+            RETURNING pending.auth_user_id
+            """,
+            new MapSqlParameterSource()
+                .addValue("claimedAt", claimedAt)
+                .addValue("retryBefore", retryBefore)
+                .addValue("batchSize", Math.max(1, batchSize)),
+            (resultSet, rowNumber) -> resultSet.getObject("auth_user_id", UUID.class)
+        );
+    }
+
+    public void deletePendingAuthDeletion(UUID authUserId) {
+        if (authUserId == null) {
+            return;
+        }
+        jdbcTemplate.update(
+            "DELETE FROM pending_auth_user_deletions WHERE auth_user_id = :authUserId",
+            Map.of("authUserId", authUserId)
         );
     }
 }

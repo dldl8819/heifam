@@ -69,11 +69,11 @@ public class MatchQueryService {
                     ? participant.getMmrBefore()
                     : safeInt(participant.getPlayer().getMmr());
 
-                boolean anonymizedPlayer = participant.getPlayer().isAnonymized();
+                boolean hiddenPlayer = PlayerIdentityPolicy.isIdentityHidden(participant.getPlayer());
                 String team = normalizeTeam(participant.getTeam());
                 GroupRecentMatchPlayerResponse playerResponse = new GroupRecentMatchPlayerResponse(
-                    anonymizedPlayer ? null : participant.getPlayer().getId(),
-                    anonymizedPlayer ? AccountDeletionDataService.DELETED_MEMBER_LABEL : participant.getPlayer().getNickname(),
+                    hiddenPlayer ? null : participant.getPlayer().getId(),
+                    hiddenPlayer ? PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL : participant.getPlayer().getNickname(),
                     team,
                     mmr
                 );

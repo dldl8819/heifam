@@ -18,6 +18,7 @@ import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.PlayerRepository;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,13 +37,27 @@ class PlayerAdminServiceTest {
     private OperationAuditLogService operationAuditLogService;
 
     private PlayerAdminService playerAdminService;
+    @Mock
+    private AccountDeletionService accountDeletionService;
+
 
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.lenient()
+            .doAnswer(invocation -> {
+                PlayerIdentityPolicy.anonymize(
+                    invocation.getArgument(0),
+                    OffsetDateTime.parse("2026-07-12T03:00:00Z")
+                );
+                return null;
+            })
+            .when(accountDeletionService)
+            .deactivatePlayer(any(Player.class));
         playerAdminService = new PlayerAdminService(
             playerRepository,
             operationAuditLogService,
-            new GroupReadCacheService(0)
+            new GroupReadCacheService(0),
+            accountDeletionService
         );
     }
 
@@ -340,7 +355,7 @@ class PlayerAdminServiceTest {
     }
 
     @Test
-    void storesChatLeaveMetadataWhenDeactivating() {
+    void anonymizesPersonalDataWhenDeactivating() {
         Player player = player(10L, 1L, "기존닉");
         OffsetDateTime chatLeftAt = OffsetDateTime.parse("2026-05-02T12:41:00+09:00");
         when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
@@ -353,9 +368,12 @@ class PlayerAdminServiceTest {
         );
 
         assertThat(player.isActive()).isFalse();
-        assertThat(player.getChatLeftAt()).isEqualTo(chatLeftAt);
-        assertThat(player.getChatLeftReason()).isEqualTo("개인 사정");
+        assertThat(player.getNickname()).isEqualTo(PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL);
+        assertThat(player.getChatLeftAt()).isNull();
+        assertThat(player.getChatLeftReason()).isNull();
         assertThat(player.getChatRejoinedAt()).isNull();
+        assertThat(player.getAnonymizedAt()).isNotNull();
+        verify(accountDeletionService).deactivatePlayer(player);
         verify(playerRepository, never()).findByGroup_IdAndNicknameIgnoreCase(anyLong(), anyString());
         verify(playerRepository).save(player);
     }
@@ -442,79 +460,31 @@ class PlayerAdminServiceTest {
     }
 
     @Test
-    void throwsWhenReactivatingWithoutChatRejoinedAt() {
+    void rejectsReactivationOfIdentityHiddenPlayer() {
         Player player = player(10L, 1L, "기존닉");
         player.setActive(false);
-        player.setChatLeftAt(OffsetDateTime.parse("2026-05-02T12:41:00+09:00"));
-        player.setChatLeftReason("개인 사정");
         when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
 
         assertThatThrownBy(() ->
             playerAdminService.updatePlayer(
                 1L,
                 10L,
-                new GroupPlayerUpdateRequest(null, null, true, null, null, null, null)
+                new GroupPlayerUpdateRequest(
+                    null,
+                    null,
+                    true,
+                    null,
+                    null,
+                    OffsetDateTime.parse("2026-05-03T13:42:00+09:00"),
+                    null
+                )
             )
         )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Chat rejoined time is required when reactivating player");
+            .isInstanceOf(NoSuchElementException.class)
+            .hasMessage("Player not found");
 
         verify(playerRepository, never()).save(any(Player.class));
     }
-
-    @Test
-    void storesChatRejoinedAtWhenReactivatingWithoutClearingLeaveMetadata() {
-        Player player = player(10L, 1L, "기존닉");
-        OffsetDateTime chatLeftAt = OffsetDateTime.parse("2026-05-02T12:41:00+09:00");
-        OffsetDateTime chatRejoinedAt = OffsetDateTime.parse("2026-05-03T13:42:00+09:00");
-        player.setActive(false);
-        player.setChatLeftAt(chatLeftAt);
-        player.setChatLeftReason("개인 사정");
-        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
-        when(playerRepository.save(any(Player.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        playerAdminService.updatePlayer(
-            1L,
-            10L,
-            new GroupPlayerUpdateRequest(null, null, true, null, null, chatRejoinedAt, null)
-        );
-
-        assertThat(player.isActive()).isTrue();
-        assertThat(player.getChatLeftAt()).isEqualTo(chatLeftAt);
-        assertThat(player.getChatLeftReason()).isEqualTo("개인 사정");
-        assertThat(player.getChatRejoinedAt()).isEqualTo(chatRejoinedAt);
-        verify(playerRepository).save(player);
-    }
-
-    @Test
-    void recordsActivityAuditLogWhenReactivating() {
-        Player player = player(10L, 1L, "PlayerAlpha");
-        OffsetDateTime chatLeftAt = OffsetDateTime.parse("2026-05-02T12:41:00+09:00");
-        OffsetDateTime chatRejoinedAt = OffsetDateTime.parse("2026-05-03T13:42:00+09:00");
-        player.setActive(false);
-        player.setChatLeftAt(chatLeftAt);
-        player.setChatLeftReason("개인 사정");
-        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
-        when(playerRepository.save(any(Player.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        playerAdminService.updatePlayer(
-            1L,
-            10L,
-            new GroupPlayerUpdateRequest(null, null, true, null, null, chatRejoinedAt, null),
-            "ops@example.com",
-            "OpsUser"
-        );
-
-        verify(operationAuditLogService).recordPlayerActivityUpdate(
-            eq("ops@example.com"),
-            eq("OpsUser"),
-            eq(1L),
-            eq(player),
-            eq(false),
-            eq(true)
-        );
-    }
-
     @Test
     void storesTierChangeAcknowledgementWithoutActiveStatusChange() {
         Player player = player(10L, 1L, "기존닉");

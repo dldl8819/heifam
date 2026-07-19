@@ -298,6 +298,49 @@ class MatchQueryServiceTest {
     }
 
     @Test
+    void hidesLegacyInactiveParticipantButKeepsActiveParticipantAndHistoricalMmr() {
+        Group group = new Group();
+        group.setId(1L);
+
+        Match match = new Match();
+        match.setId(206L);
+        match.setGroup(group);
+        match.setWinningTeam("HOME");
+        match.setPlayedAt(OffsetDateTime.parse("2026-03-23T14:00:00Z"));
+
+        Player inactivePlayer = player(18L, group, "LEGACY_NICKNAME", 1200);
+        inactivePlayer.setActive(false);
+        Player activePlayer = player(19L, group, "ACTIVE_NICKNAME", 1100);
+
+        MatchParticipant inactiveParticipant = participant(match, inactivePlayer, "HOME", 1180);
+        MatchParticipant activeParticipant = participant(match, activePlayer, "AWAY", 1090);
+
+        when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(206L))
+            .thenReturn(List.of(inactiveParticipant, activeParticipant));
+
+        List<GroupRecentMatchResponse> responses = matchQueryService.getRecentMatches(1L, 10);
+
+        assertThat(inactivePlayer.getAnonymizedAt()).isNull();
+        assertThat(responses).hasSize(1);
+        GroupRecentMatchResponse response = responses.get(0);
+        assertThat(response.homeTeam()).singleElement().satisfies(player -> {
+            assertThat(player.playerId()).isNull();
+            assertThat(player.nickname()).isEqualTo(PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL);
+            assertThat(player.mmr()).isEqualTo(1180);
+        });
+        assertThat(response.awayTeam()).singleElement().satisfies(player -> {
+            assertThat(player.playerId()).isEqualTo(19L);
+            assertThat(player.nickname()).isEqualTo("ACTIVE_NICKNAME");
+            assertThat(player.mmr()).isEqualTo(1090);
+        });
+        assertThat(response.homeMmr()).isEqualTo(1180);
+        assertThat(response.awayMmr()).isEqualTo(1090);
+        assertThat(response.mmrDiff()).isEqualTo(90);
+        verify(accessControlService, never()).resolveAccessProfile(any());
+    }
+
+    @Test
     void appliesRecentMatchOffsetForIncrementalLoading() {
         when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of());
 

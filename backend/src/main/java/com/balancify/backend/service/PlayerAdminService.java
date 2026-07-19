@@ -27,15 +27,18 @@ public class PlayerAdminService {
     private final PlayerRepository playerRepository;
     private final OperationAuditLogService operationAuditLogService;
     private final GroupReadCacheService groupReadCacheService;
+    private final AccountDeletionService accountDeletionService;
 
     public PlayerAdminService(
         PlayerRepository playerRepository,
         OperationAuditLogService operationAuditLogService,
-        GroupReadCacheService groupReadCacheService
+        GroupReadCacheService groupReadCacheService,
+        AccountDeletionService accountDeletionService
     ) {
         this.playerRepository = playerRepository;
         this.operationAuditLogService = operationAuditLogService;
         this.groupReadCacheService = groupReadCacheService;
+        this.accountDeletionService = accountDeletionService;
     }
 
     @Transactional
@@ -151,10 +154,7 @@ public class PlayerAdminService {
                 if (chatLeftReason.length() > CHAT_LEFT_REASON_MAX_LENGTH) {
                     throw new IllegalArgumentException("Chat left reason must be 500 characters or fewer");
                 }
-                player.setActive(false);
-                player.setChatLeftAt(chatLeftAt);
-                player.setChatLeftReason(chatLeftReason);
-                player.setChatRejoinedAt(null);
+                accountDeletionService.deactivatePlayer(player);
             }
         }
 
@@ -169,7 +169,8 @@ public class PlayerAdminService {
 
         playerRepository.save(player);
         groupReadCacheService.evictGroup(groupId);
-        if (nicknameChanged || raceChanged) {
+        boolean deactivated = active != null && !active && previousActive;
+        if (!deactivated && (nicknameChanged || raceChanged)) {
             operationAuditLogService.recordPlayerProfileUpdate(
                 actorEmail,
                 actorNickname,
@@ -181,7 +182,7 @@ public class PlayerAdminService {
                 player.getRace()
             );
         }
-        if (tierChanged) {
+        if (!deactivated && tierChanged) {
             operationAuditLogService.recordPlayerTierUpdate(
                 actorEmail,
                 actorNickname,
@@ -246,7 +247,7 @@ public class PlayerAdminService {
     }
 
     private void requireMutablePlayer(Player player) {
-        if (player != null && player.isAnonymized()) {
+        if (PlayerIdentityPolicy.isIdentityHidden(player)) {
             throw new NoSuchElementException("Player not found");
         }
     }

@@ -141,6 +141,14 @@ public class AccessControlService {
         return !normalizedEmail.isEmpty() && resolveAccessState(normalizedEmail).allowed();
     }
 
+    public boolean hasConfiguredAccessGrant(String email) {
+        String normalizedEmail = normalizeEmail(email);
+        return !normalizedEmail.isEmpty()
+            && (adminKeyProperties.isConfiguredSuperAdminEmail(normalizedEmail)
+                || adminKeyProperties.isConfiguredAdminEmail(normalizedEmail)
+                || adminKeyProperties.isConfiguredAllowedEmail(normalizedEmail));
+    }
+
     @Transactional(readOnly = true)
     public AdminEmailSnapshot getAdminEmailSnapshot() {
         List<String> superAdminEmails = adminKeyProperties

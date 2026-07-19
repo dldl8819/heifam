@@ -41,11 +41,8 @@ public class PlayerQueryService {
     private List<GroupPlayerResponse> loadGroupPlayers(Long groupId, boolean includeInactive) {
         List<Player> players = new ArrayList<>(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId)
             .stream()
-            .filter(player -> !player.isAnonymized())
+            .filter(player -> !PlayerIdentityPolicy.isIdentityHidden(player))
             .toList());
-        if (!includeInactive) {
-            players = new ArrayList<>(players.stream().filter(Player::isActive).toList());
-        }
         if (players.isEmpty()) {
             return List.of();
         }
@@ -122,7 +119,7 @@ public class PlayerQueryService {
         List<Player> players = new ArrayList<>(
             playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId)
                 .stream()
-                .filter(Player::isActive)
+                .filter(player -> !PlayerIdentityPolicy.isIdentityHidden(player))
                 .toList()
         );
         players.sort(

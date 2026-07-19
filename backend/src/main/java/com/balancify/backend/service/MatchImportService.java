@@ -274,6 +274,9 @@ public class MatchImportService {
         List<Player> players = playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId);
         Map<String, List<Player>> indexed = new HashMap<>();
         for (Player player : players) {
+            if (PlayerIdentityPolicy.isIdentityHidden(player)) {
+                continue;
+            }
             String key = safeTrim(player.getNickname()).toLowerCase(Locale.ROOT);
             if (key.isEmpty()) {
                 continue;

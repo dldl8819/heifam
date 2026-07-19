@@ -15,6 +15,10 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
     List<Player> findByNicknameIgnoreCaseAndAnonymizedAtIsNull(String nickname);
 
     List<Player> findByAuthUserIdAndAnonymizedAtIsNull(UUID authUserId);
+    boolean existsByAuthUserIdAndActiveTrueAndAnonymizedAtIsNullAndIdNot(
+        UUID authUserId,
+        Long excludedPlayerId
+    );
 
     Optional<Player> findByIdAndGroup_Id(Long playerId, Long groupId);
 

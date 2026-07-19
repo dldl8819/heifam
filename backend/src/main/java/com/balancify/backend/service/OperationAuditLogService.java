@@ -252,12 +252,14 @@ public class OperationAuditLogService {
             actorNickname,
             action,
             "PLAYER",
-            player.getId(),
-            player.getNickname(),
+            nextActive ? player.getId() : null,
+            nextActive ? player.getNickname() : PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL,
             groupId
         );
         log.setSummary(nextActive ? "복구" : "비활성");
-        log.setDetails("status=" + formatActiveStatus(previousActive) + " -> " + formatActiveStatus(nextActive));
+        log.setDetails(nextActive
+            ? "status=" + formatActiveStatus(previousActive) + " -> " + formatActiveStatus(true)
+            : null);
         operationAuditLogRepository.save(log);
     }
 

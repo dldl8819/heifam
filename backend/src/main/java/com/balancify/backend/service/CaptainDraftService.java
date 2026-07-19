@@ -38,7 +38,6 @@ public class CaptainDraftService {
     private static final String TEAM_UNASSIGNED = "UNASSIGNED";
     private static final String STATUS_DRAFTING = "DRAFTING";
     private static final String STATUS_READY = "READY";
-    private static final String DELETED_MEMBER_LABEL = "\uD0C8\uD1F4\uD55C \uD68C\uC6D0";
     private static final List<String> ROUND_CODES = List.of("PPP", "PPT", "PPZ", "PTZ");
 
     private final GroupRepository groupRepository;
@@ -88,7 +87,7 @@ public class CaptainDraftService {
 
         List<Player> players = playerRepository.findByGroup_IdAndIdIn(groupId, participantPlayerIds)
             .stream()
-            .filter(Player::isActive)
+            .filter(player -> !PlayerIdentityPolicy.isIdentityHidden(player))
             .toList();
         if (players.size() != participantPlayerIds.size()) {
             throw new IllegalArgumentException("All participants must belong to the group");
@@ -395,7 +394,7 @@ public class CaptainDraftService {
                             : participant.getPickOrder()
                     )
                     .thenComparing(participant ->
-                        safeTrim(participant.getPlayer().getNickname()).toLowerCase()
+                        safeTrim(PlayerIdentityPolicy.responseNickname(participant.getPlayer())).toLowerCase()
                     )
             )
             .map(participant -> new CaptainDraftParticipantResponse(
@@ -477,14 +476,11 @@ public class CaptainDraftService {
     }
 
     private Long responsePlayerId(Player player) {
-        return player == null || player.isAnonymized() ? null : player.getId();
+        return PlayerIdentityPolicy.responsePlayerId(player);
     }
 
     private String responseNickname(Player player) {
-        if (player == null) {
-            return null;
-        }
-        return player.isAnonymized() ? DELETED_MEMBER_LABEL : player.getNickname();
+        return PlayerIdentityPolicy.responseNickname(player);
     }
 
     private String normalizeTeam(String team) {

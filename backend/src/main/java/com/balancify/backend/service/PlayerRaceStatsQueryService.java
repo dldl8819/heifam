@@ -89,7 +89,7 @@ public class PlayerRaceStatsQueryService {
 
     private GroupPlayerRaceStatsResponse loadGroupPlayerRaceStats(Long groupId, Long playerId) {
         Player player = playerRepository.findByIdAndGroup_Id(playerId, groupId)
-            .filter(candidate -> !candidate.isAnonymized())
+            .filter(candidate -> !PlayerIdentityPolicy.isIdentityHidden(candidate))
             .orElseThrow(() -> new NoSuchElementException("Player not found"));
 
         return toResponse(
@@ -105,7 +105,7 @@ public class PlayerRaceStatsQueryService {
         LocalDate statMonth
     ) {
         Player player = playerRepository.findByIdAndGroup_Id(playerId, groupId)
-            .filter(candidate -> !candidate.isAnonymized())
+            .filter(candidate -> !PlayerIdentityPolicy.isIdentityHidden(candidate))
             .orElseThrow(() -> new NoSuchElementException("Player not found"));
         List<GroupPlayerGameTypeStatResponse> byGameType = playerMonthlyGameTypeStatsRepository
             .findByGroupIdAndPlayerIdAndStatMonth(groupId, playerId, statMonth)
@@ -140,7 +140,7 @@ public class PlayerRaceStatsQueryService {
     private List<GroupPlayerRaceStatsResponse> loadGroupPlayerRaceStats(Long groupId) {
         List<Player> players = playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId)
             .stream()
-            .filter(Player::isActive)
+            .filter(candidate -> !PlayerIdentityPolicy.isIdentityHidden(candidate))
             .toList();
         Map<Long, List<PlayerRaceStats>> raceStatsByPlayerId = groupByPlayerId(
             playerRaceStatsRepository.findByGroupId(groupId)

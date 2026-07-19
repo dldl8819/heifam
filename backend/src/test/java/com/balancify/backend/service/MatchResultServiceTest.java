@@ -160,6 +160,59 @@ class MatchResultServiceTest {
     }
 
     @Test
+    void masksLegacyInactivePlayerWithoutSkippingMmrAndHistoryProcessing() {
+        Group group = new Group();
+        group.setId(8L);
+
+        Match match = new Match();
+        match.setId(2L);
+        match.setGroup(group);
+        match.setStatus(MatchStatus.CONFIRMED);
+        match.setTeamSize(1);
+
+        Player inactivePlayer = player(7L, group, "LEGACY_NICKNAME", 1000);
+        inactivePlayer.setActive(false);
+        Player activePlayer = player(8L, group, "ACTIVE_NICKNAME", 1000);
+        List<MatchParticipant> participants = List.of(
+            participant(17L, match, inactivePlayer, "HOME"),
+            participant(18L, match, activePlayer, "AWAY")
+        );
+
+        when(matchRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(2L)).thenReturn(participants);
+        when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(playerRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(mmrHistoryRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MatchResultResponse response = matchResultService.processMatchResult(
+            2L,
+            new MatchResultRequest("HOME")
+        );
+
+        assertThat(inactivePlayer.getAnonymizedAt()).isNull();
+        assertThat(response.participants()).hasSize(2);
+        assertThat(response.participants().get(0).playerId()).isNull();
+        assertThat(response.participants().get(0).nickname())
+            .isEqualTo(PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL);
+        assertThat(response.participants().get(1).playerId()).isEqualTo(8L);
+        assertThat(response.participants().get(1).nickname()).isEqualTo("ACTIVE_NICKNAME");
+
+        assertThat(inactivePlayer.getMmr()).isGreaterThan(1000);
+        assertThat(activePlayer.getMmr()).isLessThan(1000);
+        assertThat(participants.get(0).getMmrAfter()).isEqualTo(inactivePlayer.getMmr());
+        assertThat(participants.get(1).getMmrAfter()).isEqualTo(activePlayer.getMmr());
+
+        ArgumentCaptor<List<MmrHistory>> historyCaptor = ArgumentCaptor.forClass(List.class);
+        verify(mmrHistoryRepository).saveAll(historyCaptor.capture());
+        assertThat(historyCaptor.getValue()).hasSize(2);
+        assertThat(historyCaptor.getValue())
+            .extracting(history -> history.getPlayer().getId())
+            .containsExactlyInAnyOrder(7L, 8L);
+        verify(playerStatsRefreshService).rebuildGroupStats(8L);
+    }
+
+    @Test
     void throwsWhenWinnerTeamIsInvalid() {
         Match match = new Match();
         match.setId(1L);

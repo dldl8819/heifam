@@ -20,7 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AccountDeletionDataService {
 
-    public static final String DELETED_MEMBER_LABEL = "\uD0C8\uD1F4\uD55C \uD68C\uC6D0";
+    public static final String DELETED_MEMBER_LABEL = PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL;
 
     private final AccountPersonalDataRepository accountPersonalDataRepository;
     private final PlayerRepository playerRepository;
@@ -71,7 +71,11 @@ public class AccountDeletionDataService {
             return;
         }
 
-        List<Player> candidates = playerRepository.findByNicknameIgnoreCaseAndAnonymizedAtIsNull(nickname);
+        List<Player> candidates = playerRepository
+            .findByNicknameIgnoreCaseAndAnonymizedAtIsNull(nickname)
+            .stream()
+            .filter(candidate -> !PlayerIdentityPolicy.isIdentityHidden(candidate))
+            .toList();
         boolean linkedToAnotherAccount = candidates.stream()
             .anyMatch(candidate -> candidate.getAuthUserId() != null
                 && !authUserId.equals(candidate.getAuthUserId()));
@@ -119,16 +123,7 @@ public class AccountDeletionDataService {
         OffsetDateTime anonymizedAt = OffsetDateTime.now(clock);
         Set<Long> groupIds = new LinkedHashSet<>();
         for (Player player : linkedPlayers.values()) {
-            player.setAuthUserId(null);
-            player.setNickname(DELETED_MEMBER_LABEL);
-            player.setNote(null);
-            player.setActive(false);
-            player.setChatLeftAt(null);
-            player.setChatLeftReason(null);
-            player.setChatRejoinedAt(null);
-            player.setTierChangeAcknowledgedTier(null);
-            player.setTierChangeAcknowledgedAt(null);
-            player.setAnonymizedAt(anonymizedAt);
+            PlayerIdentityPolicy.anonymize(player, anonymizedAt);
             if (player.getGroup() != null && player.getGroup().getId() != null) {
                 groupIds.add(player.getGroup().getId());
             }
@@ -148,6 +143,82 @@ public class AccountDeletionDataService {
         groupIds.forEach(groupReadCacheService::evictGroup);
 
         return new AnonymizationResult(playerIds.size());
+    }
+
+    @Transactional
+    public InactivePlayerCleanupOutcome anonymizeInactivePlayer(Player player) {
+        if (player == null || player.getId() == null) {
+            throw new IllegalArgumentException("A persisted player is required");
+        }
+
+        UUID authUserId = player.getAuthUserId();
+        boolean hasAnotherActiveLinkedPlayer = authUserId != null
+            && playerRepository.existsByAuthUserIdAndActiveTrueAndAnonymizedAtIsNullAndIdNot(
+                authUserId,
+                player.getId()
+            );
+        String accountEmail = authUserId == null
+            ? ""
+            : accountPersonalDataRepository.findAccountEmail(authUserId).orElse("");
+        Long groupId = player.getGroup() == null ? null : player.getGroup().getId();
+        boolean requiresAuthDeletion = authUserId != null && !hasAnotherActiveLinkedPlayer;
+
+        if (requiresAuthDeletion
+            && !accountEmail.isEmpty()
+            && accessControlService.hasConfiguredAccessGrant(accountEmail)) {
+            throw new AccountDeletionException(
+                "Account deactivation requires removal from the configured access list"
+            );
+        }
+
+        OffsetDateTime anonymizedAt = OffsetDateTime.now(clock);
+        if (requiresAuthDeletion) {
+            accountPersonalDataRepository.enqueuePendingAuthDeletion(authUserId, anonymizedAt);
+        }
+
+        PlayerIdentityPolicy.anonymize(player, anonymizedAt);
+        playerRepository.saveAndFlush(player);
+
+        if (requiresAuthDeletion) {
+            if (!accountEmail.isEmpty()) {
+                accountPersonalDataRepository.anonymizeHistoricalIdentity(
+                    accountEmail,
+                    List.of(player.getId()),
+                    DELETED_MEMBER_LABEL
+                );
+            } else {
+                accountPersonalDataRepository.anonymizeHistoricalPlayerIdentity(
+                    List.of(player.getId()),
+                    DELETED_MEMBER_LABEL
+                );
+            }
+            accountPersonalDataRepository.deleteAccountIdentity(authUserId, accountEmail);
+            if (!accountEmail.isEmpty()) {
+                accessControlService.evictAccountCache(accountEmail);
+            }
+        } else if (!accountEmail.isEmpty()) {
+            accountPersonalDataRepository.anonymizeHistoricalIdentityInGroup(
+                accountEmail,
+                groupId,
+                List.of(player.getId()),
+                DELETED_MEMBER_LABEL
+            );
+        } else {
+            accountPersonalDataRepository.anonymizeHistoricalPlayerIdentity(
+                List.of(player.getId()),
+                DELETED_MEMBER_LABEL
+            );
+        }
+
+        if (groupId != null) {
+            groupReadCacheService.evictGroup(groupId);
+        }
+        return new InactivePlayerCleanupOutcome(authUserId, requiresAuthDeletion);
+    }
+
+    @Transactional
+    public void completePendingAuthDeletion(UUID authUserId) {
+        accountPersonalDataRepository.deletePendingAuthDeletion(authUserId);
     }
 
     private void addPlayers(Map<Long, Player> target, List<Player> players) {
@@ -170,5 +241,8 @@ public class AccountDeletionDataService {
     }
 
     public record AnonymizationResult(int anonymizedPlayerCount) {
+    }
+
+    public record InactivePlayerCleanupOutcome(UUID authUserId, boolean requiresAuthDeletion) {
     }
 }

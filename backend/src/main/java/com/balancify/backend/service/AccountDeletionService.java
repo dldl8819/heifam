@@ -1,10 +1,13 @@
 package com.balancify.backend.service;
 
+import com.balancify.backend.domain.Player;
 import com.balancify.backend.security.AuthenticatedRequestResolver.ResolvedRequestIdentity;
 import com.balancify.backend.security.SupabaseAuthAdminClient;
 import com.balancify.backend.security.SupabaseJwtVerifier;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AccountDeletionService {
@@ -41,6 +44,24 @@ public class AccountDeletionService {
         accountDeletionDataService.anonymizeAccount(authUserId, identity.email());
         try {
             supabaseAuthAdminClient.deleteUser(authUserId);
+        } finally {
+            supabaseJwtVerifier.invalidateUser(authUserId.toString());
+        }
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public void deactivatePlayer(Player player) {
+        AccountDeletionDataService.InactivePlayerCleanupOutcome outcome =
+            accountDeletionDataService.anonymizeInactivePlayer(player);
+        if (!outcome.requiresAuthDeletion() || outcome.authUserId() == null) {
+            return;
+        }
+
+        UUID authUserId = outcome.authUserId();
+        try {
+            supabaseAuthAdminClient.ensureConfigured();
+            supabaseAuthAdminClient.deleteUser(authUserId);
+            accountDeletionDataService.completePendingAuthDeletion(authUserId);
         } finally {
             supabaseJwtVerifier.invalidateUser(authUserId.toString());
         }

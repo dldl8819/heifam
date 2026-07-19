@@ -146,6 +146,29 @@ class AccountDeletionDataServiceTest {
     }
 
     @Test
+    void ignoresInactiveCandidateWhenLinkingAuthenticatedPlayer() {
+        Player inactiveCandidate = new Player();
+        inactiveCandidate.setId(103L);
+        inactiveCandidate.setNickname(ORIGINAL_NICKNAME);
+        inactiveCandidate.setActive(false);
+        inactiveCandidate.setAuthUserId(UUID.fromString("00000000-0000-0000-0000-000000000002"));
+        Player activeCandidate = new Player();
+        activeCandidate.setId(104L);
+        activeCandidate.setNickname(ORIGINAL_NICKNAME);
+
+        when(accountPersonalDataRepository.findLinkedNickname(PLACEHOLDER_EMAIL))
+            .thenReturn(Optional.of(ORIGINAL_NICKNAME));
+        when(playerRepository.findByNicknameIgnoreCaseAndAnonymizedAtIsNull(ORIGINAL_NICKNAME))
+            .thenReturn(List.of(inactiveCandidate, activeCandidate));
+
+        accountDeletionDataService.linkPlayers(PLACEHOLDER_AUTH_USER_ID, PLACEHOLDER_EMAIL);
+
+        assertThat(activeCandidate.getAuthUserId()).isEqualTo(PLACEHOLDER_AUTH_USER_ID);
+        assertThat(inactiveCandidate.getAuthUserId()).isNotEqualTo(PLACEHOLDER_AUTH_USER_ID);
+        verify(playerRepository).saveAll(List.of(activeCandidate));
+    }
+
+    @Test
     void anonymizesAllLegacyPlayersForAUniquelyOwnedAccessNickname() {
         Player firstCandidate = new Player();
         firstCandidate.setId(201L);
@@ -175,6 +198,143 @@ class AccountDeletionDataServiceTest {
         verify(accountPersonalDataRepository).deleteAccountIdentity(
             PLACEHOLDER_AUTH_USER_ID,
             PLACEHOLDER_EMAIL
+        );
+    }
+    @Test
+    void anonymizesInactivePlayerAndRemovesSoleLinkedAccountIdentity() {
+        Group group = new Group();
+        group.setId(42L);
+        Player player = new Player();
+        player.setId(301L);
+        player.setGroup(group);
+        player.setAuthUserId(PLACEHOLDER_AUTH_USER_ID);
+        player.setNickname(ORIGINAL_NICKNAME);
+        player.setNote("placeholder-note");
+        player.setActive(true);
+
+        when(playerRepository.existsByAuthUserIdAndActiveTrueAndAnonymizedAtIsNullAndIdNot(
+            PLACEHOLDER_AUTH_USER_ID,
+            301L
+        )).thenReturn(false);
+        when(accountPersonalDataRepository.findAccountEmail(PLACEHOLDER_AUTH_USER_ID))
+            .thenReturn(Optional.of(PLACEHOLDER_EMAIL));
+
+        AccountDeletionDataService.InactivePlayerCleanupOutcome outcome =
+            accountDeletionDataService.anonymizeInactivePlayer(player);
+
+        assertThat(player.isActive()).isFalse();
+        assertThat(player.getAuthUserId()).isNull();
+        assertThat(player.getNickname()).isEqualTo(PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL);
+        assertThat(player.getNote()).isNull();
+        assertThat(player.getAnonymizedAt()).isEqualTo(ANONYMIZED_AT);
+        assertThat(outcome.authUserId()).isEqualTo(PLACEHOLDER_AUTH_USER_ID);
+        assertThat(outcome.requiresAuthDeletion()).isTrue();
+        verify(accountPersonalDataRepository).enqueuePendingAuthDeletion(
+            PLACEHOLDER_AUTH_USER_ID,
+            ANONYMIZED_AT
+        );
+        verify(playerRepository).saveAndFlush(player);
+        verify(accountPersonalDataRepository).anonymizeHistoricalIdentity(
+            PLACEHOLDER_EMAIL,
+            List.of(301L),
+            PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL
+        );
+        verify(accountPersonalDataRepository).deleteAccountIdentity(
+            PLACEHOLDER_AUTH_USER_ID,
+            PLACEHOLDER_EMAIL
+        );
+        verify(accessControlService).evictAccountCache(PLACEHOLDER_EMAIL);
+        verify(groupReadCacheService).evictGroup(42L);
+    }
+
+    @Test
+    void preservesSharedAccountIdentityWhenAnotherActivePlayerUsesTheAuthLink() {
+        Group group = new Group();
+        group.setId(42L);
+        Player player = new Player();
+        player.setId(302L);
+        player.setGroup(group);
+        player.setAuthUserId(PLACEHOLDER_AUTH_USER_ID);
+        player.setNickname(ORIGINAL_NICKNAME);
+        player.setActive(true);
+
+        when(playerRepository.existsByAuthUserIdAndActiveTrueAndAnonymizedAtIsNullAndIdNot(
+            PLACEHOLDER_AUTH_USER_ID,
+            302L
+        )).thenReturn(true);
+        when(accountPersonalDataRepository.findAccountEmail(PLACEHOLDER_AUTH_USER_ID))
+            .thenReturn(Optional.of(PLACEHOLDER_EMAIL));
+
+        AccountDeletionDataService.InactivePlayerCleanupOutcome outcome =
+            accountDeletionDataService.anonymizeInactivePlayer(player);
+
+        assertThat(player.isAnonymized()).isTrue();
+        assertThat(outcome.requiresAuthDeletion()).isFalse();
+        verify(accountPersonalDataRepository).anonymizeHistoricalIdentityInGroup(
+            PLACEHOLDER_EMAIL,
+            42L,
+            List.of(302L),
+            PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL
+        );
+        verify(accountPersonalDataRepository, never()).enqueuePendingAuthDeletion(
+            PLACEHOLDER_AUTH_USER_ID,
+            ANONYMIZED_AT
+        );
+        verify(accountPersonalDataRepository, never()).deleteAccountIdentity(
+            PLACEHOLDER_AUTH_USER_ID,
+            PLACEHOLDER_EMAIL
+        );
+        verify(accessControlService, never()).evictAccountCache(PLACEHOLDER_EMAIL);
+    }
+
+    @Test
+    void refusesSoleLinkedDeactivationWhenStaticAccessGrantRemains() {
+        Player player = new Player();
+        player.setId(303L);
+        player.setAuthUserId(PLACEHOLDER_AUTH_USER_ID);
+        player.setNickname(ORIGINAL_NICKNAME);
+        player.setActive(true);
+
+        when(accountPersonalDataRepository.findAccountEmail(PLACEHOLDER_AUTH_USER_ID))
+            .thenReturn(Optional.of(PLACEHOLDER_EMAIL));
+        when(accessControlService.hasConfiguredAccessGrant(PLACEHOLDER_EMAIL)).thenReturn(true);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+            () -> accountDeletionDataService.anonymizeInactivePlayer(player)
+        ).isInstanceOf(com.balancify.backend.service.exception.AccountDeletionException.class);
+
+        assertThat(player.getNickname()).isEqualTo(ORIGINAL_NICKNAME);
+        assertThat(player.getAuthUserId()).isEqualTo(PLACEHOLDER_AUTH_USER_ID);
+        verify(playerRepository, never()).saveAndFlush(player);
+        verify(accountPersonalDataRepository, never()).enqueuePendingAuthDeletion(
+            PLACEHOLDER_AUTH_USER_ID,
+            ANONYMIZED_AT
+        );
+    }
+
+    @Test
+    void removesAuthIdentityByIdWhenMirrorEmailIsUnavailable() {
+        Player player = new Player();
+        player.setId(304L);
+        player.setAuthUserId(PLACEHOLDER_AUTH_USER_ID);
+        player.setNickname(ORIGINAL_NICKNAME);
+        player.setActive(true);
+
+        AccountDeletionDataService.InactivePlayerCleanupOutcome outcome =
+            accountDeletionDataService.anonymizeInactivePlayer(player);
+
+        assertThat(outcome.requiresAuthDeletion()).isTrue();
+        verify(accountPersonalDataRepository).enqueuePendingAuthDeletion(
+            PLACEHOLDER_AUTH_USER_ID,
+            ANONYMIZED_AT
+        );
+        verify(accountPersonalDataRepository).deleteAccountIdentity(
+            PLACEHOLDER_AUTH_USER_ID,
+            ""
+        );
+        verify(accountPersonalDataRepository).anonymizeHistoricalPlayerIdentity(
+            List.of(304L),
+            PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL
         );
     }
 }

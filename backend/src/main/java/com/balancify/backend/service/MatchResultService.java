@@ -300,14 +300,11 @@ public class MatchResultService {
     }
 
     private Long responsePlayerId(Player player) {
-        return player == null || player.isAnonymized() ? null : player.getId();
+        return PlayerIdentityPolicy.responsePlayerId(player);
     }
 
     private String responseNickname(Player player) {
-        if (player == null) {
-            return null;
-        }
-        return player.isAnonymized() ? DELETED_MEMBER_LABEL : player.getNickname();
+        return PlayerIdentityPolicy.responseNickname(player);
     }
 
     private double calculateAverageMmr(List<MatchParticipant> participants) {

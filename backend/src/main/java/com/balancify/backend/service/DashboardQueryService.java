@@ -61,7 +61,7 @@ public class DashboardQueryService {
         List<Player> players = new ArrayList<>(
             playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId)
                 .stream()
-                .filter(Player::isActive)
+                .filter(player -> !PlayerIdentityPolicy.isIdentityHidden(player))
                 .toList()
         );
         players.sort(
@@ -181,7 +181,10 @@ public class DashboardQueryService {
                 ? participant.getMmrBefore()
                 : safeInt(participant.getPlayer().getMmr());
             DashboardRecentBalanceTeamPlayerResponse playerResponse =
-                new DashboardRecentBalanceTeamPlayerResponse(participant.getPlayer().getNickname(), mmr);
+                new DashboardRecentBalanceTeamPlayerResponse(
+                    PlayerIdentityPolicy.responseNickname(participant.getPlayer()),
+                    mmr
+                );
 
             if ("HOME".equals(team)) {
                 homeTeam.add(playerResponse);
@@ -271,7 +274,7 @@ public class DashboardQueryService {
 
         return new DashboardMyRaceSummaryResponse(
             true,
-            targetPlayer.getNickname(),
+            PlayerIdentityPolicy.responseNickname(targetPlayer),
             totalWins,
             totalLosses,
             totalGames,
@@ -342,7 +345,7 @@ public class DashboardQueryService {
 
         return new DashboardMyGameTypeSummaryResponse(
             true,
-            targetPlayer.getNickname(),
+            PlayerIdentityPolicy.responseNickname(targetPlayer),
             totalWins,
             totalLosses,
             totalGames,
@@ -392,7 +395,7 @@ public class DashboardQueryService {
                 Player teammate = teammateParticipant.getPlayer();
                 TeammateStatsAccumulator stats =
                     statsByTeammateId.computeIfAbsent(teammate.getId(), ignored -> new TeammateStatsAccumulator());
-                stats.nickname = teammate.getNickname();
+                stats.nickname = PlayerIdentityPolicy.responseNickname(teammate);
                 if (result == Result.WIN) {
                     stats.wins++;
                 } else {
@@ -430,7 +433,7 @@ public class DashboardQueryService {
 
         return new DashboardMyTeammateSummaryResponse(
             true,
-            targetPlayer.getNickname(),
+            PlayerIdentityPolicy.responseNickname(targetPlayer),
             TEAMMATE_MIN_GAMES,
             bestDuos,
             frequentTeammates,

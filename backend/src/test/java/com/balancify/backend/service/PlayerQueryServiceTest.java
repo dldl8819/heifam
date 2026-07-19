@@ -258,7 +258,7 @@ class PlayerQueryServiceTest {
     }
 
     @Test
-    void includesInactivePlayersWhenRequested() {
+    void excludesIdentityHiddenPlayersEvenWhenInactiveRowsAreRequested() {
         Group group = new Group();
         group.setId(1L);
 
@@ -276,11 +276,9 @@ class PlayerQueryServiceTest {
 
         List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L, true);
 
-        assertThat(response).hasSize(2);
-        assertThat(response).extracting(GroupPlayerResponse::nickname).containsExactly("비활성", "활성");
-        assertThat(response).extracting(GroupPlayerResponse::active).containsExactly(false, true);
-        assertThat(response.get(0).chatLeftAt()).isEqualTo(chatLeftAt);
-        assertThat(response.get(0).chatLeftReason()).isEqualTo("톡방 퇴장");
+        assertThat(response).hasSize(1);
+        assertThat(response).extracting(GroupPlayerResponse::nickname).containsExactly("활성");
+        assertThat(response.getFirst().active()).isTrue();
     }
 
     @Test
