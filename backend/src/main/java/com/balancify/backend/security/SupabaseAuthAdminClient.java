@@ -8,6 +8,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -18,6 +19,7 @@ public class SupabaseAuthAdminClient {
     private final SupabaseAuthProperties properties;
     private final HttpClient httpClient;
 
+    @Autowired
     public SupabaseAuthAdminClient(SupabaseAuthProperties properties) {
         this(
             properties,
