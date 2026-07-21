@@ -43,7 +43,7 @@ left join public.users account
 where player.active = false;
 
 insert into public.pending_auth_user_deletions (auth_user_id, created_at, last_attempt_at)
-select distinct auth_user_id, now(), null
+select distinct auth_user_id, now(), null::timestamptz
 from inactive_player_privacy_targets
 where sole_linked_account = true
   and auth_user_id is not null
