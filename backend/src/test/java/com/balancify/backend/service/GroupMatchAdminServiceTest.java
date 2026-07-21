@@ -730,6 +730,46 @@ class GroupMatchAdminServiceTest {
     }
 
     @Test
+    void allowsManualMatchWhenOnlyOneTeamNeedsRaceOverride() {
+        Group group = new Group();
+        group.setId(1L);
+
+        List<Player> players = List.of(
+            player(1L, group, "P"),
+            player(2L, group, "P"),
+            player(3L, group, "P"),
+            player(4L, group, "P"),
+            player(5L, group, "PTZ"),
+            player(6L, group, "PZ")
+        );
+        Match savedMatch = new Match();
+        savedMatch.setId(983L);
+        savedMatch.setGroup(group);
+
+        when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
+        when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L, 5L, 6L)))
+            .thenReturn(players);
+        when(matchRepository.save(any(Match.class))).thenReturn(savedMatch);
+
+        groupMatchAdminService.createConfirmedMatch(
+            1L,
+            List.of(1L, 2L, 3L),
+            List.of(4L, 5L, 6L),
+            3,
+            MatchSource.MANUAL,
+            null,
+            "PPT"
+        );
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<MatchParticipant>> participantsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(matchParticipantRepository).saveAll(participantsCaptor.capture());
+        assertThat(participantsCaptor.getValue())
+            .extracting(MatchParticipant::getAssignedRace)
+            .containsExactly("P", "P", "T", "P", "T", "P");
+    }
+
+    @Test
     void rejectsBalancedMatchWhenRaceCompositionDoesNotMatchRegisteredRaces() {
         Group group = new Group();
         group.setId(1L);
