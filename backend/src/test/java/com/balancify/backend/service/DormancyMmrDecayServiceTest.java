@@ -13,6 +13,7 @@ import com.balancify.backend.repository.MatchParticipantRepository.PlayerLastPla
 import com.balancify.backend.repository.PlayerRepository;
 import com.balancify.backend.repository.GroupRepository;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -272,8 +273,8 @@ class DormancyMmrDecayServiceTest {
             }
 
             @Override
-            public OffsetDateTime getLastPlayedAt() {
-                return OffsetDateTime.parse(playedAt);
+            public Instant getLastPlayedAt() {
+                return OffsetDateTime.parse(playedAt).toInstant();
             }
         };
     }

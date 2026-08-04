@@ -7,7 +7,9 @@ import com.balancify.backend.repository.MatchParticipantRepository;
 import com.balancify.backend.repository.MatchParticipantRepository.PlayerLastPlayedAtProjection;
 import com.balancify.backend.repository.PlayerRepository;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -130,13 +132,15 @@ public class DormancyMmrDecayService {
     private Map<Long, OffsetDateTime> resolveLastPlayedAtByPlayerId(Long groupId) {
         Map<Long, OffsetDateTime> lastPlayedAtByPlayerId = new HashMap<>();
         for (PlayerLastPlayedAtProjection lastPlayedAt : matchParticipantRepository.findLastPlayedAtByGroupId(groupId)) {
-            if (lastPlayedAt.getPlayerId() == null || lastPlayedAt.getLastPlayedAt() == null) {
+            Long playerId = lastPlayedAt.getPlayerId();
+            Instant playedAt = lastPlayedAt.getLastPlayedAt();
+            if (playerId == null || playedAt == null) {
                 continue;
             }
 
             lastPlayedAtByPlayerId.putIfAbsent(
-                lastPlayedAt.getPlayerId(),
-                lastPlayedAt.getLastPlayedAt()
+                playerId,
+                OffsetDateTime.ofInstant(playedAt, ZoneOffset.UTC)
             );
         }
         return lastPlayedAtByPlayerId;

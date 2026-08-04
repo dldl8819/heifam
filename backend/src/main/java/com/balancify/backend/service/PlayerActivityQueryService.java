@@ -7,7 +7,9 @@ import com.balancify.backend.repository.MatchParticipantRepository.PlayerLastPla
 import com.balancify.backend.repository.PlayerRepository;
 import com.balancify.backend.repository.PlayerRepository.PlayerActivityCandidateProjection;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
@@ -99,10 +101,15 @@ public class PlayerActivityQueryService {
         Map<Long, OffsetDateTime> lastPlayedAtByPlayerId = new HashMap<>();
         for (PlayerLastPlayedAtProjection projection :
             matchParticipantRepository.findLastPlayedAtByGroupId(groupId)) {
-            if (projection.getPlayerId() == null || projection.getLastPlayedAt() == null) {
+            Long playerId = projection.getPlayerId();
+            Instant lastPlayedAt = projection.getLastPlayedAt();
+            if (playerId == null || lastPlayedAt == null) {
                 continue;
             }
-            lastPlayedAtByPlayerId.put(projection.getPlayerId(), projection.getLastPlayedAt());
+            lastPlayedAtByPlayerId.put(
+                playerId,
+                OffsetDateTime.ofInstant(lastPlayedAt, ZoneOffset.UTC)
+            );
         }
         return lastPlayedAtByPlayerId;
     }

@@ -14,9 +14,11 @@ import com.balancify.backend.repository.MatchParticipantRepository.PlayerLastPla
 import com.balancify.backend.repository.PlayerRepository;
 import com.balancify.backend.repository.PlayerRepository.PlayerActivityCandidateProjection;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.projection.SpelAwareProxyProjectionFactory;
 
 @ExtendWith(MockitoExtension.class)
 class PlayerActivityQueryServiceTest {
@@ -160,16 +163,12 @@ class PlayerActivityQueryServiceTest {
     }
 
     private PlayerLastPlayedAtProjection lastPlayedAt(Long playerId, String playedAt) {
-        return new PlayerLastPlayedAtProjection() {
-            @Override
-            public Long getPlayerId() {
-                return playerId;
-            }
-
-            @Override
-            public OffsetDateTime getLastPlayedAt() {
-                return OffsetDateTime.parse(playedAt);
-            }
-        };
+        return new SpelAwareProxyProjectionFactory().createProjection(
+            PlayerLastPlayedAtProjection.class,
+            Map.of(
+                "playerId", playerId,
+                "lastPlayedAt", Instant.parse(playedAt)
+            )
+        );
     }
 }

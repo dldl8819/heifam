@@ -2,6 +2,7 @@ package com.balancify.backend.repository;
 
 import com.balancify.backend.domain.MatchParticipant;
 import org.springframework.data.jpa.repository.Modifying;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -86,6 +87,6 @@ public interface MatchParticipantRepository extends JpaRepository<MatchParticipa
 
     interface PlayerLastPlayedAtProjection {
         Long getPlayerId();
-        OffsetDateTime getLastPlayedAt();
+        Instant getLastPlayedAt();
     }
 }
