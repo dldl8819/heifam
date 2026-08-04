@@ -10,6 +10,8 @@ import type {
   CaptainDraftPickRequest,
   CaptainDraftResponse,
   GroupDashboardResponse,
+  GroupDormantPlayerItem,
+  GroupPlayerLastParticipationResponse,
   GroupPlayerRaceStatsItem,
   GroupPlayerMmrUpdateRequest,
   GroupPlayerUpdateRequest,
@@ -521,6 +523,42 @@ function normalizePlayerRosterItem(value: unknown): PlayerRosterItem | null {
   }
 }
 
+function normalizeGroupDormantPlayerItem(value: unknown): GroupDormantPlayerItem | null {
+  if (value === null || typeof value !== 'object') {
+    return null
+  }
+
+  const source = value as Record<string, unknown>
+  const playerId = toNumber(source.playerId)
+  const nickname = typeof source.nickname === 'string' ? source.nickname : null
+  if (playerId === null || nickname === null) {
+    return null
+  }
+
+  return { playerId, nickname }
+}
+
+function normalizeGroupPlayerLastParticipationResponse(
+  value: unknown
+): GroupPlayerLastParticipationResponse | null {
+  if (value === null || typeof value !== 'object') {
+    return null
+  }
+
+  const source = value as Record<string, unknown>
+  if (source.lastPlayedAt === null) {
+    return { lastPlayedAt: null }
+  }
+  if (
+    typeof source.lastPlayedAt !== 'string' ||
+    Number.isNaN(new Date(source.lastPlayedAt).getTime())
+  ) {
+    return null
+  }
+
+  return { lastPlayedAt: source.lastPlayedAt }
+}
+
 function normalizePlayerTierBoardItem(value: unknown): GroupPlayerTierBoardItem | null {
   if (value === null || typeof value !== 'object') {
     return null
@@ -818,6 +856,36 @@ export const apiClient = {
     return payload
       .map(normalizePlayerRosterItem)
       .filter((item): item is PlayerRosterItem => item !== null)
+  },
+  getGroupDormantPlayers: async (groupId: number): Promise<GroupDormantPlayerItem[]> => {
+    const payload = await apiRequest<unknown>(
+      `/api/groups/${groupId}/players/dormant`,
+      undefined,
+      { adminOnly: true }
+    )
+    if (!Array.isArray(payload)) {
+      throw new Error('Invalid dormant players response format')
+    }
+
+    return payload
+      .map(normalizeGroupDormantPlayerItem)
+      .filter((item): item is GroupDormantPlayerItem => item !== null)
+  },
+  getGroupPlayerLastParticipation: async (
+    groupId: number,
+    playerId: number
+  ): Promise<GroupPlayerLastParticipationResponse> => {
+    const payload = await apiRequest<unknown>(
+      `/api/groups/${groupId}/players/${playerId}/last-participation`,
+      undefined,
+      { adminOnly: true }
+    )
+    const item = normalizeGroupPlayerLastParticipationResponse(payload)
+    if (item === null) {
+      throw new Error('Invalid player last participation response format')
+    }
+
+    return item
   },
   getGroupPlayerTierBoard: async (groupId: number): Promise<GroupPlayerTierBoardItem[]> => {
     const payload = await apiRequest<unknown>(`/api/groups/${groupId}/players/tier-board`, undefined, {

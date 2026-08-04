@@ -593,8 +593,10 @@
       "searchPlaceholder": "닉네임 입력...",
       "raceLabel": "종족 필터",
       "includeInactive": "비활성 선수 보기",
+      "includeDormant": "휴면 선수 보기",
       "activeCount": "활성 선수 {count}명",
       "inactiveCount": "비활성 선수 {count}명",
+      "dormantCount": "휴면 선수 {count}명",
       "totalCount": "전체 {count}명"
     },
     "table": {
@@ -612,6 +614,12 @@
       "empty": "조건에 맞는 선수가 없습니다.",
       "unassigned": "배정 필요",
       "inactive": "비활성",
+      "dormant": "휴면",
+      "lastParticipationToggleAria": "{nickname} 선수의 마지막 게임 참여 일자 조회",
+      "lastParticipationLoading": "마지막 게임 참여 일자를 조회하는 중...",
+      "lastParticipationLabel": "마지막 게임 참여 일자: {value}",
+      "lastParticipationNone": "마지막 게임 참여 일자: 없음",
+      "lastParticipationError": "마지막 게임 참여 일자를 불러오지 못했습니다.",
       "chatLeftAt": "나간 일시 {value}",
       "chatLeftReason": "나간 사유 {value}",
       "chatRejoinedAt": "복귀 일시 {value}"
@@ -1066,4 +1074,3 @@
     }
   }
 }
-

@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAdminAuth } from '@/lib/admin-auth'
 import { apiClient, isApiConflictError, isApiForbiddenError, isApiNotFoundError, isApiUnauthorizedError } from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
@@ -14,6 +14,10 @@ import {
   resolveDefaultMmrForTier,
   resolveEditableMmrValue,
 } from '@/lib/player-edit'
+import {
+  filterPlayerRosterByView,
+  type PlayerRosterView,
+} from '@/lib/player-roster-filter'
 import type { GroupPlayerRaceStatsItem, PlayerRace, PlayerRosterItem, PlayerTierStatus } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
@@ -47,6 +51,11 @@ type ActivityFormState = {
   chatLeftAt: string
   chatLeftReason: string
   chatRejoinedAt: string
+}
+type LastParticipationState = {
+  playerId: number
+  status: 'loading' | 'success' | 'error'
+  lastPlayedAt: string | null
 }
 const PLAYER_RACE_OPTIONS: PlayerRace[] = ['P', 'T', 'Z', 'PT', 'PZ', 'TZ', 'PTZ']
 const PLAYER_EDIT_TIER_OPTIONS: PlayerTierStatus[] = [
@@ -196,6 +205,15 @@ function formatChatRecordDisplay(value: string | undefined): string {
   return `${year}.${month}.${day} ${hour}:${minute}`
 }
 
+function formatLastParticipationDate(value: string): string {
+  return new Intl.DateTimeFormat('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    timeZone: 'Asia/Seoul',
+  }).format(new Date(value))
+}
+
 function toImportResultNumber(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0
 }
@@ -293,7 +311,10 @@ export default function PlayersPage() {
   const [deletingPlayerId, setDeletingPlayerId] = useState<number | null>(null)
   const [togglingPlayerId, setTogglingPlayerId] = useState<number | null>(null)
   const [activityForm, setActivityForm] = useState<ActivityFormState | null>(null)
-  const [showInactive, setShowInactive] = useState<boolean>(false)
+  const [rosterView, setRosterView] = useState<PlayerRosterView>('active')
+  const [dormantPlayerIds, setDormantPlayerIds] = useState<ReadonlySet<number>>(
+    () => new Set<number>()
+  )
   const [playerActionError, setPlayerActionError] = useState<string | null>(null)
   const [playerActionSuccess, setPlayerActionSuccess] = useState<string | null>(null)
   const [gameTypeStatsPlayer, setGameTypeStatsPlayer] =
@@ -301,27 +322,61 @@ export default function PlayersPage() {
   const [gameTypeStats, setGameTypeStats] = useState<GroupPlayerRaceStatsItem | null>(null)
   const [gameTypeStatsLoading, setGameTypeStatsLoading] = useState<boolean>(false)
   const [gameTypeStatsError, setGameTypeStatsError] = useState<string | null>(null)
+  const [lastParticipation, setLastParticipation] = useState<LastParticipationState | null>(null)
+  const rosterRequestId = useRef(0)
+  const lastParticipationRequestId = useRef(0)
+  const effectiveRosterView: PlayerRosterView = isAdmin ? rosterView : 'active'
 
   const fetchRoster = useCallback(async () => {
+    const requestId = rosterRequestId.current + 1
+    rosterRequestId.current = requestId
     setLoading(true)
     setError(null)
 
     try {
-      const response = await apiClient.getGroupPlayers(TEMP_GROUP_ID, {
-        includeInactive: isAdmin && showInactive,
-      })
+      const [response, dormantPlayers] = await Promise.all([
+        apiClient.getGroupPlayers(TEMP_GROUP_ID, {
+          includeInactive: isAdmin && effectiveRosterView === 'inactive',
+        }),
+        isAdmin && effectiveRosterView === 'dormant'
+          ? apiClient.getGroupDormantPlayers(TEMP_GROUP_ID)
+          : Promise.resolve([]),
+      ])
+      if (rosterRequestId.current !== requestId) {
+        return
+      }
       setRows(sortRosterRows(response, showMmrColumn))
+      setDormantPlayerIds(new Set(dormantPlayers.map((player) => player.playerId)))
     } catch {
+      if (rosterRequestId.current !== requestId) {
+        return
+      }
       setRows([])
+      setDormantPlayerIds(new Set<number>())
       setError(t('players.loadError'))
     } finally {
-      setLoading(false)
+      if (rosterRequestId.current === requestId) {
+        setLoading(false)
+      }
     }
-  }, [isAdmin, showInactive, showMmrColumn])
+  }, [effectiveRosterView, isAdmin, showMmrColumn])
 
   useEffect(() => {
     void fetchRoster()
+    return () => {
+      rosterRequestId.current += 1
+    }
   }, [fetchRoster])
+
+  useEffect(() => {
+    if (isAdmin) {
+      return
+    }
+    lastParticipationRequestId.current += 1
+    setRosterView('active')
+    setDormantPlayerIds(new Set<number>())
+    setLastParticipation(null)
+  }, [isAdmin])
 
   const handleRegisterPlayer = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -379,7 +434,7 @@ export default function PlayersPage() {
       setRegistrationRace('')
       setSearch('')
       setRaceFilter('ALL')
-      setShowInactive(false)
+      setRosterView('active')
       await fetchRoster()
     } catch (importRequestError) {
       if (isApiUnauthorizedError(importRequestError)) {
@@ -629,7 +684,7 @@ export default function PlayersPage() {
               }
             : row
         )
-        if (!showInactive && !nextActive) {
+        if (rosterView !== 'inactive' && !nextActive) {
           return nextRows.filter((row) => row.id !== player.id)
         }
 
@@ -685,23 +740,87 @@ export default function PlayersPage() {
     setGameTypeStatsLoading(false)
   }, [])
 
+  const handleRosterViewChange = useCallback(
+    (view: Exclude<PlayerRosterView, 'active'>, checked: boolean) => {
+      rosterRequestId.current += 1
+      lastParticipationRequestId.current += 1
+      setLastParticipation(null)
+      setRosterView(checked ? view : 'active')
+    },
+    []
+  )
+
+  const handleToggleLastParticipation = useCallback(
+    async (player: PlayerRosterItem) => {
+      if (!isAdmin || rosterView !== 'dormant') {
+        return
+      }
+
+      if (lastParticipation?.playerId === player.id) {
+        lastParticipationRequestId.current += 1
+        setLastParticipation(null)
+        return
+      }
+
+      const requestId = lastParticipationRequestId.current + 1
+      lastParticipationRequestId.current = requestId
+      setLastParticipation({
+        playerId: player.id,
+        status: 'loading',
+        lastPlayedAt: null,
+      })
+
+      try {
+        const response = await apiClient.getGroupPlayerLastParticipation(
+          TEMP_GROUP_ID,
+          player.id
+        )
+        if (lastParticipationRequestId.current !== requestId) {
+          return
+        }
+        setLastParticipation({
+          playerId: player.id,
+          status: 'success',
+          lastPlayedAt: response.lastPlayedAt,
+        })
+      } catch {
+        if (lastParticipationRequestId.current !== requestId) {
+          return
+        }
+        setLastParticipation({
+          playerId: player.id,
+          status: 'error',
+          lastPlayedAt: null,
+        })
+      }
+    },
+    [isAdmin, lastParticipation?.playerId, rosterView]
+  )
+
+  const activityRows = useMemo(
+    () => filterPlayerRosterByView(rows, effectiveRosterView, dormantPlayerIds),
+    [dormantPlayerIds, effectiveRosterView, rows]
+  )
   const filteredRows = useMemo(() => {
     const searchText = search.trim().toLowerCase()
-    return rows.filter((row) => {
-      const matchesActivity = !showInactive || row.active === false
+    return activityRows.filter((row) => {
       const matchesRace = raceFilter === 'ALL' || row.race === raceFilter
       const matchesSearch =
         searchText.length === 0 || row.nickname.toLowerCase().includes(searchText)
-      return matchesActivity && matchesRace && matchesSearch
+      return matchesRace && matchesSearch
     })
-  }, [raceFilter, rows, search, showInactive])
+  }, [activityRows, raceFilter, search])
   const activePlayerCount = useMemo(
-    () => rows.filter((row) => row.active !== false).length,
+    () => filterPlayerRosterByView(rows, 'active').length,
     [rows]
   )
   const inactivePlayerCount = useMemo(
-    () => rows.filter((row) => row.active === false).length,
+    () => filterPlayerRosterByView(rows, 'inactive').length,
     [rows]
+  )
+  const dormantPlayerCount = useMemo(
+    () => filterPlayerRosterByView(rows, 'dormant', dormantPlayerIds).length,
+    [dormantPlayerIds, rows]
   )
 
   const showStatusColumn = isAdmin
@@ -987,12 +1106,16 @@ export default function PlayersPage() {
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {isAdmin && (
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            {showInactive ? (
-          <span className="rounded-md border border-slate-300 bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+            {rosterView === 'inactive' ? (
+              <span className="rounded-md border border-slate-300 bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
                 {t('players.filters.inactiveCount', { count: inactivePlayerCount })}
               </span>
+            ) : rosterView === 'dormant' ? (
+              <span className="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                {t('players.filters.dormantCount', { count: dormantPlayerCount })}
+              </span>
             ) : (
-            <span className="rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-800 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200">
+              <span className="rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-800 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200">
                 {t('players.filters.activeCount', { count: activePlayerCount })}
               </span>
             )}
@@ -1027,15 +1150,30 @@ export default function PlayersPage() {
           </label>
         </div>
         {isAdmin && (
-          <label className="mt-3 inline-flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
-            <input
-              type="checkbox"
-              checked={showInactive}
-              onChange={(event) => setShowInactive(event.target.checked)}
-              className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
-            />
-            <span>{t('players.filters.includeInactive')}</span>
-          </label>
+          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
+            <label className="inline-flex min-h-8 items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
+              <input
+                type="checkbox"
+                checked={rosterView === 'inactive'}
+                onChange={(event) =>
+                  handleRosterViewChange('inactive', event.target.checked)
+                }
+                className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+              />
+              <span>{t('players.filters.includeInactive')}</span>
+            </label>
+            <label className="inline-flex min-h-8 items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
+              <input
+                type="checkbox"
+                checked={rosterView === 'dormant'}
+                onChange={(event) =>
+                  handleRosterViewChange('dormant', event.target.checked)
+                }
+                className="h-4 w-4 rounded border-slate-300 text-amber-700 focus:ring-amber-400 dark:border-slate-600 dark:bg-slate-950 dark:text-amber-300"
+              />
+              <span>{t('players.filters.includeDormant')}</span>
+            </label>
+          </div>
         )}
         {isSuperAdmin && (
           <div className="mt-3 flex justify-end">
@@ -1101,6 +1239,10 @@ export default function PlayersPage() {
                 const isToggling = togglingPlayerId === row.id
                 const busy = isSaving || isDeleting || isToggling
                 const isActive = row.active !== false
+                const canInspectLastParticipation = isAdmin && rosterView === 'dormant'
+                const lastParticipationExpanded =
+                  canInspectLastParticipation && lastParticipation?.playerId === row.id
+                const lastParticipationDetailsId = `player-${row.id}-last-participation`
 
                 return (
                   <tr
@@ -1120,12 +1262,62 @@ export default function PlayersPage() {
                           className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                         />
                       ) : (
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span>{row.nickname}</span>
-                          {!isActive && (
-                            <span className="rounded-md border border-slate-300 bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100">
-                              {t('players.table.inactive')}
-                            </span>
+                        <div className="min-w-[8rem] space-y-1.5">
+                          <div className="flex flex-wrap items-center gap-2">
+                            {canInspectLastParticipation ? (
+                              <button
+                                type="button"
+                                aria-expanded={lastParticipationExpanded}
+                                aria-controls={
+                                  lastParticipationExpanded
+                                    ? lastParticipationDetailsId
+                                    : undefined
+                                }
+                                aria-label={t('players.table.lastParticipationToggleAria', {
+                                  nickname: row.nickname,
+                                })}
+                                onClick={() => handleToggleLastParticipation(row)}
+                                className="rounded-sm text-left font-semibold text-slate-900 underline decoration-slate-300 underline-offset-4 transition-colors hover:text-amber-700 hover:decoration-amber-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 dark:text-slate-100 dark:decoration-slate-600 dark:hover:text-amber-300 dark:focus-visible:ring-offset-slate-900"
+                              >
+                                {row.nickname}
+                              </button>
+                            ) : (
+                              <span>{row.nickname}</span>
+                            )}
+                            {canInspectLastParticipation && (
+                              <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                                {t('players.table.dormant')}
+                              </span>
+                            )}
+                            {!isActive && (
+                              <span className="rounded-md border border-slate-300 bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100">
+                                {t('players.table.inactive')}
+                              </span>
+                            )}
+                          </div>
+                          {lastParticipationExpanded && lastParticipation && (
+                            <div
+                              id={lastParticipationDetailsId}
+                              aria-live="polite"
+                              role={lastParticipation.status === 'error' ? 'alert' : 'status'}
+                              className={`max-w-56 text-[11px] font-normal leading-4 ${
+                                lastParticipation.status === 'error'
+                                  ? 'text-rose-700 dark:text-rose-300'
+                                  : 'text-slate-500 dark:text-slate-400'
+                              }`}
+                            >
+                              {lastParticipation.status === 'loading'
+                                ? t('players.table.lastParticipationLoading')
+                                : lastParticipation.status === 'error'
+                                  ? t('players.table.lastParticipationError')
+                                  : lastParticipation.lastPlayedAt === null
+                                    ? t('players.table.lastParticipationNone')
+                                    : t('players.table.lastParticipationLabel', {
+                                        value: formatLastParticipationDate(
+                                          lastParticipation.lastPlayedAt
+                                        ),
+                                      })}
+                            </div>
                           )}
                         </div>
                       )}

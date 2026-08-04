@@ -68,6 +68,7 @@ import com.balancify.backend.service.MatchResultService;
 import com.balancify.backend.service.ManualMatchService;
 import com.balancify.backend.service.MultiMatchBalancingService;
 import com.balancify.backend.service.OperationAuditLogService;
+import com.balancify.backend.service.PlayerActivityQueryService;
 import com.balancify.backend.service.PlayerAdminService;
 import com.balancify.backend.service.PlayerQueryService;
 import com.balancify.backend.service.PlayerRaceStatsQueryService;
@@ -145,6 +146,9 @@ class AdminKeyFilterTest {
 
     @MockBean
     private PlayerQueryService playerQueryService;
+
+    @MockBean
+    private PlayerActivityQueryService playerActivityQueryService;
 
     @MockBean
     private PlayerRaceStatsQueryService playerRaceStatsQueryService;

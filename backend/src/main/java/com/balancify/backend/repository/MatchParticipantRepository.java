@@ -4,6 +4,7 @@ import com.balancify.backend.domain.MatchParticipant;
 import org.springframework.data.jpa.repository.Modifying;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -29,9 +30,26 @@ public interface MatchParticipantRepository extends JpaRepository<MatchParticipa
         join players p on p.id = mp.player_id
         where p.group_id = :groupId
           and m.played_at is not null
+          and m.status = 'COMPLETED'
         group by mp.player_id
         """, nativeQuery = true)
     List<PlayerLastPlayedAtProjection> findLastPlayedAtByGroupId(@Param("groupId") Long groupId);
+
+    @Query("""
+        select max(m.playedAt)
+        from MatchParticipant mp
+        join mp.match m
+        join mp.player p
+        where p.id = :playerId
+          and p.group.id = :groupId
+          and m.group.id = :groupId
+          and m.status = com.balancify.backend.domain.MatchStatus.COMPLETED
+          and m.playedAt is not null
+        """)
+    Optional<OffsetDateTime> findLastCompletedPlayedAt(
+        @Param("groupId") Long groupId,
+        @Param("playerId") Long playerId
+    );
 
     @Query("""
         select mp

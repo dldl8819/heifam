@@ -234,6 +234,15 @@ export type PlayerRosterItem = {
   chatRejoinedAt?: string
 }
 
+export type GroupPlayerLastParticipationResponse = {
+  lastPlayedAt: string | null
+}
+
+export type GroupDormantPlayerItem = {
+  playerId: number
+  nickname: string
+}
+
 export type GroupPlayerTierBoardItem = Pick<
   PlayerRosterItem,
   'id' | 'nickname' | 'race' | 'tier' | 'liveTier' | 'active'
