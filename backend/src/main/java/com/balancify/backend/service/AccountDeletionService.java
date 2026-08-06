@@ -41,9 +41,10 @@ public class AccountDeletionService {
         }
 
         supabaseAuthAdminClient.ensureConfigured();
-        accountDeletionDataService.anonymizeAccount(authUserId, identity.email());
+        accountDeletionDataService.retainWithdrawnAccount(authUserId, identity.email());
         try {
             supabaseAuthAdminClient.deleteUser(authUserId);
+            accountDeletionDataService.completePendingAuthDeletion(authUserId);
         } finally {
             supabaseJwtVerifier.invalidateUser(authUserId.toString());
         }
@@ -52,7 +53,7 @@ public class AccountDeletionService {
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void deactivatePlayer(Player player) {
         AccountDeletionDataService.InactivePlayerCleanupOutcome outcome =
-            accountDeletionDataService.anonymizeInactivePlayer(player);
+            accountDeletionDataService.retainInactivePlayer(player);
         if (!outcome.requiresAuthDeletion() || outcome.authUserId() == null) {
             return;
         }

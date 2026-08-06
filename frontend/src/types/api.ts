@@ -212,6 +212,8 @@ export type PlayerTier =
 
 export type PlayerTierStatus = PlayerTier | 'UNASSIGNED'
 
+export type PlayerLifecycleStatus = 'ACTIVE' | 'INACTIVE' | 'WITHDRAWN' | 'ANONYMIZED'
+
 export type PlayerRosterItem = {
   id: number
   nickname: string
@@ -230,6 +232,8 @@ export type PlayerRosterItem = {
   games: number
   active?: boolean
   identityHidden?: boolean
+  lifecycleStatus?: PlayerLifecycleStatus
+  identityRetainedUntil?: string
   chatLeftAt?: string
   chatLeftReason?: string
   chatRejoinedAt?: string

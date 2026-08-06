@@ -2,6 +2,8 @@ package com.balancify.backend.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -74,6 +76,13 @@ public class Player {
 
     @Column(name = "anonymized_at")
     private OffsetDateTime anonymizedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "lifecycle_status", nullable = false, length = 20)
+    private PlayerLifecycleStatus lifecycleStatus = PlayerLifecycleStatus.ACTIVE;
+
+    @Column(name = "identity_retained_until")
+    private OffsetDateTime identityRetainedUntil;
 
     @Column(name = "last_dormancy_mmr_decay_at")
     private OffsetDateTime lastDormancyMmrDecayAt;
@@ -258,6 +267,22 @@ public class Player {
         return anonymizedAt != null;
     }
 
+    public PlayerLifecycleStatus getLifecycleStatus() {
+        return lifecycleStatus;
+    }
+
+    public void setLifecycleStatus(PlayerLifecycleStatus lifecycleStatus) {
+        this.lifecycleStatus = lifecycleStatus;
+    }
+
+    public OffsetDateTime getIdentityRetainedUntil() {
+        return identityRetainedUntil;
+    }
+
+    public void setIdentityRetainedUntil(OffsetDateTime identityRetainedUntil) {
+        this.identityRetainedUntil = identityRetainedUntil;
+    }
+
     public OffsetDateTime getLastDormancyMmrDecayAt() {
         return lastDormancyMmrDecayAt;
     }
@@ -351,6 +376,15 @@ public class Player {
             : Math.max(1.0, this.returnBoostMultiplier);
         if (this.tier == null || this.tier.isBlank()) {
             this.tier = PlayerTierPolicy.resolveTier(this.mmr);
+        }
+        if (this.anonymizedAt != null) {
+            this.lifecycleStatus = PlayerLifecycleStatus.ANONYMIZED;
+            this.identityRetainedUntil = null;
+        } else if (this.active) {
+            this.lifecycleStatus = PlayerLifecycleStatus.ACTIVE;
+            this.identityRetainedUntil = null;
+        } else if (this.lifecycleStatus == null || this.lifecycleStatus == PlayerLifecycleStatus.ACTIVE) {
+            this.lifecycleStatus = PlayerLifecycleStatus.INACTIVE;
         }
         recordHighestAchievedTier(this.tier);
     }

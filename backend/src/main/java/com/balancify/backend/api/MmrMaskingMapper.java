@@ -76,7 +76,10 @@ public final class MmrMaskingMapper {
                     response.chatLeftReason(),
                     response.chatRejoinedAt(),
                     response.tierChangeAcknowledgedTier(),
-                    response.tierChangeAcknowledgedAt()
+                    response.tierChangeAcknowledgedAt(),
+                    null,
+                    response.lifecycleStatus(),
+                    response.identityRetainedUntil()
                 )
             )
             .toList();
@@ -107,7 +110,9 @@ public final class MmrMaskingMapper {
                     response.chatRejoinedAt(),
                     response.tierChangeAcknowledgedTier(),
                     response.tierChangeAcknowledgedAt(),
-                    null
+                    null,
+                    response.lifecycleStatus(),
+                    response.identityRetainedUntil()
                 )
             )
             .toList();

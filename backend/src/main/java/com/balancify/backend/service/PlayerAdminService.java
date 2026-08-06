@@ -3,8 +3,10 @@ package com.balancify.backend.service;
 import com.balancify.backend.api.group.dto.GroupPlayerUpdateRequest;
 import com.balancify.backend.api.group.dto.GroupPlayerMmrUpdateRequest;
 import com.balancify.backend.domain.Player;
+import com.balancify.backend.domain.PlayerLifecycleStatus;
 import com.balancify.backend.domain.PlayerTierPolicy;
 import com.balancify.backend.repository.PlayerRepository;
+import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Locale;
@@ -28,6 +30,7 @@ public class PlayerAdminService {
     private final OperationAuditLogService operationAuditLogService;
     private final GroupReadCacheService groupReadCacheService;
     private final AccountDeletionService accountDeletionService;
+    private final Clock clock;
 
     public PlayerAdminService(
         PlayerRepository playerRepository,
@@ -35,10 +38,27 @@ public class PlayerAdminService {
         GroupReadCacheService groupReadCacheService,
         AccountDeletionService accountDeletionService
     ) {
+        this(
+            playerRepository,
+            operationAuditLogService,
+            groupReadCacheService,
+            accountDeletionService,
+            Clock.systemUTC()
+        );
+    }
+
+    PlayerAdminService(
+        PlayerRepository playerRepository,
+        OperationAuditLogService operationAuditLogService,
+        GroupReadCacheService groupReadCacheService,
+        AccountDeletionService accountDeletionService,
+        Clock clock
+    ) {
         this.playerRepository = playerRepository;
         this.operationAuditLogService = operationAuditLogService;
         this.groupReadCacheService = groupReadCacheService;
         this.accountDeletionService = accountDeletionService;
+        this.clock = clock == null ? Clock.systemUTC() : clock;
     }
 
     @Transactional
@@ -60,7 +80,6 @@ public class PlayerAdminService {
     ) {
         Player player = playerRepository.findByIdAndGroup_Id(playerId, groupId)
             .orElseThrow(() -> new NoSuchElementException("Player not found"));
-        requireMutablePlayer(player);
 
         String previousNickname = safeTrim(player.getNickname());
         String previousRace = PlayerRacePolicy.toDisplayRace(player.getRace());
@@ -71,6 +90,7 @@ public class PlayerAdminService {
         String race = safeTrim(request == null ? null : request.race());
         String tier = normalizeEditableTier(request == null ? null : request.tier());
         Boolean active = request == null ? null : request.active();
+        requireProfileUpdateAllowed(player, active);
         OffsetDateTime chatLeftAt = request == null ? null : request.chatLeftAt();
         String chatLeftReason = safeTrim(request == null ? null : request.chatLeftReason());
         OffsetDateTime chatRejoinedAt = request == null ? null : request.chatRejoinedAt();
@@ -99,6 +119,54 @@ public class PlayerAdminService {
         boolean hasChatMetadata = chatLeftAt != null || !chatLeftReason.isEmpty() || chatRejoinedAt != null;
         if (active == null && hasChatMetadata) {
             throw new IllegalArgumentException("Chat activity metadata requires active status change");
+        }
+
+        boolean reactivating = !previousActive && Boolean.TRUE.equals(active);
+        if (reactivating) {
+            if (chatRejoinedAt == null) {
+                throw new IllegalArgumentException("Chat rejoined time is required when reactivating player");
+            }
+            if (!nickname.isEmpty()
+                || !normalizedRace.isEmpty()
+                || !tier.isEmpty()
+                || chatLeftAt != null
+                || !chatLeftReason.isEmpty()
+                || !tierChangeAcknowledgedTier.isEmpty()
+                || hasDormancyMmrFloorTier) {
+                throw new IllegalArgumentException("Reactivation request contains unsupported fields");
+            }
+            boolean duplicateActiveNickname = playerRepository
+                .findByGroup_IdAndNicknameIgnoreCase(groupId, previousNickname)
+                .stream()
+                .anyMatch(candidate -> candidate.getId() != null
+                    && !candidate.getId().equals(playerId)
+                    && candidate.isActive()
+                    && !candidate.isAnonymized());
+            if (duplicateActiveNickname) {
+                throw new IllegalArgumentException("Nickname already exists in group");
+            }
+            int updated = playerRepository.reactivateRetainedInactivePlayer(
+                groupId,
+                playerId,
+                chatRejoinedAt,
+                OffsetDateTime.now(clock)
+            );
+            if (updated != 1) {
+                throw new NoSuchElementException("Player not found");
+            }
+            PlayerIdentityPolicy.reactivate(player, chatRejoinedAt);
+            TransactionAfterCommit.runNowAndAfterCommit(
+                () -> groupReadCacheService.evictGroup(groupId)
+            );
+            operationAuditLogService.recordPlayerActivityUpdate(
+                actorEmail,
+                actorNickname,
+                groupId,
+                player,
+                false,
+                true
+            );
+            return;
         }
 
         boolean nicknameChanged = !nickname.isEmpty() && !nickname.equals(previousNickname);
@@ -142,8 +210,7 @@ public class PlayerAdminService {
                 if (chatRejoinedAt == null) {
                     throw new IllegalArgumentException("Chat rejoined time is required when reactivating player");
                 }
-                player.setActive(true);
-                player.setChatRejoinedAt(chatRejoinedAt);
+                PlayerIdentityPolicy.reactivate(player, chatRejoinedAt);
             } else {
                 if (chatLeftAt == null) {
                     throw new IllegalArgumentException("Chat left time is required when deactivating player");
@@ -154,6 +221,8 @@ public class PlayerAdminService {
                 if (chatLeftReason.length() > CHAT_LEFT_REASON_MAX_LENGTH) {
                     throw new IllegalArgumentException("Chat left reason must be 500 characters or fewer");
                 }
+                player.setChatLeftAt(chatLeftAt);
+                player.setChatLeftReason(chatLeftReason);
                 accountDeletionService.deactivatePlayer(player);
             }
         }
@@ -214,7 +283,7 @@ public class PlayerAdminService {
     ) {
         Player player = playerRepository.findByIdAndGroup_Id(playerId, groupId)
             .orElseThrow(() -> new NoSuchElementException("Player not found"));
-        requireMutablePlayer(player);
+        requireActivePlayer(player);
 
         Integer nextMmr = request == null ? null : request.mmr();
         if (nextMmr == null) {
@@ -233,7 +302,7 @@ public class PlayerAdminService {
     public void deletePlayer(Long groupId, Long playerId) {
         Player player = playerRepository.findByIdAndGroup_Id(playerId, groupId)
             .orElseThrow(() -> new NoSuchElementException("Player not found"));
-        requireMutablePlayer(player);
+        requireActivePlayer(player);
         try {
             playerRepository.delete(player);
             playerRepository.flush();
@@ -246,7 +315,17 @@ public class PlayerAdminService {
         }
     }
 
-    private void requireMutablePlayer(Player player) {
+    private void requireProfileUpdateAllowed(Player player, Boolean requestedActive) {
+        if (player == null || player.isAnonymized()
+            || player.getLifecycleStatus() == PlayerLifecycleStatus.WITHDRAWN) {
+            throw new NoSuchElementException("Player not found");
+        }
+        if (!player.isActive() && !Boolean.TRUE.equals(requestedActive)) {
+            throw new NoSuchElementException("Player not found");
+        }
+    }
+
+    private void requireActivePlayer(Player player) {
         if (PlayerIdentityPolicy.isIdentityHidden(player)) {
             throw new NoSuchElementException("Player not found");
         }

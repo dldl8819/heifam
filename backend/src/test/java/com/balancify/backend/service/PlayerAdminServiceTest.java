@@ -3,6 +3,7 @@ package com.balancify.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -15,6 +16,7 @@ import com.balancify.backend.api.group.dto.GroupPlayerUpdateRequest;
 import com.balancify.backend.api.group.dto.GroupPlayerMmrUpdateRequest;
 import com.balancify.backend.domain.Group;
 import com.balancify.backend.domain.Player;
+import com.balancify.backend.domain.PlayerLifecycleStatus;
 import com.balancify.backend.repository.PlayerRepository;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -45,9 +47,13 @@ class PlayerAdminServiceTest {
     void setUp() {
         org.mockito.Mockito.lenient()
             .doAnswer(invocation -> {
-                PlayerIdentityPolicy.anonymize(
-                    invocation.getArgument(0),
-                    OffsetDateTime.parse("2026-07-12T03:00:00Z")
+                Player player = invocation.getArgument(0);
+                PlayerIdentityPolicy.retainAdministrativeIdentity(
+                    player,
+                    PlayerLifecycleStatus.INACTIVE,
+                    player.getChatLeftAt(),
+                    player.getChatLeftReason(),
+                    player.getChatLeftAt().plusYears(5)
                 );
                 return null;
             })
@@ -355,7 +361,7 @@ class PlayerAdminServiceTest {
     }
 
     @Test
-    void anonymizesPersonalDataWhenDeactivating() {
+    void retainsMinimalAdministrativeRecordWhenDeactivating() {
         Player player = player(10L, 1L, "기존닉");
         OffsetDateTime chatLeftAt = OffsetDateTime.parse("2026-05-02T12:41:00+09:00");
         when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
@@ -368,11 +374,13 @@ class PlayerAdminServiceTest {
         );
 
         assertThat(player.isActive()).isFalse();
-        assertThat(player.getNickname()).isEqualTo(PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL);
-        assertThat(player.getChatLeftAt()).isNull();
-        assertThat(player.getChatLeftReason()).isNull();
+        assertThat(player.getNickname()).isNotEqualTo(PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL);
+        assertThat(player.getChatLeftAt()).isEqualTo(chatLeftAt);
+        assertThat(player.getChatLeftReason()).isNotBlank();
         assertThat(player.getChatRejoinedAt()).isNull();
-        assertThat(player.getAnonymizedAt()).isNotNull();
+        assertThat(player.getAnonymizedAt()).isNull();
+        assertThat(player.getLifecycleStatus()).isEqualTo(PlayerLifecycleStatus.INACTIVE);
+        assertThat(player.getIdentityRetainedUntil()).isEqualTo(chatLeftAt.plusYears(5));
         verify(accountDeletionService).deactivatePlayer(player);
         verify(playerRepository, never()).findByGroup_IdAndNicknameIgnoreCase(anyLong(), anyString());
         verify(playerRepository).save(player);
@@ -460,26 +468,129 @@ class PlayerAdminServiceTest {
     }
 
     @Test
-    void rejectsReactivationOfIdentityHiddenPlayer() {
+    void reactivatesOperationallyInactivePlayer() {
         Player player = player(10L, 1L, "기존닉");
         player.setActive(false);
+        player.setLifecycleStatus(PlayerLifecycleStatus.INACTIVE);
+        player.setChatLeftAt(OffsetDateTime.parse("2026-05-02T12:41:00+09:00"));
+        player.setChatLeftReason("PAST_INACTIVE_REASON");
+        player.setIdentityRetainedUntil(OffsetDateTime.parse("2031-05-02T12:41:00+09:00"));
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+        OffsetDateTime rejoinedAt = OffsetDateTime.parse("2026-05-03T13:42:00+09:00");
+        when(playerRepository.reactivateRetainedInactivePlayer(
+            eq(1L),
+            eq(10L),
+            eq(rejoinedAt),
+            any(OffsetDateTime.class)
+        )).thenReturn(1);
+
+        playerAdminService.updatePlayer(
+            1L,
+            10L,
+            new GroupPlayerUpdateRequest(
+                null,
+                null,
+                true,
+                null,
+                null,
+                rejoinedAt,
+                null
+            )
+        );
+
+        assertThat(player.isActive()).isTrue();
+        assertThat(player.getLifecycleStatus()).isEqualTo(PlayerLifecycleStatus.ACTIVE);
+        assertThat(player.getIdentityRetainedUntil()).isNull();
+        assertThat(player.getChatLeftAt()).isNull();
+        assertThat(player.getChatLeftReason()).isNull();
+        verify(playerRepository).reactivateRetainedInactivePlayer(
+            eq(1L),
+            eq(10L),
+            eq(rejoinedAt),
+            any(OffsetDateTime.class)
+        );
+        verify(playerRepository, never()).save(any(Player.class));
+    }
+
+    @Test
+    void rejectsReactivationWhenExpirySweepWinsTheConditionalUpdate() {
+        Player player = player(10L, 1L, "INACTIVE_PLAYER");
+        player.setActive(false);
+        player.setLifecycleStatus(PlayerLifecycleStatus.INACTIVE);
+        player.setIdentityRetainedUntil(OffsetDateTime.parse("2031-05-02T12:41:00+09:00"));
+        OffsetDateTime rejoinedAt = OffsetDateTime.parse("2026-05-03T13:42:00+09:00");
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+        when(playerRepository.reactivateRetainedInactivePlayer(
+            eq(1L),
+            eq(10L),
+            eq(rejoinedAt),
+            any(OffsetDateTime.class)
+        )).thenReturn(0);
+
+        assertThatThrownBy(() -> playerAdminService.updatePlayer(
+            1L,
+            10L,
+            new GroupPlayerUpdateRequest(null, null, true, null, null, rejoinedAt, null)
+        ))
+            .isInstanceOf(NoSuchElementException.class)
+            .hasMessage("Player not found");
+
+        assertThat(player.isActive()).isFalse();
+        verify(playerRepository, never()).save(any(Player.class));
+        verify(operationAuditLogService, never()).recordPlayerActivityUpdate(
+            any(), any(), any(), any(), anyBoolean(), anyBoolean()
+        );
+    }
+
+    @Test
+    void rejectsReactivationWhenAnotherActivePlayerUsesTheRetainedNickname() {
+        Player inactive = player(10L, 1L, "DUPLICATE_NICKNAME");
+        inactive.setActive(false);
+        inactive.setLifecycleStatus(PlayerLifecycleStatus.INACTIVE);
+        inactive.setIdentityRetainedUntil(OffsetDateTime.parse("2031-05-02T12:41:00+09:00"));
+        Player active = player(11L, 1L, "DUPLICATE_NICKNAME");
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(inactive));
+        when(playerRepository.findByGroup_IdAndNicknameIgnoreCase(1L, "DUPLICATE_NICKNAME"))
+            .thenReturn(List.of(inactive, active));
+        OffsetDateTime rejoinedAt = OffsetDateTime.parse("2026-05-03T13:42:00+09:00");
+
+        assertThatThrownBy(() -> playerAdminService.updatePlayer(
+            1L,
+            10L,
+            new GroupPlayerUpdateRequest(null, null, true, null, null, rejoinedAt, null)
+        ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Nickname already exists in group");
+
+        verify(playerRepository, never()).reactivateRetainedInactivePlayer(
+            anyLong(),
+            anyLong(),
+            any(OffsetDateTime.class),
+            any(OffsetDateTime.class)
+        );
+    }
+
+    @Test
+    void rejectsReactivationOfWithdrawnPlayer() {
+        Player player = player(10L, 1L, "WITHDRAWN_PLAYER");
+        player.setActive(false);
+        player.setLifecycleStatus(PlayerLifecycleStatus.WITHDRAWN);
+        player.setIdentityRetainedUntil(OffsetDateTime.parse("2031-05-02T12:41:00+09:00"));
         when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
 
-        assertThatThrownBy(() ->
-            playerAdminService.updatePlayer(
-                1L,
-                10L,
-                new GroupPlayerUpdateRequest(
-                    null,
-                    null,
-                    true,
-                    null,
-                    null,
-                    OffsetDateTime.parse("2026-05-03T13:42:00+09:00"),
-                    null
-                )
+        assertThatThrownBy(() -> playerAdminService.updatePlayer(
+            1L,
+            10L,
+            new GroupPlayerUpdateRequest(
+                null,
+                null,
+                true,
+                null,
+                null,
+                OffsetDateTime.parse("2026-05-03T13:42:00+09:00"),
+                null
             )
-        )
+        ))
             .isInstanceOf(NoSuchElementException.class)
             .hasMessage("Player not found");
 

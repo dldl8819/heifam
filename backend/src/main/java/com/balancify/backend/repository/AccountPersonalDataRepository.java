@@ -69,6 +69,40 @@ public class AccountPersonalDataRepository {
         return nicknames.stream().findFirst().map(String::trim).filter(value -> !value.isEmpty());
     }
 
+    public List<NicknameAccountCandidate> findAccountIdentitiesByNickname(String nickname) {
+        if (nickname == null || nickname.isBlank()) {
+            return List.of();
+        }
+        return jdbcTemplate.query(
+            """
+            WITH access_profiles AS (
+                SELECT normalized_email, nickname
+                FROM managed_admin_emails
+                UNION ALL
+                SELECT normalized_email, nickname
+                FROM allowed_user_emails
+            ),
+            matching_emails AS (
+                SELECT DISTINCT LOWER(BTRIM(normalized_email)) AS normalized_email
+                FROM access_profiles
+                WHERE NULLIF(BTRIM(normalized_email), '') IS NOT NULL
+                  AND NULLIF(BTRIM(nickname), '') IS NOT NULL
+                  AND LOWER(BTRIM(nickname)) = LOWER(BTRIM(:nickname))
+            )
+            SELECT matching_emails.normalized_email, account.id AS auth_user_id
+            FROM matching_emails
+            LEFT JOIN public.users account
+              ON LOWER(BTRIM(account.email)) = matching_emails.normalized_email
+            ORDER BY matching_emails.normalized_email, account.id
+            """,
+            Map.of("nickname", nickname.trim()),
+            (resultSet, rowNumber) -> new NicknameAccountCandidate(
+                resultSet.getString("normalized_email"),
+                resultSet.getObject("auth_user_id", UUID.class)
+            )
+        );
+    }
+
     public void anonymizeHistoricalIdentity(
         String normalizedEmail,
         List<Long> playerIds,
@@ -249,5 +283,8 @@ public class AccountPersonalDataRepository {
             "DELETE FROM pending_auth_user_deletions WHERE auth_user_id = :authUserId",
             Map.of("authUserId", authUserId)
         );
+    }
+
+    public record NicknameAccountCandidate(String normalizedEmail, UUID authUserId) {
     }
 }

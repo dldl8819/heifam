@@ -9,6 +9,7 @@ const sections = [
       t('legal.privacy.sections.collect.items.two'),
       t('legal.privacy.sections.collect.items.three'),
       t('legal.privacy.sections.collect.items.four'),
+      t('legal.privacy.sections.collect.items.five'),
     ],
   },
   {
@@ -17,6 +18,7 @@ const sections = [
       t('legal.privacy.sections.purpose.items.one'),
       t('legal.privacy.sections.purpose.items.two'),
       t('legal.privacy.sections.purpose.items.three'),
+      t('legal.privacy.sections.purpose.items.four'),
     ],
   },
   {
@@ -26,6 +28,8 @@ const sections = [
       t('legal.privacy.sections.retention.items.two'),
       t('legal.privacy.sections.retention.items.three'),
       t('legal.privacy.sections.retention.items.four'),
+      t('legal.privacy.sections.retention.items.five'),
+      t('legal.privacy.sections.retention.items.six'),
     ],
   },
   {
@@ -36,6 +40,7 @@ const sections = [
       t('legal.privacy.sections.classification.items.three'),
       t('legal.privacy.sections.classification.items.four'),
       t('legal.privacy.sections.classification.items.five'),
+      t('legal.privacy.sections.classification.items.six'),
     ],
   },
   {
@@ -47,6 +52,7 @@ const sections = [
       t('legal.privacy.sections.destruction.items.four'),
       t('legal.privacy.sections.destruction.items.five'),
       t('legal.privacy.sections.destruction.items.six'),
+      t('legal.privacy.sections.destruction.items.seven'),
     ],
   },
   {
@@ -81,7 +87,7 @@ export default function PrivacyPage() {
           {t('legal.privacy.description')}
         </p>
         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-          {t('legal.common.updatedAt', { date: '2026-07-12' })}
+          {t('legal.common.updatedAt', { date: '2026-08-06' })}
         </p>
       </header>
 

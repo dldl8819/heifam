@@ -1,6 +1,7 @@
 package com.balancify.backend.service;
 
 import com.balancify.backend.domain.Player;
+import com.balancify.backend.domain.PlayerLifecycleStatus;
 import com.balancify.backend.repository.AccountPersonalDataRepository;
 import com.balancify.backend.repository.PlayerRepository;
 import com.balancify.backend.service.exception.AccountDeletionException;
@@ -21,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class AccountDeletionDataService {
 
     public static final String DELETED_MEMBER_LABEL = PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL;
+    public static final String SELF_WITHDRAWAL_REASON = "회원 본인 요청";
+    private static final int MAX_IDENTITY_RETENTION_YEARS = 5;
 
     private final AccountPersonalDataRepository accountPersonalDataRepository;
     private final PlayerRepository playerRepository;
@@ -93,13 +96,18 @@ public class AccountDeletionDataService {
     }
 
     @Transactional
-    public AnonymizationResult anonymizeAccount(UUID authUserId, String email) {
+    public WithdrawalRetentionResult retainWithdrawnAccount(UUID authUserId, String email) {
         if (authUserId == null) {
             throw new IllegalArgumentException("A verified account identifier is required");
         }
         String normalizedEmail = normalizeEmail(email);
         if (normalizedEmail.isEmpty()) {
             throw new IllegalArgumentException("A verified account email is required");
+        }
+        if (accessControlService.hasConfiguredAccessGrant(normalizedEmail)) {
+            throw new AccountDeletionException(
+                "Account withdrawal requires removal from the configured access list"
+            );
         }
 
         String linkedNickname = accountPersonalDataRepository
@@ -120,10 +128,18 @@ public class AccountDeletionDataService {
             addPlayers(linkedPlayers, fallbackCandidates);
         }
 
-        OffsetDateTime anonymizedAt = OffsetDateTime.now(clock);
+        OffsetDateTime withdrawnAt = OffsetDateTime.now(clock);
+        OffsetDateTime retainedUntil = withdrawnAt.plusYears(MAX_IDENTITY_RETENTION_YEARS);
+        accountPersonalDataRepository.enqueuePendingAuthDeletion(authUserId, withdrawnAt);
         Set<Long> groupIds = new LinkedHashSet<>();
         for (Player player : linkedPlayers.values()) {
-            PlayerIdentityPolicy.anonymize(player, anonymizedAt);
+            PlayerIdentityPolicy.retainAdministrativeIdentity(
+                player,
+                PlayerLifecycleStatus.WITHDRAWN,
+                withdrawnAt,
+                SELF_WITHDRAWAL_REASON,
+                retainedUntil
+            );
             if (player.getGroup() != null && player.getGroup().getId() != null) {
                 groupIds.add(player.getGroup().getId());
             }
@@ -139,63 +155,71 @@ public class AccountDeletionDataService {
             DELETED_MEMBER_LABEL
         );
         accountPersonalDataRepository.deleteAccountIdentity(authUserId, normalizedEmail);
-        accessControlService.evictAccountCache(normalizedEmail);
-        groupIds.forEach(groupReadCacheService::evictGroup);
+        evictCaches(normalizedEmail, groupIds);
 
-        return new AnonymizationResult(playerIds.size());
+        return new WithdrawalRetentionResult(playerIds.size());
     }
 
     @Transactional
-    public InactivePlayerCleanupOutcome anonymizeInactivePlayer(Player player) {
+    public InactivePlayerCleanupOutcome retainInactivePlayer(Player player) {
         if (player == null || player.getId() == null) {
             throw new IllegalArgumentException("A persisted player is required");
         }
 
-        UUID authUserId = player.getAuthUserId();
+        ResolvedAccountIdentity resolvedAccountIdentity = resolveInactiveAccountIdentity(player);
+        UUID authUserId = resolvedAccountIdentity.authUserId();
+        String accountEmail = resolvedAccountIdentity.normalizedEmail();
         boolean hasAnotherActiveLinkedPlayer = authUserId != null
             && playerRepository.existsByAuthUserIdAndActiveTrueAndAnonymizedAtIsNullAndIdNot(
                 authUserId,
                 player.getId()
             );
-        String accountEmail = authUserId == null
-            ? ""
-            : accountPersonalDataRepository.findAccountEmail(authUserId).orElse("");
+        if (!hasAnotherActiveLinkedPlayer && resolvedAccountIdentity.resolvedByNickname()) {
+            hasAnotherActiveLinkedPlayer = playerRepository
+                .existsByNicknameIgnoreCaseAndActiveTrueAndAnonymizedAtIsNullAndIdNot(
+                    player.getNickname(),
+                    player.getId()
+                );
+        }
         Long groupId = player.getGroup() == null ? null : player.getGroup().getId();
         boolean requiresAuthDeletion = authUserId != null && !hasAnotherActiveLinkedPlayer;
+        boolean requiresAccountCleanup = !accountEmail.isEmpty() && !hasAnotherActiveLinkedPlayer;
 
-        if (requiresAuthDeletion
-            && !accountEmail.isEmpty()
-            && accessControlService.hasConfiguredAccessGrant(accountEmail)) {
+        if (requiresAccountCleanup && accessControlService.hasConfiguredAccessGrant(accountEmail)) {
             throw new AccountDeletionException(
                 "Account deactivation requires removal from the configured access list"
             );
         }
 
-        OffsetDateTime anonymizedAt = OffsetDateTime.now(clock);
+        OffsetDateTime processedAt = OffsetDateTime.now(clock);
+        OffsetDateTime inactiveAt = player.getChatLeftAt() == null
+            ? processedAt
+            : player.getChatLeftAt();
+        OffsetDateTime retainedUntil = inactiveAt.plusYears(MAX_IDENTITY_RETENTION_YEARS);
+        OffsetDateTime maximumRetainedUntil = processedAt.plusYears(MAX_IDENTITY_RETENTION_YEARS);
+        if (retainedUntil.isAfter(maximumRetainedUntil)) {
+            retainedUntil = maximumRetainedUntil;
+        }
         if (requiresAuthDeletion) {
-            accountPersonalDataRepository.enqueuePendingAuthDeletion(authUserId, anonymizedAt);
+            accountPersonalDataRepository.enqueuePendingAuthDeletion(authUserId, processedAt);
         }
 
-        PlayerIdentityPolicy.anonymize(player, anonymizedAt);
+        PlayerIdentityPolicy.retainAdministrativeIdentity(
+            player,
+            PlayerLifecycleStatus.INACTIVE,
+            inactiveAt,
+            player.getChatLeftReason(),
+            retainedUntil
+        );
         playerRepository.saveAndFlush(player);
 
-        if (requiresAuthDeletion) {
-            if (!accountEmail.isEmpty()) {
-                accountPersonalDataRepository.anonymizeHistoricalIdentity(
-                    accountEmail,
-                    List.of(player.getId()),
-                    DELETED_MEMBER_LABEL
-                );
-            } else {
-                accountPersonalDataRepository.anonymizeHistoricalPlayerIdentity(
-                    List.of(player.getId()),
-                    DELETED_MEMBER_LABEL
-                );
-            }
+        if (requiresAccountCleanup) {
+            accountPersonalDataRepository.anonymizeHistoricalIdentity(
+                accountEmail,
+                List.of(player.getId()),
+                DELETED_MEMBER_LABEL
+            );
             accountPersonalDataRepository.deleteAccountIdentity(authUserId, accountEmail);
-            if (!accountEmail.isEmpty()) {
-                accessControlService.evictAccountCache(accountEmail);
-            }
         } else if (!accountEmail.isEmpty()) {
             accountPersonalDataRepository.anonymizeHistoricalIdentityInGroup(
                 accountEmail,
@@ -210,15 +234,70 @@ public class AccountDeletionDataService {
             );
         }
 
-        if (groupId != null) {
-            groupReadCacheService.evictGroup(groupId);
-        }
+        evictCaches(
+            requiresAccountCleanup ? accountEmail : "",
+            groupId == null ? Set.of() : Set.of(groupId)
+        );
         return new InactivePlayerCleanupOutcome(authUserId, requiresAuthDeletion);
     }
 
     @Transactional
     public void completePendingAuthDeletion(UUID authUserId) {
         accountPersonalDataRepository.deletePendingAuthDeletion(authUserId);
+    }
+
+    private ResolvedAccountIdentity resolveInactiveAccountIdentity(Player player) {
+        UUID linkedAuthUserId = player.getAuthUserId();
+        if (linkedAuthUserId != null) {
+            String linkedEmail = accountPersonalDataRepository
+                .findAccountEmail(linkedAuthUserId)
+                .orElse("");
+            if (linkedEmail.isEmpty()) {
+                throw new AccountDeletionException(
+                    "Account deactivation requires a verified account email"
+                );
+            }
+            return new ResolvedAccountIdentity(linkedAuthUserId, normalizeEmail(linkedEmail), false);
+        }
+
+        List<AccountPersonalDataRepository.NicknameAccountCandidate> candidates =
+            accountPersonalDataRepository.findAccountIdentitiesByNickname(player.getNickname());
+        if (candidates.isEmpty()) {
+            return new ResolvedAccountIdentity(null, "", false);
+        }
+
+        Set<String> emails = new LinkedHashSet<>();
+        Set<UUID> authUserIds = new LinkedHashSet<>();
+        for (AccountPersonalDataRepository.NicknameAccountCandidate candidate : candidates) {
+            String candidateEmail = normalizeEmail(candidate.normalizedEmail());
+            if (!candidateEmail.isEmpty()) {
+                emails.add(candidateEmail);
+            }
+            if (candidate.authUserId() != null) {
+                authUserIds.add(candidate.authUserId());
+            }
+        }
+        if (emails.size() != 1 || authUserIds.size() > 1) {
+            throw new AccountDeletionException(
+                "Account deactivation identity ownership could not be resolved"
+            );
+        }
+        return new ResolvedAccountIdentity(
+            authUserIds.stream().findFirst().orElse(null),
+            emails.iterator().next(),
+            true
+        );
+    }
+
+    private void evictCaches(String normalizedEmail, Set<Long> groupIds) {
+        String email = normalizeEmail(normalizedEmail);
+        Set<Long> safeGroupIds = groupIds == null ? Set.of() : Set.copyOf(groupIds);
+        TransactionAfterCommit.runNowAndAfterCommit(() -> {
+            if (!email.isEmpty()) {
+                accessControlService.evictAccountCache(email);
+            }
+            safeGroupIds.forEach(groupReadCacheService::evictGroup);
+        });
     }
 
     private void addPlayers(Map<Long, Player> target, List<Player> players) {
@@ -240,9 +319,16 @@ public class AccountDeletionDataService {
         return value == null ? "" : value.trim();
     }
 
-    public record AnonymizationResult(int anonymizedPlayerCount) {
+    public record WithdrawalRetentionResult(int retainedPlayerCount) {
     }
 
     public record InactivePlayerCleanupOutcome(UUID authUserId, boolean requiresAuthDeletion) {
+    }
+
+    private record ResolvedAccountIdentity(
+        UUID authUserId,
+        String normalizedEmail,
+        boolean resolvedByNickname
+    ) {
     }
 }

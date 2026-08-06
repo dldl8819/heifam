@@ -7,6 +7,8 @@ import com.balancify.backend.domain.PlayerStats;
 import com.balancify.backend.domain.PlayerTierPolicy;
 import com.balancify.backend.repository.PlayerRepository;
 import com.balancify.backend.repository.PlayerStatsRepository;
+import java.time.Clock;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -21,6 +23,7 @@ public class PlayerQueryService {
     private final PlayerRepository playerRepository;
     private final PlayerStatsRepository playerStatsRepository;
     private final GroupReadCacheService groupReadCacheService;
+    private final Clock clock;
 
     @Autowired
     public PlayerQueryService(
@@ -28,12 +31,25 @@ public class PlayerQueryService {
         PlayerStatsRepository playerStatsRepository,
         GroupReadCacheService groupReadCacheService
     ) {
+        this(playerRepository, playerStatsRepository, groupReadCacheService, Clock.systemUTC());
+    }
+
+    PlayerQueryService(
+        PlayerRepository playerRepository,
+        PlayerStatsRepository playerStatsRepository,
+        GroupReadCacheService groupReadCacheService,
+        Clock clock
+    ) {
         this.playerRepository = playerRepository;
         this.playerStatsRepository = playerStatsRepository;
         this.groupReadCacheService = groupReadCacheService;
+        this.clock = clock == null ? Clock.systemUTC() : clock;
     }
 
     public List<GroupPlayerResponse> getGroupPlayers(Long groupId, boolean includeInactive) {
+        if (includeInactive) {
+            return List.copyOf(loadGroupPlayers(groupId, true));
+        }
         String cacheKey = "players:group:%d:includeInactive:%s".formatted(groupId, includeInactive);
         return groupReadCacheService.get(cacheKey, () -> List.copyOf(loadGroupPlayers(groupId, includeInactive)));
     }
@@ -47,7 +63,8 @@ public class PlayerQueryService {
             return List.of();
         }
 
-        players.sort(this::compareRosterPlayers);
+        OffsetDateTime now = OffsetDateTime.now(clock);
+        players.sort((first, second) -> compareRosterPlayers(first, second, now));
 
         Map<Long, StatsAccumulator> statsByPlayerId = new HashMap<>();
         for (PlayerStats stats : playerStatsRepository.findByGroupId(groupId)) {
@@ -63,7 +80,13 @@ public class PlayerQueryService {
         List<GroupPlayerResponse> responses = new ArrayList<>();
         for (Player player : players) {
             if (PlayerIdentityPolicy.isIdentityHidden(player)) {
-                responses.add(maskInactivePlayer());
+                StatsAccumulator stats = statsByPlayerId.getOrDefault(
+                    player.getId(),
+                    new StatsAccumulator(0, 0)
+                );
+                responses.add(PlayerIdentityPolicy.isAdministrativeIdentityRetained(player, now)
+                    ? retainedInactivePlayer(player, stats)
+                    : maskInactivePlayer());
                 continue;
             }
 
@@ -103,21 +126,36 @@ public class PlayerQueryService {
                 player.getTierChangeAcknowledgedAt(),
                 PlayerTierPolicy.normalizeRankedTier(player.getDormancyMmrFloorTier()).isEmpty()
                     ? null
-                    : PlayerTierPolicy.normalizeRankedTier(player.getDormancyMmrFloorTier())
+                    : PlayerTierPolicy.normalizeRankedTier(player.getDormancyMmrFloorTier()),
+                player.getLifecycleStatus() == null ? null : player.getLifecycleStatus().name(),
+                player.getIdentityRetainedUntil()
             ));
         }
 
         return responses;
     }
 
-    private int compareRosterPlayers(Player first, Player second) {
+    private int compareRosterPlayers(Player first, Player second, OffsetDateTime now) {
         boolean firstIdentityHidden = PlayerIdentityPolicy.isIdentityHidden(first);
         boolean secondIdentityHidden = PlayerIdentityPolicy.isIdentityHidden(second);
         if (firstIdentityHidden != secondIdentityHidden) {
             return firstIdentityHidden ? 1 : -1;
         }
         if (firstIdentityHidden) {
-            return 0;
+            boolean firstRetained = PlayerIdentityPolicy.isAdministrativeIdentityRetained(first, now);
+            boolean secondRetained = PlayerIdentityPolicy.isAdministrativeIdentityRetained(second, now);
+            if (firstRetained != secondRetained) {
+                return firstRetained ? -1 : 1;
+            }
+            if (!firstRetained) {
+                return 0;
+            }
+            int nicknameComparison = Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)
+                .compare(first.getNickname(), second.getNickname());
+            if (nicknameComparison != 0) {
+                return nicknameComparison;
+            }
+            return Comparator.nullsLast(Long::compareTo).compare(first.getId(), second.getId());
         }
 
         int mmrComparison = Integer.compare(safeInt(second.getMmr()), safeInt(first.getMmr()));
@@ -149,7 +187,37 @@ public class PlayerQueryService {
             null,
             null,
             null,
+            null,
+            null,
             null
+        );
+    }
+
+    private GroupPlayerResponse retainedInactivePlayer(Player player, StatsAccumulator stats) {
+        return new GroupPlayerResponse(
+            player.getId(),
+            player.getNickname(),
+            normalizeRace(player.getRace()),
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            stats.wins(),
+            stats.losses(),
+            stats.wins() + stats.losses(),
+            false,
+            player.getChatLeftAt(),
+            player.getChatLeftReason(),
+            null,
+            null,
+            null,
+            null,
+            player.getLifecycleStatus() == null ? null : player.getLifecycleStatus().name(),
+            player.getIdentityRetainedUntil()
         );
     }
 

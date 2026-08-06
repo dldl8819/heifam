@@ -60,8 +60,10 @@ class AccountDeletionServiceTest {
         );
         deletionOrder.verify(supabaseAuthAdminClient).ensureConfigured();
         deletionOrder.verify(accountDeletionDataService)
-            .anonymizeAccount(PLACEHOLDER_AUTH_USER_ID, PLACEHOLDER_EMAIL);
+            .retainWithdrawnAccount(PLACEHOLDER_AUTH_USER_ID, PLACEHOLDER_EMAIL);
         deletionOrder.verify(supabaseAuthAdminClient).deleteUser(PLACEHOLDER_AUTH_USER_ID);
+        deletionOrder.verify(accountDeletionDataService)
+            .completePendingAuthDeletion(PLACEHOLDER_AUTH_USER_ID);
         deletionOrder.verify(supabaseJwtVerifier).invalidateUser(PLACEHOLDER_AUTH_USER_ID.toString());
     }
 
@@ -106,14 +108,16 @@ class AccountDeletionServiceTest {
             .isInstanceOf(AccountDeletionException.class);
 
         verify(accountDeletionDataService)
-            .anonymizeAccount(PLACEHOLDER_AUTH_USER_ID, PLACEHOLDER_EMAIL);
+            .retainWithdrawnAccount(PLACEHOLDER_AUTH_USER_ID, PLACEHOLDER_EMAIL);
+        verify(accountDeletionDataService, never())
+            .completePendingAuthDeletion(PLACEHOLDER_AUTH_USER_ID);
         verify(supabaseJwtVerifier).invalidateUser(PLACEHOLDER_AUTH_USER_ID.toString());
     }
 
     @Test
     void deletesSoleLinkedAuthUserWhenPlayerIsDeactivated() {
         Player player = new Player();
-        when(accountDeletionDataService.anonymizeInactivePlayer(player))
+        when(accountDeletionDataService.retainInactivePlayer(player))
             .thenReturn(new AccountDeletionDataService.InactivePlayerCleanupOutcome(
                 PLACEHOLDER_AUTH_USER_ID,
                 true
@@ -130,7 +134,7 @@ class AccountDeletionServiceTest {
     @Test
     void preservesSharedAuthUserWhenPlayerIsDeactivated() {
         Player player = new Player();
-        when(accountDeletionDataService.anonymizeInactivePlayer(player))
+        when(accountDeletionDataService.retainInactivePlayer(player))
             .thenReturn(new AccountDeletionDataService.InactivePlayerCleanupOutcome(
                 PLACEHOLDER_AUTH_USER_ID,
                 false
@@ -145,7 +149,7 @@ class AccountDeletionServiceTest {
     @Test
     void retainsPendingDeletionAndInvalidatesCacheWhenAuthDeletionFails() {
         Player player = new Player();
-        when(accountDeletionDataService.anonymizeInactivePlayer(player))
+        when(accountDeletionDataService.retainInactivePlayer(player))
             .thenReturn(new AccountDeletionDataService.InactivePlayerCleanupOutcome(
                 PLACEHOLDER_AUTH_USER_ID,
                 true

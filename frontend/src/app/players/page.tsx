@@ -18,6 +18,7 @@ import {
   filterPlayerRosterByView,
   type PlayerRosterView,
 } from '@/lib/player-roster-filter'
+import { applyPlayerActivityTransition } from '@/lib/player-activity'
 import type { GroupPlayerRaceStatsItem, PlayerRace, PlayerRosterItem, PlayerTierStatus } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
@@ -203,6 +204,16 @@ function formatChatRecordDisplay(value: string | undefined): string {
   const hour = String(date.getHours()).padStart(2, '0')
   const minute = String(date.getMinutes()).padStart(2, '0')
   return `${year}.${month}.${day} ${hour}:${minute}`
+}
+
+function resolveLifecycleStatus(row: PlayerRosterItem) {
+  if (row.lifecycleStatus) {
+    return row.lifecycleStatus
+  }
+  if (row.active !== false) {
+    return 'ACTIVE'
+  }
+  return row.identityHidden ? 'ANONYMIZED' : 'INACTIVE'
 }
 
 function formatLastParticipationDate(value: string): string {
@@ -675,13 +686,12 @@ export default function PlayersPage() {
       setRows((currentRows) => {
         const nextRows = currentRows.map((row) =>
           row.id === player.id
-            ? {
-                ...row,
-                active: nextActive,
-                chatLeftAt: nextActive ? row.chatLeftAt : chatLeftAt ?? undefined,
-                chatLeftReason: nextActive ? row.chatLeftReason : chatLeftReason ?? undefined,
-                chatRejoinedAt: nextActive ? chatRejoinedAt ?? undefined : undefined,
-              }
+            ? applyPlayerActivityTransition(row, {
+                nextActive,
+                chatLeftAt: chatLeftAt ?? undefined,
+                chatLeftReason: chatLeftReason ?? undefined,
+                chatRejoinedAt: chatRejoinedAt ?? undefined,
+              })
             : row
         )
         if (rosterView !== 'inactive' && !nextActive) {
@@ -823,17 +833,26 @@ export default function PlayersPage() {
     [dormantPlayerIds, rows]
   )
 
+  const showInactiveRetentionColumns = rosterView === 'inactive'
+  const showTierColumn = !showInactiveRetentionColumns
   const showStatusColumn = isAdmin
-  const showDormancyFloorColumn = isSuperAdmin
+  const showDormancyFloorColumn = isSuperAdmin && !showInactiveRetentionColumns
+  const showRosterMmrColumn = showMmrColumn && !showInactiveRetentionColumns
+  const showGameTypeStatsColumn = !showInactiveRetentionColumns
   const showActionsColumn = isAdmin
   const tableColumnCount =
-    7 +
+    5 +
+    (showTierColumn ? 1 : 0) +
     (showStatusColumn ? 1 : 0) +
     (showDormancyFloorColumn ? 1 : 0) +
-    (showMmrColumn ? 1 : 0) +
+    (showRosterMmrColumn ? 1 : 0) +
+    (showGameTypeStatsColumn ? 1 : 0) +
     (showActionsColumn ? 1 : 0)
   const downloadableRows = useMemo(
-    () => rows.filter((row) => !row.identityHidden).sort(comparePlayersByTierThenNickname),
+    () =>
+      rows
+        .filter((row) => row.active !== false && !row.identityHidden)
+        .sort(comparePlayersByTierThenNickname),
     [rows]
   )
 
@@ -1051,6 +1070,9 @@ export default function PlayersPage() {
                   <span className="block text-right text-[11px] text-slate-400 dark:text-slate-500">
                       {activityForm.chatLeftReason.length}/500
                     </span>
+                    <span className="block text-[11px] font-normal leading-4 text-amber-700 dark:text-amber-300">
+                      {t('players.activityForm.reasonPrivacyNotice')}
+                    </span>
                   </label>
                 </>
               ) : (
@@ -1188,22 +1210,30 @@ export default function PlayersPage() {
         )}
       </div>
 
+      {isAdmin && rosterView === 'inactive' && (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+          {t('players.table.inactiveRetentionNotice')}
+        </p>
+      )}
+
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <table className="min-w-full text-left text-sm">
           <thead className="bg-slate-50 text-xs tracking-wide text-slate-500 dark:bg-slate-800/80 dark:text-slate-300">
             <tr>
               <th className="px-4 py-3">{t('players.table.nickname')}</th>
               <th className="px-4 py-3">{t('players.table.race')}</th>
-              <th className="px-4 py-3">{t('players.table.tier')}</th>
+              {showTierColumn && <th className="px-4 py-3">{t('players.table.tier')}</th>}
               {showStatusColumn && <th className="px-4 py-3">{t('players.table.status')}</th>}
               {showDormancyFloorColumn && (
                 <th className="px-4 py-3">{t('players.dormancyFloor.inlineLabel')}</th>
               )}
-              {showMmrColumn && <th className="px-4 py-3">{t('players.table.currentMmr')}</th>}
+              {showRosterMmrColumn && <th className="px-4 py-3">{t('players.table.currentMmr')}</th>}
               <th className="px-4 py-3">{t('players.table.wins')}</th>
               <th className="px-4 py-3">{t('players.table.losses')}</th>
               <th className="px-4 py-3">{t('players.table.games')}</th>
-              <th className="px-4 py-3">{t('players.table.gameTypeStats')}</th>
+              {showGameTypeStatsColumn && (
+                <th className="px-4 py-3">{t('players.table.gameTypeStats')}</th>
+              )}
               {showActionsColumn && <th className="px-4 py-3">{t('players.table.actions')}</th>}
             </tr>
           </thead>
@@ -1234,12 +1264,23 @@ export default function PlayersPage() {
             {!loading &&
               filteredRows.map((row) => {
                 const identityHidden = row.identityHidden === true
-                const isEditing = !identityHidden && editingPlayerId === row.id
+                const lifecycleStatus = resolveLifecycleStatus(row)
+                const isActive = lifecycleStatus === 'ACTIVE' && row.active !== false
+                const isOperationallyInactive = lifecycleStatus === 'INACTIVE'
+                const isWithdrawn = lifecycleStatus === 'WITHDRAWN'
+                const lifecycleLabel = isActive
+                  ? t('players.table.active')
+                  : isOperationallyInactive
+                    ? t('players.table.operationallyInactive')
+                    : isWithdrawn
+                      ? t('players.table.withdrawn')
+                      : t('players.table.anonymized')
+                const canReactivate = isOperationallyInactive && !identityHidden && row.id > 0
+                const isEditing = isActive && !identityHidden && editingPlayerId === row.id
                 const isSaving = savingPlayerId === row.id
                 const isDeleting = deletingPlayerId === row.id
                 const isToggling = togglingPlayerId === row.id
                 const busy = isSaving || isDeleting || isToggling
-                const isActive = row.active !== false
                 const canInspectLastParticipation = isAdmin && rosterView === 'dormant'
                 const lastParticipationExpanded =
                   canInspectLastParticipation && lastParticipation?.playerId === row.id
@@ -1292,7 +1333,7 @@ export default function PlayersPage() {
                             )}
                             {!isActive && (
                               <span className="rounded-md border border-slate-300 bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100">
-                                {t('players.table.inactive')}
+                                {lifecycleLabel}
                               </span>
                             )}
                           </div>
@@ -1342,37 +1383,41 @@ export default function PlayersPage() {
                         row.race
                       )}
                     </td>
-                    <td className="px-4 py-3">
-                      {identityHidden ? (
-                        <span className="text-slate-500 dark:text-slate-400" aria-hidden="true">—</span>
-                      ) : isEditing ? (
-                        <select
-                          value={editingTier}
-                          onChange={(event) => {
-                            const nextTier = event.target.value as PlayerTierStatus
-                            setEditingTier(nextTier)
-                            if (isSuperAdmin) {
-                              setEditingInlineMmrValue(String(resolveDefaultMmrForTier(nextTier)))
-                            }
-                          }}
+                    {showTierColumn && (
+                      <td className="px-4 py-3">
+                        {identityHidden ? (
+                          <span className="text-slate-500 dark:text-slate-400" aria-hidden="true">—</span>
+                        ) : isEditing ? (
+                          <select
+                            value={editingTier}
+                            onChange={(event) => {
+                              const nextTier = event.target.value as PlayerTierStatus
+                              setEditingTier(nextTier)
+                              if (isSuperAdmin) {
+                                setEditingInlineMmrValue(String(resolveDefaultMmrForTier(nextTier)))
+                              }
+                            }}
                             className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
-                        >
-                          {PLAYER_EDIT_TIER_OPTIONS.map((tierOption) => (
-                            <option key={tierOption} value={tierOption}>
-                              {tierOption === 'UNASSIGNED' ? t('players.table.unassigned') : tierOption}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span
-                          className={`rounded-md px-2 py-1 text-xs font-semibold ${getTierBadgeClass(
-                            row.tier
-                          )}`}
-                        >
-                          {row.tier === 'UNASSIGNED' ? t('players.table.unassigned') : row.tier}
-                        </span>
-                      )}
-                    </td>
+                          >
+                            {PLAYER_EDIT_TIER_OPTIONS.map((tierOption) => (
+                              <option key={tierOption} value={tierOption}>
+                                {tierOption === 'UNASSIGNED'
+                                  ? t('players.table.unassigned')
+                                  : tierOption}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span
+                            className={`rounded-md px-2 py-1 text-xs font-semibold ${getTierBadgeClass(
+                              row.tier
+                            )}`}
+                          >
+                            {row.tier === 'UNASSIGNED' ? t('players.table.unassigned') : row.tier}
+                          </span>
+                        )}
+                      </td>
+                    )}
                     {showStatusColumn && (
                       <td className="px-4 py-3">
                         <div className="space-y-1">
@@ -1380,21 +1425,37 @@ export default function PlayersPage() {
                             className={`rounded-md px-2 py-1 text-xs font-semibold ${
                               isActive
                                 ? 'border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
-                                : 'border border-slate-300 bg-slate-200 text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100'
+                                : isWithdrawn
+                                  ? 'border border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300'
+                                  : isOperationallyInactive
+                                    ? 'border border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200'
+                                    : 'border border-slate-300 bg-slate-200 text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100'
                             }`}
                           >
-                            {isActive ? t('players.table.active') : t('players.table.inactive')}
+                            {lifecycleLabel}
                           </span>
                           {!isActive && row.chatLeftAt && (
                               <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                              {t('players.table.chatLeftAt', {
+                              {t(isWithdrawn ? 'players.table.withdrawnAt' : 'players.table.inactiveAt', {
                                 value: formatChatRecordDisplay(row.chatLeftAt),
                               })}
                             </div>
                           )}
                           {!isActive && row.chatLeftReason && (
                               <div className="max-w-52 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
-                              {t('players.table.chatLeftReason', { value: row.chatLeftReason })}
+                              {t(
+                                isWithdrawn
+                                  ? 'players.table.withdrawnReason'
+                                  : 'players.table.inactiveReason',
+                                { value: row.chatLeftReason }
+                              )}
+                            </div>
+                          )}
+                          {!isActive && row.identityRetainedUntil && (
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                              {t('players.table.identityRetainedUntil', {
+                                value: formatChatRecordDisplay(row.identityRetainedUntil),
+                              })}
                             </div>
                           )}
                           {isActive && row.chatRejoinedAt && (
@@ -1432,8 +1493,8 @@ export default function PlayersPage() {
                         )}
                       </td>
                     )}
-                    {showMmrColumn && (
-                    <td className={`px-4 py-3 ${isActive ? 'text-slate-700 dark:text-slate-300' : 'text-slate-600 dark:text-slate-300'}`}>
+                    {showRosterMmrColumn && (
+                      <td className={`px-4 py-3 ${isActive ? 'text-slate-700 dark:text-slate-300' : 'text-slate-600 dark:text-slate-300'}`}>
                         {identityHidden ? (
                           <span aria-hidden="true">—</span>
                         ) : isEditing && isSuperAdmin ? (
@@ -1454,26 +1515,43 @@ export default function PlayersPage() {
                     <td className={`px-4 py-3 ${isActive ? 'text-slate-700 dark:text-slate-300' : 'text-slate-600 dark:text-slate-300'}`}>{identityHidden ? '—' : row.wins}</td>
                     <td className={`px-4 py-3 ${isActive ? 'text-slate-700 dark:text-slate-300' : 'text-slate-600 dark:text-slate-300'}`}>{identityHidden ? '—' : row.losses}</td>
                     <td className={`px-4 py-3 ${isActive ? 'text-slate-700 dark:text-slate-300' : 'text-slate-600 dark:text-slate-300'}`}>{identityHidden ? '—' : row.games}</td>
-                    <td className="px-4 py-3">
-                      {identityHidden ? (
-                        <span className="text-slate-500 dark:text-slate-400" aria-hidden="true">—</span>
-                      ) : (
-                        <button
-                          type="button"
-                          disabled={gameTypeStatsLoading && gameTypeStatsPlayer?.id === row.id}
-                          onClick={() => handleOpenGameTypeStats(row)}
-                          className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-emerald-600 hover:bg-emerald-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:border-emerald-400 dark:hover:bg-emerald-700"
-                        >
-                          {gameTypeStatsLoading && gameTypeStatsPlayer?.id === row.id
-                            ? t('statsModal.buttonLoading')
-                            : t('statsModal.button')}
-                        </button>
-                      )}
-                    </td>
+                    {showGameTypeStatsColumn && (
+                      <td className="px-4 py-3">
+                        {identityHidden ? (
+                          <span className="text-slate-500 dark:text-slate-400" aria-hidden="true">—</span>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={gameTypeStatsLoading && gameTypeStatsPlayer?.id === row.id}
+                            onClick={() => handleOpenGameTypeStats(row)}
+                            className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-emerald-600 hover:bg-emerald-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:border-emerald-400 dark:hover:bg-emerald-700"
+                          >
+                            {gameTypeStatsLoading && gameTypeStatsPlayer?.id === row.id
+                              ? t('statsModal.buttonLoading')
+                              : t('statsModal.button')}
+                          </button>
+                        )}
+                      </td>
+                    )}
                     {showActionsColumn && (
                       <td className="px-4 py-3">
                         {identityHidden ? (
                           <span className="text-slate-500 dark:text-slate-400" aria-hidden="true">—</span>
+                        ) : !isActive ? (
+                          canReactivate ? (
+                            <button
+                              type="button"
+                              disabled={busy || editingPlayerId !== null || activityForm !== null}
+                              onClick={() => handleTogglePlayerActive(row)}
+                              className="rounded-md border border-emerald-300 px-2.5 py-1 text-xs font-medium text-emerald-700 transition-colors hover:border-emerald-600 hover:bg-emerald-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-700 dark:text-emerald-300 dark:hover:border-emerald-400 dark:hover:bg-emerald-700"
+                            >
+                              {isToggling
+                                ? t('players.actions.toggling')
+                                : t('players.actions.reactivate')}
+                            </button>
+                          ) : (
+                            <span className="text-slate-500 dark:text-slate-400" aria-hidden="true">—</span>
+                          )
                         ) : (
                           <div className="flex flex-wrap gap-2">
                           {isEditing ? (
@@ -1514,17 +1592,11 @@ export default function PlayersPage() {
                             type="button"
                             disabled={busy || editingPlayerId !== null || activityForm !== null}
                             onClick={() => handleTogglePlayerActive(row)}
-                            className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-                              isActive
-                                ? 'border border-slate-300 text-slate-700 hover:border-slate-900 hover:bg-slate-900 hover:text-white dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-300 dark:hover:bg-slate-100 dark:hover:text-slate-900'
-                                : 'border border-emerald-300 text-emerald-700 hover:border-emerald-600 hover:bg-emerald-600 hover:text-white dark:border-emerald-700 dark:text-emerald-300 dark:hover:border-emerald-400 dark:hover:bg-emerald-700'
-                            }`}
+                            className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-slate-900 hover:bg-slate-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-300 dark:hover:bg-slate-100 dark:hover:text-slate-900"
                           >
                             {isToggling
                               ? t('players.actions.toggling')
-                              : isActive
-                                ? t('players.actions.deactivate')
-                                : t('players.actions.reactivate')}
+                              : t('players.actions.deactivate')}
                           </button>
 
                           <button

@@ -25,7 +25,9 @@ public record GroupPlayerResponse(
     OffsetDateTime chatRejoinedAt,
     String tierChangeAcknowledgedTier,
     OffsetDateTime tierChangeAcknowledgedAt,
-    String dormancyMmrFloorTier
+    String dormancyMmrFloorTier,
+    String lifecycleStatus,
+    OffsetDateTime identityRetainedUntil
 ) {
     public GroupPlayerResponse(
         Long id,
@@ -70,6 +72,58 @@ public record GroupPlayerResponse(
             chatRejoinedAt,
             tierChangeAcknowledgedTier,
             tierChangeAcknowledgedAt,
+            null,
+            null,
+            null
+        );
+    }
+
+    public GroupPlayerResponse(
+        Long id,
+        String nickname,
+        String race,
+        String tier,
+        Integer baseMmr,
+        String baseTier,
+        Integer currentMmr,
+        OffsetDateTime lastTierSnapshotAt,
+        Integer lastTierSnapshotMmr,
+        String lastTierSnapshotTier,
+        String liveTier,
+        int wins,
+        int losses,
+        int games,
+        boolean active,
+        OffsetDateTime chatLeftAt,
+        String chatLeftReason,
+        OffsetDateTime chatRejoinedAt,
+        String tierChangeAcknowledgedTier,
+        OffsetDateTime tierChangeAcknowledgedAt,
+        String dormancyMmrFloorTier
+    ) {
+        this(
+            id,
+            nickname,
+            race,
+            tier,
+            baseMmr,
+            baseTier,
+            currentMmr,
+            lastTierSnapshotAt,
+            lastTierSnapshotMmr,
+            lastTierSnapshotTier,
+            liveTier,
+            wins,
+            losses,
+            games,
+            active,
+            chatLeftAt,
+            chatLeftReason,
+            chatRejoinedAt,
+            tierChangeAcknowledgedTier,
+            tierChangeAcknowledgedAt,
+            dormancyMmrFloorTier,
+            null,
             null
         );
     }

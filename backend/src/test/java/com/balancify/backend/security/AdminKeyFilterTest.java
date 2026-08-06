@@ -73,7 +73,6 @@ import com.balancify.backend.service.PlayerAdminService;
 import com.balancify.backend.service.PlayerQueryService;
 import com.balancify.backend.service.PlayerRaceStatsQueryService;
 import com.balancify.backend.service.PlayerImportService;
-import com.balancify.backend.service.PlayerIdentityPolicy;
 import com.balancify.backend.service.RankingService;
 import com.balancify.backend.service.RatingRecalculationService;
 import com.balancify.backend.service.TeamBalancingService;
@@ -1034,7 +1033,7 @@ class AdminKeyFilterTest {
     @Test
     void allowsIncludeInactiveForAdminGroupPlayersRequest() throws Exception {
         when(playerQueryService.getGroupPlayers(eq(1L), eq(true)))
-            .thenReturn(List.of(maskedInactiveGroupPlayerResponse()));
+            .thenReturn(List.of(retainedInactiveGroupPlayerResponse()));
 
         mockMvc
             .perform(
@@ -1042,10 +1041,10 @@ class AdminKeyFilterTest {
                     .header("X-USER-EMAIL", "admin@hei.gg")
             )
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].id").doesNotExist())
-            .andExpect(jsonPath("$[0].nickname").value(PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL))
+            .andExpect(jsonPath("$[0].id").value(10))
+            .andExpect(jsonPath("$[0].nickname").value("RETAINED_NICKNAME"))
             .andExpect(jsonPath("$[0].active").value(false))
-            .andExpect(jsonPath("$[0].race").doesNotExist())
+            .andExpect(jsonPath("$[0].race").value("T"))
             .andExpect(jsonPath("$[0].tier").doesNotExist())
             .andExpect(jsonPath("$[0].baseMmr").doesNotExist())
             .andExpect(jsonPath("$[0].baseTier").doesNotExist())
@@ -1054,12 +1053,17 @@ class AdminKeyFilterTest {
             .andExpect(jsonPath("$[0].lastTierSnapshotMmr").doesNotExist())
             .andExpect(jsonPath("$[0].lastTierSnapshotTier").doesNotExist())
             .andExpect(jsonPath("$[0].liveTier").doesNotExist())
-            .andExpect(jsonPath("$[0].chatLeftAt").doesNotExist())
-            .andExpect(jsonPath("$[0].chatLeftReason").doesNotExist())
+            .andExpect(jsonPath("$[0].wins").value(2))
+            .andExpect(jsonPath("$[0].losses").value(1))
+            .andExpect(jsonPath("$[0].games").value(3))
+            .andExpect(jsonPath("$[0].chatLeftAt").exists())
+            .andExpect(jsonPath("$[0].chatLeftReason").value("운영 비활성"))
             .andExpect(jsonPath("$[0].chatRejoinedAt").doesNotExist())
             .andExpect(jsonPath("$[0].tierChangeAcknowledgedTier").doesNotExist())
             .andExpect(jsonPath("$[0].tierChangeAcknowledgedAt").doesNotExist())
-            .andExpect(jsonPath("$[0].dormancyMmrFloorTier").doesNotExist());
+            .andExpect(jsonPath("$[0].dormancyMmrFloorTier").doesNotExist())
+            .andExpect(jsonPath("$[0].lifecycleStatus").value("INACTIVE"))
+            .andExpect(jsonPath("$[0].identityRetainedUntil").exists());
 
         verify(playerQueryService).getGroupPlayers(eq(1L), eq(true));
     }
@@ -1853,29 +1857,31 @@ class AdminKeyFilterTest {
         );
     }
 
-    private GroupPlayerResponse maskedInactiveGroupPlayerResponse() {
+    private GroupPlayerResponse retainedInactiveGroupPlayerResponse() {
         return new GroupPlayerResponse(
-            null,
-            PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL,
-            null,
-            null,
-            null,
+            10L,
+            "RETAINED_NICKNAME",
+            "T",
             null,
             null,
             null,
             null,
             null,
             null,
-            0,
-            0,
-            0,
+            null,
+            null,
+            2,
+            1,
+            3,
             false,
+            OffsetDateTime.parse("2026-07-12T03:00:00Z"),
+            "운영 비활성",
             null,
             null,
             null,
             null,
-            null,
-            null
+            "INACTIVE",
+            OffsetDateTime.parse("2031-07-12T03:00:00Z")
         );
     }
 }

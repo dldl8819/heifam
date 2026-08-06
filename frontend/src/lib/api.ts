@@ -27,6 +27,7 @@ import type {
   OperationAuditLogItem,
   OperationAuditLogPage,
   PlayerRosterItem,
+  PlayerLifecycleStatus,
   PlayerRace,
   PlayerTierStatus,
   RatingRecalculationRequest,
@@ -496,9 +497,23 @@ export function normalizePlayerRosterItem(value: unknown, index = 0): PlayerRost
   const losses = toNumber(source.losses) ?? 0
   const games = toNumber(source.games) ?? wins + losses
   const active = typeof source.active === 'boolean' ? source.active : true
+  const rawLifecycleStatus =
+    typeof source.lifecycleStatus === 'string' ? source.lifecycleStatus.toUpperCase() : null
+  const lifecycleStatus = (
+    ['ACTIVE', 'INACTIVE', 'WITHDRAWN', 'ANONYMIZED'] as PlayerLifecycleStatus[]
+  ).includes(rawLifecycleStatus as PlayerLifecycleStatus)
+    ? (rawLifecycleStatus as PlayerLifecycleStatus)
+    : null
+  const retainedInactiveIdentity =
+    lifecycleStatus === 'INACTIVE' || lifecycleStatus === 'WITHDRAWN'
   const identityHidden =
-    active === false && source.race == null && source.tier == null
-  const id = identityHidden ? -(index + 1) : responseId
+    lifecycleStatus === 'ANONYMIZED' ||
+    (active === false && !retainedInactiveIdentity && source.race == null && source.tier == null)
+  const normalizedLifecycleStatus: PlayerLifecycleStatus =
+    lifecycleStatus ?? (active ? 'ACTIVE' : identityHidden ? 'ANONYMIZED' : 'INACTIVE')
+  const id = identityHidden
+    ? -(index + 1)
+    : responseId ?? (active ? null : -(index + 1))
 
   if (id === null || nickname === null) {
     return null
@@ -522,6 +537,11 @@ export function normalizePlayerRosterItem(value: unknown, index = 0): PlayerRost
     games,
     active,
     identityHidden,
+    lifecycleStatus: normalizedLifecycleStatus,
+    identityRetainedUntil:
+      typeof source.identityRetainedUntil === 'string'
+        ? source.identityRetainedUntil
+        : undefined,
     chatLeftAt: typeof source.chatLeftAt === 'string' ? source.chatLeftAt : undefined,
     chatLeftReason: typeof source.chatLeftReason === 'string' ? source.chatLeftReason : undefined,
     chatRejoinedAt: typeof source.chatRejoinedAt === 'string' ? source.chatRejoinedAt : undefined,

@@ -3,6 +3,7 @@ package com.balancify.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.balancify.backend.domain.Player;
+import com.balancify.backend.domain.PlayerLifecycleStatus;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -65,6 +66,8 @@ class PlayerIdentityPolicyTest {
         assertThat(player.getTierChangeAcknowledgedTier()).isNull();
         assertThat(player.getTierChangeAcknowledgedAt()).isNull();
         assertThat(player.getAnonymizedAt()).isEqualTo(anonymizedAt);
+        assertThat(player.getLifecycleStatus()).isEqualTo(PlayerLifecycleStatus.ANONYMIZED);
+        assertThat(player.getIdentityRetainedUntil()).isNull();
         assertThat(player.getMmr()).isEqualTo(1200);
         assertThat(player.getRace()).isEqualTo("P");
         assertThat(player.getTier()).isEqualTo("A");
@@ -75,5 +78,67 @@ class PlayerIdentityPolicyTest {
         assertThat(PlayerIdentityPolicy.isIdentityHidden(null)).isTrue();
         assertThat(PlayerIdentityPolicy.responsePlayerId(null)).isNull();
         assertThat(PlayerIdentityPolicy.responseNickname(null)).isNull();
+    }
+
+    @Test
+    void retainsMinimalInactiveIdentityForAdminUntilExpiry() {
+        OffsetDateTime inactiveAt = OffsetDateTime.parse("2026-07-19T00:00:00Z");
+        OffsetDateTime retainedUntil = inactiveAt.plusYears(5);
+        Player player = new Player();
+        player.setAuthUserId(UUID.fromString("00000000-0000-0000-0000-000000000001"));
+        player.setNickname("RETAINED_NICKNAME");
+        player.setRace("T");
+        player.setNote("REMOVE_NOTE");
+
+        PlayerIdentityPolicy.retainAdministrativeIdentity(
+            player,
+            PlayerLifecycleStatus.INACTIVE,
+            inactiveAt,
+            "운영 비활성",
+            retainedUntil
+        );
+
+        assertThat(player.getAuthUserId()).isNull();
+        assertThat(player.getNickname()).isEqualTo("RETAINED_NICKNAME");
+        assertThat(player.getRace()).isEqualTo("T");
+        assertThat(player.getNote()).isNull();
+        assertThat(player.getChatLeftReason()).isEqualTo("운영 비활성");
+        assertThat(PlayerIdentityPolicy.isIdentityHidden(player)).isTrue();
+        assertThat(PlayerIdentityPolicy.isAdministrativeIdentityRetained(
+            player,
+            retainedUntil.minusSeconds(1)
+        )).isTrue();
+        assertThat(PlayerIdentityPolicy.isAdministrativeIdentityRetained(player, retainedUntil)).isFalse();
+    }
+
+    @Test
+    void neverAllowsWithdrawnPlayerReactivation() {
+        Player player = new Player();
+        player.setActive(false);
+        player.setLifecycleStatus(PlayerLifecycleStatus.WITHDRAWN);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+            () -> PlayerIdentityPolicy.reactivate(player, OffsetDateTime.now())
+        ).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void reactivationClearsExpiredPurposeInactiveMetadata() {
+        OffsetDateTime rejoinedAt = OffsetDateTime.parse("2026-07-20T00:00:00Z");
+        Player player = new Player();
+        player.setActive(false);
+        player.setLifecycleStatus(PlayerLifecycleStatus.INACTIVE);
+        player.setChatLeftAt(OffsetDateTime.parse("2026-07-19T00:00:00Z"));
+        player.setChatLeftReason("PAST_INACTIVE_REASON");
+        player.setIdentityRetainedUntil(rejoinedAt.plusYears(5));
+
+        PlayerIdentityPolicy.reactivate(player, rejoinedAt);
+
+        assertThat(player.isActive()).isTrue();
+        assertThat(player.getChatLeftAt()).isNull();
+        assertThat(player.getChatLeftReason()).isNull();
+        assertThat(player.getChatRejoinedAt()).isEqualTo(rejoinedAt);
+        assertThat(player.getLifecycleStatus()).isEqualTo(PlayerLifecycleStatus.ACTIVE);
+        assertThat(player.getIdentityRetainedUntil()).isNull();
     }
 }

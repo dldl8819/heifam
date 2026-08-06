@@ -1,6 +1,7 @@
 package com.balancify.backend.service;
 
 import com.balancify.backend.domain.Player;
+import com.balancify.backend.domain.PlayerLifecycleStatus;
 import java.time.OffsetDateTime;
 
 public final class PlayerIdentityPolicy {
@@ -25,6 +26,57 @@ public final class PlayerIdentityPolicy {
         return isIdentityHidden(player) ? HIDDEN_MEMBER_LABEL : player.getNickname();
     }
 
+    public static boolean isAdministrativeIdentityRetained(Player player, OffsetDateTime now) {
+        if (player == null || player.isActive() || player.isAnonymized()) {
+            return false;
+        }
+        PlayerLifecycleStatus status = player.getLifecycleStatus();
+        if (status != PlayerLifecycleStatus.INACTIVE && status != PlayerLifecycleStatus.WITHDRAWN) {
+            return false;
+        }
+        OffsetDateTime retainedUntil = player.getIdentityRetainedUntil();
+        return retainedUntil != null && now != null && retainedUntil.isAfter(now);
+    }
+
+    public static void retainAdministrativeIdentity(
+        Player player,
+        PlayerLifecycleStatus status,
+        OffsetDateTime lifecycleAt,
+        String reason,
+        OffsetDateTime retainedUntil
+    ) {
+        if (player == null) {
+            return;
+        }
+        if (status != PlayerLifecycleStatus.INACTIVE && status != PlayerLifecycleStatus.WITHDRAWN) {
+            throw new IllegalArgumentException("Retained player lifecycle status is invalid");
+        }
+        player.setAuthUserId(null);
+        player.setNote(null);
+        player.setActive(false);
+        player.setChatLeftAt(lifecycleAt);
+        player.setChatLeftReason(reason);
+        player.setChatRejoinedAt(null);
+        player.setTierChangeAcknowledgedTier(null);
+        player.setTierChangeAcknowledgedAt(null);
+        player.setAnonymizedAt(null);
+        player.setLifecycleStatus(status);
+        player.setIdentityRetainedUntil(retainedUntil);
+    }
+
+    public static void reactivate(Player player, OffsetDateTime rejoinedAt) {
+        if (player == null || player.isAnonymized()
+            || player.getLifecycleStatus() == PlayerLifecycleStatus.WITHDRAWN) {
+            throw new IllegalArgumentException("Player cannot be reactivated");
+        }
+        player.setActive(true);
+        player.setChatLeftAt(null);
+        player.setChatLeftReason(null);
+        player.setChatRejoinedAt(rejoinedAt);
+        player.setLifecycleStatus(PlayerLifecycleStatus.ACTIVE);
+        player.setIdentityRetainedUntil(null);
+    }
+
     public static void anonymize(Player player, OffsetDateTime anonymizedAt) {
         if (player == null) {
             return;
@@ -39,5 +91,7 @@ public final class PlayerIdentityPolicy {
         player.setTierChangeAcknowledgedTier(null);
         player.setTierChangeAcknowledgedAt(null);
         player.setAnonymizedAt(anonymizedAt == null ? OffsetDateTime.now() : anonymizedAt);
+        player.setLifecycleStatus(PlayerLifecycleStatus.ANONYMIZED);
+        player.setIdentityRetainedUntil(null);
     }
 }
