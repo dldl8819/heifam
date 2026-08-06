@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.balancify.backend.api.group.dto.GroupDormantPlayerResponse;
+import com.balancify.backend.domain.PlayerLifecycleStatus;
 import com.balancify.backend.api.group.dto.GroupPlayerLastParticipationResponse;
 import com.balancify.backend.repository.MatchParticipantRepository;
 import com.balancify.backend.repository.MatchParticipantRepository.PlayerLastPlayedAtProjection;
@@ -105,7 +106,11 @@ class PlayerActivityQueryServiceTest {
     @Test
     void returnsLatestCompletedParticipationTimestamp() {
         OffsetDateTime lastPlayedAt = OffsetDateTime.parse("2026-07-20T12:30:00Z");
-        when(playerRepository.existsByIdAndGroup_IdAndActiveTrueAndAnonymizedAtIsNull(11L, 1L))
+        when(playerRepository.existsByIdAndGroup_IdAndActiveTrueAndAnonymizedAtIsNullAndLifecycleStatus(
+            11L,
+            1L,
+            PlayerLifecycleStatus.ACTIVE
+        ))
             .thenReturn(true);
         when(matchParticipantRepository.findLastCompletedPlayedAt(1L, 11L))
             .thenReturn(Optional.of(lastPlayedAt));
@@ -117,7 +122,11 @@ class PlayerActivityQueryServiceTest {
 
     @Test
     void returnsNullWhenPlayerHasNoCompletedParticipation() {
-        when(playerRepository.existsByIdAndGroup_IdAndActiveTrueAndAnonymizedAtIsNull(11L, 1L))
+        when(playerRepository.existsByIdAndGroup_IdAndActiveTrueAndAnonymizedAtIsNullAndLifecycleStatus(
+            11L,
+            1L,
+            PlayerLifecycleStatus.ACTIVE
+        ))
             .thenReturn(true);
         when(matchParticipantRepository.findLastCompletedPlayedAt(1L, 11L))
             .thenReturn(Optional.empty());
@@ -129,7 +138,11 @@ class PlayerActivityQueryServiceTest {
 
     @Test
     void hidesMissingInactiveAnonymizedOrCrossGroupPlayersBehindNotFound() {
-        when(playerRepository.existsByIdAndGroup_IdAndActiveTrueAndAnonymizedAtIsNull(11L, 1L))
+        when(playerRepository.existsByIdAndGroup_IdAndActiveTrueAndAnonymizedAtIsNullAndLifecycleStatus(
+            11L,
+            1L,
+            PlayerLifecycleStatus.ACTIVE
+        ))
             .thenReturn(false);
 
         assertThatThrownBy(() -> service.getLastParticipation(1L, 11L))

@@ -33,6 +33,9 @@ class PendingAuthDeletionWorkerTest {
     private AccountPersonalDataRepository accountPersonalDataRepository;
 
     @Mock
+    private AccountDeletionDataService accountDeletionDataService;
+
+    @Mock
     private SupabaseAuthAdminClient supabaseAuthAdminClient;
 
     @Mock
@@ -44,6 +47,7 @@ class PendingAuthDeletionWorkerTest {
     void setUp() {
         worker = new PendingAuthDeletionWorker(
             accountPersonalDataRepository,
+            accountDeletionDataService,
             supabaseAuthAdminClient,
             supabaseJwtVerifier,
             Clock.fixed(Instant.parse("2026-07-19T03:00:00Z"), ZoneOffset.UTC)
@@ -62,7 +66,7 @@ class PendingAuthDeletionWorkerTest {
 
         verify(supabaseAuthAdminClient).deleteUser(PLACEHOLDER_AUTH_USER_ID);
         verify(supabaseJwtVerifier).invalidateUser(PLACEHOLDER_AUTH_USER_ID.toString());
-        verify(accountPersonalDataRepository).deletePendingAuthDeletion(PLACEHOLDER_AUTH_USER_ID);
+        verify(accountDeletionDataService).completePendingAuthDeletion(PLACEHOLDER_AUTH_USER_ID);
     }
 
     @Test
@@ -79,8 +83,8 @@ class PendingAuthDeletionWorkerTest {
         worker.processPendingDeletions();
 
         verify(supabaseJwtVerifier).invalidateUser(PLACEHOLDER_AUTH_USER_ID.toString());
-        verify(accountPersonalDataRepository, never())
-            .deletePendingAuthDeletion(PLACEHOLDER_AUTH_USER_ID);
+        verify(accountDeletionDataService, never())
+            .completePendingAuthDeletion(PLACEHOLDER_AUTH_USER_ID);
     }
 
     @Test

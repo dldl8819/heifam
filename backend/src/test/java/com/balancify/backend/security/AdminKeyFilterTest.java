@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.balancify.backend.api.HealthController;
@@ -714,7 +715,9 @@ class AdminKeyFilterTest {
                 get("/api/admin/audit-logs")
                     .header("X-USER-EMAIL", "superadmin@hei.gg")
             )
-            .andExpect(status().isOk());
+            .andExpect(status().isOk())
+            .andExpect(header().string("Cache-Control", "no-store, max-age=0"))
+            .andExpect(header().string("Pragma", "no-cache"));
     }
 
     @Test
@@ -1041,6 +1044,8 @@ class AdminKeyFilterTest {
                     .header("X-USER-EMAIL", "admin@hei.gg")
             )
             .andExpect(status().isOk())
+            .andExpect(header().string("Cache-Control", "no-store, max-age=0"))
+            .andExpect(header().string("Pragma", "no-cache"))
             .andExpect(jsonPath("$[0].id").value(10))
             .andExpect(jsonPath("$[0].nickname").value("RETAINED_NICKNAME"))
             .andExpect(jsonPath("$[0].active").value(false))

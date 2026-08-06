@@ -72,19 +72,16 @@ public class PlayerRaceStatsQueryService {
     }
 
     public List<GroupPlayerRaceStatsResponse> getGroupPlayerRaceStats(Long groupId) {
-        String cacheKey = "player-race-stats:group:%d:".formatted(groupId);
-        return groupReadCacheService.get(cacheKey, () -> List.copyOf(loadGroupPlayerRaceStats(groupId)));
+        return List.copyOf(loadGroupPlayerRaceStats(groupId));
     }
 
     public GroupPlayerRaceStatsResponse getGroupPlayerRaceStats(Long groupId, Long playerId) {
-        String cacheKey = "player-race-stats:group:%d:player:%d".formatted(groupId, playerId);
-        return groupReadCacheService.get(cacheKey, () -> loadGroupPlayerRaceStats(groupId, playerId));
+        return loadGroupPlayerRaceStats(groupId, playerId);
     }
 
     public GroupPlayerRaceStatsResponse getGroupPlayerMonthlyRaceStats(Long groupId, Long playerId) {
         LocalDate statMonth = currentStatMonth();
-        String cacheKey = "player-race-stats:group:%d:player:%d:month:%s".formatted(groupId, playerId, statMonth);
-        return groupReadCacheService.get(cacheKey, () -> loadGroupPlayerMonthlyRaceStats(groupId, playerId, statMonth));
+        return loadGroupPlayerMonthlyRaceStats(groupId, playerId, statMonth);
     }
 
     private GroupPlayerRaceStatsResponse loadGroupPlayerRaceStats(Long groupId, Long playerId) {

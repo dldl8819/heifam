@@ -6,6 +6,7 @@ import com.balancify.backend.domain.OperationAuditLog;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.OperationAuditLogRepository;
 import jakarta.persistence.criteria.Predicate;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -35,13 +36,23 @@ public class OperationAuditLogService {
 
     private final OperationAuditLogRepository operationAuditLogRepository;
     private final AccessControlService accessControlService;
+    private final Clock clock;
 
     public OperationAuditLogService(
         OperationAuditLogRepository operationAuditLogRepository,
         AccessControlService accessControlService
     ) {
+        this(operationAuditLogRepository, accessControlService, Clock.systemUTC());
+    }
+
+    OperationAuditLogService(
+        OperationAuditLogRepository operationAuditLogRepository,
+        AccessControlService accessControlService,
+        Clock clock
+    ) {
         this.operationAuditLogRepository = operationAuditLogRepository;
         this.accessControlService = accessControlService;
+        this.clock = clock == null ? Clock.systemUTC() : clock;
     }
 
     @Transactional(readOnly = true)
@@ -64,9 +75,15 @@ public class OperationAuditLogService {
             Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))
         );
         OperationAuditLogFilter normalizedFilter = filter == null ? OperationAuditLogFilter.empty() : filter;
+        OffsetDateTime retentionCutoff = OffsetDateTime.now(clock)
+            .minusYears(OperationAuditRetentionService.RETENTION_YEARS);
         Page<OperationAuditLog> logs = normalizedFilter.isEmpty()
-            ? operationAuditLogRepository.findAllByOrderByCreatedAtDescIdDesc(pageRequest)
-            : operationAuditLogRepository.findAll(buildSpecification(normalizedFilter), pageRequest);
+            ? operationAuditLogRepository
+                .findAllByCreatedAtGreaterThanEqualOrderByCreatedAtDescIdDesc(retentionCutoff, pageRequest)
+            : operationAuditLogRepository.findAll(
+                buildSpecification(normalizedFilter, retentionCutoff),
+                pageRequest
+            );
         List<OperationAuditLogResponse> items = logs
             .stream()
             .map(this::toResponse)
@@ -82,9 +99,17 @@ public class OperationAuditLogService {
         );
     }
 
-    private Specification<OperationAuditLog> buildSpecification(OperationAuditLogFilter filter) {
+    private Specification<OperationAuditLog> buildSpecification(
+        OperationAuditLogFilter filter,
+        OffsetDateTime retentionCutoff
+    ) {
         return (root, query, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
+
+            predicates.add(criteriaBuilder.greaterThanOrEqualTo(
+                root.<OffsetDateTime>get("createdAt"),
+                retentionCutoff
+            ));
 
             if (filter.fromDate() != null) {
                 predicates.add(criteriaBuilder.greaterThanOrEqualTo(

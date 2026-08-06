@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpStatus;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.server.ResponseStatusException;
 
 class GroupPlayerControllerDormancyTest {
@@ -36,6 +37,7 @@ class GroupPlayerControllerDormancyTest {
     private final AuthenticatedRequestResolver authenticatedRequestResolver =
         mock(AuthenticatedRequestResolver.class);
     private final HttpServletRequest request = mock(HttpServletRequest.class);
+    private final MockHttpServletResponse response = new MockHttpServletResponse();
 
     private GroupPlayerController controller;
 
@@ -66,7 +68,8 @@ class GroupPlayerControllerDormancyTest {
         );
         when(playerActivityQueryService.getDormantPlayers(1L)).thenReturn(expected);
 
-        assertThat(controller.getDormantGroupPlayers(1L, request)).isEqualTo(expected);
+        assertThat(controller.getDormantGroupPlayers(1L, request, response)).isEqualTo(expected);
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store, max-age=0");
         verify(playerActivityQueryService).getDormantPlayers(1L);
     }
 
@@ -74,7 +77,7 @@ class GroupPlayerControllerDormancyTest {
     void rejectsMemberDormantRosterRequest() {
         allowMember();
 
-        assertForbidden(() -> controller.getDormantGroupPlayers(1L, request));
+        assertForbidden(() -> controller.getDormantGroupPlayers(1L, request, response));
         verify(playerActivityQueryService, never()).getDormantPlayers(1L);
     }
 
@@ -87,7 +90,8 @@ class GroupPlayerControllerDormancyTest {
         );
         when(playerActivityQueryService.getLastParticipation(1L, 11L)).thenReturn(expected);
 
-        assertThat(controller.getPlayerLastParticipation(1L, 11L, request)).isEqualTo(expected);
+        assertThat(controller.getPlayerLastParticipation(1L, 11L, request, response)).isEqualTo(expected);
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store, max-age=0");
         verify(playerActivityQueryService).getLastParticipation(1L, 11L);
     }
 
@@ -95,7 +99,7 @@ class GroupPlayerControllerDormancyTest {
     void rejectsMemberLastParticipationRequest() {
         allowMember();
 
-        assertForbidden(() -> controller.getPlayerLastParticipation(1L, 11L, request));
+        assertForbidden(() -> controller.getPlayerLastParticipation(1L, 11L, request, response));
         verify(playerActivityQueryService, never()).getLastParticipation(1L, 11L);
     }
 
@@ -105,7 +109,7 @@ class GroupPlayerControllerDormancyTest {
         when(playerActivityQueryService.getLastParticipation(1L, 11L))
             .thenThrow(new NoSuchElementException("Player not found"));
 
-        assertThatThrownBy(() -> controller.getPlayerLastParticipation(1L, 11L, request))
+        assertThatThrownBy(() -> controller.getPlayerLastParticipation(1L, 11L, request, response))
             .isInstanceOfSatisfying(ResponseStatusException.class, exception ->
                 assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND)
             );

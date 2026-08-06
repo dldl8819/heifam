@@ -81,7 +81,7 @@ class PlayerIdentityRetentionServiceTest {
         player.setIdentityRetainedUntil(NOW);
 
         when(playerRepository
-            .findIdentityRetentionExpiryCandidates(NOW))
+            .findIdentityRetentionExpiryCandidates(NOW, PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL))
             .thenReturn(List.of(player));
         when(playerRepository.anonymizeExpiredIdentity(
             101L,
@@ -113,7 +113,7 @@ class PlayerIdentityRetentionServiceTest {
         player.setLifecycleStatus(PlayerLifecycleStatus.INACTIVE);
         player.setIdentityRetainedUntil(NOW);
         when(playerRepository
-            .findIdentityRetentionExpiryCandidates(NOW))
+            .findIdentityRetentionExpiryCandidates(NOW, PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL))
             .thenReturn(List.of(player));
         when(playerRepository.anonymizeExpiredIdentity(
             102L,
@@ -142,7 +142,10 @@ class PlayerIdentityRetentionServiceTest {
         reactivated.setActive(false);
         reactivated.setLifecycleStatus(PlayerLifecycleStatus.INACTIVE);
         reactivated.setIdentityRetainedUntil(NOW);
-        when(playerRepository.findIdentityRetentionExpiryCandidates(NOW))
+        when(playerRepository.findIdentityRetentionExpiryCandidates(
+            NOW,
+            PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL
+        ))
             .thenReturn(List.of(expired, reactivated));
         when(playerRepository.anonymizeExpiredIdentity(
             103L,
@@ -170,7 +173,10 @@ class PlayerIdentityRetentionServiceTest {
         inconsistent.setActive(false);
         inconsistent.setLifecycleStatus(PlayerLifecycleStatus.ACTIVE);
         inconsistent.setIdentityRetainedUntil(null);
-        when(playerRepository.findIdentityRetentionExpiryCandidates(NOW))
+        when(playerRepository.findIdentityRetentionExpiryCandidates(
+            NOW,
+            PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL
+        ))
             .thenReturn(List.of(inconsistent));
         when(playerRepository.anonymizeExpiredIdentity(
             105L,
@@ -189,7 +195,7 @@ class PlayerIdentityRetentionServiceTest {
     @Test
     void leavesRepositoriesUntouchedWhenNoIdentityHasExpired() {
         when(playerRepository
-            .findIdentityRetentionExpiryCandidates(NOW))
+            .findIdentityRetentionExpiryCandidates(NOW, PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL))
             .thenReturn(List.of());
 
         assertThat(retentionService.anonymizeExpiredIdentities()).isZero();

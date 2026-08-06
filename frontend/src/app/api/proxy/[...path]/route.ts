@@ -161,6 +161,7 @@ async function buildProxyResponse(upstream: Response): Promise<NextResponse> {
   responseHeaders.delete('content-encoding')
   responseHeaders.delete('content-length')
   responseHeaders.delete('transfer-encoding')
+  responseHeaders.set('Cache-Control', 'no-store, max-age=0')
 
   const upstreamBodyText = upstream.status === 204 ? null : await upstream.text()
   return new NextResponse(upstreamBodyText, {

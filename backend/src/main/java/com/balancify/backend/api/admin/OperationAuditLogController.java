@@ -2,6 +2,7 @@ package com.balancify.backend.api.admin;
 
 import com.balancify.backend.api.admin.dto.OperationAuditLogPageResponse;
 import com.balancify.backend.service.OperationAuditLogService;
+import jakarta.servlet.http.HttpServletResponse;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import org.springframework.http.HttpStatus;
@@ -31,8 +32,12 @@ public class OperationAuditLogController {
         @RequestParam(name = "actor", required = false) String actor,
         @RequestParam(name = "action", required = false) String action,
         @RequestParam(name = "content", required = false) String content,
-        @RequestParam(name = "target", required = false) String target
+        @RequestParam(name = "target", required = false) String target,
+        HttpServletResponse response
     ) {
+        response.setHeader("Cache-Control", "no-store, max-age=0");
+        response.setHeader("Pragma", "no-cache");
+        response.setDateHeader("Expires", 0);
         int requestedSize = size == null ? limit == null ? 20 : limit : size;
         LocalDate parsedFromDate = parseDate(fromDate, "fromDate");
         LocalDate parsedToDate = parseDate(toDate, "toDate");

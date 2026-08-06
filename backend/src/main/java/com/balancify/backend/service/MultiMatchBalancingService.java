@@ -246,7 +246,7 @@ public class MultiMatchBalancingService {
         List<Player> loaded = playerRepository.findByGroup_IdAndIdIn(groupId, playerIds);
         Map<Long, Player> byId = new HashMap<>();
         for (Player player : loaded) {
-            if (player.isActive()) {
+            if (!PlayerIdentityPolicy.isIdentityHidden(player)) {
                 byId.put(player.getId(), player);
             }
         }

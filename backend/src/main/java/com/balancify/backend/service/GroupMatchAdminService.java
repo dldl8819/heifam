@@ -194,7 +194,7 @@ public class GroupMatchAdminService {
 
         List<Player> players = playerRepository.findByGroup_IdAndIdIn(groupId, new ArrayList<>(allIds))
             .stream()
-            .filter(Player::isActive)
+            .filter(player -> !PlayerIdentityPolicy.isIdentityHidden(player))
             .toList();
         if (players.size() != normalizedTeamSize * 2) {
             throw new IllegalArgumentException("All players must belong to the group");

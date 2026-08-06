@@ -26,6 +26,7 @@ const ENABLE_SUPABASE_PROFILE_SYNC =
 const INITIAL_SESSION_TIMEOUT_MS = 7000
 const SUPABASE_AUTH_STORAGE_KEY_PREFIX = 'sb-'
 const SUPABASE_AUTH_STORAGE_KEY_SUFFIX = '-auth-token'
+const LEGACY_BALANCE_STATE_STORAGE_KEY = 'balancify.balance.state.v2'
 
 function toSafeNickname(value: unknown): string | null {
   if (typeof value !== 'string') {
@@ -105,6 +106,17 @@ function removeStoredSupabaseSession(): void {
   }
 }
 
+function removeLegacyPersonalizedUiState(): void {
+  if (typeof window === 'undefined') {
+    return
+  }
+  try {
+    window.localStorage.removeItem(LEGACY_BALANCE_STATE_STORAGE_KEY)
+  } catch {
+    // Storage can be unavailable in restricted browser modes.
+  }
+}
+
 function shouldHydrateAuthSession(pathname: string | null): boolean {
   const currentPath = pathname ?? '/'
   if (currentPath === '/auth' || currentPath.startsWith('/auth/')) {
@@ -135,6 +147,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [accessToken, setAccessToken] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    removeLegacyPersonalizedUiState()
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -211,7 +227,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const signOut = async () => {
     clearSessionIdentityCache()
-    await supabase.auth.signOut()
+    removeLegacyPersonalizedUiState()
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        removeStoredSupabaseSession()
+      }
+    } catch {
+      removeStoredSupabaseSession()
+    }
+    setAccessToken(null)
+    setUser(null)
   }
 
   const deleteAccount = async () => {
@@ -225,6 +251,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     })
 
     clearSessionIdentityCache()
+    removeLegacyPersonalizedUiState()
     try {
       const { error } = await supabase.auth.signOut({ scope: 'local' })
       if (error) {

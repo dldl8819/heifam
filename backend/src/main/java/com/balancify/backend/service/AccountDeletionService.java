@@ -1,10 +1,10 @@
 package com.balancify.backend.service;
 
-import com.balancify.backend.domain.Player;
 import com.balancify.backend.security.AuthenticatedRequestResolver.ResolvedRequestIdentity;
 import com.balancify.backend.security.SupabaseAuthAdminClient;
 import com.balancify.backend.security.SupabaseJwtVerifier;
 import java.util.UUID;
+import java.time.OffsetDateTime;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,7 +41,7 @@ public class AccountDeletionService {
         }
 
         supabaseAuthAdminClient.ensureConfigured();
-        accountDeletionDataService.retainWithdrawnAccount(authUserId, identity.email());
+        accountDeletionDataService.anonymizeWithdrawnAccount(authUserId, identity.email());
         try {
             supabaseAuthAdminClient.deleteUser(authUserId);
             accountDeletionDataService.completePendingAuthDeletion(authUserId);
@@ -51,9 +51,9 @@ public class AccountDeletionService {
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public void deactivatePlayer(Player player) {
+    public void deactivatePlayer(Long playerId, OffsetDateTime inactiveAt, String inactiveReason) {
         AccountDeletionDataService.InactivePlayerCleanupOutcome outcome =
-            accountDeletionDataService.retainInactivePlayer(player);
+            accountDeletionDataService.retainInactivePlayer(playerId, inactiveAt, inactiveReason);
         if (!outcome.requiresAuthDeletion() || outcome.authUserId() == null) {
             return;
         }
@@ -66,6 +66,10 @@ public class AccountDeletionService {
         } finally {
             supabaseJwtVerifier.invalidateUser(authUserId.toString());
         }
+    }
+
+    public UUID resolveRetainedAuthUserId(String expectedRetentionSubjectHash) {
+        return accountDeletionDataService.resolveRetainedAuthUserId(expectedRetentionSubjectHash);
     }
 
     private UUID resolveVerifiedUserId(ResolvedRequestIdentity identity) {

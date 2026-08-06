@@ -15,6 +15,7 @@ import com.balancify.backend.domain.CaptainDraftEntry;
 import com.balancify.backend.domain.CaptainDraftParticipant;
 import com.balancify.backend.domain.Group;
 import com.balancify.backend.domain.Player;
+import com.balancify.backend.domain.PlayerLifecycleStatus;
 import com.balancify.backend.repository.CaptainDraftEntryRepository;
 import com.balancify.backend.repository.CaptainDraftParticipantRepository;
 import com.balancify.backend.repository.CaptainDraftRepository;
@@ -142,6 +143,31 @@ class CaptainDraftServiceTest {
     }
 
     @Test
+    void pickPlayerRejectsDraftContainingInactiveParticipant() {
+        Group group = group(1L);
+        CaptainDraft draft = draft(group, 100L, "DRAFTING", 4, "HOME", 1L, 2L);
+        Player inactive = player(group, 3L);
+        inactive.setActive(false);
+        inactive.setLifecycleStatus(PlayerLifecycleStatus.INACTIVE);
+        List<CaptainDraftParticipant> participants = List.of(
+            participant(draft, player(group, 1L), true, "HOME", null),
+            participant(draft, player(group, 2L), true, "AWAY", null),
+            participant(draft, inactive, false, null, null)
+        );
+
+        when(captainDraftRepository.findByIdAndGroup_Id(100L, 1L)).thenReturn(Optional.of(draft));
+        when(captainDraftParticipantRepository.findByDraftIdWithPlayer(100L)).thenReturn(participants);
+
+        assertThatThrownBy(() -> captainDraftService.pickPlayer(
+            1L,
+            100L,
+            new CaptainDraftPickRequest(1L, 3L)
+        ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Draft contains an inactive participant");
+    }
+
+    @Test
     void updateEntriesRejectsOppositeTeamPlayer() {
         Group group = group(1L);
         CaptainDraft draft = draft(group, 100L, "READY", 4, "UNASSIGNED", 1L, 2L);
@@ -244,6 +270,7 @@ class CaptainDraftServiceTest {
                 assertThat(participantResponse.playerId()).isNull();
                 assertThat(participantResponse.nickname())
                     .isEqualTo("\uD0C8\uD1F4\uD55C \uD68C\uC6D0");
+                assertThat(participantResponse.race()).isNull();
             });
         assertThat(response.picks()).singleElement().satisfies(pick -> {
             assertThat(pick.captainPlayerId()).isNull();

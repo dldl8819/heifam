@@ -185,6 +185,7 @@ public class CaptainDraftService {
 
         List<CaptainDraftParticipant> participants =
             captainDraftParticipantRepository.findByDraftIdWithPlayer(draft.getId());
+        requireActiveDraftParticipants(participants);
         Map<Long, CaptainDraftParticipant> participantsByPlayerId = participants
             .stream()
             .collect(Collectors.toMap(participant -> participant.getPlayer().getId(), participant -> participant));
@@ -245,6 +246,7 @@ public class CaptainDraftService {
         CaptainDraft draft = loadDraft(groupId, draftId);
         List<CaptainDraftParticipant> participants =
             captainDraftParticipantRepository.findByDraftIdWithPlayer(draft.getId());
+        requireActiveDraftParticipants(participants);
 
         Map<Long, CaptainDraftParticipant> participantsByPlayerId = participants
             .stream()
@@ -400,7 +402,9 @@ public class CaptainDraftService {
             .map(participant -> new CaptainDraftParticipantResponse(
                 responsePlayerId(participant.getPlayer()),
                 responseNickname(participant.getPlayer()),
-                normalizeRace(participant.getPlayer().getRace()),
+                PlayerIdentityPolicy.isIdentityHidden(participant.getPlayer())
+                    ? null
+                    : normalizeRace(participant.getPlayer().getRace()),
                 normalizeTeam(participant.getTeam()),
                 participant.isCaptain(),
                 participant.getPickOrder()
@@ -477,6 +481,15 @@ public class CaptainDraftService {
 
     private Long responsePlayerId(Player player) {
         return PlayerIdentityPolicy.responsePlayerId(player);
+    }
+
+    private void requireActiveDraftParticipants(List<CaptainDraftParticipant> participants) {
+        boolean hasHiddenParticipant = participants == null || participants.stream()
+            .anyMatch(participant -> participant == null
+                || PlayerIdentityPolicy.isIdentityHidden(participant.getPlayer()));
+        if (hasHiddenParticipant) {
+            throw new IllegalArgumentException("Draft contains an inactive participant");
+        }
     }
 
     private String responseNickname(Player player) {

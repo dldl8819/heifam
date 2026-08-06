@@ -31,7 +31,8 @@ import type {
 
 const TEMP_GROUP_ID = 1
 const MAX_SLOT_COUNT = 6
-const BALANCE_STATE_STORAGE_KEY = 'balancify.balance.state.v2'
+const LEGACY_BALANCE_STATE_STORAGE_KEY = 'balancify.balance.state.v2'
+const BALANCE_STATE_STORAGE_KEY = 'balancify.balance.state.v3'
 const winnerTeamOptions: TeamSide[] = ['HOME', 'AWAY']
 type WinnerTeamSelection = '' | TeamSide
 const teamSizeOptions = [
@@ -44,8 +45,6 @@ type SupportedTeamSize = 2 | 3
 type PersistedBalanceState = {
   teamSize: SupportedTeamSize
   raceComposition: RaceComposition | null
-  slots: Array<number | null>
-  slotInputs: string[]
 }
 
 function formatPercent(value: number): string {
@@ -151,44 +150,15 @@ function sanitizePersistedTeamSize(teamSize: unknown): SupportedTeamSize {
   return teamSize === 2 ? 2 : 3
 }
 
-function sanitizePersistedSlots(slots: unknown): Array<number | null> {
-  if (!Array.isArray(slots)) {
-    return createEmptySlots()
-  }
-
-  const normalized = slots
-    .slice(0, MAX_SLOT_COUNT)
-    .map((value) => (typeof value === 'number' && Number.isFinite(value) ? value : null))
-
-  while (normalized.length < MAX_SLOT_COUNT) {
-    normalized.push(null)
-  }
-
-  return normalized
-}
-
-function sanitizePersistedSlotInputs(slotInputs: unknown): string[] {
-  if (!Array.isArray(slotInputs)) {
-    return createEmptySlotInputs()
-  }
-
-  const normalized = slotInputs
-    .slice(0, MAX_SLOT_COUNT)
-    .map((value) => (typeof value === 'string' ? value : ''))
-
-  while (normalized.length < MAX_SLOT_COUNT) {
-    normalized.push('')
-  }
-
-  return normalized
-}
-
 function readPersistedBalanceState(): PersistedBalanceState | null {
   if (typeof window === 'undefined') {
     return null
   }
 
   try {
+    // Previous versions stored player IDs and nickname input in localStorage.
+    // Remove that legacy data instead of carrying personal data forward.
+    window.localStorage.removeItem(LEGACY_BALANCE_STATE_STORAGE_KEY)
     const raw = window.localStorage.getItem(BALANCE_STATE_STORAGE_KEY)
     if (!raw) {
       return null
@@ -201,8 +171,6 @@ function readPersistedBalanceState(): PersistedBalanceState | null {
         sanitizePersistedTeamSize(parsed.teamSize),
         typeof parsed.raceComposition === 'string' ? parsed.raceComposition : null
       ),
-      slots: sanitizePersistedSlots(parsed.slots),
-      slotInputs: sanitizePersistedSlotInputs(parsed.slotInputs),
     }
   } catch {
     return null
@@ -307,8 +275,7 @@ export default function BalancePage() {
   useEffect(() => {
     const persisted = readPersistedBalanceState()
     if (persisted) {
-      setSlots(persisted.slots)
-      setSlotInputs(persisted.slotInputs)
+      setTeamSize(persisted.teamSize)
       setRaceComposition(persisted.raceComposition)
     }
     setPersistedReady(true)
@@ -322,8 +289,6 @@ export default function BalancePage() {
     const payload: PersistedBalanceState = {
       teamSize,
       raceComposition,
-      slots,
-      slotInputs,
     }
 
     try {
@@ -331,7 +296,7 @@ export default function BalancePage() {
     } catch {
       return
     }
-  }, [teamSize, raceComposition, slots, slotInputs, persistedReady])
+  }, [teamSize, raceComposition, persistedReady])
 
   useEffect(() => {
     setCopyStatus('idle')

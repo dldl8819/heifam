@@ -1,9 +1,25 @@
 import Link from 'next/link'
 import { t } from '@/lib/i18n'
 
-const YOUTUBE_URL = 'https://www.youtube.com/@Hei-minsik'
-const INSTAGRAM_URL = 'https://www.instagram.com/hei.minsik'
+const YOUTUBE_URL = resolvePublicContactUrl(process.env.NEXT_PUBLIC_FOOTER_YOUTUBE_URL)
+const INSTAGRAM_URL = resolvePublicContactUrl(process.env.NEXT_PUBLIC_FOOTER_INSTAGRAM_URL)
+const PRIVACY_CONTACT_URL = resolvePublicContactUrl(process.env.NEXT_PUBLIC_PRIVACY_CONTACT_URL)
+const PRIVACY_CONTACT_LABEL =
+  process.env.NEXT_PUBLIC_PRIVACY_CONTACT_LABEL?.trim() || t('footer.privacyContactLinkText')
 const SUPPORT_ACCOUNT = process.env.NEXT_PUBLIC_FOOTER_SUPPORT_ACCOUNT?.trim()
+
+function resolvePublicContactUrl(value: string | undefined): string | null {
+  const normalized = value?.trim()
+  if (!normalized) {
+    return null
+  }
+  try {
+    const parsed = new URL(normalized)
+    return parsed.protocol === 'https:' || parsed.protocol === 'mailto:' ? parsed.toString() : null
+  } catch {
+    return null
+  }
+}
 
 export function SiteFooter() {
   return (
@@ -16,31 +32,46 @@ export function SiteFooter() {
                 <span className="font-semibold text-slate-900 dark:text-slate-100">{t('footer.supportLabel')}</span>
                 <span className="ml-2">{SUPPORT_ACCOUNT || t('footer.supportAccount')}</span>
               </p>
-              <p>
-                <span className="font-semibold text-slate-900 dark:text-slate-100">{t('footer.youtubeLabel')}</span>
-                <a
-                  href={YOUTUBE_URL}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="ml-2 text-slate-700 underline-offset-2 hover:text-slate-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:text-slate-300 dark:hover:text-white"
-                >
-                  {t('footer.youtubeLinkText')}
-                </a>
-              </p>
-              <p>
-                <span className="font-semibold text-slate-900 dark:text-slate-100">{t('footer.instagramLabel')}</span>
-                <a
-                  href={INSTAGRAM_URL}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="ml-2 text-slate-700 underline-offset-2 hover:text-slate-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:text-slate-300 dark:hover:text-white"
-                >
-                  {t('footer.instagramLinkText')}
-                </a>
-              </p>
+              {YOUTUBE_URL && (
+                <p>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">{t('footer.youtubeLabel')}</span>
+                  <a
+                    href={YOUTUBE_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="ml-2 text-slate-700 underline-offset-2 hover:text-slate-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:text-slate-300 dark:hover:text-white"
+                  >
+                    {t('footer.youtubeLinkText')}
+                  </a>
+                </p>
+              )}
+              {INSTAGRAM_URL && (
+                <p>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">{t('footer.instagramLabel')}</span>
+                  <a
+                    href={INSTAGRAM_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="ml-2 text-slate-700 underline-offset-2 hover:text-slate-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:text-slate-300 dark:hover:text-white"
+                  >
+                    {t('footer.instagramLinkText')}
+                  </a>
+                </p>
+              )}
               <p>
                 <span className="font-semibold text-slate-900 dark:text-slate-100">{t('footer.contactLabel')}</span>
-                <span className="ml-2">{t('footer.contactName')}</span>
+                {PRIVACY_CONTACT_URL ? (
+                  <a
+                    href={PRIVACY_CONTACT_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="ml-2 text-slate-700 underline-offset-2 hover:text-slate-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:text-slate-300 dark:hover:text-white"
+                  >
+                    {PRIVACY_CONTACT_LABEL}
+                  </a>
+                ) : (
+                  <span className="ml-2">{t('footer.contactName')}</span>
+                )}
               </p>
             </div>
 

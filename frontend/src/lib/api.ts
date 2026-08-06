@@ -496,7 +496,8 @@ export function normalizePlayerRosterItem(value: unknown, index = 0): PlayerRost
   const wins = toNumber(source.wins) ?? 0
   const losses = toNumber(source.losses) ?? 0
   const games = toNumber(source.games) ?? wins + losses
-  const active = typeof source.active === 'boolean' ? source.active : true
+  const hasExplicitActiveStatus = typeof source.active === 'boolean'
+  const active = source.active === true
   const rawLifecycleStatus =
     typeof source.lifecycleStatus === 'string' ? source.lifecycleStatus.toUpperCase() : null
   const lifecycleStatus = (
@@ -504,13 +505,47 @@ export function normalizePlayerRosterItem(value: unknown, index = 0): PlayerRost
   ).includes(rawLifecycleStatus as PlayerLifecycleStatus)
     ? (rawLifecycleStatus as PlayerLifecycleStatus)
     : null
+  const rawIdentityRetainedUntil =
+    typeof source.identityRetainedUntil === 'string' ? source.identityRetainedUntil : null
+  const rawInactiveAt = typeof source.chatLeftAt === 'string' ? source.chatLeftAt : null
+  const rawInactiveReason =
+    typeof source.chatLeftReason === 'string' ? source.chatLeftReason.trim() : null
+  const identityRetainedUntilMillis =
+    rawIdentityRetainedUntil === null ? Number.NaN : Date.parse(rawIdentityRetainedUntil)
+  const inactiveAtMillis = rawInactiveAt === null ? Number.NaN : Date.parse(rawInactiveAt)
+  const maximumRetainedUntilMillis =
+    rawInactiveAt === null ? Number.NaN : addOneCalendarYear(rawInactiveAt)
+  const now = Date.now()
+  const allowedInactiveReason =
+    rawInactiveReason !== null &&
+    ['장기 미참여', '본인 요청', '운영 정책', '기타'].includes(rawInactiveReason)
+  const retainedNickname =
+    nickname !== null && nickname.trim().length > 0 && nickname !== '탈퇴한 회원'
   const retainedInactiveIdentity =
-    lifecycleStatus === 'INACTIVE' || lifecycleStatus === 'WITHDRAWN'
+    hasExplicitActiveStatus &&
+    active === false &&
+    lifecycleStatus === 'INACTIVE' &&
+    retainedNickname &&
+    Number.isFinite(inactiveAtMillis) &&
+    inactiveAtMillis <= now &&
+    allowedInactiveReason &&
+    Number.isFinite(identityRetainedUntilMillis) &&
+    identityRetainedUntilMillis > now &&
+    Number.isFinite(maximumRetainedUntilMillis) &&
+    identityRetainedUntilMillis <= maximumRetainedUntilMillis
+  const unsupportedLifecycleStatus = rawLifecycleStatus !== null && lifecycleStatus === null
+  const inconsistentActiveLifecycle =
+    active && lifecycleStatus !== null && lifecycleStatus !== 'ACTIVE'
   const identityHidden =
+    !hasExplicitActiveStatus ||
     lifecycleStatus === 'ANONYMIZED' ||
-    (active === false && !retainedInactiveIdentity && source.race == null && source.tier == null)
+    lifecycleStatus === 'WITHDRAWN' ||
+    unsupportedLifecycleStatus ||
+    inconsistentActiveLifecycle ||
+    (active === false && !retainedInactiveIdentity)
   const normalizedLifecycleStatus: PlayerLifecycleStatus =
     lifecycleStatus ?? (active ? 'ACTIVE' : identityHidden ? 'ANONYMIZED' : 'INACTIVE')
+  const retainedInactive = retainedInactiveIdentity && !identityHidden
   const id = identityHidden
     ? -(index + 1)
     : responseId ?? (active ? null : -(index + 1))
@@ -521,31 +556,55 @@ export function normalizePlayerRosterItem(value: unknown, index = 0): PlayerRost
 
   return {
     id,
-    nickname,
-    race: normalizeRace(source.race),
-    tier: normalizeTier(source.tier) ?? 'UNASSIGNED',
-    baseMmr: baseMmr ?? undefined,
-    baseTier: baseTier ?? undefined,
-    currentMmr: currentMmr ?? undefined,
-    dormancyMmrFloorTier: dormancyMmrFloorTier ?? undefined,
-    lastTierSnapshotAt: typeof source.lastTierSnapshotAt === 'string' ? source.lastTierSnapshotAt : undefined,
-    lastTierSnapshotMmr: lastTierSnapshotMmr ?? undefined,
-    lastTierSnapshotTier: lastTierSnapshotTier ?? undefined,
-    liveTier: liveTier ?? undefined,
-    wins,
-    losses,
-    games,
+    nickname: identityHidden ? '탈퇴한 회원' : nickname,
+    race: identityHidden ? 'P' : normalizeRace(source.race),
+    tier: identityHidden || retainedInactive ? 'UNASSIGNED' : normalizeTier(source.tier) ?? 'UNASSIGNED',
+    baseMmr: identityHidden || retainedInactive ? undefined : baseMmr ?? undefined,
+    baseTier: identityHidden || retainedInactive ? undefined : baseTier ?? undefined,
+    currentMmr: identityHidden || retainedInactive ? undefined : currentMmr ?? undefined,
+    dormancyMmrFloorTier:
+      identityHidden || retainedInactive ? undefined : dormancyMmrFloorTier ?? undefined,
+    lastTierSnapshotAt:
+      !identityHidden && !retainedInactive && typeof source.lastTierSnapshotAt === 'string'
+        ? source.lastTierSnapshotAt
+        : undefined,
+    lastTierSnapshotMmr:
+      identityHidden || retainedInactive ? undefined : lastTierSnapshotMmr ?? undefined,
+    lastTierSnapshotTier:
+      identityHidden || retainedInactive ? undefined : lastTierSnapshotTier ?? undefined,
+    liveTier: identityHidden || retainedInactive ? undefined : liveTier ?? undefined,
+    wins: identityHidden ? 0 : wins,
+    losses: identityHidden ? 0 : losses,
+    games: identityHidden ? 0 : games,
     active,
     identityHidden,
     lifecycleStatus: normalizedLifecycleStatus,
     identityRetainedUntil:
-      typeof source.identityRetainedUntil === 'string'
-        ? source.identityRetainedUntil
+      !identityHidden && rawIdentityRetainedUntil !== null ? rawIdentityRetainedUntil : undefined,
+    chatLeftAt: !identityHidden && rawInactiveAt !== null ? rawInactiveAt : undefined,
+    chatLeftReason: !identityHidden && allowedInactiveReason ? rawInactiveReason ?? undefined : undefined,
+    chatRejoinedAt:
+      !identityHidden && !retainedInactive && typeof source.chatRejoinedAt === 'string'
+        ? source.chatRejoinedAt
         : undefined,
-    chatLeftAt: typeof source.chatLeftAt === 'string' ? source.chatLeftAt : undefined,
-    chatLeftReason: typeof source.chatLeftReason === 'string' ? source.chatLeftReason : undefined,
-    chatRejoinedAt: typeof source.chatRejoinedAt === 'string' ? source.chatRejoinedAt : undefined,
   }
+}
+
+function addOneCalendarYear(value: string): number {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})(T.*)$/)
+  if (match === null) {
+    return Number.NaN
+  }
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  if (!Number.isInteger(year) || month < 1 || month > 12 || day < 1) {
+    return Number.NaN
+  }
+  const targetYear = year + 1
+  const lastDay = new Date(Date.UTC(targetYear, month, 0)).getUTCDate()
+  const targetDay = String(Math.min(day, lastDay)).padStart(2, '0')
+  return Date.parse(`${String(targetYear).padStart(4, '0')}-${match[2]}-${targetDay}${match[4]}`)
 }
 
 function normalizeGroupDormantPlayerItem(value: unknown): GroupDormantPlayerItem | null {

@@ -12,6 +12,7 @@ import com.balancify.backend.service.PlayerActivityQueryService;
 import com.balancify.backend.service.PlayerQueryService;
 import com.balancify.backend.service.PlayerRaceStatsQueryService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.NoSuchElementException;
 import org.springframework.http.HttpStatus;
@@ -49,9 +50,11 @@ public class GroupPlayerController {
     @GetMapping("/{groupId}/players/dormant")
     public List<GroupDormantPlayerResponse> getDormantGroupPlayers(
         @PathVariable Long groupId,
-        HttpServletRequest request
+        HttpServletRequest request,
+        HttpServletResponse response
     ) {
         requireAdmin(request, "Only admins can access dormant player data");
+        preventSensitiveResponseCaching(response);
         return playerActivityQueryService.getDormantPlayers(groupId);
     }
 
@@ -59,9 +62,11 @@ public class GroupPlayerController {
     public GroupPlayerLastParticipationResponse getPlayerLastParticipation(
         @PathVariable Long groupId,
         @PathVariable Long playerId,
-        HttpServletRequest request
+        HttpServletRequest request,
+        HttpServletResponse response
     ) {
         requireAdmin(request, "Only admins can access player participation data");
+        preventSensitiveResponseCaching(response);
         try {
             return playerActivityQueryService.getLastParticipation(groupId, playerId);
         } catch (NoSuchElementException exception) {
@@ -73,7 +78,8 @@ public class GroupPlayerController {
     public List<GroupPlayerResponse> getGroupPlayers(
         @PathVariable Long groupId,
         @RequestParam(name = "includeInactive", defaultValue = "false") boolean includeInactive,
-        HttpServletRequest request
+        HttpServletRequest request,
+        HttpServletResponse httpResponse
     ) {
         AccessControlService.AccessProfile accessProfile = accessControlService.resolveAccessProfile(
             authenticatedRequestResolver.resolve(request).email()
@@ -82,6 +88,9 @@ public class GroupPlayerController {
             groupId,
             accessProfile.admin() && includeInactive
         );
+        if (accessProfile.admin() && includeInactive) {
+            preventSensitiveResponseCaching(httpResponse);
+        }
         if (accessProfile.superAdmin()) {
             return response;
         }
@@ -172,5 +181,11 @@ public class GroupPlayerController {
         if (!accessProfile.admin()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, message);
         }
+    }
+
+    private void preventSensitiveResponseCaching(HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store, max-age=0");
+        response.setHeader("Pragma", "no-cache");
+        response.setDateHeader("Expires", 0);
     }
 }

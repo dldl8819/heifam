@@ -13,6 +13,9 @@ import java.util.Locale;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Service;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,7 +23,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class PlayerAdminService {
 
-    private static final int CHAT_LEFT_REASON_MAX_LENGTH = 500;
     private static final Set<String> ACKNOWLEDGEABLE_TIERS = Set.of(
         "S", "A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D", "UNASSIGNED"
     );
@@ -31,6 +33,9 @@ public class PlayerAdminService {
     private final GroupReadCacheService groupReadCacheService;
     private final AccountDeletionService accountDeletionService;
     private final Clock clock;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public PlayerAdminService(
         PlayerRepository playerRepository,
@@ -140,16 +145,24 @@ public class PlayerAdminService {
                 .stream()
                 .anyMatch(candidate -> candidate.getId() != null
                     && !candidate.getId().equals(playerId)
-                    && candidate.isActive()
-                    && !candidate.isAnonymized());
+                    && !PlayerIdentityPolicy.isIdentityHidden(candidate));
             if (duplicateActiveNickname) {
                 throw new IllegalArgumentException("Nickname already exists in group");
+            }
+            String expectedRetentionSubjectHash = player.getRetentionSubjectHash();
+            UUID restoredAuthUserId = accountDeletionService.resolveRetainedAuthUserId(
+                expectedRetentionSubjectHash
+            );
+            if (expectedRetentionSubjectHash != null && restoredAuthUserId == null) {
+                throw new IllegalStateException("Retained account link could not be restored");
             }
             int updated = playerRepository.reactivateRetainedInactivePlayer(
                 groupId,
                 playerId,
                 chatRejoinedAt,
-                OffsetDateTime.now(clock)
+                OffsetDateTime.now(clock),
+                expectedRetentionSubjectHash,
+                restoredAuthUserId
             );
             if (updated != 1) {
                 throw new NoSuchElementException("Player not found");
@@ -165,6 +178,42 @@ public class PlayerAdminService {
                 player,
                 false,
                 true
+            );
+            return;
+        }
+
+        boolean deactivating = previousActive && Boolean.FALSE.equals(active);
+        if (deactivating) {
+            if (chatLeftAt == null) {
+                throw new IllegalArgumentException("Chat left time is required when deactivating player");
+            }
+            if (chatLeftReason.isEmpty()) {
+                throw new IllegalArgumentException("Chat left reason is required when deactivating player");
+            }
+            if (!PlayerIdentityPolicy.isAllowedInactiveReason(chatLeftReason)) {
+                throw new IllegalArgumentException("Chat left reason must use an allowed category");
+            }
+            if (!nickname.isEmpty()
+                || !normalizedRace.isEmpty()
+                || !tier.isEmpty()
+                || chatRejoinedAt != null
+                || !tierChangeAcknowledgedTier.isEmpty()
+                || hasDormancyMmrFloorTier) {
+                throw new IllegalArgumentException("Deactivation request contains unsupported fields");
+            }
+
+            if (entityManager != null && entityManager.contains(player)) {
+                entityManager.detach(player);
+            }
+            accountDeletionService.deactivatePlayer(playerId, chatLeftAt, chatLeftReason);
+            groupReadCacheService.evictGroup(groupId);
+            operationAuditLogService.recordPlayerActivityUpdate(
+                actorEmail,
+                actorNickname,
+                groupId,
+                player,
+                true,
+                false
             );
             return;
         }
@@ -211,19 +260,6 @@ public class PlayerAdminService {
                     throw new IllegalArgumentException("Chat rejoined time is required when reactivating player");
                 }
                 PlayerIdentityPolicy.reactivate(player, chatRejoinedAt);
-            } else {
-                if (chatLeftAt == null) {
-                    throw new IllegalArgumentException("Chat left time is required when deactivating player");
-                }
-                if (chatLeftReason.isEmpty()) {
-                    throw new IllegalArgumentException("Chat left reason is required when deactivating player");
-                }
-                if (chatLeftReason.length() > CHAT_LEFT_REASON_MAX_LENGTH) {
-                    throw new IllegalArgumentException("Chat left reason must be 500 characters or fewer");
-                }
-                player.setChatLeftAt(chatLeftAt);
-                player.setChatLeftReason(chatLeftReason);
-                accountDeletionService.deactivatePlayer(player);
             }
         }
 
@@ -238,8 +274,7 @@ public class PlayerAdminService {
 
         playerRepository.save(player);
         groupReadCacheService.evictGroup(groupId);
-        boolean deactivated = active != null && !active && previousActive;
-        if (!deactivated && (nicknameChanged || raceChanged)) {
+        if (nicknameChanged || raceChanged) {
             operationAuditLogService.recordPlayerProfileUpdate(
                 actorEmail,
                 actorNickname,
@@ -251,7 +286,7 @@ public class PlayerAdminService {
                 player.getRace()
             );
         }
-        if (!deactivated && tierChanged) {
+        if (tierChanged) {
             operationAuditLogService.recordPlayerTierUpdate(
                 actorEmail,
                 actorNickname,
@@ -316,11 +351,18 @@ public class PlayerAdminService {
     }
 
     private void requireProfileUpdateAllowed(Player player, Boolean requestedActive) {
-        if (player == null || player.isAnonymized()
-            || player.getLifecycleStatus() == PlayerLifecycleStatus.WITHDRAWN) {
+        if (player == null) {
             throw new NoSuchElementException("Player not found");
         }
-        if (!player.isActive() && !Boolean.TRUE.equals(requestedActive)) {
+        if (!PlayerIdentityPolicy.isIdentityHidden(player)) {
+            return;
+        }
+        boolean retainedReactivation = Boolean.TRUE.equals(requestedActive)
+            && PlayerIdentityPolicy.isAdministrativeIdentityRetained(
+                player,
+                OffsetDateTime.now(clock)
+            );
+        if (!retainedReactivation) {
             throw new NoSuchElementException("Player not found");
         }
     }

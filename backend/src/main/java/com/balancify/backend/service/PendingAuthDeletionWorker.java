@@ -20,6 +20,7 @@ public class PendingAuthDeletionWorker {
     private static final Duration RETRY_DELAY = Duration.ofMinutes(5);
 
     private final AccountPersonalDataRepository accountPersonalDataRepository;
+    private final AccountDeletionDataService accountDeletionDataService;
     private final SupabaseAuthAdminClient supabaseAuthAdminClient;
     private final SupabaseJwtVerifier supabaseJwtVerifier;
     private final Clock clock;
@@ -27,11 +28,13 @@ public class PendingAuthDeletionWorker {
     @Autowired
     public PendingAuthDeletionWorker(
         AccountPersonalDataRepository accountPersonalDataRepository,
+        AccountDeletionDataService accountDeletionDataService,
         SupabaseAuthAdminClient supabaseAuthAdminClient,
         SupabaseJwtVerifier supabaseJwtVerifier
     ) {
         this(
             accountPersonalDataRepository,
+            accountDeletionDataService,
             supabaseAuthAdminClient,
             supabaseJwtVerifier,
             Clock.systemUTC()
@@ -40,11 +43,13 @@ public class PendingAuthDeletionWorker {
 
     PendingAuthDeletionWorker(
         AccountPersonalDataRepository accountPersonalDataRepository,
+        AccountDeletionDataService accountDeletionDataService,
         SupabaseAuthAdminClient supabaseAuthAdminClient,
         SupabaseJwtVerifier supabaseJwtVerifier,
         Clock clock
     ) {
         this.accountPersonalDataRepository = accountPersonalDataRepository;
+        this.accountDeletionDataService = accountDeletionDataService;
         this.supabaseAuthAdminClient = supabaseAuthAdminClient;
         this.supabaseJwtVerifier = supabaseJwtVerifier;
         this.clock = clock == null ? Clock.systemUTC() : clock;
@@ -78,7 +83,7 @@ public class PendingAuthDeletionWorker {
                 supabaseJwtVerifier.invalidateUser(authUserId.toString());
             }
             if (deleted) {
-                accountPersonalDataRepository.deletePendingAuthDeletion(authUserId);
+                accountDeletionDataService.completePendingAuthDeletion(authUserId);
             }
         }
     }

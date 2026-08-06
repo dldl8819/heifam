@@ -2,6 +2,7 @@ package com.balancify.backend.service;
 
 import com.balancify.backend.api.group.dto.GroupDormantPlayerResponse;
 import com.balancify.backend.api.group.dto.GroupPlayerLastParticipationResponse;
+import com.balancify.backend.domain.PlayerLifecycleStatus;
 import com.balancify.backend.repository.MatchParticipantRepository;
 import com.balancify.backend.repository.MatchParticipantRepository.PlayerLastPlayedAtProjection;
 import com.balancify.backend.repository.PlayerRepository;
@@ -86,7 +87,12 @@ public class PlayerActivityQueryService {
     public GroupPlayerLastParticipationResponse getLastParticipation(Long groupId, Long playerId) {
         boolean visibleActivePlayer = groupId != null
             && playerId != null
-            && playerRepository.existsByIdAndGroup_IdAndActiveTrueAndAnonymizedAtIsNull(playerId, groupId);
+            && playerRepository
+                .existsByIdAndGroup_IdAndActiveTrueAndAnonymizedAtIsNullAndLifecycleStatus(
+                    playerId,
+                    groupId,
+                    PlayerLifecycleStatus.ACTIVE
+                );
         if (!visibleActivePlayer) {
             throw new NoSuchElementException("Player not found");
         }

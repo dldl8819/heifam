@@ -107,7 +107,7 @@ class PlayerRaceStatsQueryServiceTest {
     }
 
     @Test
-    void excludesInactivePlayersAndCachesGroupRead() {
+    void excludesInactivePlayersAndReloadsIdentityBearingStats() {
         Group group = new Group();
         group.setId(1L);
         Player active = player(1L, group, "Active", "P", 1500, true);
@@ -126,9 +126,9 @@ class PlayerRaceStatsQueryServiceTest {
         assertThat(first).hasSize(1);
         assertThat(second).hasSize(1);
         assertThat(first.get(0).nickname()).isEqualTo("Active");
-        verify(playerRepository, times(1)).findByGroup_IdOrderByMmrDescIdAsc(1L);
-        verify(playerRaceStatsRepository, times(1)).findByGroupId(1L);
-        verify(playerGameTypeStatsRepository, times(1)).findByGroupId(1L);
+        verify(playerRepository, times(2)).findByGroup_IdOrderByMmrDescIdAsc(1L);
+        verify(playerRaceStatsRepository, times(2)).findByGroupId(1L);
+        verify(playerGameTypeStatsRepository, times(2)).findByGroupId(1L);
     }
 
     @Test

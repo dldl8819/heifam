@@ -57,7 +57,10 @@ public class PlayerIdentityRetentionService {
     public int anonymizeExpiredIdentities() {
         OffsetDateTime now = OffsetDateTime.now(clock);
         List<Player> expiredPlayers = playerRepository
-            .findIdentityRetentionExpiryCandidates(now);
+            .findIdentityRetentionExpiryCandidates(
+                now,
+                PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL
+            );
         if (expiredPlayers.isEmpty()) {
             return 0;
         }

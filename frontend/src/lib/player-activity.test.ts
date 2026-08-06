@@ -14,9 +14,9 @@ function inactivePlayer(): PlayerRosterItem {
     active: false,
     identityHidden: false,
     lifecycleStatus: 'INACTIVE',
-    identityRetainedUntil: '2031-08-01T12:00:00Z',
+    identityRetainedUntil: '2027-08-01T12:00:00Z',
     chatLeftAt: '2026-08-01T12:00:00Z',
-    chatLeftReason: '운영상 비활성',
+    chatLeftReason: '운영 정책',
   }
 }
 
@@ -44,7 +44,7 @@ describe('applyPlayerActivityTransition', () => {
       {
         nextActive: false,
         chatLeftAt: '2026-08-06T12:00:00Z',
-        chatLeftReason: '운영상 비활성',
+        chatLeftReason: '운영 정책',
       }
     )
 
@@ -52,7 +52,7 @@ describe('applyPlayerActivityTransition', () => {
       active: false,
       lifecycleStatus: 'INACTIVE',
       chatLeftAt: '2026-08-06T12:00:00Z',
-      chatLeftReason: '운영상 비활성',
+      chatLeftReason: '운영 정책',
     })
     expect(updated.identityRetainedUntil).toBeUndefined()
   })

@@ -119,7 +119,7 @@ class RankingServiceTest {
     }
 
     @Test
-    void cachesRankingBrieflyToAvoidRepeatedDatabaseEgress() {
+    void reloadsRankingSoIdentityChangesAreVisibleAcrossInstances() {
         GroupReadCacheService cache = new GroupReadCacheService(60_000);
         rankingService = new RankingService(playerRepository, playerMonthlyStatsRepository, cache, FIXED_CLOCK);
 
@@ -135,8 +135,8 @@ class RankingServiceTest {
         rankingService.getGroupRanking(1L);
         rankingService.getGroupRanking(1L);
 
-        verify(playerRepository, times(1)).findByGroup_IdOrderByMmrDescIdAsc(1L);
-        verify(playerMonthlyStatsRepository, times(1)).findByGroupIdAndStatMonth(1L, JULY_2026);
+        verify(playerRepository, times(2)).findByGroup_IdOrderByMmrDescIdAsc(1L);
+        verify(playerMonthlyStatsRepository, times(2)).findByGroupIdAndStatMonth(1L, JULY_2026);
     }
 
     private Player player(

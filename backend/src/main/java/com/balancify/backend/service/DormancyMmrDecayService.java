@@ -108,7 +108,7 @@ public class DormancyMmrDecayService {
 
         List<Player> players = playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId)
             .stream()
-            .filter(Player::isActive)
+            .filter(player -> !PlayerIdentityPolicy.isIdentityHidden(player))
             .toList();
         if (players.isEmpty()) {
             return;

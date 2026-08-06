@@ -1,5 +1,6 @@
 package com.balancify.backend.domain;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -13,6 +14,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import com.balancify.backend.service.PlayerRacePolicy;
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -24,6 +26,10 @@ public class Player {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Version
+    @Column(nullable = false)
+    private Long version;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "group_id", nullable = false)
@@ -84,6 +90,10 @@ public class Player {
     @Column(name = "identity_retained_until")
     private OffsetDateTime identityRetainedUntil;
 
+    @Column(name = "retention_subject_hash", length = 64)
+    @JsonIgnore
+    private String retentionSubjectHash;
+
     @Column(name = "last_dormancy_mmr_decay_at")
     private OffsetDateTime lastDormancyMmrDecayAt;
 
@@ -120,6 +130,10 @@ public class Player {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public Long getVersion() {
+        return version;
     }
 
     public Group getGroup() {
@@ -283,6 +297,14 @@ public class Player {
         this.identityRetainedUntil = identityRetainedUntil;
     }
 
+    public String getRetentionSubjectHash() {
+        return retentionSubjectHash;
+    }
+
+    public void setRetentionSubjectHash(String retentionSubjectHash) {
+        this.retentionSubjectHash = retentionSubjectHash;
+    }
+
     public OffsetDateTime getLastDormancyMmrDecayAt() {
         return lastDormancyMmrDecayAt;
     }
@@ -365,7 +387,7 @@ public class Player {
 
     @PrePersist
     @PreUpdate
-    private void syncTierWithMmr() {
+    void syncTierWithMmr() {
         this.race = PlayerRacePolicy.normalizeCapabilityOrDefault(this.race, "P");
         this.mmr = normalizeMmr(this.mmr);
         this.returnBoostGamesRemaining = this.returnBoostGamesRemaining == null
@@ -378,11 +400,24 @@ public class Player {
             this.tier = PlayerTierPolicy.resolveTier(this.mmr);
         }
         if (this.anonymizedAt != null) {
+            this.active = false;
             this.lifecycleStatus = PlayerLifecycleStatus.ANONYMIZED;
             this.identityRetainedUntil = null;
+            this.retentionSubjectHash = null;
+        } else if (this.lifecycleStatus == PlayerLifecycleStatus.ANONYMIZED) {
+            this.active = false;
+            this.anonymizedAt = OffsetDateTime.now();
+            this.identityRetainedUntil = null;
+            this.retentionSubjectHash = null;
+        } else if (this.lifecycleStatus == PlayerLifecycleStatus.WITHDRAWN) {
+            this.active = false;
+            this.retentionSubjectHash = null;
+        } else if (this.lifecycleStatus == PlayerLifecycleStatus.INACTIVE) {
+            this.active = false;
         } else if (this.active) {
             this.lifecycleStatus = PlayerLifecycleStatus.ACTIVE;
             this.identityRetainedUntil = null;
+            this.retentionSubjectHash = null;
         } else if (this.lifecycleStatus == null || this.lifecycleStatus == PlayerLifecycleStatus.ACTIVE) {
             this.lifecycleStatus = PlayerLifecycleStatus.INACTIVE;
         }

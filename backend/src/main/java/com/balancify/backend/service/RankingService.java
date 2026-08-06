@@ -51,14 +51,13 @@ public class RankingService {
 
     public List<RankingItemResponse> getGroupRanking(Long groupId) {
         LocalDate statMonth = currentStatMonth();
-        String cacheKey = "ranking:group:%d:month:%s".formatted(groupId, statMonth);
-        return groupReadCacheService.get(cacheKey, () -> List.copyOf(loadGroupRanking(groupId, statMonth)));
+        return List.copyOf(loadGroupRanking(groupId, statMonth));
     }
 
     private List<RankingItemResponse> loadGroupRanking(Long groupId, LocalDate statMonth) {
         List<Player> players = playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId)
             .stream()
-            .filter(Player::isActive)
+            .filter(player -> !PlayerIdentityPolicy.isIdentityHidden(player))
             .toList();
         if (players.isEmpty()) {
             return List.of();

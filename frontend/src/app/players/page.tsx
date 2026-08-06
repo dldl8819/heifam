@@ -59,6 +59,7 @@ type LastParticipationState = {
   lastPlayedAt: string | null
 }
 const PLAYER_RACE_OPTIONS: PlayerRace[] = ['P', 'T', 'Z', 'PT', 'PZ', 'TZ', 'PTZ']
+const PLAYER_INACTIVE_REASON_OPTIONS = ['장기 미참여', '본인 요청', '운영 정책', '기타'] as const
 const PLAYER_EDIT_TIER_OPTIONS: PlayerTierStatus[] = [
   'S',
   'A+',
@@ -659,11 +660,6 @@ export default function PlayersPage() {
         setPlayerActionSuccess(null)
         return
       }
-      if (chatLeftReason.length > 500) {
-        setPlayerActionError(t('players.actions.chatLeftReasonTooLong'))
-        setPlayerActionSuccess(null)
-        return
-      }
     } else {
       chatRejoinedAt = parseDateTimeLocalInput(activityForm.chatRejoinedAt)
       if (chatRejoinedAt === null) {
@@ -1056,20 +1052,25 @@ export default function PlayersPage() {
                   </label>
                 <label className="block space-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
                     {t('players.activityForm.chatLeftReasonLabel')}
-                    <textarea
+                    <select
                       required
-                      maxLength={500}
                       value={activityForm.chatLeftReason}
                       onChange={(event) =>
                         setActivityForm((current) =>
                           current === null ? current : { ...current, chatLeftReason: event.target.value }
                         )
                       }
-                    className="mt-1 h-24 w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
-                    />
-                  <span className="block text-right text-[11px] text-slate-400 dark:text-slate-500">
-                      {activityForm.chatLeftReason.length}/500
-                    </span>
+                      className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                    >
+                      <option value="" disabled>
+                        {t('players.activityForm.chatLeftReasonPlaceholder')}
+                      </option>
+                      {PLAYER_INACTIVE_REASON_OPTIONS.map((reason) => (
+                        <option key={reason} value={reason}>
+                          {reason}
+                        </option>
+                      ))}
+                    </select>
                     <span className="block text-[11px] font-normal leading-4 text-amber-700 dark:text-amber-300">
                       {t('players.activityForm.reasonPrivacyNotice')}
                     </span>

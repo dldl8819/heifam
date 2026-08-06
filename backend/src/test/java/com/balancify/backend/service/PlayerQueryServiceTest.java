@@ -1,6 +1,7 @@
 package com.balancify.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -251,7 +252,7 @@ class PlayerQueryServiceTest {
         inactive.setActive(false);
         OffsetDateTime chatLeftAt = OffsetDateTime.parse("2026-05-02T12:41:00+09:00");
         inactive.setChatLeftAt(chatLeftAt);
-        inactive.setChatLeftReason("톡방 퇴장");
+        inactive.setChatLeftReason("운영 정책");
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
             .thenReturn(List.of(inactive, active));
@@ -274,9 +275,9 @@ class PlayerQueryServiceTest {
         inactive.setActive(false);
         OffsetDateTime chatLeftAt = OffsetDateTime.parse("2026-05-02T12:41:00+09:00");
         inactive.setChatLeftAt(chatLeftAt);
-        inactive.setChatLeftReason("톡방 퇴장");
+        inactive.setChatLeftReason("운영 정책");
         inactive.setLifecycleStatus(PlayerLifecycleStatus.INACTIVE);
-        inactive.setIdentityRetainedUntil(OffsetDateTime.parse("2031-05-02T12:41:00+09:00"));
+        inactive.setIdentityRetainedUntil(OffsetDateTime.parse("2027-05-02T12:41:00+09:00"));
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
             .thenReturn(List.of(inactive, active));
@@ -307,11 +308,11 @@ class PlayerQueryServiceTest {
         assertThat(retainedInactive.dormancyMmrFloorTier()).isNull();
         assertThat(retainedInactive.lifecycleStatus()).isEqualTo("INACTIVE");
         assertThat(retainedInactive.identityRetainedUntil())
-            .isEqualTo(OffsetDateTime.parse("2031-05-02T12:41:00+09:00"));
+            .isEqualTo(OffsetDateTime.parse("2027-05-02T12:41:00+09:00"));
     }
 
     @Test
-    void masksExpiredInactiveIdentityEvenBeforeRetentionSweepRuns() {
+    void omitsExpiredInactiveIdentityEvenBeforeRetentionSweepRuns() {
         Group group = new Group();
         group.setId(1L);
         Player inactive = player(2L, group, "EXPIRED_NICKNAME", "T", "A", 1700);
@@ -320,24 +321,36 @@ class PlayerQueryServiceTest {
         inactive.setIdentityRetainedUntil(OffsetDateTime.parse("2026-07-12T02:59:59Z"));
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of(inactive));
-        when(playerStatsRepository.findByGroupId(1L)).thenReturn(List.of(resultStats(2L, 2, 1)));
 
-        GroupPlayerResponse response = playerQueryService.getGroupPlayers(1L, true).getFirst();
-
-        assertThat(response.id()).isNull();
-        assertThat(response.nickname()).isEqualTo(PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL);
-        assertThat(response.race()).isNull();
-        assertThat(response.wins()).isZero();
-        assertThat(response.chatLeftReason()).isNull();
-        assertThat(response.lifecycleStatus()).isNull();
+        assertThat(playerQueryService.getGroupPlayers(1L, true)).isEmpty();
     }
 
     @Test
-    void bypassesReadCacheForAdministrativeInactiveRoster() {
+    void omitsLegacyWithdrawnAndAnonymizedRowsFromAdministrativeRoster() {
+        Group group = new Group();
+        group.setId(1L);
+        Player withdrawn = player(2L, group, "LEGACY_WITHDRAWN", "T", "A", 1700);
+        withdrawn.setActive(false);
+        withdrawn.setLifecycleStatus(PlayerLifecycleStatus.WITHDRAWN);
+        withdrawn.setIdentityRetainedUntil(OffsetDateTime.parse("2031-07-12T03:00:00Z"));
+        Player anonymized = player(3L, group, PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL, "P", "B", 1200);
+        anonymized.setActive(false);
+        anonymized.setLifecycleStatus(PlayerLifecycleStatus.ANONYMIZED);
+        anonymized.setAnonymizedAt(OffsetDateTime.parse("2026-07-12T03:00:00Z"));
+
+        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
+            .thenReturn(List.of(withdrawn, anonymized));
+
+        assertThat(playerQueryService.getGroupPlayers(1L, true)).isEmpty();
+        verify(playerStatsRepository, never()).findByGroupId(1L);
+    }
+
+    @Test
+    void bypassesReadCacheForPlayerRosterSoIdentityChangesAreImmediate() {
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of());
 
-        playerQueryService.getGroupPlayers(1L, true);
-        playerQueryService.getGroupPlayers(1L, true);
+        playerQueryService.getGroupPlayers(1L, false);
+        playerQueryService.getGroupPlayers(1L, false);
 
         verify(playerRepository, times(2)).findByGroup_IdOrderByMmrDescIdAsc(1L);
     }
@@ -346,14 +359,18 @@ class PlayerQueryServiceTest {
     void sortsRetainedInactiveRowsByAllowedIdentityInsteadOfHiddenMmr() {
         Group group = new Group();
         group.setId(1L);
-        OffsetDateTime retainedUntil = OffsetDateTime.parse("2031-07-12T03:00:00Z");
+        OffsetDateTime retainedUntil = OffsetDateTime.parse("2027-07-12T03:00:00Z");
         Player highMmr = player(2L, group, "Zulu", "T", "A", 1900);
         highMmr.setActive(false);
         highMmr.setLifecycleStatus(PlayerLifecycleStatus.INACTIVE);
+        highMmr.setChatLeftAt(OffsetDateTime.parse("2026-07-12T03:00:00Z"));
+        highMmr.setChatLeftReason(PlayerIdentityPolicy.ALLOWED_INACTIVE_REASONS.iterator().next());
         highMmr.setIdentityRetainedUntil(retainedUntil);
         Player lowMmr = player(3L, group, "Alpha", "P", "B", 900);
         lowMmr.setActive(false);
         lowMmr.setLifecycleStatus(PlayerLifecycleStatus.INACTIVE);
+        lowMmr.setChatLeftAt(OffsetDateTime.parse("2026-07-12T03:00:00Z"));
+        lowMmr.setChatLeftReason(PlayerIdentityPolicy.ALLOWED_INACTIVE_REASONS.iterator().next());
         lowMmr.setIdentityRetainedUntil(retainedUntil);
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
             .thenReturn(List.of(highMmr, lowMmr));

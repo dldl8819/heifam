@@ -36,7 +36,7 @@ class AccountDeletionDataServiceTest {
     private static final OffsetDateTime TRANSITION_AT =
         OffsetDateTime.parse("2026-07-12T03:00:00Z");
     private static final OffsetDateTime RETAINED_UNTIL =
-        OffsetDateTime.parse("2031-07-12T03:00:00Z");
+        OffsetDateTime.parse("2027-07-12T03:00:00Z");
 
     @Mock
     private AccountPersonalDataRepository accountPersonalDataRepository;
@@ -65,7 +65,7 @@ class AccountDeletionDataServiceTest {
     }
 
     @Test
-    void removesAccountIdentifiersWhileRetainingMinimalWithdrawalRecord() {
+    void removesAccountAndPlayerIdentifiersImmediatelyOnWithdrawal() {
         Group group = new Group();
         group.setId(42L);
 
@@ -88,26 +88,25 @@ class AccountDeletionDataServiceTest {
         when(playerRepository.findByAuthUserIdAndAnonymizedAtIsNull(PLACEHOLDER_AUTH_USER_ID))
             .thenReturn(List.of(player));
 
-        AccountDeletionDataService.WithdrawalRetentionResult result =
-            accountDeletionDataService.retainWithdrawnAccount(
+        AccountDeletionDataService.WithdrawalAnonymizationResult result =
+            accountDeletionDataService.anonymizeWithdrawnAccount(
                 PLACEHOLDER_AUTH_USER_ID,
                 "  Placeholder.User@Example.Test  "
             );
 
-        assertThat(result.retainedPlayerCount()).isEqualTo(1);
+        assertThat(result.anonymizedPlayerCount()).isEqualTo(1);
         assertThat(player.getAuthUserId()).isNull();
-        assertThat(player.getNickname()).isEqualTo(ORIGINAL_NICKNAME);
+        assertThat(player.getNickname()).isEqualTo(PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL);
         assertThat(player.getNote()).isNull();
         assertThat(player.isActive()).isFalse();
-        assertThat(player.getChatLeftAt()).isEqualTo(TRANSITION_AT);
-        assertThat(player.getChatLeftReason())
-            .isEqualTo(AccountDeletionDataService.SELF_WITHDRAWAL_REASON);
+        assertThat(player.getChatLeftAt()).isNull();
+        assertThat(player.getChatLeftReason()).isNull();
         assertThat(player.getChatRejoinedAt()).isNull();
         assertThat(player.getTierChangeAcknowledgedTier()).isNull();
         assertThat(player.getTierChangeAcknowledgedAt()).isNull();
-        assertThat(player.getAnonymizedAt()).isNull();
-        assertThat(player.getLifecycleStatus()).isEqualTo(PlayerLifecycleStatus.WITHDRAWN);
-        assertThat(player.getIdentityRetainedUntil()).isEqualTo(RETAINED_UNTIL);
+        assertThat(player.getAnonymizedAt()).isEqualTo(TRANSITION_AT);
+        assertThat(player.getLifecycleStatus()).isEqualTo(PlayerLifecycleStatus.ANONYMIZED);
+        assertThat(player.getIdentityRetainedUntil()).isNull();
 
         assertThat(player.getId()).isEqualTo(100L);
         assertThat(player.getMmr()).isEqualTo(1450);
@@ -137,7 +136,7 @@ class AccountDeletionDataServiceTest {
     }
 
     @Test
-    void linksAllPlayersForAUniquelyOwnedAccessNickname() {
+    void refusesToLinkMultiplePlayersFromNicknameAlone() {
         Player firstCandidate = new Player();
         firstCandidate.setId(101L);
         firstCandidate.setNickname(ORIGINAL_NICKNAME);
@@ -152,13 +151,32 @@ class AccountDeletionDataServiceTest {
 
         accountDeletionDataService.linkPlayers(PLACEHOLDER_AUTH_USER_ID, PLACEHOLDER_EMAIL);
 
-        assertThat(firstCandidate.getAuthUserId()).isEqualTo(PLACEHOLDER_AUTH_USER_ID);
-        assertThat(secondCandidate.getAuthUserId()).isEqualTo(PLACEHOLDER_AUTH_USER_ID);
-        verify(playerRepository).saveAll(List.of(firstCandidate, secondCandidate));
+        assertThat(firstCandidate.getAuthUserId()).isNull();
+        assertThat(secondCandidate.getAuthUserId()).isNull();
+        verify(playerRepository, never()).saveAll(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
-    void ignoresInactiveCandidateWhenLinkingAuthenticatedPlayer() {
+    void linksSingleActivePlayerAndClearsStaleRetentionSubject() {
+        Player candidate = new Player();
+        candidate.setId(105L);
+        candidate.setNickname(ORIGINAL_NICKNAME);
+        candidate.setRetentionSubjectHash("PLACEHOLDER_RETENTION_HASH");
+
+        when(accountPersonalDataRepository.findLinkedNickname(PLACEHOLDER_EMAIL))
+            .thenReturn(Optional.of(ORIGINAL_NICKNAME));
+        when(playerRepository.findByNicknameIgnoreCaseAndAnonymizedAtIsNull(ORIGINAL_NICKNAME))
+            .thenReturn(List.of(candidate));
+
+        accountDeletionDataService.linkPlayers(PLACEHOLDER_AUTH_USER_ID, PLACEHOLDER_EMAIL);
+
+        assertThat(candidate.getAuthUserId()).isEqualTo(PLACEHOLDER_AUTH_USER_ID);
+        assertThat(candidate.getRetentionSubjectHash()).isNull();
+        verify(playerRepository).saveAll(List.of(candidate));
+    }
+
+    @Test
+    void refusesToLinkActivePlayerWhenSameNicknameInactiveRecordExists() {
         Player inactiveCandidate = new Player();
         inactiveCandidate.setId(103L);
         inactiveCandidate.setNickname(ORIGINAL_NICKNAME);
@@ -175,35 +193,101 @@ class AccountDeletionDataServiceTest {
 
         accountDeletionDataService.linkPlayers(PLACEHOLDER_AUTH_USER_ID, PLACEHOLDER_EMAIL);
 
-        assertThat(activeCandidate.getAuthUserId()).isEqualTo(PLACEHOLDER_AUTH_USER_ID);
+        assertThat(activeCandidate.getAuthUserId()).isNull();
         assertThat(inactiveCandidate.getAuthUserId()).isNotEqualTo(PLACEHOLDER_AUTH_USER_ID);
-        verify(playerRepository).saveAll(List.of(activeCandidate));
+        verify(playerRepository, never()).saveAll(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
-    void retainsAllUniquelyOwnedPlayersForAccountWithdrawal() {
+    void refusesAccountWithdrawalWithoutGuessingBetweenAmbiguousNicknameRecords() {
         Player firstCandidate = new Player();
-        firstCandidate.setId(201L);
+        firstCandidate.setId(106L);
         firstCandidate.setNickname(ORIGINAL_NICKNAME);
         Player secondCandidate = new Player();
-        secondCandidate.setId(202L);
+        secondCandidate.setId(107L);
         secondCandidate.setNickname(ORIGINAL_NICKNAME);
 
         when(accountPersonalDataRepository.findLinkedNickname(PLACEHOLDER_EMAIL))
             .thenReturn(Optional.of(ORIGINAL_NICKNAME));
-        when(playerRepository.findByAuthUserIdAndAnonymizedAtIsNull(PLACEHOLDER_AUTH_USER_ID))
-            .thenReturn(List.of());
         when(playerRepository.findByNicknameIgnoreCaseAndAnonymizedAtIsNull(ORIGINAL_NICKNAME))
             .thenReturn(List.of(firstCandidate, secondCandidate));
 
-        AccountDeletionDataService.WithdrawalRetentionResult result =
-            accountDeletionDataService.retainWithdrawnAccount(PLACEHOLDER_AUTH_USER_ID, PLACEHOLDER_EMAIL);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            accountDeletionDataService.anonymizeWithdrawnAccount(
+                PLACEHOLDER_AUTH_USER_ID,
+                PLACEHOLDER_EMAIL
+            )
+        )
+            .isInstanceOf(com.balancify.backend.service.exception.AccountDeletionException.class)
+            .hasMessage("Account data ownership could not be resolved");
 
-        assertThat(result.retainedPlayerCount()).isEqualTo(2);
         assertThat(firstCandidate.getNickname()).isEqualTo(ORIGINAL_NICKNAME);
         assertThat(secondCandidate.getNickname()).isEqualTo(ORIGINAL_NICKNAME);
-        assertThat(firstCandidate.getLifecycleStatus()).isEqualTo(PlayerLifecycleStatus.WITHDRAWN);
-        assertThat(secondCandidate.getIdentityRetainedUntil()).isEqualTo(RETAINED_UNTIL);
+        verify(playerRepository, never()).saveAllAndFlush(org.mockito.ArgumentMatchers.any());
+        verify(accountPersonalDataRepository, never()).enqueuePendingAuthDeletion(
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any()
+        );
+    }
+
+    @Test
+    void refusesAccountWithdrawalWithoutClaimingAPlayerLinkedToAnotherAccount() {
+        Player candidate = new Player();
+        candidate.setId(108L);
+        candidate.setNickname(ORIGINAL_NICKNAME);
+        candidate.setAuthUserId(UUID.fromString("00000000-0000-0000-0000-000000000002"));
+
+        when(accountPersonalDataRepository.findLinkedNickname(PLACEHOLDER_EMAIL))
+            .thenReturn(Optional.of(ORIGINAL_NICKNAME));
+        when(playerRepository.findByNicknameIgnoreCaseAndAnonymizedAtIsNull(ORIGINAL_NICKNAME))
+            .thenReturn(List.of(candidate));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            accountDeletionDataService.anonymizeWithdrawnAccount(
+                PLACEHOLDER_AUTH_USER_ID,
+                PLACEHOLDER_EMAIL
+            )
+        )
+            .isInstanceOf(com.balancify.backend.service.exception.AccountDeletionException.class)
+            .hasMessage("Account data ownership could not be resolved");
+
+        assertThat(candidate.getAuthUserId()).isNotEqualTo(PLACEHOLDER_AUTH_USER_ID);
+        verify(playerRepository, never()).saveAllAndFlush(org.mockito.ArgumentMatchers.any());
+        verify(accountPersonalDataRepository, never()).deleteAccountIdentity(
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.anyString()
+        );
+    }
+
+    @Test
+    void anonymizesAllUniquelyOwnedPlayersForAccountWithdrawal() {
+        Player firstCandidate = new Player();
+        firstCandidate.setId(201L);
+        firstCandidate.setAuthUserId(PLACEHOLDER_AUTH_USER_ID);
+        firstCandidate.setNickname(ORIGINAL_NICKNAME);
+        Player secondCandidate = new Player();
+        secondCandidate.setId(202L);
+        secondCandidate.setNickname(ORIGINAL_NICKNAME);
+        secondCandidate.setRetentionSubjectHash(
+            AccountDeletionDataService.retentionSubjectHash(PLACEHOLDER_AUTH_USER_ID)
+        );
+
+        when(accountPersonalDataRepository.findLinkedNickname(PLACEHOLDER_EMAIL))
+            .thenReturn(Optional.of(ORIGINAL_NICKNAME));
+        when(playerRepository.findByAuthUserIdAndAnonymizedAtIsNull(PLACEHOLDER_AUTH_USER_ID))
+            .thenReturn(List.of(firstCandidate));
+        when(playerRepository.findByRetentionSubjectHashAndAnonymizedAtIsNull(
+            AccountDeletionDataService.retentionSubjectHash(PLACEHOLDER_AUTH_USER_ID)
+        )).thenReturn(List.of(secondCandidate));
+
+        AccountDeletionDataService.WithdrawalAnonymizationResult result =
+            accountDeletionDataService.anonymizeWithdrawnAccount(PLACEHOLDER_AUTH_USER_ID, PLACEHOLDER_EMAIL);
+
+        assertThat(result.anonymizedPlayerCount()).isEqualTo(2);
+        assertThat(firstCandidate.getNickname()).isEqualTo(PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL);
+        assertThat(secondCandidate.getNickname()).isEqualTo(PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL);
+        assertThat(firstCandidate.getLifecycleStatus()).isEqualTo(PlayerLifecycleStatus.ANONYMIZED);
+        assertThat(secondCandidate.getIdentityRetainedUntil()).isNull();
         verify(accountPersonalDataRepository).anonymizeHistoricalIdentity(
             PLACEHOLDER_EMAIL,
             List.of(201L, 202L),
@@ -216,11 +300,89 @@ class AccountDeletionDataServiceTest {
     }
 
     @Test
+    void anonymizesPreviouslyInactivePlayerWhenSharedAccountLaterWithdraws() {
+        Player directlyLinked = new Player();
+        directlyLinked.setId(203L);
+        directlyLinked.setAuthUserId(PLACEHOLDER_AUTH_USER_ID);
+        directlyLinked.setNickname(ORIGINAL_NICKNAME);
+        directlyLinked.setActive(true);
+
+        Player previouslyInactive = new Player();
+        previouslyInactive.setId(204L);
+        previouslyInactive.setNickname(ORIGINAL_NICKNAME);
+        previouslyInactive.setActive(false);
+        previouslyInactive.setLifecycleStatus(PlayerLifecycleStatus.INACTIVE);
+        previouslyInactive.setChatLeftReason("운영 정책");
+        previouslyInactive.setIdentityRetainedUntil(TRANSITION_AT.plusMonths(6));
+        previouslyInactive.setRetentionSubjectHash(
+            AccountDeletionDataService.retentionSubjectHash(PLACEHOLDER_AUTH_USER_ID)
+        );
+
+        when(accountPersonalDataRepository.findLinkedNickname(PLACEHOLDER_EMAIL))
+            .thenReturn(Optional.of(ORIGINAL_NICKNAME));
+        when(playerRepository.findByAuthUserIdAndAnonymizedAtIsNull(PLACEHOLDER_AUTH_USER_ID))
+            .thenReturn(List.of(directlyLinked));
+        when(playerRepository.findByRetentionSubjectHashAndAnonymizedAtIsNull(
+            AccountDeletionDataService.retentionSubjectHash(PLACEHOLDER_AUTH_USER_ID)
+        )).thenReturn(List.of(previouslyInactive));
+
+        AccountDeletionDataService.WithdrawalAnonymizationResult result =
+            accountDeletionDataService.anonymizeWithdrawnAccount(
+                PLACEHOLDER_AUTH_USER_ID,
+                PLACEHOLDER_EMAIL
+            );
+
+        assertThat(result.anonymizedPlayerCount()).isEqualTo(2);
+        assertThat(directlyLinked.getLifecycleStatus()).isEqualTo(PlayerLifecycleStatus.ANONYMIZED);
+        assertThat(previouslyInactive.getLifecycleStatus()).isEqualTo(PlayerLifecycleStatus.ANONYMIZED);
+        assertThat(previouslyInactive.getNickname()).isEqualTo(PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL);
+        assertThat(previouslyInactive.getIdentityRetainedUntil()).isNull();
+    }
+
+    @Test
+    void doesNotAnonymizeSameNicknamePlayerFromAnUnlinkedGroup() {
+        Group linkedGroup = new Group();
+        linkedGroup.setId(41L);
+        Group unrelatedGroup = new Group();
+        unrelatedGroup.setId(42L);
+
+        Player directlyLinked = new Player();
+        directlyLinked.setId(205L);
+        directlyLinked.setGroup(linkedGroup);
+        directlyLinked.setAuthUserId(PLACEHOLDER_AUTH_USER_ID);
+        directlyLinked.setNickname(ORIGINAL_NICKNAME);
+        directlyLinked.setActive(true);
+
+        Player unrelatedInactive = new Player();
+        unrelatedInactive.setId(206L);
+        unrelatedInactive.setGroup(unrelatedGroup);
+        unrelatedInactive.setNickname(ORIGINAL_NICKNAME);
+        unrelatedInactive.setActive(false);
+        unrelatedInactive.setLifecycleStatus(PlayerLifecycleStatus.INACTIVE);
+
+        when(accountPersonalDataRepository.findLinkedNickname(PLACEHOLDER_EMAIL))
+            .thenReturn(Optional.of(ORIGINAL_NICKNAME));
+        when(playerRepository.findByAuthUserIdAndAnonymizedAtIsNull(PLACEHOLDER_AUTH_USER_ID))
+            .thenReturn(List.of(directlyLinked));
+        AccountDeletionDataService.WithdrawalAnonymizationResult result =
+            accountDeletionDataService.anonymizeWithdrawnAccount(
+                PLACEHOLDER_AUTH_USER_ID,
+                PLACEHOLDER_EMAIL
+            );
+
+        assertThat(result.anonymizedPlayerCount()).isEqualTo(1);
+        assertThat(unrelatedInactive.getNickname()).isEqualTo(ORIGINAL_NICKNAME);
+        assertThat(unrelatedInactive.getLifecycleStatus()).isEqualTo(PlayerLifecycleStatus.INACTIVE);
+        verify(playerRepository, never())
+            .findByNicknameIgnoreCaseAndAnonymizedAtIsNull(ORIGINAL_NICKNAME);
+    }
+
+    @Test
     void refusesWithdrawalWhileConfiguredAccessGrantRemains() {
         when(accessControlService.hasConfiguredAccessGrant(PLACEHOLDER_EMAIL)).thenReturn(true);
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() ->
-            accountDeletionDataService.retainWithdrawnAccount(
+            accountDeletionDataService.anonymizeWithdrawnAccount(
                 PLACEHOLDER_AUTH_USER_ID,
                 PLACEHOLDER_EMAIL
             )
@@ -255,7 +417,7 @@ class AccountDeletionDataServiceTest {
         TransactionSynchronizationManager.initSynchronization();
         TransactionSynchronizationManager.setActualTransactionActive(true);
         try {
-            accountDeletionDataService.retainWithdrawnAccount(
+            accountDeletionDataService.anonymizeWithdrawnAccount(
                 PLACEHOLDER_AUTH_USER_ID,
                 PLACEHOLDER_EMAIL
             );
@@ -285,10 +447,11 @@ class AccountDeletionDataServiceTest {
         player.setNote("placeholder-note");
         player.setActive(true);
         player.setChatLeftAt(TRANSITION_AT.minusDays(1));
-        player.setChatLeftReason("운영 비활성");
+        player.setChatLeftReason("운영 정책");
 
-        when(playerRepository.existsByAuthUserIdAndActiveTrueAndAnonymizedAtIsNullAndIdNot(
+        when(playerRepository.existsByAuthUserIdAndActiveTrueAndAnonymizedAtIsNullAndLifecycleStatusAndIdNot(
             PLACEHOLDER_AUTH_USER_ID,
+            PlayerLifecycleStatus.ACTIVE,
             301L
         )).thenReturn(false);
         when(accountPersonalDataRepository.findAccountEmail(PLACEHOLDER_AUTH_USER_ID))
@@ -303,15 +466,20 @@ class AccountDeletionDataServiceTest {
         assertThat(player.getRace()).isEqualTo("T");
         assertThat(player.getNote()).isNull();
         assertThat(player.getChatLeftAt()).isEqualTo(TRANSITION_AT.minusDays(1));
-        assertThat(player.getChatLeftReason()).isEqualTo("운영 비활성");
+        assertThat(player.getChatLeftReason()).isEqualTo("운영 정책");
         assertThat(player.getAnonymizedAt()).isNull();
         assertThat(player.getLifecycleStatus()).isEqualTo(PlayerLifecycleStatus.INACTIVE);
+        assertThat(player.getRetentionSubjectHash())
+            .isEqualTo(AccountDeletionDataService.retentionSubjectHash(PLACEHOLDER_AUTH_USER_ID));
         assertThat(player.getIdentityRetainedUntil()).isEqualTo(RETAINED_UNTIL.minusDays(1));
         assertThat(outcome.authUserId()).isEqualTo(PLACEHOLDER_AUTH_USER_ID);
         assertThat(outcome.requiresAuthDeletion()).isTrue();
         verify(accountPersonalDataRepository).enqueuePendingAuthDeletion(
             PLACEHOLDER_AUTH_USER_ID,
             TRANSITION_AT
+        );
+        verify(playerRepository, never()).clearRetentionSubjectHash(
+            AccountDeletionDataService.retentionSubjectHash(PLACEHOLDER_AUTH_USER_ID)
         );
         verify(playerRepository).saveAndFlush(player);
         verify(accountPersonalDataRepository).anonymizeHistoricalIdentity(
@@ -337,9 +505,11 @@ class AccountDeletionDataServiceTest {
         player.setAuthUserId(PLACEHOLDER_AUTH_USER_ID);
         player.setNickname(ORIGINAL_NICKNAME);
         player.setActive(true);
+        player.setChatLeftReason("운영 정책");
 
-        when(playerRepository.existsByAuthUserIdAndActiveTrueAndAnonymizedAtIsNullAndIdNot(
+        when(playerRepository.existsByAuthUserIdAndActiveTrueAndAnonymizedAtIsNullAndLifecycleStatusAndIdNot(
             PLACEHOLDER_AUTH_USER_ID,
+            PlayerLifecycleStatus.ACTIVE,
             302L
         )).thenReturn(true);
         when(accountPersonalDataRepository.findAccountEmail(PLACEHOLDER_AUTH_USER_ID))
@@ -352,6 +522,8 @@ class AccountDeletionDataServiceTest {
         assertThat(player.getAuthUserId()).isNull();
         assertThat(player.getNickname()).isEqualTo(ORIGINAL_NICKNAME);
         assertThat(player.getLifecycleStatus()).isEqualTo(PlayerLifecycleStatus.INACTIVE);
+        assertThat(player.getRetentionSubjectHash())
+            .isEqualTo(AccountDeletionDataService.retentionSubjectHash(PLACEHOLDER_AUTH_USER_ID));
         assertThat(outcome.requiresAuthDeletion()).isFalse();
         verify(accountPersonalDataRepository).anonymizeHistoricalIdentityInGroup(
             PLACEHOLDER_EMAIL,
@@ -363,11 +535,67 @@ class AccountDeletionDataServiceTest {
             PLACEHOLDER_AUTH_USER_ID,
             TRANSITION_AT
         );
+        verify(playerRepository, never()).clearRetentionSubjectHash(
+            AccountDeletionDataService.retentionSubjectHash(PLACEHOLDER_AUTH_USER_ID)
+        );
         verify(accountPersonalDataRepository, never()).deleteAccountIdentity(
             PLACEHOLDER_AUTH_USER_ID,
             PLACEHOLDER_EMAIL
         );
         verify(accessControlService, never()).evictAccountCache(PLACEHOLDER_EMAIL);
+    }
+
+    @Test
+    void clearsThePendingAccountLinkOnlyAfterAuthDeletionCompletes() {
+        accountDeletionDataService.completePendingAuthDeletion(PLACEHOLDER_AUTH_USER_ID);
+
+        verify(playerRepository).clearRetentionSubjectHash(
+            AccountDeletionDataService.retentionSubjectHash(PLACEHOLDER_AUTH_USER_ID)
+        );
+        verify(accountPersonalDataRepository).deletePendingAuthDeletion(PLACEHOLDER_AUTH_USER_ID);
+    }
+
+    @Test
+    void resolvesARetainedAccountHashOnlyFromAnActiveLinkedAccount() {
+        Player activeAccountLink = new Player();
+        activeAccountLink.setId(401L);
+        activeAccountLink.setAuthUserId(PLACEHOLDER_AUTH_USER_ID);
+        activeAccountLink.setActive(true);
+        activeAccountLink.setLifecycleStatus(PlayerLifecycleStatus.ACTIVE);
+        when(playerRepository.findDistinctActiveAuthUserIds())
+            .thenReturn(List.of(PLACEHOLDER_AUTH_USER_ID));
+        when(playerRepository.findByAuthUserIdAndAnonymizedAtIsNull(PLACEHOLDER_AUTH_USER_ID))
+            .thenReturn(List.of(activeAccountLink));
+
+        UUID resolved = accountDeletionDataService.resolveRetainedAuthUserId(
+            AccountDeletionDataService.retentionSubjectHash(PLACEHOLDER_AUTH_USER_ID)
+        );
+
+        assertThat(resolved).isEqualTo(PLACEHOLDER_AUTH_USER_ID);
+    }
+
+    @Test
+    void rejectsRetainedAccountLinkWhenItBecomesInactiveBeforeLockValidation() {
+        Player inactiveAccountLink = new Player();
+        inactiveAccountLink.setId(402L);
+        inactiveAccountLink.setAuthUserId(PLACEHOLDER_AUTH_USER_ID);
+        inactiveAccountLink.setActive(false);
+        inactiveAccountLink.setLifecycleStatus(PlayerLifecycleStatus.INACTIVE);
+        when(playerRepository.findDistinctActiveAuthUserIds())
+            .thenReturn(List.of(PLACEHOLDER_AUTH_USER_ID));
+        when(playerRepository.findByAuthUserIdAndAnonymizedAtIsNull(PLACEHOLDER_AUTH_USER_ID))
+            .thenReturn(List.of(inactiveAccountLink));
+
+        assertThat(accountDeletionDataService.resolveRetainedAuthUserId(
+            AccountDeletionDataService.retentionSubjectHash(PLACEHOLDER_AUTH_USER_ID)
+        )).isNull();
+    }
+
+    @Test
+    void rejectsAnInvalidRetainedAccountHashWithoutReadingAccountLinks() {
+        assertThat(accountDeletionDataService.resolveRetainedAuthUserId("invalid")).isNull();
+
+        verify(playerRepository, never()).findDistinctActiveAuthUserIds();
     }
 
     @Test
@@ -430,14 +658,17 @@ class AccountDeletionDataServiceTest {
         player.setId(306L);
         player.setNickname(ORIGINAL_NICKNAME);
         player.setActive(true);
-        player.setChatLeftReason("운영 비활성");
+        player.setChatLeftReason("운영 정책");
         when(accountPersonalDataRepository.findAccountIdentitiesByNickname(ORIGINAL_NICKNAME))
             .thenReturn(List.of(new AccountPersonalDataRepository.NicknameAccountCandidate(
                 PLACEHOLDER_EMAIL,
                 resolvedAuthUserId
             )));
-        when(playerRepository.existsByAuthUserIdAndActiveTrueAndAnonymizedAtIsNullAndIdNot(
+        when(playerRepository.findByNicknameIgnoreCaseAndAnonymizedAtIsNull(ORIGINAL_NICKNAME))
+            .thenReturn(List.of(player));
+        when(playerRepository.existsByAuthUserIdAndActiveTrueAndAnonymizedAtIsNullAndLifecycleStatusAndIdNot(
             resolvedAuthUserId,
+            PlayerLifecycleStatus.ACTIVE,
             306L
         )).thenReturn(false);
 
@@ -462,11 +693,14 @@ class AccountDeletionDataServiceTest {
         player.setId(307L);
         player.setNickname(ORIGINAL_NICKNAME);
         player.setActive(true);
+        player.setChatLeftReason("운영 정책");
         when(accountPersonalDataRepository.findAccountIdentitiesByNickname(ORIGINAL_NICKNAME))
             .thenReturn(List.of(new AccountPersonalDataRepository.NicknameAccountCandidate(
                 PLACEHOLDER_EMAIL,
                 null
             )));
+        when(playerRepository.findByNicknameIgnoreCaseAndAnonymizedAtIsNull(ORIGINAL_NICKNAME))
+            .thenReturn(List.of(player));
 
         AccountDeletionDataService.InactivePlayerCleanupOutcome outcome =
             accountDeletionDataService.retainInactivePlayer(player);
@@ -478,40 +712,28 @@ class AccountDeletionDataServiceTest {
     }
 
     @Test
-    void preservesNicknameResolvedAccountWhenAnotherActivePlayerMayShareIt() {
-        UUID resolvedAuthUserId = UUID.fromString("00000000-0000-0000-0000-000000000004");
+    void refusesNicknameOwnershipWhenMultipleVisiblePlayersShareNickname() {
         Player player = new Player();
         player.setId(310L);
         player.setNickname(ORIGINAL_NICKNAME);
         player.setActive(true);
-        when(accountPersonalDataRepository.findAccountIdentitiesByNickname(ORIGINAL_NICKNAME))
-            .thenReturn(List.of(new AccountPersonalDataRepository.NicknameAccountCandidate(
-                PLACEHOLDER_EMAIL,
-                resolvedAuthUserId
-            )));
-        when(playerRepository.existsByAuthUserIdAndActiveTrueAndAnonymizedAtIsNullAndIdNot(
-            resolvedAuthUserId,
-            310L
-        )).thenReturn(false);
-        when(playerRepository
-            .existsByNicknameIgnoreCaseAndActiveTrueAndAnonymizedAtIsNullAndIdNot(
-                ORIGINAL_NICKNAME,
-                310L
-            )).thenReturn(true);
+        player.setChatLeftReason("운영 정책");
+        Player sameNickname = new Player();
+        sameNickname.setId(311L);
+        sameNickname.setNickname(ORIGINAL_NICKNAME);
+        sameNickname.setActive(false);
+        sameNickname.setLifecycleStatus(PlayerLifecycleStatus.INACTIVE);
+        sameNickname.setChatLeftAt(TRANSITION_AT.minusDays(30));
+        sameNickname.setChatLeftReason("운영 정책");
+        sameNickname.setIdentityRetainedUntil(TRANSITION_AT.plusMonths(6));
+        when(playerRepository.findByNicknameIgnoreCaseAndAnonymizedAtIsNull(ORIGINAL_NICKNAME))
+            .thenReturn(List.of(player, sameNickname));
 
-        AccountDeletionDataService.InactivePlayerCleanupOutcome outcome =
-            accountDeletionDataService.retainInactivePlayer(player);
-
-        assertThat(outcome.authUserId()).isEqualTo(resolvedAuthUserId);
-        assertThat(outcome.requiresAuthDeletion()).isFalse();
-        verify(accountPersonalDataRepository, never()).enqueuePendingAuthDeletion(
-            org.mockito.ArgumentMatchers.any(),
-            org.mockito.ArgumentMatchers.any()
-        );
-        verify(accountPersonalDataRepository, never()).deleteAccountIdentity(
-            org.mockito.ArgumentMatchers.any(),
-            org.mockito.ArgumentMatchers.anyString()
-        );
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            accountDeletionDataService.retainInactivePlayer(player)
+        )
+            .isInstanceOf(com.balancify.backend.service.exception.AccountDeletionException.class)
+            .hasMessage("Account deactivation identity ownership could not be resolved");
     }
 
     @Test
@@ -520,6 +742,8 @@ class AccountDeletionDataServiceTest {
         player.setId(308L);
         player.setNickname(ORIGINAL_NICKNAME);
         player.setActive(true);
+        when(playerRepository.findByNicknameIgnoreCaseAndAnonymizedAtIsNull(ORIGINAL_NICKNAME))
+            .thenReturn(List.of(player));
         when(accountPersonalDataRepository.findAccountIdentitiesByNickname(ORIGINAL_NICKNAME))
             .thenReturn(List.of(
                 new AccountPersonalDataRepository.NicknameAccountCandidate(
@@ -552,6 +776,8 @@ class AccountDeletionDataServiceTest {
         player.setId(309L);
         player.setNickname(ORIGINAL_NICKNAME);
         player.setActive(true);
+        when(playerRepository.findByNicknameIgnoreCaseAndAnonymizedAtIsNull(ORIGINAL_NICKNAME))
+            .thenReturn(List.of(player));
         when(accountPersonalDataRepository.findAccountIdentitiesByNickname(ORIGINAL_NICKNAME))
             .thenReturn(List.of(new AccountPersonalDataRepository.NicknameAccountCandidate(
                 PLACEHOLDER_EMAIL,
@@ -571,17 +797,91 @@ class AccountDeletionDataServiceTest {
     }
 
     @Test
-    void capsInactiveIdentityRetentionAtFiveYearsFromProcessingTime() {
+    void rejectsAnInactiveTimeInTheFuture() {
         Player player = new Player();
         player.setId(305L);
         player.setNickname(ORIGINAL_NICKNAME);
         player.setActive(true);
         player.setChatLeftAt(TRANSITION_AT.plusYears(1));
-        player.setChatLeftReason("운영 비활성");
+        player.setChatLeftReason("운영 정책");
+        when(playerRepository.findByNicknameIgnoreCaseAndAnonymizedAtIsNull(ORIGINAL_NICKNAME))
+            .thenReturn(List.of(player));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            accountDeletionDataService.retainInactivePlayer(player)
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Inactive time cannot be in the future");
+
+        verify(playerRepository, never()).saveAndFlush(player);
+    }
+
+    @Test
+    void immediatelyAnonymizesInactiveIdentityWhoseRetentionAlreadyExpired() {
+        Player player = new Player();
+        player.setId(311L);
+        player.setNickname(ORIGINAL_NICKNAME);
+        player.setActive(true);
+        player.setChatLeftAt(TRANSITION_AT.minusYears(1).minusSeconds(1));
+        player.setChatLeftReason("장기 미참여");
+        when(playerRepository.findByNicknameIgnoreCaseAndAnonymizedAtIsNull(ORIGINAL_NICKNAME))
+            .thenReturn(List.of(player));
 
         accountDeletionDataService.retainInactivePlayer(player);
 
-        assertThat(player.getIdentityRetainedUntil()).isEqualTo(RETAINED_UNTIL);
+        assertThat(player.getNickname()).isEqualTo(PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL);
+        assertThat(player.getChatLeftReason()).isNull();
+        assertThat(player.getAnonymizedAt()).isEqualTo(TRANSITION_AT);
+        assertThat(player.getLifecycleStatus()).isEqualTo(PlayerLifecycleStatus.ANONYMIZED);
+        assertThat(player.getIdentityRetainedUntil()).isNull();
+        verify(accountPersonalDataRepository).anonymizeHistoricalPlayerIdentity(
+            List.of(311L),
+            PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL
+        );
+    }
+
+    @Test
+    void locksAndReloadsTheCurrentPlayerBeforeOperationalDeactivation() {
+        Player player = new Player();
+        player.setId(312L);
+        player.setNickname(ORIGINAL_NICKNAME);
+        player.setActive(true);
+        when(playerRepository.findByIdForIdentityUpdate(312L)).thenReturn(Optional.of(player));
+        when(playerRepository.findByNicknameIgnoreCaseAndAnonymizedAtIsNull(ORIGINAL_NICKNAME))
+            .thenReturn(List.of(player));
+
+        accountDeletionDataService.retainInactivePlayer(
+            312L,
+            TRANSITION_AT.minusDays(1),
+            "운영 정책"
+        );
+
         assertThat(player.getLifecycleStatus()).isEqualTo(PlayerLifecycleStatus.INACTIVE);
+        assertThat(player.getChatLeftAt()).isEqualTo(TRANSITION_AT.minusDays(1));
+        verify(playerRepository).findByIdForIdentityUpdate(312L);
+        verify(playerRepository).saveAndFlush(player);
+    }
+
+    @Test
+    void refusesOperationalDeactivationWhenConcurrentWithdrawalAlreadyHidThePlayer() {
+        Player player = new Player();
+        player.setId(313L);
+        player.setNickname(PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL);
+        player.setActive(false);
+        player.setLifecycleStatus(PlayerLifecycleStatus.ANONYMIZED);
+        player.setAnonymizedAt(TRANSITION_AT);
+        when(playerRepository.findByIdForIdentityUpdate(313L)).thenReturn(Optional.of(player));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            accountDeletionDataService.retainInactivePlayer(
+                313L,
+                TRANSITION_AT.minusDays(1),
+                "운영 정책"
+            )
+        )
+            .isInstanceOf(java.util.NoSuchElementException.class)
+            .hasMessage("Player not found");
+
+        verify(playerRepository, never()).saveAndFlush(org.mockito.ArgumentMatchers.any());
     }
 }

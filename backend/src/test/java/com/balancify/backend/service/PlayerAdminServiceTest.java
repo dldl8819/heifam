@@ -18,16 +18,19 @@ import com.balancify.backend.domain.Group;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.domain.PlayerLifecycleStatus;
 import com.balancify.backend.repository.PlayerRepository;
+import jakarta.persistence.EntityManager;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class PlayerAdminServiceTest {
@@ -42,29 +45,23 @@ class PlayerAdminServiceTest {
     @Mock
     private AccountDeletionService accountDeletionService;
 
+    @Mock
+    private EntityManager entityManager;
+
 
     @BeforeEach
     void setUp() {
         org.mockito.Mockito.lenient()
-            .doAnswer(invocation -> {
-                Player player = invocation.getArgument(0);
-                PlayerIdentityPolicy.retainAdministrativeIdentity(
-                    player,
-                    PlayerLifecycleStatus.INACTIVE,
-                    player.getChatLeftAt(),
-                    player.getChatLeftReason(),
-                    player.getChatLeftAt().plusYears(5)
-                );
-                return null;
-            })
+            .doNothing()
             .when(accountDeletionService)
-            .deactivatePlayer(any(Player.class));
+            .deactivatePlayer(anyLong(), any(OffsetDateTime.class), anyString());
         playerAdminService = new PlayerAdminService(
             playerRepository,
             operationAuditLogService,
             new GroupReadCacheService(0),
             accountDeletionService
         );
+        ReflectionTestUtils.setField(playerAdminService, "entityManager", entityManager);
     }
 
     @Test
@@ -361,29 +358,21 @@ class PlayerAdminServiceTest {
     }
 
     @Test
-    void retainsMinimalAdministrativeRecordWhenDeactivating() {
+    void delegatesDeactivationToTheLockedIdentityLifecyclePath() {
         Player player = player(10L, 1L, "기존닉");
         OffsetDateTime chatLeftAt = OffsetDateTime.parse("2026-05-02T12:41:00+09:00");
         when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
-        when(playerRepository.save(any(Player.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
+        when(entityManager.contains(player)).thenReturn(true);
         playerAdminService.updatePlayer(
             1L,
             10L,
-            new GroupPlayerUpdateRequest(null, null, false, chatLeftAt, " 개인 사정 ", null, null)
+            new GroupPlayerUpdateRequest(null, null, false, chatLeftAt, " 운영 정책 ", null, null)
         );
 
-        assertThat(player.isActive()).isFalse();
-        assertThat(player.getNickname()).isNotEqualTo(PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL);
-        assertThat(player.getChatLeftAt()).isEqualTo(chatLeftAt);
-        assertThat(player.getChatLeftReason()).isNotBlank();
-        assertThat(player.getChatRejoinedAt()).isNull();
-        assertThat(player.getAnonymizedAt()).isNull();
-        assertThat(player.getLifecycleStatus()).isEqualTo(PlayerLifecycleStatus.INACTIVE);
-        assertThat(player.getIdentityRetainedUntil()).isEqualTo(chatLeftAt.plusYears(5));
-        verify(accountDeletionService).deactivatePlayer(player);
+        verify(accountDeletionService).deactivatePlayer(10L, chatLeftAt, "운영 정책");
+        verify(entityManager).detach(player);
         verify(playerRepository, never()).findByGroup_IdAndNicknameIgnoreCase(anyLong(), anyString());
-        verify(playerRepository).save(player);
+        verify(playerRepository, never()).save(any(Player.class));
     }
 
     @Test
@@ -391,12 +380,10 @@ class PlayerAdminServiceTest {
         Player player = player(10L, 1L, "PlayerAlpha");
         OffsetDateTime chatLeftAt = OffsetDateTime.parse("2026-05-02T12:41:00+09:00");
         when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
-        when(playerRepository.save(any(Player.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
         playerAdminService.updatePlayer(
             1L,
             10L,
-            new GroupPlayerUpdateRequest(null, null, false, chatLeftAt, "개인 사정", null, null),
+            new GroupPlayerUpdateRequest(null, null, false, chatLeftAt, "본인 요청", null, null),
             "ops@example.com",
             "OpsUser"
         );
@@ -409,6 +396,27 @@ class PlayerAdminServiceTest {
             eq(true),
             eq(false)
         );
+        verify(playerRepository, never()).save(any(Player.class));
+    }
+
+    @Test
+    void rejectsProfileChangesCombinedWithDeactivation() {
+        Player player = player(10L, 1L, "기존닉");
+        OffsetDateTime chatLeftAt = OffsetDateTime.parse("2026-05-02T12:41:00+09:00");
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+
+        assertThatThrownBy(() -> playerAdminService.updatePlayer(
+            1L,
+            10L,
+            new GroupPlayerUpdateRequest("새닉네임", null, false, chatLeftAt, "운영 정책", null, null)
+        ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Deactivation request contains unsupported fields");
+
+        verify(accountDeletionService, never()).deactivatePlayer(
+            anyLong(), any(OffsetDateTime.class), anyString()
+        );
+        verify(playerRepository, never()).save(any(Player.class));
     }
 
     @Test
@@ -449,7 +457,7 @@ class PlayerAdminServiceTest {
     }
 
     @Test
-    void throwsWhenChatLeftReasonIsTooLong() {
+    void rejectsFreeTextInactiveReason() {
         Player player = player(10L, 1L, "기존닉");
         OffsetDateTime chatLeftAt = OffsetDateTime.parse("2026-05-02T12:41:00+09:00");
         when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
@@ -458,11 +466,11 @@ class PlayerAdminServiceTest {
             playerAdminService.updatePlayer(
                 1L,
                 10L,
-                new GroupPlayerUpdateRequest(null, null, false, chatLeftAt, "a".repeat(501), null, null)
+                new GroupPlayerUpdateRequest(null, null, false, chatLeftAt, "개인 사정", null, null)
             )
         )
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Chat left reason must be 500 characters or fewer");
+            .hasMessage("Chat left reason must use an allowed category");
 
         verify(playerRepository, never()).save(any(Player.class));
     }
@@ -473,15 +481,17 @@ class PlayerAdminServiceTest {
         player.setActive(false);
         player.setLifecycleStatus(PlayerLifecycleStatus.INACTIVE);
         player.setChatLeftAt(OffsetDateTime.parse("2026-05-02T12:41:00+09:00"));
-        player.setChatLeftReason("PAST_INACTIVE_REASON");
-        player.setIdentityRetainedUntil(OffsetDateTime.parse("2031-05-02T12:41:00+09:00"));
+        player.setChatLeftReason("운영 정책");
+        player.setIdentityRetainedUntil(OffsetDateTime.parse("2027-05-02T12:41:00+09:00"));
         when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
         OffsetDateTime rejoinedAt = OffsetDateTime.parse("2026-05-03T13:42:00+09:00");
         when(playerRepository.reactivateRetainedInactivePlayer(
             eq(1L),
             eq(10L),
             eq(rejoinedAt),
-            any(OffsetDateTime.class)
+            any(OffsetDateTime.class),
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.isNull()
         )).thenReturn(1);
 
         playerAdminService.updatePlayer(
@@ -507,7 +517,9 @@ class PlayerAdminServiceTest {
             eq(1L),
             eq(10L),
             eq(rejoinedAt),
-            any(OffsetDateTime.class)
+            any(OffsetDateTime.class),
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.isNull()
         );
         verify(playerRepository, never()).save(any(Player.class));
     }
@@ -517,14 +529,18 @@ class PlayerAdminServiceTest {
         Player player = player(10L, 1L, "INACTIVE_PLAYER");
         player.setActive(false);
         player.setLifecycleStatus(PlayerLifecycleStatus.INACTIVE);
-        player.setIdentityRetainedUntil(OffsetDateTime.parse("2031-05-02T12:41:00+09:00"));
+        player.setChatLeftAt(OffsetDateTime.parse("2026-05-02T12:41:00+09:00"));
+        player.setChatLeftReason("운영 정책");
+        player.setIdentityRetainedUntil(OffsetDateTime.parse("2027-05-02T12:41:00+09:00"));
         OffsetDateTime rejoinedAt = OffsetDateTime.parse("2026-05-03T13:42:00+09:00");
         when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
         when(playerRepository.reactivateRetainedInactivePlayer(
             eq(1L),
             eq(10L),
             eq(rejoinedAt),
-            any(OffsetDateTime.class)
+            any(OffsetDateTime.class),
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.isNull()
         )).thenReturn(0);
 
         assertThatThrownBy(() -> playerAdminService.updatePlayer(
@@ -547,7 +563,9 @@ class PlayerAdminServiceTest {
         Player inactive = player(10L, 1L, "DUPLICATE_NICKNAME");
         inactive.setActive(false);
         inactive.setLifecycleStatus(PlayerLifecycleStatus.INACTIVE);
-        inactive.setIdentityRetainedUntil(OffsetDateTime.parse("2031-05-02T12:41:00+09:00"));
+        inactive.setChatLeftAt(OffsetDateTime.parse("2026-05-02T12:41:00+09:00"));
+        inactive.setChatLeftReason("운영 정책");
+        inactive.setIdentityRetainedUntil(OffsetDateTime.parse("2027-05-02T12:41:00+09:00"));
         Player active = player(11L, 1L, "DUPLICATE_NICKNAME");
         when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(inactive));
         when(playerRepository.findByGroup_IdAndNicknameIgnoreCase(1L, "DUPLICATE_NICKNAME"))
@@ -566,7 +584,78 @@ class PlayerAdminServiceTest {
             anyLong(),
             anyLong(),
             any(OffsetDateTime.class),
-            any(OffsetDateTime.class)
+            any(OffsetDateTime.class),
+            org.mockito.ArgumentMatchers.nullable(String.class),
+            org.mockito.ArgumentMatchers.nullable(UUID.class)
+        );
+    }
+
+    @Test
+    void restoresTheExactSharedAccountLinkWhenReactivating() {
+        UUID authUserId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        String retainedHash = AccountDeletionDataService.retentionSubjectHash(authUserId);
+        Player player = player(12L, 1L, "공유계정선수");
+        player.setActive(false);
+        player.setLifecycleStatus(PlayerLifecycleStatus.INACTIVE);
+        player.setChatLeftAt(OffsetDateTime.parse("2026-05-02T12:41:00+09:00"));
+        player.setChatLeftReason("운영 정책");
+        player.setIdentityRetainedUntil(OffsetDateTime.parse("2027-05-02T12:41:00+09:00"));
+        player.setRetentionSubjectHash(retainedHash);
+        OffsetDateTime rejoinedAt = OffsetDateTime.parse("2026-05-03T13:42:00+09:00");
+        when(playerRepository.findByIdAndGroup_Id(12L, 1L)).thenReturn(Optional.of(player));
+        when(accountDeletionService.resolveRetainedAuthUserId(retainedHash)).thenReturn(authUserId);
+        when(playerRepository.reactivateRetainedInactivePlayer(
+            eq(1L),
+            eq(12L),
+            eq(rejoinedAt),
+            any(OffsetDateTime.class),
+            eq(retainedHash),
+            eq(authUserId)
+        )).thenReturn(1);
+
+        playerAdminService.updatePlayer(
+            1L,
+            12L,
+            new GroupPlayerUpdateRequest(null, null, true, null, null, rejoinedAt, null)
+        );
+
+        verify(playerRepository).reactivateRetainedInactivePlayer(
+            eq(1L),
+            eq(12L),
+            eq(rejoinedAt),
+            any(OffsetDateTime.class),
+            eq(retainedHash),
+            eq(authUserId)
+        );
+    }
+
+    @Test
+    void refusesReactivationWhenTheRetainedAccountLinkCannotBeResolved() {
+        Player player = player(13L, 1L, "연결확인선수");
+        player.setActive(false);
+        player.setLifecycleStatus(PlayerLifecycleStatus.INACTIVE);
+        player.setChatLeftAt(OffsetDateTime.parse("2026-05-02T12:41:00+09:00"));
+        player.setChatLeftReason("운영 정책");
+        player.setIdentityRetainedUntil(OffsetDateTime.parse("2027-05-02T12:41:00+09:00"));
+        player.setRetentionSubjectHash("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        OffsetDateTime rejoinedAt = OffsetDateTime.parse("2026-05-03T13:42:00+09:00");
+        when(playerRepository.findByIdAndGroup_Id(13L, 1L)).thenReturn(Optional.of(player));
+
+        assertThatThrownBy(() -> playerAdminService.updatePlayer(
+            1L,
+            13L,
+            new GroupPlayerUpdateRequest(null, null, true, null, null, rejoinedAt, null)
+        ))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("Retained account link could not be restored");
+
+        verify(playerRepository, never()).reactivateRetainedInactivePlayer(
+            anyLong(),
+            anyLong(),
+            any(OffsetDateTime.class),
+            any(OffsetDateTime.class),
+            org.mockito.ArgumentMatchers.nullable(String.class),
+            org.mockito.ArgumentMatchers.nullable(UUID.class)
         );
     }
 

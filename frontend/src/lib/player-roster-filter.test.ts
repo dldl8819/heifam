@@ -15,6 +15,8 @@ function player(
     losses: 0,
     games: 0,
     active,
+    identityHidden: false,
+    lifecycleStatus: active ? 'ACTIVE' : 'INACTIVE',
   }
 }
 
@@ -41,5 +43,23 @@ describe('filterPlayerRosterByView', () => {
 
     expect(filterPlayerRosterByView(rows, 'active', new Set([inactive.id]))).toEqual([active])
     expect(filterPlayerRosterByView(rows, 'inactive', new Set([active.id]))).toEqual([inactive])
+  })
+
+  it('omits withdrawn and anonymized rows from the administrator inactive view', () => {
+    const retainedInactive = player(1, { active: false })
+    const withdrawn = {
+      ...player(2, { active: false }),
+      identityHidden: true,
+      lifecycleStatus: 'WITHDRAWN' as const,
+    }
+    const anonymized = {
+      ...player(3, { active: false }),
+      identityHidden: true,
+      lifecycleStatus: 'ANONYMIZED' as const,
+    }
+
+    expect(
+      filterPlayerRosterByView([retainedInactive, withdrawn, anonymized], 'inactive')
+    ).toEqual([retainedInactive])
   })
 })

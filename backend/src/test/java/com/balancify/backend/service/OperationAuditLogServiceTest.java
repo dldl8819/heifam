@@ -10,8 +10,11 @@ import static org.mockito.Mockito.when;
 import com.balancify.backend.domain.OperationAuditLog;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.OperationAuditLogRepository;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -237,7 +240,10 @@ class OperationAuditLogServiceTest {
         log.setSummary("티어 수정");
         log.setCreatedAt(OffsetDateTime.parse("2026-05-23T12:00:00Z"));
 
-        when(operationAuditLogRepository.findAllByOrderByCreatedAtDescIdDesc(any(Pageable.class)))
+        when(operationAuditLogRepository.findAllByCreatedAtGreaterThanEqualOrderByCreatedAtDescIdDesc(
+            any(OffsetDateTime.class),
+            any(Pageable.class)
+        ))
             .thenReturn(new PageImpl<>(List.of(log), PageRequest.of(1, 20), 21));
 
         var response = operationAuditLogService.getLogs(1, 20);
@@ -260,7 +266,10 @@ class OperationAuditLogServiceTest {
         log.setSummary("?곗뼱 ?섏젙");
         log.setCreatedAt(OffsetDateTime.parse("2026-06-09T12:00:00+09:00"));
 
-        when(operationAuditLogRepository.findAllByOrderByCreatedAtDescIdDesc(any(Pageable.class)))
+        when(operationAuditLogRepository.findAllByCreatedAtGreaterThanEqualOrderByCreatedAtDescIdDesc(
+            any(OffsetDateTime.class),
+            any(Pageable.class)
+        ))
             .thenReturn(new PageImpl<>(List.of(log), PageRequest.of(0, 20), 1));
         when(accessControlService.resolveAccessProfile(eq("operator-id")))
             .thenReturn(new AccessControlService.AccessProfile(
@@ -279,6 +288,30 @@ class OperationAuditLogServiceTest {
         assertThat(response.items()).hasSize(1);
         assertThat(response.items().get(0).actorNickname()).isEqualTo("OpsUser");
         assertThat(response.items().get(0).actorEmail()).isNull();
+    }
+
+    @Test
+    void excludesAuditLogsOlderThanTheRetentionWindowFromQueries() {
+        OffsetDateTime now = OffsetDateTime.parse("2026-08-07T03:00:00Z");
+        OperationAuditLogService fixedClockService = new OperationAuditLogService(
+            operationAuditLogRepository,
+            accessControlService,
+            Clock.fixed(Instant.parse("2026-08-07T03:00:00Z"), ZoneOffset.UTC)
+        );
+        when(operationAuditLogRepository
+            .findAllByCreatedAtGreaterThanEqualOrderByCreatedAtDescIdDesc(
+                eq(now.minusYears(1)),
+                any(Pageable.class)
+            ))
+            .thenReturn(new PageImpl<>(List.of()));
+
+        fixedClockService.getLogs(0, 20);
+
+        verify(operationAuditLogRepository)
+            .findAllByCreatedAtGreaterThanEqualOrderByCreatedAtDescIdDesc(
+                eq(now.minusYears(1)),
+                any(Pageable.class)
+            );
     }
 
     @Test

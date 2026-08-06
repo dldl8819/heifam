@@ -23,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AccessControlService {
 
-    private static final long DEFAULT_ACCESS_STATE_CACHE_TTL_MS = 60_000L;
+    private static final long DEFAULT_ACCESS_STATE_CACHE_TTL_MS = 0L;
 
     private final AdminKeyProperties adminKeyProperties;
     private final ManagedAdminEmailRepository managedAdminEmailRepository;
@@ -328,6 +328,9 @@ public class AccessControlService {
     }
 
     private AccessState resolveAccessState(String normalizedEmail) {
+        if (accessStateCacheTtlMs <= 0L) {
+            return loadAccessState(normalizedEmail);
+        }
         long now = System.currentTimeMillis();
         CachedAccessState cached = accessStateCache.get(normalizedEmail);
         if (cached != null && cached.expiresAtEpochMs() > now) {

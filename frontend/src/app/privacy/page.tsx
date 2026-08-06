@@ -1,6 +1,23 @@
 import Link from 'next/link'
 import { t } from '@/lib/i18n'
 
+function resolvePublicContactUrl(value: string | undefined): string | null {
+  const normalized = value?.trim()
+  if (!normalized) {
+    return null
+  }
+  try {
+    const parsed = new URL(normalized)
+    return parsed.protocol === 'https:' || parsed.protocol === 'mailto:' ? parsed.toString() : null
+  } catch {
+    return null
+  }
+}
+
+const privacyContactUrl = resolvePublicContactUrl(process.env.NEXT_PUBLIC_PRIVACY_CONTACT_URL)
+const privacyContactLabel =
+  process.env.NEXT_PUBLIC_PRIVACY_CONTACT_LABEL?.trim() || t('footer.privacyContactLinkText')
+
 const sections = [
   {
     title: t('legal.privacy.sections.collect.title'),
@@ -10,6 +27,9 @@ const sections = [
       t('legal.privacy.sections.collect.items.three'),
       t('legal.privacy.sections.collect.items.four'),
       t('legal.privacy.sections.collect.items.five'),
+      t('legal.privacy.sections.collect.items.six'),
+      t('legal.privacy.sections.collect.items.seven'),
+      t('legal.privacy.sections.collect.items.eight'),
     ],
   },
   {
@@ -19,6 +39,9 @@ const sections = [
       t('legal.privacy.sections.purpose.items.two'),
       t('legal.privacy.sections.purpose.items.three'),
       t('legal.privacy.sections.purpose.items.four'),
+      t('legal.privacy.sections.purpose.items.five'),
+      t('legal.privacy.sections.purpose.items.six'),
+      t('legal.privacy.sections.purpose.items.seven'),
     ],
   },
   {
@@ -30,6 +53,8 @@ const sections = [
       t('legal.privacy.sections.retention.items.four'),
       t('legal.privacy.sections.retention.items.five'),
       t('legal.privacy.sections.retention.items.six'),
+      t('legal.privacy.sections.retention.items.seven'),
+      t('legal.privacy.sections.retention.items.eight'),
     ],
   },
   {
@@ -53,6 +78,7 @@ const sections = [
       t('legal.privacy.sections.destruction.items.five'),
       t('legal.privacy.sections.destruction.items.six'),
       t('legal.privacy.sections.destruction.items.seven'),
+      t('legal.privacy.sections.destruction.items.eight'),
     ],
   },
   {
@@ -60,6 +86,16 @@ const sections = [
     items: [
       t('legal.privacy.sections.safeguards.items.one'),
       t('legal.privacy.sections.safeguards.items.two'),
+      t('legal.privacy.sections.safeguards.items.three'),
+    ],
+  },
+  {
+    title: t('legal.privacy.sections.storage.title'),
+    items: [
+      t('legal.privacy.sections.storage.items.one'),
+      t('legal.privacy.sections.storage.items.two'),
+      t('legal.privacy.sections.storage.items.three'),
+      t('legal.privacy.sections.storage.items.four'),
     ],
   },
   {
@@ -67,6 +103,23 @@ const sections = [
     items: [
       t('legal.privacy.sections.thirdParty.items.one'),
       t('legal.privacy.sections.thirdParty.items.two'),
+    ],
+  },
+  {
+    title: t('legal.privacy.sections.rights.title'),
+    items: [
+      t('legal.privacy.sections.rights.items.one'),
+      t('legal.privacy.sections.rights.items.two'),
+      t('legal.privacy.sections.rights.items.three'),
+      t('legal.privacy.sections.rights.items.four'),
+    ],
+  },
+  {
+    title: t('legal.privacy.sections.contact.title'),
+    items: [
+      t('legal.privacy.sections.contact.items.one'),
+      t('legal.privacy.sections.contact.items.two'),
+      t('legal.privacy.sections.contact.items.three'),
     ],
   },
   {
@@ -87,7 +140,7 @@ export default function PrivacyPage() {
           {t('legal.privacy.description')}
         </p>
         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-          {t('legal.common.updatedAt', { date: '2026-08-06' })}
+          {t('legal.common.updatedAt', { date: '2026-08-07' })}
         </p>
       </header>
 
@@ -105,6 +158,16 @@ export default function PrivacyPage() {
       </article>
 
       <div className="flex flex-wrap items-center gap-2">
+        {privacyContactUrl && (
+          <a
+            href={privacyContactUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 transition-colors hover:border-amber-400 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:border-amber-600 dark:hover:bg-amber-950/60"
+          >
+            {privacyContactLabel}
+          </a>
+        )}
         <Link
           href="/terms"
           className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:bg-slate-800"

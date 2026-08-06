@@ -9,7 +9,12 @@ export function filterPlayerRosterByView(
 ): PlayerRosterItem[] {
   switch (view) {
     case 'inactive':
-      return rows.filter((row) => row.active === false)
+      return rows.filter(
+        (row) =>
+          row.active === false &&
+          row.identityHidden !== true &&
+          row.lifecycleStatus === 'INACTIVE'
+      )
     case 'dormant':
       return rows.filter((row) => row.active !== false && dormantPlayerIds.has(row.id))
     case 'active':

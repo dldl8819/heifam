@@ -47,23 +47,23 @@ public class PlayerQueryService {
     }
 
     public List<GroupPlayerResponse> getGroupPlayers(Long groupId, boolean includeInactive) {
-        if (includeInactive) {
-            return List.copyOf(loadGroupPlayers(groupId, true));
-        }
-        String cacheKey = "players:group:%d:includeInactive:%s".formatted(groupId, includeInactive);
-        return groupReadCacheService.get(cacheKey, () -> List.copyOf(loadGroupPlayers(groupId, includeInactive)));
+        // Player identity changes must be visible immediately across application instances.
+        // The local read cache cannot be invalidated reliably after withdrawal or anonymization.
+        return List.copyOf(loadGroupPlayers(groupId, includeInactive));
     }
 
     private List<GroupPlayerResponse> loadGroupPlayers(Long groupId, boolean includeInactive) {
+        OffsetDateTime now = OffsetDateTime.now(clock);
         List<Player> players = new ArrayList<>(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId)
             .stream()
-            .filter(player -> includeInactive || !PlayerIdentityPolicy.isIdentityHidden(player))
+            .filter(player -> !PlayerIdentityPolicy.isIdentityHidden(player)
+                || (includeInactive
+                    && PlayerIdentityPolicy.isAdministrativeIdentityRetained(player, now)))
             .toList());
         if (players.isEmpty()) {
             return List.of();
         }
 
-        OffsetDateTime now = OffsetDateTime.now(clock);
         players.sort((first, second) -> compareRosterPlayers(first, second, now));
 
         Map<Long, StatsAccumulator> statsByPlayerId = new HashMap<>();
@@ -84,9 +84,7 @@ public class PlayerQueryService {
                     player.getId(),
                     new StatsAccumulator(0, 0)
                 );
-                responses.add(PlayerIdentityPolicy.isAdministrativeIdentityRetained(player, now)
-                    ? retainedInactivePlayer(player, stats)
-                    : maskInactivePlayer());
+                responses.add(retainedInactivePlayer(player, stats));
                 continue;
             }
 
@@ -165,34 +163,6 @@ public class PlayerQueryService {
         return Comparator.nullsLast(Long::compareTo).compare(first.getId(), second.getId());
     }
 
-    private GroupPlayerResponse maskInactivePlayer() {
-        return new GroupPlayerResponse(
-            null,
-            PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            0,
-            0,
-            0,
-            false,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null
-        );
-    }
-
     private GroupPlayerResponse retainedInactivePlayer(Player player, StatsAccumulator stats) {
         return new GroupPlayerResponse(
             player.getId(),
@@ -222,8 +192,7 @@ public class PlayerQueryService {
     }
 
     public List<GroupPlayerTierBoardResponse> getGroupPlayerTierBoard(Long groupId) {
-        String cacheKey = "players-tier-board:group:%d:".formatted(groupId);
-        return groupReadCacheService.get(cacheKey, () -> List.copyOf(loadGroupPlayerTierBoard(groupId)));
+        return List.copyOf(loadGroupPlayerTierBoard(groupId));
     }
 
     private List<GroupPlayerTierBoardResponse> loadGroupPlayerTierBoard(Long groupId) {
