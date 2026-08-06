@@ -39,6 +39,9 @@ public class Player {
     @Column(length = 20)
     private String tier = PlayerTierPolicy.resolveTier(1000);
 
+    @Column(name = "highest_achieved_tier", length = 20)
+    private String highestAchievedTier;
+
     @Column(name = "base_mmr")
     private Integer baseMmr;
 
@@ -148,6 +151,15 @@ public class Player {
 
     public void setTier(String tier) {
         this.tier = tier;
+        recordHighestAchievedTier(tier);
+    }
+
+    public String getHighestAchievedTier() {
+        return highestAchievedTier;
+    }
+
+    public void setHighestAchievedTier(String highestAchievedTier) {
+        recordHighestAchievedTier(highestAchievedTier);
     }
 
     public Integer getMmr() {
@@ -340,6 +352,15 @@ public class Player {
         if (this.tier == null || this.tier.isBlank()) {
             this.tier = PlayerTierPolicy.resolveTier(this.mmr);
         }
+        recordHighestAchievedTier(this.tier);
+    }
+
+    private void recordHighestAchievedTier(String tier) {
+        String nextHighestTier = PlayerTierPolicy.resolveHigherRankedTier(
+            this.highestAchievedTier,
+            tier
+        );
+        this.highestAchievedTier = nextHighestTier.isEmpty() ? null : nextHighestTier;
     }
 
     private int normalizeMmr(Integer mmr) {

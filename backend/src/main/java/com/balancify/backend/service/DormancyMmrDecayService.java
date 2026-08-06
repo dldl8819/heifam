@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -170,18 +171,28 @@ public class DormancyMmrDecayService {
         }
 
         int currentMmr = Math.max(0, player.getMmr() == null ? 0 : player.getMmr());
-        String episodeFloorTier = PlayerTierPolicy.normalizeRankedTier(
+        String storedEpisodeFloorTier = PlayerTierPolicy.normalizeRankedTier(
             player.getDormancyEpisodeFloorTier()
         );
-        boolean episodeFloorChanged = startsNewDormancyEpisode || episodeFloorTier.isEmpty();
-        if (episodeFloorChanged) {
-            episodeFloorTier = PlayerTierPolicy.normalizeRankedTier(
-                PlayerTierPolicy.resolveDormancyFloorTier(
-                    player.getTier(),
-                    currentMmr,
-                    MAX_DORMANCY_TIER_DEMOTION_STEPS
-                )
+        String highestAchievedTier = PlayerTierPolicy.resolveHigherRankedTier(
+            player.getHighestAchievedTier(),
+            player.getTier()
+        );
+        String requiredEpisodeFloorTier = PlayerTierPolicy.normalizeRankedTier(
+            PlayerTierPolicy.resolveDormancyFloorTier(
+                highestAchievedTier,
+                currentMmr,
+                MAX_DORMANCY_TIER_DEMOTION_STEPS
+            )
+        );
+        String episodeFloorTier = startsNewDormancyEpisode
+            ? requiredEpisodeFloorTier
+            : PlayerTierPolicy.resolveHigherRankedTier(
+                storedEpisodeFloorTier,
+                requiredEpisodeFloorTier
             );
+        boolean episodeFloorChanged = !Objects.equals(storedEpisodeFloorTier, episodeFloorTier);
+        if (startsNewDormancyEpisode || episodeFloorChanged) {
             player.setDormancyEpisodeFloorTier(episodeFloorTier.isEmpty() ? null : episodeFloorTier);
         }
 

@@ -129,6 +129,21 @@ public final class PlayerTierPolicy {
         return TIER_NONE.equals(normalizedTier) ? "" : normalizedTier;
     }
 
+    public static String resolveHigherRankedTier(String firstTier, String secondTier) {
+        String normalizedFirstTier = normalizeRankedTier(firstTier);
+        String normalizedSecondTier = normalizeRankedTier(secondTier);
+        if (normalizedFirstTier.isEmpty()) {
+            return normalizedSecondTier;
+        }
+        if (normalizedSecondTier.isEmpty()) {
+            return normalizedFirstTier;
+        }
+
+        return tierIndex(normalizedFirstTier) >= tierIndex(normalizedSecondTier)
+            ? normalizedFirstTier
+            : normalizedSecondTier;
+    }
+
     public static String demoteTier(String tier, int steps) {
         if (steps <= 0) {
             return canonicalTier(tier, TIER_NONE);

@@ -144,6 +144,44 @@ class DormancyMmrDecayServiceTest {
     }
 
     @Test
+    void capsDormancyAtTwoStepsBelowLifetimeHighestTier() {
+        Group group = group(1L);
+        Player player = player(9L, group, 1320, "2025-07-06T00:00:00Z");
+        player.setHighestAchievedTier("A-");
+
+        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of(player));
+        when(matchParticipantRepository.findLastPlayedAtByGroupId(1L)).thenReturn(List.of());
+
+        service.applyGroupDormancyDecay(1L);
+
+        assertThat(player.getMmr()).isEqualTo(1000);
+        assertThat(player.getTier()).isEqualTo("B+");
+        assertThat(player.getHighestAchievedTier()).isEqualTo("A-");
+        assertThat(player.getDormancyEpisodeFloorTier()).isEqualTo("B");
+        verify(playerRepository).saveAll(List.of(player));
+    }
+
+    @Test
+    void raisesAnExistingDormancyEpisodeFloorToTheLifetimeHighestTierPolicy() {
+        Group group = group(1L);
+        Player player = player(9L, group, 1050, "2026-01-02T00:00:00Z");
+        player.setTier("B+");
+        player.setHighestAchievedTier("A-");
+        player.setDormantSince(OffsetDateTime.parse("2026-02-01T00:00:00Z"));
+        player.setDormancyEpisodeFloorTier("B-");
+        player.setLastDormancyMmrDecayAt(OffsetDateTime.parse("2026-03-03T00:00:00Z"));
+
+        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of(player));
+        when(matchParticipantRepository.findLastPlayedAtByGroupId(1L)).thenReturn(List.of());
+
+        service.applyGroupDormancyDecay(1L);
+
+        assertThat(player.getMmr()).isEqualTo(1000);
+        assertThat(player.getDormancyEpisodeFloorTier()).isEqualTo("B");
+        verify(playerRepository).saveAll(List.of(player));
+    }
+
+    @Test
     void keepsInitialAPlusFloorAfterMonthlyTierRefreshDuringSameDormancyEpisode() {
         Group group = group(1L);
         Player player = player(9L, group, 1930, "2025-07-06T00:00:00Z");
@@ -196,8 +234,8 @@ class DormancyMmrDecayServiceTest {
     @Test
     void usesStoredTierInsteadOfLiveMmrTierForDormancyCap() {
         Group group = group(1L);
-        Player player = player(9L, group, 1680, "2025-07-06T00:00:00Z");
-        player.setTier("B+");
+        Player player = player(9L, group, 1320, "2025-07-06T00:00:00Z");
+        player.setMmr(1680);
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of(player));
         when(matchParticipantRepository.findLastPlayedAtByGroupId(1L)).thenReturn(List.of());
@@ -206,6 +244,7 @@ class DormancyMmrDecayServiceTest {
 
         assertThat(player.getMmr()).isEqualTo(1140);
         assertThat(player.getTier()).isEqualTo("B+");
+        assertThat(player.getHighestAchievedTier()).isEqualTo("B+");
         verify(playerRepository).saveAll(List.of(player));
     }
 
@@ -301,6 +340,7 @@ class DormancyMmrDecayServiceTest {
         Group group = group(1L);
         Player player = player(9L, group, 1320, "2026-01-02T00:00:00Z");
         player.setTier("B+");
+        player.setHighestAchievedTier("A-");
         player.setDormantSince(OffsetDateTime.parse("2026-02-01T00:00:00Z"));
         player.setReturnedAt(OffsetDateTime.parse("2026-03-18T00:00:00Z"));
         player.setDormancyEpisodeFloorTier("A-");
@@ -313,7 +353,7 @@ class DormancyMmrDecayServiceTest {
         service.applyGroupDormancyDecay(1L);
 
         assertThat(player.getMmr()).isEqualTo(1290);
-        assertThat(player.getDormancyEpisodeFloorTier()).isEqualTo("B-");
+        assertThat(player.getDormancyEpisodeFloorTier()).isEqualTo("B");
         assertThat(player.getDormantSince()).isEqualTo(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
         assertThat(player.getReturnedAt()).isNull();
         verify(playerRepository).saveAll(List.of(player));

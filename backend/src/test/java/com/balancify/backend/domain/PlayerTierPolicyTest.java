@@ -143,6 +143,26 @@ class PlayerTierPolicyTest {
     }
 
     @Test
+    void resolvesHigherRankedTierWithoutLettingInvalidValuesOverwriteIt() {
+        assertThat(PlayerTierPolicy.resolveHigherRankedTier("B+", "A-")).isEqualTo("A-");
+        assertThat(PlayerTierPolicy.resolveHigherRankedTier("A-", "B+")).isEqualTo("A-");
+        assertThat(PlayerTierPolicy.resolveHigherRankedTier("A-", "UNKNOWN")).isEqualTo("A-");
+        assertThat(PlayerTierPolicy.resolveHigherRankedTier(null, "UNASSIGNED")).isEmpty();
+    }
+
+    @Test
+    void playerKeepsTheHighestTierThatWasActuallyAssigned() {
+        Player player = new Player();
+
+        player.setTier("A-");
+        player.setTier("B+");
+        player.setHighestAchievedTier("B");
+
+        assertThat(player.getTier()).isEqualTo("B+");
+        assertThat(player.getHighestAchievedTier()).isEqualTo("A-");
+    }
+
+    @Test
     void doesNotIncreaseMmrWhenDormancyTargetIsHigherThanCurrent() {
         assertThat(PlayerTierPolicy.resolveDormancyAdjustedMmr("A+", 1750, 1)).isEqualTo(1750);
         assertThat(PlayerTierPolicy.resolveDormancyAdjustedMmr("NONE", 0, 1)).isEqualTo(0);

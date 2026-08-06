@@ -58,6 +58,24 @@ class MonthlyTierRefreshServiceTest {
     }
 
     @Test
+    void preservesLifetimeHighestTierAcrossMonthlyDemotionAndRaisesItOnPromotion() {
+        OffsetDateTime now = OffsetDateTime.parse("2026-04-30T14:59:59Z");
+        MonthlyTierRefreshService service = service(now);
+        Player demotedPlayer = player(1L, "A-", 1320);
+        Player promotedPlayer = player(2L, "B+", 1450);
+
+        when(playerRepository.findAll()).thenReturn(List.of(demotedPlayer, promotedPlayer));
+
+        service.applyMonthlyTierRefreshIfDue();
+
+        assertThat(demotedPlayer.getTier()).isEqualTo("B+");
+        assertThat(demotedPlayer.getHighestAchievedTier()).isEqualTo("A-");
+        assertThat(promotedPlayer.getTier()).isEqualTo("A-");
+        assertThat(promotedPlayer.getHighestAchievedTier()).isEqualTo("A-");
+        verify(playerRepository).saveAll(List.of(demotedPlayer, promotedPlayer));
+    }
+
+    @Test
     void doesNotRefreshTierBeforeKstMonthEndSettlementTime() {
         MonthlyTierRefreshService service = service(OffsetDateTime.parse("2026-04-30T14:59:58Z"));
         Player player = player(1L, "S", 890);
