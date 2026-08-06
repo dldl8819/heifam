@@ -1218,24 +1218,26 @@ export default function PlayersPage() {
       )}
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <table className="min-w-full text-left text-sm">
+        <table
+          className={`${rosterView === 'inactive' ? 'min-w-[48rem]' : 'min-w-full'} text-left text-sm`}
+        >
           <thead className="bg-slate-50 text-xs tracking-wide text-slate-500 dark:bg-slate-800/80 dark:text-slate-300">
             <tr>
-              <th className="px-4 py-3">{t('players.table.nickname')}</th>
-              <th className="px-4 py-3">{t('players.table.race')}</th>
-              {showTierColumn && <th className="px-4 py-3">{t('players.table.tier')}</th>}
-              {showStatusColumn && <th className="px-4 py-3">{t('players.table.status')}</th>}
+              <th className="whitespace-nowrap px-4 py-3">{t('players.table.nickname')}</th>
+              <th className="whitespace-nowrap px-4 py-3">{t('players.table.race')}</th>
+              {showTierColumn && <th className="whitespace-nowrap px-4 py-3">{t('players.table.tier')}</th>}
+              {showStatusColumn && <th className="min-w-[11rem] whitespace-nowrap px-4 py-3">{t('players.table.status')}</th>}
               {showDormancyFloorColumn && (
-                <th className="px-4 py-3">{t('players.dormancyFloor.inlineLabel')}</th>
+                <th className="whitespace-nowrap px-4 py-3">{t('players.dormancyFloor.inlineLabel')}</th>
               )}
-              {showRosterMmrColumn && <th className="px-4 py-3">{t('players.table.currentMmr')}</th>}
-              <th className="px-4 py-3">{t('players.table.wins')}</th>
-              <th className="px-4 py-3">{t('players.table.losses')}</th>
-              <th className="px-4 py-3">{t('players.table.games')}</th>
+              {showRosterMmrColumn && <th className="whitespace-nowrap px-4 py-3">{t('players.table.currentMmr')}</th>}
+              <th className="whitespace-nowrap px-4 py-3">{t('players.table.wins')}</th>
+              <th className="whitespace-nowrap px-4 py-3">{t('players.table.losses')}</th>
+              <th className="whitespace-nowrap px-4 py-3">{t('players.table.games')}</th>
               {showGameTypeStatsColumn && (
-                <th className="px-4 py-3">{t('players.table.gameTypeStats')}</th>
+                <th className="whitespace-nowrap px-4 py-3">{t('players.table.gameTypeStats')}</th>
               )}
-              {showActionsColumn && <th className="px-4 py-3">{t('players.table.actions')}</th>}
+              {showActionsColumn && <th className="whitespace-nowrap px-4 py-3">{t('players.table.actions')}</th>}
             </tr>
           </thead>
           <tbody>
@@ -1333,7 +1335,7 @@ export default function PlayersPage() {
                               </span>
                             )}
                             {!isActive && (
-                              <span className="rounded-md border border-slate-300 bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100">
+                              <span className="inline-flex whitespace-nowrap rounded-md border border-slate-300 bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100">
                                 {lifecycleLabel}
                               </span>
                             )}
@@ -1365,7 +1367,7 @@ export default function PlayersPage() {
                         </div>
                       )}
                     </td>
-                    <td className={`px-4 py-3 ${isActive ? 'text-slate-700 dark:text-slate-300' : 'text-slate-600 dark:text-slate-300'}`}>
+                    <td className={`whitespace-nowrap px-4 py-3 ${isActive ? 'text-slate-700 dark:text-slate-300' : 'text-slate-600 dark:text-slate-300'}`}>
                       {identityHidden ? (
                         <span aria-hidden="true">—</span>
                       ) : isEditing ? (
@@ -1385,7 +1387,7 @@ export default function PlayersPage() {
                       )}
                     </td>
                     {showTierColumn && (
-                      <td className="px-4 py-3">
+                      <td className="min-w-[11rem] px-4 py-3">
                         {identityHidden ? (
                           <span className="text-slate-500 dark:text-slate-400" aria-hidden="true">—</span>
                         ) : isEditing ? (
@@ -1423,7 +1425,7 @@ export default function PlayersPage() {
                       <td className="px-4 py-3">
                         <div className="space-y-1">
                           <span
-                            className={`rounded-md px-2 py-1 text-xs font-semibold ${
+                            className={`inline-flex whitespace-nowrap rounded-md px-2 py-1 text-xs font-semibold ${
                               isActive
                                 ? 'border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
                                 : isWithdrawn
@@ -1513,11 +1515,11 @@ export default function PlayersPage() {
                         )}
                       </td>
                     )}
-                    <td className={`px-4 py-3 ${isActive ? 'text-slate-700 dark:text-slate-300' : 'text-slate-600 dark:text-slate-300'}`}>{identityHidden ? '—' : row.wins}</td>
-                    <td className={`px-4 py-3 ${isActive ? 'text-slate-700 dark:text-slate-300' : 'text-slate-600 dark:text-slate-300'}`}>{identityHidden ? '—' : row.losses}</td>
-                    <td className={`px-4 py-3 ${isActive ? 'text-slate-700 dark:text-slate-300' : 'text-slate-600 dark:text-slate-300'}`}>{identityHidden ? '—' : row.games}</td>
+                    <td className={`whitespace-nowrap px-4 py-3 ${isActive ? 'text-slate-700 dark:text-slate-300' : 'text-slate-600 dark:text-slate-300'}`}>{identityHidden ? '—' : row.wins}</td>
+                    <td className={`whitespace-nowrap px-4 py-3 ${isActive ? 'text-slate-700 dark:text-slate-300' : 'text-slate-600 dark:text-slate-300'}`}>{identityHidden ? '—' : row.losses}</td>
+                    <td className={`whitespace-nowrap px-4 py-3 ${isActive ? 'text-slate-700 dark:text-slate-300' : 'text-slate-600 dark:text-slate-300'}`}>{identityHidden ? '—' : row.games}</td>
                     {showGameTypeStatsColumn && (
-                      <td className="px-4 py-3">
+                      <td className="whitespace-nowrap px-4 py-3">
                         {identityHidden ? (
                           <span className="text-slate-500 dark:text-slate-400" aria-hidden="true">—</span>
                         ) : (
