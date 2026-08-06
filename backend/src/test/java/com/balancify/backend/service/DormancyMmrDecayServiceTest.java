@@ -27,6 +27,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class DormancyMmrDecayServiceTest {
 
     private static final OffsetDateTime FIXED_NOW = OffsetDateTime.parse("2026-04-02T00:00:00Z");
+    private static final int MMR_DROP_PER_PERIOD = 50;
 
     @Mock
     private PlayerRepository playerRepository;
@@ -47,7 +48,7 @@ class DormancyMmrDecayServiceTest {
             groupRepository,
             true,
             15,
-            100,
+            MMR_DROP_PER_PERIOD,
             5,
             2.0,
             new GroupReadCacheService(0),
@@ -70,14 +71,14 @@ class DormancyMmrDecayServiceTest {
 
         service.applyAllGroupsDormancyDecay();
 
-        assertThat(firstPlayer.getMmr()).isEqualTo(730);
-        assertThat(secondPlayer.getMmr()).isEqualTo(680);
+        assertThat(firstPlayer.getMmr()).isEqualTo(830);
+        assertThat(secondPlayer.getMmr()).isEqualTo(780);
     }
 
     @Test
     void capsLongDormancyDecayAtTwoTierFloor() {
         Group group = group(1L);
-        Player player = player(9L, group, 930, "2026-01-02T00:00:00Z");
+        Player player = player(9L, group, 930, "2025-10-04T00:00:00Z");
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of(player));
         when(matchParticipantRepository.findLastPlayedAtByGroupId(1L)).thenReturn(List.of());
@@ -88,7 +89,7 @@ class DormancyMmrDecayServiceTest {
         assertThat(player.getTier()).isEqualTo("B-");
         assertThat(player.getLastDormancyMmrDecayAt())
             .isEqualTo(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
-        assertThat(player.getDormantSince()).isEqualTo(OffsetDateTime.parse("2026-01-17T00:00:00Z"));
+        assertThat(player.getDormantSince()).isEqualTo(OffsetDateTime.parse("2025-10-19T00:00:00Z"));
         assertThat(player.getReturnedAt()).isNull();
         assertThat(player.getReturnBoostGamesRemaining()).isZero();
         assertThat(player.getReturnBoostMultiplier()).isEqualTo(2.0);
@@ -105,14 +106,14 @@ class DormancyMmrDecayServiceTest {
 
         service.applyGroupDormancyDecay(1L);
 
-        assertThat(player.getMmr()).isEqualTo(830);
+        assertThat(player.getMmr()).isEqualTo(880);
         verify(playerRepository).saveAll(List.of(player));
     }
 
     @Test
     void capsLongDormancyForATierPlayerAtBPlusFloor() {
         Group group = group(1L);
-        Player player = player(9L, group, 1680, "2026-01-02T00:00:00Z");
+        Player player = player(9L, group, 1680, "2025-10-04T00:00:00Z");
         player.setTier("A");
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of(player));
@@ -128,7 +129,7 @@ class DormancyMmrDecayServiceTest {
     @Test
     void capsLongDormancyForBPlusTierPlayerAtBMinusFloor() {
         Group group = group(1L);
-        Player player = player(9L, group, 1320, "2026-01-02T00:00:00Z");
+        Player player = player(9L, group, 1320, "2025-10-04T00:00:00Z");
         player.setTier("B+");
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of(player));
@@ -145,7 +146,7 @@ class DormancyMmrDecayServiceTest {
     @Test
     void keepsInitialAPlusFloorAfterMonthlyTierRefreshDuringSameDormancyEpisode() {
         Group group = group(1L);
-        Player player = player(9L, group, 1930, "2026-01-02T00:00:00Z");
+        Player player = player(9L, group, 1930, "2025-10-04T00:00:00Z");
         player.setTier("A+");
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of(player));
@@ -177,7 +178,7 @@ class DormancyMmrDecayServiceTest {
             groupRepository,
             true,
             15,
-            100,
+            MMR_DROP_PER_PERIOD,
             5,
             2.0,
             new GroupReadCacheService(0),
@@ -195,7 +196,7 @@ class DormancyMmrDecayServiceTest {
     @Test
     void usesStoredTierInsteadOfLiveMmrTierForDormancyCap() {
         Group group = group(1L);
-        Player player = player(9L, group, 1680, "2026-01-02T00:00:00Z");
+        Player player = player(9L, group, 1680, "2025-10-04T00:00:00Z");
         player.setTier("B+");
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of(player));
@@ -211,7 +212,7 @@ class DormancyMmrDecayServiceTest {
     @Test
     void appliesConfiguredDormancyFloorTierWhenItIsHigherThanTwoStepCap() {
         Group group = group(1L);
-        Player player = player(9L, group, 1930, "2026-01-02T00:00:00Z");
+        Player player = player(9L, group, 1930, "2025-10-04T00:00:00Z");
         player.setTier("A+");
         player.setDormancyMmrFloorTier("A");
 
@@ -311,7 +312,7 @@ class DormancyMmrDecayServiceTest {
 
         service.applyGroupDormancyDecay(1L);
 
-        assertThat(player.getMmr()).isEqualTo(1220);
+        assertThat(player.getMmr()).isEqualTo(1270);
         assertThat(player.getDormancyEpisodeFloorTier()).isEqualTo("B-");
         assertThat(player.getDormantSince()).isEqualTo(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
         assertThat(player.getReturnedAt()).isNull();
