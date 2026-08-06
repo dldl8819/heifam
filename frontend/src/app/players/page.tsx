@@ -804,7 +804,7 @@ export default function PlayersPage() {
   const filteredRows = useMemo(() => {
     const searchText = search.trim().toLowerCase()
     return activityRows.filter((row) => {
-      const matchesRace = raceFilter === 'ALL' || row.race === raceFilter
+      const matchesRace = row.identityHidden || raceFilter === 'ALL' || row.race === raceFilter
       const matchesSearch =
         searchText.length === 0 || row.nickname.toLowerCase().includes(searchText)
       return matchesRace && matchesSearch
@@ -833,7 +833,7 @@ export default function PlayersPage() {
     (showMmrColumn ? 1 : 0) +
     (showActionsColumn ? 1 : 0)
   const downloadableRows = useMemo(
-    () => [...rows].sort(comparePlayersByTierThenNickname),
+    () => rows.filter((row) => !row.identityHidden).sort(comparePlayersByTierThenNickname),
     [rows]
   )
 
@@ -1175,7 +1175,7 @@ export default function PlayersPage() {
             </label>
           </div>
         )}
-        {isSuperAdmin && (
+        {isSuperAdmin && rosterView !== 'inactive' && (
           <div className="mt-3 flex justify-end">
             <button
               type="button"
@@ -1233,7 +1233,8 @@ export default function PlayersPage() {
 
             {!loading &&
               filteredRows.map((row) => {
-                const isEditing = editingPlayerId === row.id
+                const identityHidden = row.identityHidden === true
+                const isEditing = !identityHidden && editingPlayerId === row.id
                 const isSaving = savingPlayerId === row.id
                 const isDeleting = deletingPlayerId === row.id
                 const isToggling = togglingPlayerId === row.id
@@ -1323,7 +1324,9 @@ export default function PlayersPage() {
                       )}
                     </td>
                     <td className={`px-4 py-3 ${isActive ? 'text-slate-700 dark:text-slate-300' : 'text-slate-600 dark:text-slate-300'}`}>
-                      {isEditing ? (
+                      {identityHidden ? (
+                        <span aria-hidden="true">—</span>
+                      ) : isEditing ? (
                         <select
                           value={editingRace}
                           onChange={(event) => setEditingRace(event.target.value as PlayerRace)}
@@ -1340,7 +1343,9 @@ export default function PlayersPage() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      {isEditing ? (
+                      {identityHidden ? (
+                        <span className="text-slate-500 dark:text-slate-400" aria-hidden="true">—</span>
+                      ) : isEditing ? (
                         <select
                           value={editingTier}
                           onChange={(event) => {
@@ -1404,7 +1409,9 @@ export default function PlayersPage() {
                     )}
                     {showDormancyFloorColumn && (
                       <td className="px-4 py-3">
-                        {isEditing ? (
+                        {identityHidden ? (
+                          <span className="text-slate-500 dark:text-slate-400" aria-hidden="true">—</span>
+                        ) : isEditing ? (
                           <select
                             value={editingDormancyFloorTier}
                             onChange={(event) =>
@@ -1427,7 +1434,9 @@ export default function PlayersPage() {
                     )}
                     {showMmrColumn && (
                     <td className={`px-4 py-3 ${isActive ? 'text-slate-700 dark:text-slate-300' : 'text-slate-600 dark:text-slate-300'}`}>
-                        {isEditing && isSuperAdmin ? (
+                        {identityHidden ? (
+                          <span aria-hidden="true">—</span>
+                        ) : isEditing && isSuperAdmin ? (
                           <input
                             type="number"
                             min={0}
@@ -1442,24 +1451,31 @@ export default function PlayersPage() {
                         )}
                       </td>
                     )}
-                    <td className={`px-4 py-3 ${isActive ? 'text-slate-700 dark:text-slate-300' : 'text-slate-600 dark:text-slate-300'}`}>{row.wins}</td>
-                    <td className={`px-4 py-3 ${isActive ? 'text-slate-700 dark:text-slate-300' : 'text-slate-600 dark:text-slate-300'}`}>{row.losses}</td>
-                    <td className={`px-4 py-3 ${isActive ? 'text-slate-700 dark:text-slate-300' : 'text-slate-600 dark:text-slate-300'}`}>{row.games}</td>
+                    <td className={`px-4 py-3 ${isActive ? 'text-slate-700 dark:text-slate-300' : 'text-slate-600 dark:text-slate-300'}`}>{identityHidden ? '—' : row.wins}</td>
+                    <td className={`px-4 py-3 ${isActive ? 'text-slate-700 dark:text-slate-300' : 'text-slate-600 dark:text-slate-300'}`}>{identityHidden ? '—' : row.losses}</td>
+                    <td className={`px-4 py-3 ${isActive ? 'text-slate-700 dark:text-slate-300' : 'text-slate-600 dark:text-slate-300'}`}>{identityHidden ? '—' : row.games}</td>
                     <td className="px-4 py-3">
-                      <button
-                        type="button"
-                        disabled={gameTypeStatsLoading && gameTypeStatsPlayer?.id === row.id}
-                        onClick={() => handleOpenGameTypeStats(row)}
-                        className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-emerald-600 hover:bg-emerald-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:border-emerald-400 dark:hover:bg-emerald-700"
-                      >
-                        {gameTypeStatsLoading && gameTypeStatsPlayer?.id === row.id
-                          ? t('statsModal.buttonLoading')
-                          : t('statsModal.button')}
-                      </button>
+                      {identityHidden ? (
+                        <span className="text-slate-500 dark:text-slate-400" aria-hidden="true">—</span>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={gameTypeStatsLoading && gameTypeStatsPlayer?.id === row.id}
+                          onClick={() => handleOpenGameTypeStats(row)}
+                          className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-emerald-600 hover:bg-emerald-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:border-emerald-400 dark:hover:bg-emerald-700"
+                        >
+                          {gameTypeStatsLoading && gameTypeStatsPlayer?.id === row.id
+                            ? t('statsModal.buttonLoading')
+                            : t('statsModal.button')}
+                        </button>
+                      )}
                     </td>
                     {showActionsColumn && (
                       <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-2">
+                        {identityHidden ? (
+                          <span className="text-slate-500 dark:text-slate-400" aria-hidden="true">—</span>
+                        ) : (
+                          <div className="flex flex-wrap gap-2">
                           {isEditing ? (
                             <>
                               <button
@@ -1519,7 +1535,8 @@ export default function PlayersPage() {
                           >
                             {isDeleting ? t('players.actions.deleting') : t('players.actions.delete')}
                           </button>
-                        </div>
+                          </div>
+                        )}
                       </td>
                     )}
                   </tr>

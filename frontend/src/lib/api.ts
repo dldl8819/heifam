@@ -472,13 +472,13 @@ function normalizeRecentMatchItem(value: unknown): RecentMatchItem | null {
   }
 }
 
-function normalizePlayerRosterItem(value: unknown): PlayerRosterItem | null {
+export function normalizePlayerRosterItem(value: unknown, index = 0): PlayerRosterItem | null {
   if (value === null || typeof value !== 'object') {
     return null
   }
 
   const source = value as Record<string, unknown>
-  const id = toNumber(source.id)
+  const responseId = toNumber(source.id)
   const nickname =
     typeof source.nickname === 'string'
       ? source.nickname
@@ -495,6 +495,10 @@ function normalizePlayerRosterItem(value: unknown): PlayerRosterItem | null {
   const wins = toNumber(source.wins) ?? 0
   const losses = toNumber(source.losses) ?? 0
   const games = toNumber(source.games) ?? wins + losses
+  const active = typeof source.active === 'boolean' ? source.active : true
+  const identityHidden =
+    active === false && source.race == null && source.tier == null
+  const id = identityHidden ? -(index + 1) : responseId
 
   if (id === null || nickname === null) {
     return null
@@ -516,7 +520,8 @@ function normalizePlayerRosterItem(value: unknown): PlayerRosterItem | null {
     wins,
     losses,
     games,
-    active: typeof source.active === 'boolean' ? source.active : true,
+    active,
+    identityHidden,
     chatLeftAt: typeof source.chatLeftAt === 'string' ? source.chatLeftAt : undefined,
     chatLeftReason: typeof source.chatLeftReason === 'string' ? source.chatLeftReason : undefined,
     chatRejoinedAt: typeof source.chatRejoinedAt === 'string' ? source.chatRejoinedAt : undefined,

@@ -229,6 +229,7 @@ export type PlayerRosterItem = {
   losses: number
   games: number
   active?: boolean
+  identityHidden?: boolean
   chatLeftAt?: string
   chatLeftReason?: string
   chatRejoinedAt?: string

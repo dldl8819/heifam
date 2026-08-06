@@ -73,6 +73,7 @@ import com.balancify.backend.service.PlayerAdminService;
 import com.balancify.backend.service.PlayerQueryService;
 import com.balancify.backend.service.PlayerRaceStatsQueryService;
 import com.balancify.backend.service.PlayerImportService;
+import com.balancify.backend.service.PlayerIdentityPolicy;
 import com.balancify.backend.service.RankingService;
 import com.balancify.backend.service.RatingRecalculationService;
 import com.balancify.backend.service.TeamBalancingService;
@@ -1032,14 +1033,33 @@ class AdminKeyFilterTest {
 
     @Test
     void allowsIncludeInactiveForAdminGroupPlayersRequest() throws Exception {
-        when(playerQueryService.getGroupPlayers(eq(1L), eq(true))).thenReturn(List.of());
+        when(playerQueryService.getGroupPlayers(eq(1L), eq(true)))
+            .thenReturn(List.of(maskedInactiveGroupPlayerResponse()));
 
         mockMvc
             .perform(
                 get("/api/groups/1/players?includeInactive=true")
                     .header("X-USER-EMAIL", "admin@hei.gg")
             )
-            .andExpect(status().isOk());
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].id").doesNotExist())
+            .andExpect(jsonPath("$[0].nickname").value(PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL))
+            .andExpect(jsonPath("$[0].active").value(false))
+            .andExpect(jsonPath("$[0].race").doesNotExist())
+            .andExpect(jsonPath("$[0].tier").doesNotExist())
+            .andExpect(jsonPath("$[0].baseMmr").doesNotExist())
+            .andExpect(jsonPath("$[0].baseTier").doesNotExist())
+            .andExpect(jsonPath("$[0].currentMmr").doesNotExist())
+            .andExpect(jsonPath("$[0].lastTierSnapshotAt").doesNotExist())
+            .andExpect(jsonPath("$[0].lastTierSnapshotMmr").doesNotExist())
+            .andExpect(jsonPath("$[0].lastTierSnapshotTier").doesNotExist())
+            .andExpect(jsonPath("$[0].liveTier").doesNotExist())
+            .andExpect(jsonPath("$[0].chatLeftAt").doesNotExist())
+            .andExpect(jsonPath("$[0].chatLeftReason").doesNotExist())
+            .andExpect(jsonPath("$[0].chatRejoinedAt").doesNotExist())
+            .andExpect(jsonPath("$[0].tierChangeAcknowledgedTier").doesNotExist())
+            .andExpect(jsonPath("$[0].tierChangeAcknowledgedAt").doesNotExist())
+            .andExpect(jsonPath("$[0].dormancyMmrFloorTier").doesNotExist());
 
         verify(playerQueryService).getGroupPlayers(eq(1L), eq(true));
     }
@@ -1830,6 +1850,32 @@ class AdminKeyFilterTest {
             chatRejoinedAt,
             "A",
             chatRejoinedAt
+        );
+    }
+
+    private GroupPlayerResponse maskedInactiveGroupPlayerResponse() {
+        return new GroupPlayerResponse(
+            null,
+            PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            0,
+            0,
+            0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
         );
     }
 }

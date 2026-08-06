@@ -258,7 +258,7 @@ class PlayerQueryServiceTest {
     }
 
     @Test
-    void excludesIdentityHiddenPlayersEvenWhenInactiveRowsAreRequested() {
+    void returnsInactivePlayersAsMinimalReadOnlyRowsWhenRequested() {
         Group group = new Group();
         group.setId(1L);
 
@@ -276,9 +276,31 @@ class PlayerQueryServiceTest {
 
         List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L, true);
 
-        assertThat(response).hasSize(1);
-        assertThat(response).extracting(GroupPlayerResponse::nickname).containsExactly("활성");
+        assertThat(response).hasSize(2);
         assertThat(response.getFirst().active()).isTrue();
+
+        GroupPlayerResponse maskedInactive = response.get(1);
+        assertThat(maskedInactive.id()).isNull();
+        assertThat(maskedInactive.nickname()).isEqualTo(PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL);
+        assertThat(maskedInactive.active()).isFalse();
+        assertThat(maskedInactive.race()).isNull();
+        assertThat(maskedInactive.tier()).isNull();
+        assertThat(maskedInactive.baseMmr()).isNull();
+        assertThat(maskedInactive.baseTier()).isNull();
+        assertThat(maskedInactive.currentMmr()).isNull();
+        assertThat(maskedInactive.lastTierSnapshotAt()).isNull();
+        assertThat(maskedInactive.lastTierSnapshotMmr()).isNull();
+        assertThat(maskedInactive.lastTierSnapshotTier()).isNull();
+        assertThat(maskedInactive.liveTier()).isNull();
+        assertThat(maskedInactive.wins()).isZero();
+        assertThat(maskedInactive.losses()).isZero();
+        assertThat(maskedInactive.games()).isZero();
+        assertThat(maskedInactive.chatLeftAt()).isNull();
+        assertThat(maskedInactive.chatLeftReason()).isNull();
+        assertThat(maskedInactive.chatRejoinedAt()).isNull();
+        assertThat(maskedInactive.tierChangeAcknowledgedTier()).isNull();
+        assertThat(maskedInactive.tierChangeAcknowledgedAt()).isNull();
+        assertThat(maskedInactive.dormancyMmrFloorTier()).isNull();
     }
 
     @Test

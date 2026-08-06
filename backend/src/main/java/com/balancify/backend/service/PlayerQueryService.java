@@ -41,18 +41,13 @@ public class PlayerQueryService {
     private List<GroupPlayerResponse> loadGroupPlayers(Long groupId, boolean includeInactive) {
         List<Player> players = new ArrayList<>(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId)
             .stream()
-            .filter(player -> !PlayerIdentityPolicy.isIdentityHidden(player))
+            .filter(player -> includeInactive || !PlayerIdentityPolicy.isIdentityHidden(player))
             .toList());
         if (players.isEmpty()) {
             return List.of();
         }
 
-        players.sort(
-            Comparator
-                .comparingInt((Player player) -> safeInt(player.getMmr()))
-                .reversed()
-                .thenComparing(Player::getId, Comparator.nullsLast(Long::compareTo))
-        );
+        players.sort(this::compareRosterPlayers);
 
         Map<Long, StatsAccumulator> statsByPlayerId = new HashMap<>();
         for (PlayerStats stats : playerStatsRepository.findByGroupId(groupId)) {
@@ -67,6 +62,11 @@ public class PlayerQueryService {
 
         List<GroupPlayerResponse> responses = new ArrayList<>();
         for (Player player : players) {
+            if (PlayerIdentityPolicy.isIdentityHidden(player)) {
+                responses.add(maskInactivePlayer());
+                continue;
+            }
+
             StatsAccumulator stats =
                 statsByPlayerId.getOrDefault(player.getId(), new StatsAccumulator(0, 0));
             int games = stats.wins() + stats.losses();
@@ -108,6 +108,49 @@ public class PlayerQueryService {
         }
 
         return responses;
+    }
+
+    private int compareRosterPlayers(Player first, Player second) {
+        boolean firstIdentityHidden = PlayerIdentityPolicy.isIdentityHidden(first);
+        boolean secondIdentityHidden = PlayerIdentityPolicy.isIdentityHidden(second);
+        if (firstIdentityHidden != secondIdentityHidden) {
+            return firstIdentityHidden ? 1 : -1;
+        }
+        if (firstIdentityHidden) {
+            return 0;
+        }
+
+        int mmrComparison = Integer.compare(safeInt(second.getMmr()), safeInt(first.getMmr()));
+        if (mmrComparison != 0) {
+            return mmrComparison;
+        }
+        return Comparator.nullsLast(Long::compareTo).compare(first.getId(), second.getId());
+    }
+
+    private GroupPlayerResponse maskInactivePlayer() {
+        return new GroupPlayerResponse(
+            null,
+            PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            0,
+            0,
+            0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+        );
     }
 
     public List<GroupPlayerTierBoardResponse> getGroupPlayerTierBoard(Long groupId) {
