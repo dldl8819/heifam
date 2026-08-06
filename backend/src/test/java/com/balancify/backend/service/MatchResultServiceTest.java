@@ -407,6 +407,7 @@ class MatchResultServiceTest {
 
         Player returningPlayer = player(33L, group, "A1", 1000);
         returningPlayer.setDormantSince(OffsetDateTime.parse("2026-03-01T00:00:00Z"));
+        returningPlayer.setDormancyEpisodeFloorTier("B-");
         returningPlayer.setReturnBoostMultiplier(2.0);
 
         List<MatchParticipant> participants = List.of(
@@ -431,6 +432,7 @@ class MatchResultServiceTest {
         assertThat(participantDelta(response, "AWAY", "A1")).isEqualTo(36);
         assertThat(participantDelta(response, "AWAY", "A2")).isEqualTo(18);
         assertThat(returningPlayer.getReturnedAt()).isNotNull();
+        assertThat(returningPlayer.getDormancyEpisodeFloorTier()).isEqualTo("B-");
         assertThat(returningPlayer.getReturnBoostGamesRemaining()).isEqualTo(4);
         assertThat(returningPlayer.getMmr()).isEqualTo(1036);
     }

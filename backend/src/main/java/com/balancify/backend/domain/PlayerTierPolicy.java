@@ -162,9 +162,23 @@ public final class PlayerTierPolicy {
             return 0;
         }
 
-        String normalizedCurrentTier = canonicalTier(currentTier, resolveTier(normalizedMmr));
-        String demotedTier = demoteTier(normalizedCurrentTier, cappedDemoteSteps);
+        String demotedTier = resolveDormancyFloorTier(currentTier, normalizedMmr, cappedDemoteSteps);
         return TIER_FLOOR_MMR.getOrDefault(demotedTier, 0);
+    }
+
+    public static String resolveDormancyFloorTier(
+        String currentTier,
+        Integer mmr,
+        int demoteSteps
+    ) {
+        int normalizedMmr = Math.max(0, mmr == null ? 0 : mmr);
+        int cappedDemoteSteps = capDormancyDemoteSteps(demoteSteps);
+        if (normalizedMmr <= 0 || cappedDemoteSteps <= 0) {
+            return TIER_NONE;
+        }
+
+        String normalizedCurrentTier = canonicalTier(currentTier, resolveTier(normalizedMmr));
+        return demoteTier(normalizedCurrentTier, cappedDemoteSteps);
     }
 
     public static int resolveDormancyMinimumMmr(

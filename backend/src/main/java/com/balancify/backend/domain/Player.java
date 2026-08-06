@@ -78,6 +78,9 @@ public class Player {
     @Column(name = "dormancy_mmr_floor_tier", length = 20)
     private String dormancyMmrFloorTier;
 
+    @Column(name = "dormancy_episode_floor_tier", length = 20)
+    private String dormancyEpisodeFloorTier;
+
     @Column(name = "last_tier_recalculated_at")
     private OffsetDateTime lastTierRecalculatedAt;
 
@@ -257,6 +260,14 @@ public class Player {
 
     public void setDormancyMmrFloorTier(String dormancyMmrFloorTier) {
         this.dormancyMmrFloorTier = dormancyMmrFloorTier;
+    }
+
+    public String getDormancyEpisodeFloorTier() {
+        return dormancyEpisodeFloorTier;
+    }
+
+    public void setDormancyEpisodeFloorTier(String dormancyEpisodeFloorTier) {
+        this.dormancyEpisodeFloorTier = dormancyEpisodeFloorTier;
     }
 
     public OffsetDateTime getLastTierRecalculatedAt() {

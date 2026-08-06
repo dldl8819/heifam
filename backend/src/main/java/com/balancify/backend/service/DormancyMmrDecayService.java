@@ -157,8 +157,12 @@ public class DormancyMmrDecayService {
         }
 
         OffsetDateTime lastDecayAt = player.getLastDormancyMmrDecayAt();
-        OffsetDateTime decayAnchor =
-            lastDecayAt != null && lastDecayAt.isAfter(activityReference) ? lastDecayAt : activityReference;
+        boolean startsNewDormancyEpisode = player.getDormantSince() == null
+            ? lastDecayAt == null || activityReference.isAfter(lastDecayAt)
+            : !activityReference.isBefore(player.getDormantSince());
+        OffsetDateTime decayAnchor = startsNewDormancyEpisode
+            ? activityReference
+            : lastDecayAt != null && lastDecayAt.isAfter(activityReference) ? lastDecayAt : activityReference;
         long inactiveDayCount = ChronoUnit.DAYS.between(decayAnchor.toInstant(), now.toInstant());
         long elapsedPeriods = inactiveDayCount / inactiveDays;
         if (elapsedPeriods <= 0) {
@@ -166,15 +170,28 @@ public class DormancyMmrDecayService {
         }
 
         int currentMmr = Math.max(0, player.getMmr() == null ? 0 : player.getMmr());
+        String episodeFloorTier = PlayerTierPolicy.normalizeRankedTier(
+            player.getDormancyEpisodeFloorTier()
+        );
+        boolean episodeFloorChanged = startsNewDormancyEpisode || episodeFloorTier.isEmpty();
+        if (episodeFloorChanged) {
+            episodeFloorTier = PlayerTierPolicy.normalizeRankedTier(
+                PlayerTierPolicy.resolveDormancyFloorTier(
+                    player.getTier(),
+                    currentMmr,
+                    MAX_DORMANCY_TIER_DEMOTION_STEPS
+                )
+            );
+            player.setDormancyEpisodeFloorTier(episodeFloorTier.isEmpty() ? null : episodeFloorTier);
+        }
+
         int totalDrop = safeTotalDrop(elapsedPeriods);
         int rawNextMmr = Math.max(0, currentMmr - totalDrop);
         int minimumAllowedMmr = Math.min(
             currentMmr,
-            PlayerTierPolicy.resolveDormancyMinimumMmr(
-                player.getTier(),
-                currentMmr,
-                MAX_DORMANCY_TIER_DEMOTION_STEPS,
-                player.getDormancyMmrFloorTier()
+            Math.max(
+                PlayerTierPolicy.resolveDefaultMmrForTier(player.getDormancyMmrFloorTier()),
+                PlayerTierPolicy.resolveDefaultMmrForTier(episodeFloorTier)
             )
         );
         int nextMmr = Math.max(rawNextMmr, minimumAllowedMmr);
@@ -183,13 +200,16 @@ public class DormancyMmrDecayService {
 
         player.setMmr(nextMmr);
         player.setLastDormancyMmrDecayAt(appliedThrough);
-        if (player.getDormantSince() == null || activityReference.isAfter(player.getDormantSince())) {
+        if (startsNewDormancyEpisode) {
             player.setDormantSince(dormantSince);
             player.setReturnedAt(null);
             player.setReturnBoostGamesRemaining(0);
             player.setReturnBoostMultiplier(returnBoostGames > 0 ? returnBoostMultiplier : 1.0);
         }
-        return nextMmr != currentMmr || !appliedThrough.equals(lastDecayAt);
+        return startsNewDormancyEpisode
+            || episodeFloorChanged
+            || nextMmr != currentMmr
+            || !appliedThrough.equals(lastDecayAt);
     }
 
     private int safeTotalDrop(long elapsedPeriods) {

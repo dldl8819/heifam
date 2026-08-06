@@ -122,6 +122,13 @@ class PlayerTierPolicyTest {
     }
 
     @Test
+    void resolvesDormancyEpisodeFloorTierFromStoredTier() {
+        assertThat(PlayerTierPolicy.resolveDormancyFloorTier("A+", 1930, 2)).isEqualTo("A-");
+        assertThat(PlayerTierPolicy.resolveDormancyFloorTier("B+", 1320, 2)).isEqualTo("B-");
+        assertThat(PlayerTierPolicy.resolveDormancyFloorTier("UNKNOWN", 1930, 2)).isEqualTo("A-");
+    }
+
+    @Test
     void appliesConfiguredDormancyFloorTierWhenItIsHigherThanDefaultCap() {
         assertThat(PlayerTierPolicy.resolveDormancyMinimumMmr("A+", 1930, 2, "A")).isEqualTo(1600);
         assertThat(PlayerTierPolicy.resolveDormancyMinimumMmr("A", 1680, 2, "B+")).isEqualTo(1200);
