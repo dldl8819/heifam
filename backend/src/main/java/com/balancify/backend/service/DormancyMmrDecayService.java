@@ -44,7 +44,7 @@ public class DormancyMmrDecayService {
         GroupRepository groupRepository,
         @Value("${balancify.rank.dormancy.enabled:true}") boolean enabled,
         @Value("${balancify.rank.dormancy.inactive-days:15}") int inactiveDays,
-        @Value("${balancify.rank.dormancy.mmr-drop-per-period:50}") int mmrDropPerPeriod,
+        @Value("${balancify.rank.dormancy.mmr-drop-per-period:30}") int mmrDropPerPeriod,
         @Value("${balancify.rank.return-boost.games:5}") int returnBoostGames,
         @Value("${balancify.rank.return-boost.multiplier:2.0}") double returnBoostMultiplier,
         GroupReadCacheService groupReadCacheService

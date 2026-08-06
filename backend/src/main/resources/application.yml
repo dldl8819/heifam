@@ -98,7 +98,7 @@ balancify:
     dormancy:
       enabled: ${RANK_DORMANCY_ENABLED:true}
       inactive-days: ${RANK_DORMANCY_INACTIVE_DAYS:15}
-      mmr-drop-per-period: ${RANK_DORMANCY_MMR_DROP_PER_PERIOD:50}
+      mmr-drop-per-period: ${RANK_DORMANCY_MMR_DROP_PER_PERIOD:30}
       sweep-cron: "${RANK_DORMANCY_SWEEP_CRON:0 0 4 * * *}"
     monthly-tier-refresh:
       enabled: ${RANK_MONTHLY_TIER_REFRESH_ENABLED:true}
