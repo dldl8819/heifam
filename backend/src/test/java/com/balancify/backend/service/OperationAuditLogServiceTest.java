@@ -22,6 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -43,6 +44,22 @@ class OperationAuditLogServiceTest {
         operationAuditLogService = new OperationAuditLogService(operationAuditLogRepository, accessControlService);
         lenient().when(operationAuditLogRepository.save(any(OperationAuditLog.class)))
             .thenAnswer(invocation -> invocation.getArgument(0));
+    }
+
+    @Test
+    void productionConstructorIsExplicitlyAutowired() {
+        var autowiredConstructors = java.util.Arrays.stream(
+                OperationAuditLogService.class.getDeclaredConstructors()
+            )
+            .filter(constructor -> constructor.isAnnotationPresent(Autowired.class))
+            .toList();
+
+        assertThat(autowiredConstructors)
+            .singleElement()
+            .satisfies(constructor -> assertThat(constructor.getParameterTypes()).containsExactly(
+                OperationAuditLogRepository.class,
+                AccessControlService.class
+            ));
     }
 
     @Test

@@ -13,6 +13,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -38,6 +39,7 @@ public class OperationAuditLogService {
     private final AccessControlService accessControlService;
     private final Clock clock;
 
+    @Autowired
     public OperationAuditLogService(
         OperationAuditLogRepository operationAuditLogRepository,
         AccessControlService accessControlService
