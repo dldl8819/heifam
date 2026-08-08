@@ -587,6 +587,15 @@
         "nickname": "닉네임"
       }
     },
+    "monthlyTierBoard": {
+      "button": "월별 티어표 PNG 다운로드",
+      "downloading": "티어표 생성 중...",
+      "success": "{period} 티어표 PNG 다운로드를 시작했습니다. (총 {count}명)",
+      "empty": "티어표에 포함할 활성 선수가 없습니다.",
+      "failure": "티어표 이미지를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      "tierSuffix": "티어",
+      "totalSuffix": "명"
+    },
     "dormancyFloor": {
       "inlineLabel": "휴면 최대 하한",
       "defaultPolicy": "기본 정책"

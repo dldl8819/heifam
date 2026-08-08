@@ -19,6 +19,10 @@ import {
   type PlayerRosterView,
 } from '@/lib/player-roster-filter'
 import { applyPlayerActivityTransition } from '@/lib/player-activity'
+import {
+  createMonthlyTierBoardPng,
+  selectMonthlyTierBoardPlayers,
+} from '@/lib/monthly-tier-board-image'
 import type { GroupPlayerRaceStatsItem, PlayerRace, PlayerRosterItem, PlayerTierStatus } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
@@ -135,6 +139,21 @@ function sortRosterRows(rows: PlayerRosterItem[], showMmrColumn: boolean): Playe
 
 function escapeCsvCell(value: string): string {
   return `"${value.replace(/"/g, '""')}"`
+}
+
+function triggerBlobDownload(blob: Blob, fileName: string): void {
+  const downloadUrl = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = downloadUrl
+  anchor.download = fileName
+
+  try {
+    document.body.append(anchor)
+    anchor.click()
+  } finally {
+    anchor.remove()
+    window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000)
+  }
 }
 
 function formatMmrValue(value: number | undefined): string {
@@ -329,6 +348,7 @@ export default function PlayersPage() {
   )
   const [playerActionError, setPlayerActionError] = useState<string | null>(null)
   const [playerActionSuccess, setPlayerActionSuccess] = useState<string | null>(null)
+  const [tierBoardDownloading, setTierBoardDownloading] = useState<boolean>(false)
   const [gameTypeStatsPlayer, setGameTypeStatsPlayer] =
     useState<{ id: number; nickname: string } | null>(null)
   const [gameTypeStats, setGameTypeStats] = useState<GroupPlayerRaceStatsItem | null>(null)
@@ -888,18 +908,55 @@ export default function PlayersPage() {
     ).padStart(2, '0')}`
     const fileName = `players-tier-name-${fileDate}.csv`
     const blob = new Blob([`\uFEFF${lines.join('\n')}`], { type: 'text/csv;charset=utf-8;' })
-    const downloadUrl = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = downloadUrl
-    anchor.download = fileName
-    document.body.append(anchor)
-    anchor.click()
-    anchor.remove()
-    URL.revokeObjectURL(downloadUrl)
+    triggerBlobDownload(blob, fileName)
 
     setPlayerActionError(null)
     setPlayerActionSuccess(t('players.download.success', { count: downloadableRows.length }))
   }, [downloadableRows, isSuperAdmin])
+
+  const handleDownloadMonthlyTierBoard = useCallback(async () => {
+    if (!isSuperAdmin) {
+      setPlayerActionError(t('common.adminOnlyAction'))
+      return
+    }
+
+    setTierBoardDownloading(true)
+    setPlayerActionError(null)
+    setPlayerActionSuccess(null)
+    try {
+      const tierBoardItems = await apiClient.getGroupPlayerTierBoard(TEMP_GROUP_ID)
+      const tierBoardPlayers = selectMonthlyTierBoardPlayers(tierBoardItems)
+      if (tierBoardPlayers.length === 0) {
+        setPlayerActionError(t('players.monthlyTierBoard.empty'))
+        return
+      }
+
+      const image = await createMonthlyTierBoardPng(tierBoardPlayers, {
+        title: t('common.tierBoard.title'),
+        index: t('common.tierBoard.index'),
+        unassigned: t('common.tierBoard.unassigned'),
+        tierSuffix: t('players.monthlyTierBoard.tierSuffix'),
+        totalSuffix: t('players.monthlyTierBoard.totalSuffix'),
+      })
+      triggerBlobDownload(image.blob, image.fileName)
+      setPlayerActionSuccess(
+        t('players.monthlyTierBoard.success', {
+          period: image.periodLabel,
+          count: image.totalCount,
+        }),
+      )
+    } catch (downloadError) {
+      if (isApiUnauthorizedError(downloadError)) {
+        setPlayerActionError(t('common.adminLoginRequired'))
+      } else if (isApiForbiddenError(downloadError)) {
+        setPlayerActionError(t('common.permissionDenied'))
+      } else {
+        setPlayerActionError(t('players.monthlyTierBoard.failure'))
+      }
+    } finally {
+      setTierBoardDownloading(false)
+    }
+  }, [isSuperAdmin])
 
   return (
     <section className="space-y-6">
@@ -1199,11 +1256,22 @@ export default function PlayersPage() {
           </div>
         )}
         {isSuperAdmin && rosterView !== 'inactive' && (
-          <div className="mt-3 flex justify-end">
+          <div className="mt-3 flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => void handleDownloadMonthlyTierBoard()}
+              disabled={tierBoardDownloading || loading}
+              className="rounded-lg border border-slate-900 bg-slate-900 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-300 dark:border-slate-100 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:border-slate-700 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
+            >
+              {tierBoardDownloading
+                ? t('players.monthlyTierBoard.downloading')
+                : t('players.monthlyTierBoard.button')}
+            </button>
             <button
               type="button"
               onClick={handleDownloadTierSortedRoster}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:border-slate-900 hover:bg-slate-900 hover:text-white dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-300 dark:hover:bg-slate-100 dark:hover:text-slate-900"
+              disabled={tierBoardDownloading}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:border-slate-900 hover:bg-slate-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-300 dark:hover:bg-slate-100 dark:hover:text-slate-900"
             >
               {t('players.download.button')}
             </button>
