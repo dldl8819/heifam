@@ -211,7 +211,10 @@ public class GroupMatchAdminService {
             normalizedSource == MatchSource.MANUAL
         );
 
-        Signature requestedSignature = buildRequestedSignature(homePlayerIds, awayPlayerIds);
+        MatchSignaturePolicy.Signature requestedSignature = MatchSignaturePolicy.fromPlayerIds(
+            homePlayerIds,
+            awayPlayerIds
+        );
         if (duplicateHandling != DuplicateHandling.NONE) {
             OffsetDateTime duplicateCheckStartAt = OffsetDateTime.now().minusMinutes(duplicateWindowMinutes);
             List<Match> duplicateCandidates = matchRepository.findRecentDuplicateCandidates(
@@ -230,9 +233,11 @@ public class GroupMatchAdminService {
                     continue;
                 }
 
-                Signature existingSignature = readSignature(duplicateCandidate);
+                MatchSignaturePolicy.Signature existingSignature = MatchSignaturePolicy.fromStored(duplicateCandidate);
                 if (existingSignature == null) {
-                    existingSignature = buildSignatureFromParticipants(duplicateCandidate.getId());
+                    existingSignature = MatchSignaturePolicy.fromParticipants(
+                        matchParticipantRepository.findByMatchIdWithPlayerAndMatch(duplicateCandidate.getId())
+                    );
                 }
                 if (existingSignature == null || !requestedSignature.equals(existingSignature)) {
                     continue;
@@ -310,20 +315,17 @@ public class GroupMatchAdminService {
             .toList();
 
         PlayerRacePolicy.TeamRaceAssignment homeAssignment =
-            PlayerRacePolicy.assignToComposition(homeCapabilities, raceComposition);
+            PlayerRacePolicy.assignToComposition(homeCapabilities, raceComposition, allowManualOverride);
         PlayerRacePolicy.TeamRaceAssignment awayAssignment =
-            PlayerRacePolicy.assignToComposition(awayCapabilities, raceComposition);
+            PlayerRacePolicy.assignToComposition(awayCapabilities, raceComposition, allowManualOverride);
 
-        if (!allowManualOverride && (homeAssignment == null || awayAssignment == null)) {
+        if (homeAssignment == null || awayAssignment == null) {
             throw new IllegalArgumentException("선택한 종족 조합으로 매치를 구성할 수 없습니다");
         }
 
-        List<String> manualAssignedRaces = raceComposition.chars()
-            .mapToObj(race -> String.valueOf((char) race))
-            .toList();
         return new MatchRaceAssignments(
-            homeAssignment == null ? manualAssignedRaces : homeAssignment.assignedRaces(),
-            awayAssignment == null ? manualAssignedRaces : awayAssignment.assignedRaces()
+            homeAssignment.assignedRaces(),
+            awayAssignment.assignedRaces()
         );
     }
 
@@ -335,108 +337,6 @@ public class GroupMatchAdminService {
         return PlayerRacePolicy.normalizeCapability(player.getRace());
     }
 
-    private Signature buildRequestedSignature(List<Long> homePlayerIds, List<Long> awayPlayerIds) {
-        List<Long> participantIds = new ArrayList<>(homePlayerIds.size() + awayPlayerIds.size());
-        participantIds.addAll(homePlayerIds);
-        participantIds.addAll(awayPlayerIds);
-        return new Signature(
-            buildParticipantSignature(participantIds),
-            buildTeamSignature(homePlayerIds, awayPlayerIds)
-        );
-    }
-
-    private Signature readSignature(Match match) {
-        if (match.getParticipantSignature() == null || match.getTeamSignature() == null) {
-            return null;
-        }
-        String participantSignature = match.getParticipantSignature().trim();
-        String teamSignature = canonicalizeStoredTeamSignature(match.getTeamSignature());
-        if (participantSignature.isEmpty() || teamSignature == null) {
-            return null;
-        }
-        return new Signature(participantSignature, teamSignature);
-    }
-    private Signature buildSignatureFromParticipants(Long matchId) {
-        List<MatchParticipant> participants =
-            matchParticipantRepository.findByMatchIdWithPlayerAndMatch(matchId);
-        if (participants.isEmpty()) {
-            return null;
-        }
-
-        List<Long> homePlayerIds = new ArrayList<>();
-        List<Long> awayPlayerIds = new ArrayList<>();
-        List<Long> participantIds = new ArrayList<>();
-
-        for (MatchParticipant participant : participants) {
-            if (participant.getPlayer() == null || participant.getPlayer().getId() == null) {
-                continue;
-            }
-            Long playerId = participant.getPlayer().getId();
-            participantIds.add(playerId);
-            if (TEAM_HOME.equals(participant.getTeam())) {
-                homePlayerIds.add(playerId);
-            } else if (TEAM_AWAY.equals(participant.getTeam())) {
-                awayPlayerIds.add(playerId);
-            }
-        }
-
-        if (participants.size() % 2 != 0) {
-            return null;
-        }
-
-        int inferredTeamSize = participants.size() / 2;
-        if (homePlayerIds.size() != inferredTeamSize || awayPlayerIds.size() != inferredTeamSize) {
-            return null;
-        }
-
-        return new Signature(
-            buildParticipantSignature(participantIds),
-            buildTeamSignature(homePlayerIds, awayPlayerIds)
-        );
-    }
-
-    private String buildParticipantSignature(List<Long> playerIds) {
-        return playerIds.stream()
-            .sorted()
-            .map(String::valueOf)
-            .collect(Collectors.joining("-"));
-    }
-
-    private String buildTeamSignature(List<Long> homePlayerIds, List<Long> awayPlayerIds) {
-        String homeSignature = buildParticipantSignature(homePlayerIds);
-        String awaySignature = buildParticipantSignature(awayPlayerIds);
-        return canonicalTeamPairSignature(homeSignature, awaySignature);
-    }
-
-    private String canonicalizeStoredTeamSignature(String value) {
-        String normalized = value == null ? "" : value.trim();
-        String[] teams = normalized.split("\\|", -1);
-        if (teams.length != 2) {
-            return null;
-        }
-
-        String firstTeam = rosterPart(teams[0]);
-        String secondTeam = rosterPart(teams[1]);
-        if (firstTeam == null || secondTeam == null) {
-            return null;
-        }
-        return canonicalTeamPairSignature(firstTeam, secondTeam);
-    }
-
-    private String rosterPart(String teamSignaturePart) {
-        int separatorIndex = teamSignaturePart == null ? -1 : teamSignaturePart.indexOf(':');
-        if (separatorIndex < 0 || separatorIndex == teamSignaturePart.length() - 1) {
-            return null;
-        }
-        return teamSignaturePart.substring(separatorIndex + 1).trim();
-    }
-
-    private String canonicalTeamPairSignature(String firstTeam, String secondTeam) {
-        if (firstTeam.compareTo(secondTeam) <= 0) {
-            return "TEAM1:" + firstTeam + "|TEAM2:" + secondTeam;
-        }
-        return "TEAM1:" + secondTeam + "|TEAM2:" + firstTeam;
-    }
     private int resolveTeamSize(Match match) {
         if (match.getTeamSize() == null || match.getTeamSize() <= 0) {
             return TEAM_SIZE_3V3;
@@ -465,14 +365,8 @@ public class GroupMatchAdminService {
         return normalized;
     }
 
-    private static String duplicateConflictMessage() {
+    static String duplicateConflictMessage() {
         return "The same teams and race composition were already entered within the last 5 minutes.";
-    }
-
-    private record Signature(
-        String participantSignature,
-        String teamSignature
-    ) {
     }
 
     private enum DuplicateHandling {

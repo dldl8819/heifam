@@ -961,7 +961,7 @@
   "results": {
     "title": "경기 결과",
     "description": "최근 경기 결과를 조회합니다.",
-    "descriptionAdmin": "관리자는 최근 경기 결과를 조회하고 승리 팀 수정/삭제를 관리합니다.",
+    "descriptionAdmin": "관리자는 최근 경기 결과를 조회하고 승리 팀과 종족전 수정/삭제를 관리합니다.",
     "descriptionMember": "로그인한 사용자는 수동 경기 입력과 최근 경기 결과 조회를 이용할 수 있습니다.",
     "descriptionViewer": "최근 경기 결과를 조회합니다.",
     "form": {
@@ -996,15 +996,17 @@
       "saving": "저장 중...",
       "delete": "삭제",
       "deleting": "삭제 중...",
-      "updated": "{matchReference} 승리 팀을 {winner}(으)로 수정했습니다.",
+      "updated": "{matchReference} 경기 결과를 수정했습니다.",
       "submittedFromBalance": "{matchReference} 결과가 입력되었습니다.",
       "submittedFromBalanceGeneric": "경기 결과가 입력되었습니다.",
       "deleted": "{matchReference}를 삭제했습니다.",
-      "updateFailure": "승리 팀 수정에 실패했습니다. 권한과 서버 상태를 확인해 주세요.",
+      "updateFailure": "경기 결과 수정에 실패했습니다. 권한과 서버 상태를 확인해 주세요.",
       "deleteNotFound": "삭제 API를 찾지 못했습니다. 백엔드를 재시작하고 다시 시도해 주세요.",
       "deleteFailure": "매치 삭제에 실패했습니다. 권한과 서버 상태를 확인해 주세요.",
       "deleteConfirm": "{matchReference}를 삭제하시겠습니까? MMR이 롤백됩니다.",
-      "selectedHint": "{matchReference}를 선택했습니다. 승리 팀을 확인하고 저장하세요.",
+      "selectedHint": "{matchReference}를 선택했습니다. 승리 팀과 종족전을 확인하고 저장하세요.",
+      "keepRaceComposition": "변경 안 함",
+      "raceCompositionAriaLabel": "{matchReference} 종족전 수정",
       "noWinner": "미입력",
       "reference": {
         "matchId": "매치 ID {matchId}",
@@ -1033,7 +1035,7 @@
         "existing": "기존 경기 결과 입력",
         "manual": "수동 경기 입력"
       },
-      "existingHelper": "최근 경기 목록에서 원하는 경기를 선택한 뒤 승리 팀을 수정하거나 삭제할 수 있습니다."
+      "existingHelper": "최근 경기 목록에서 원하는 경기를 선택한 뒤 승리 팀과 종족전을 수정하거나 삭제할 수 있습니다."
     },
     "manual": {
       "teamSizeLabel": "팀 크기",

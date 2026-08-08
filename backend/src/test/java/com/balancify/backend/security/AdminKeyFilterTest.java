@@ -52,6 +52,7 @@ import com.balancify.backend.api.match.MatchResultController;
 import com.balancify.backend.api.match.dto.BalancePlayerDto;
 import com.balancify.backend.api.match.dto.BalanceResponse;
 import com.balancify.backend.api.match.dto.MatchResultRequest;
+import com.balancify.backend.api.match.dto.MatchResultUpdateRequest;
 import com.balancify.backend.api.match.dto.MatchResultParticipantResponse;
 import com.balancify.backend.api.match.dto.MatchResultResponse;
 import com.balancify.backend.api.match.dto.MultiBalanceMatchResponse;
@@ -409,10 +410,31 @@ class AdminKeyFilterTest {
     }
 
     @Test
+    void returnsForbiddenWhenMemberAttemptsMatchResultPatch() throws Exception {
+        mockMvc
+            .perform(
+                patch("/api/matches/1/result")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"winnerTeam\":\"HOME\",\"raceComposition\":\"PPT\"}")
+            )
+            .andExpect(status().isForbidden());
+
+        verify(matchResultService, never()).updateMatchResult(any(), any(), any(), any());
+    }
+
+    @Test
     void allowsMatchResultPatchWhenAdminEmailHeaderIsValid() throws Exception {
         MatchResultService.MatchResultUpdateAuditSnapshot auditSnapshot =
-            new MatchResultService.MatchResultUpdateAuditSnapshot(1L, 1L, "HOME", "AWAY");
-        when(matchResultService.updateMatchResult(eq(1L), any(MatchResultRequest.class), any(), any()))
+            new MatchResultService.MatchResultUpdateAuditSnapshot(
+                1L,
+                1L,
+                "HOME",
+                "AWAY",
+                "PPP",
+                "PPT"
+            );
+        when(matchResultService.updateMatchResult(eq(1L), any(MatchResultUpdateRequest.class), any(), any()))
             .thenReturn(
                 new MatchResultService.MatchResultUpdateOutcome(
                     new MatchResultResponse(
@@ -431,19 +453,64 @@ class AdminKeyFilterTest {
                 patch("/api/matches/1/result")
                     .header("X-USER-EMAIL", "admin@hei.gg")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"winnerTeam\":\"AWAY\"}")
+                    .content("{\"winnerTeam\":\"AWAY\",\"raceComposition\":\"PPT\"}")
             )
             .andExpect(status().isOk());
 
         verify(matchResultService).updateMatchResult(
             eq(1L),
-            any(MatchResultRequest.class),
+            argThat(request -> request != null
+                && "AWAY".equals(request.winnerTeam())
+                && "PPT".equals(request.raceComposition())),
             eq("admin@hei.gg"),
             eq("admin")
         );
         verify(operationAuditLogService).recordMatchResultUpdate(
             eq("admin@hei.gg"),
             eq("admin"),
+            eq(auditSnapshot)
+        );
+    }
+
+    @Test
+    void allowsMatchResultPatchWhenSuperAdminEmailIsValid() throws Exception {
+        MatchResultService.MatchResultUpdateAuditSnapshot auditSnapshot =
+            new MatchResultService.MatchResultUpdateAuditSnapshot(
+                1L,
+                1L,
+                "HOME",
+                "HOME",
+                "PPP",
+                "PPT"
+            );
+        when(matchResultService.updateMatchResult(eq(1L), any(MatchResultUpdateRequest.class), any(), any()))
+            .thenReturn(
+                new MatchResultService.MatchResultUpdateOutcome(
+                    new MatchResultResponse(1L, "HOME", 32, 0.5, 0.5, List.of()),
+                    auditSnapshot
+                )
+            );
+
+        mockMvc
+            .perform(
+                patch("/api/matches/1/result")
+                    .header("X-USER-EMAIL", "superadmin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"winnerTeam\":\"HOME\",\"raceComposition\":\"PPT\"}")
+            )
+            .andExpect(status().isOk());
+
+        verify(matchResultService).updateMatchResult(
+            eq(1L),
+            argThat(request -> request != null
+                && "HOME".equals(request.winnerTeam())
+                && "PPT".equals(request.raceComposition())),
+            eq("superadmin@hei.gg"),
+            eq("superadmin")
+        );
+        verify(operationAuditLogService).recordMatchResultUpdate(
+            eq("superadmin@hei.gg"),
+            eq("superadmin"),
             eq(auditSnapshot)
         );
     }

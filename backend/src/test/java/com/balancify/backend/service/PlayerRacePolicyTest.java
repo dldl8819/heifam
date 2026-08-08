@@ -38,4 +38,16 @@ class PlayerRacePolicyTest {
 
         assertThat(assignment).isNull();
     }
+
+    @Test
+    void usesCompositionSlotOrderForExplicitManualOverride() {
+        PlayerRacePolicy.TeamRaceAssignment assignment = PlayerRacePolicy.assignToComposition(
+            List.of("P", "P", "P"),
+            "PPT",
+            true
+        );
+
+        assertThat(assignment).isNotNull();
+        assertThat(assignment.assignedRaces()).containsExactly("P", "P", "T");
+    }
 }

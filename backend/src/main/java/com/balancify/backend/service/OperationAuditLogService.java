@@ -337,6 +337,10 @@ public class OperationAuditLogService {
                 + formatTeamForAudit(snapshot.previousWinnerTeam())
                 + " -> "
                 + formatTeamForAudit(snapshot.nextWinnerTeam())
+                + ", raceComposition="
+                + formatRaceCompositionForAudit(snapshot.previousRaceComposition())
+                + " -> "
+                + formatRaceCompositionForAudit(snapshot.nextRaceComposition())
         );
         operationAuditLogRepository.save(log);
     }
@@ -452,6 +456,17 @@ public class OperationAuditLogService {
     private String formatTeamForAudit(String value) {
         String normalized = trimToNull(value);
         return normalized == null ? "-" : normalized.toUpperCase(Locale.ROOT);
+    }
+
+    private String formatRaceCompositionForAudit(String value) {
+        String normalized = trimToNull(value);
+        if (normalized == null) {
+            return "-";
+        }
+        return switch (normalized.toUpperCase(Locale.ROOT)) {
+            case "PP", "PT", "PZ", "PPP", "PPT", "PPZ", "PTZ" -> normalized.toUpperCase(Locale.ROOT);
+            default -> "-";
+        };
     }
 
     private OperationAuditLogResponse toResponse(OperationAuditLog log) {

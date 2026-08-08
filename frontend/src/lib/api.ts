@@ -22,6 +22,7 @@ import type {
   MultiBalanceResponse,
   MatchResultRequest,
   MatchResultResponse,
+  MatchResultUpdateRequest,
   ManualMatchCreateRequest,
   OperationAuditLogFilters,
   OperationAuditLogItem,
@@ -852,7 +853,7 @@ export const apiClient = {
       method: 'POST',
       body: JSON.stringify(payload),
     }, { requireUserEmail: true }),
-  updateMatchResult: (matchId: number, payload: MatchResultRequest) =>
+  updateMatchResult: (matchId: number, payload: MatchResultUpdateRequest) =>
     apiRequest<MatchResultResponse>(`/api/matches/${matchId}/result`, {
       method: 'PATCH',
       body: JSON.stringify(payload),

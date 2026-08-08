@@ -123,6 +123,28 @@ public final class PlayerRacePolicy {
         return new TeamRaceAssignment(List.of(assigned));
     }
 
+    public static TeamRaceAssignment assignToComposition(
+        List<String> capabilities,
+        String raceComposition,
+        boolean allowManualOverride
+    ) {
+        if (capabilities == null) {
+            return null;
+        }
+        TeamRaceAssignment assignment = assignToComposition(capabilities, raceComposition);
+        if (assignment != null || !allowManualOverride) {
+            return assignment;
+        }
+        if (capabilities == null || raceComposition == null || capabilities.size() != raceComposition.length()) {
+            return null;
+        }
+
+        List<String> assignedRaces = raceComposition.chars()
+            .mapToObj(race -> normalizeAssignedRace(String.valueOf((char) race)))
+            .toList();
+        return new TeamRaceAssignment(assignedRaces);
+    }
+
     private static boolean assignPlayer(
         int index,
         List<PlayerCapability> orderedPlayers,

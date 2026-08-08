@@ -105,7 +105,14 @@ class OperationAuditLogServiceTest {
         operationAuditLogService.recordMatchResultUpdate(
             "ops@example.com",
             "OpsUser",
-            new MatchResultService.MatchResultUpdateAuditSnapshot(99L, 1L, "HOME", "AWAY")
+            new MatchResultService.MatchResultUpdateAuditSnapshot(
+                99L,
+                1L,
+                "HOME",
+                "AWAY",
+                "PPP",
+                "PPT"
+            )
         );
 
         ArgumentCaptor<OperationAuditLog> logCaptor = ArgumentCaptor.forClass(OperationAuditLog.class);
@@ -118,7 +125,9 @@ class OperationAuditLogServiceTest {
         assertThat(log.getTargetLabel()).isEqualTo("#99");
         assertThat(log.getGroupId()).isEqualTo(1L);
         assertThat(log.getSummary()).isEqualTo("경기 결과 수정");
-        assertThat(log.getDetails()).isEqualTo("winner=HOME -> AWAY");
+        assertThat(log.getDetails()).isEqualTo(
+            "winner=HOME -> AWAY, raceComposition=PPP -> PPT"
+        );
     }
 
     @Test

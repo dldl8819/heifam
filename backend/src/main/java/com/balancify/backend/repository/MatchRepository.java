@@ -70,4 +70,30 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
         @Param("raceComposition") String raceComposition,
         @Param("fromInclusive") OffsetDateTime fromInclusive
     );
+
+    @Query("""
+        select m
+        from Match m
+        where m.id <> :excludedMatchId
+          and m.group.id = :groupId
+          and m.teamSize = :teamSize
+          and m.participantSignature = :participantSignature
+          and (
+            (:raceComposition is null and m.raceComposition is null)
+            or m.raceComposition = :raceComposition
+          )
+          and m.status <> com.balancify.backend.domain.MatchStatus.CANCELLED
+          and m.createdAt >= :fromInclusive
+          and m.createdAt <= :toInclusive
+        order by m.createdAt desc, m.id desc
+        """)
+    List<Match> findRecentDuplicateCandidatesExcludingMatch(
+        @Param("excludedMatchId") Long excludedMatchId,
+        @Param("groupId") Long groupId,
+        @Param("teamSize") Integer teamSize,
+        @Param("participantSignature") String participantSignature,
+        @Param("raceComposition") String raceComposition,
+        @Param("fromInclusive") OffsetDateTime fromInclusive,
+        @Param("toInclusive") OffsetDateTime toInclusive
+    );
 }

@@ -94,6 +94,10 @@ export type MatchResultRequest = {
   winnerTeam: TeamSide
 }
 
+export type MatchResultUpdateRequest = MatchResultRequest & {
+  raceComposition?: RaceComposition
+}
+
 export type ManualMatchCreateRequest = {
   groupId: number
   teamSize: number

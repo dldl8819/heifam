@@ -4,6 +4,7 @@ import com.balancify.backend.api.MmrMaskingMapper;
 import com.balancify.backend.api.match.dto.ManualMatchCreateRequest;
 import com.balancify.backend.api.match.dto.MatchResultRequest;
 import com.balancify.backend.api.match.dto.MatchResultResponse;
+import com.balancify.backend.api.match.dto.MatchResultUpdateRequest;
 import com.balancify.backend.security.AuthenticatedRequestResolver;
 import com.balancify.backend.security.MmrAccessRequestResolver;
 import com.balancify.backend.service.AccessControlService;
@@ -107,7 +108,7 @@ public class MatchResultController {
     @PatchMapping("/{id}/result")
     public MatchResultResponse updateResult(
         @PathVariable("id") Long matchId,
-        @RequestBody MatchResultRequest request,
+        @RequestBody MatchResultUpdateRequest request,
         HttpServletRequest httpRequest
     ) {
         try {

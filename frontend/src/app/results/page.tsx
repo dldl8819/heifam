@@ -9,10 +9,17 @@ import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
 import { findUniquePlayerByNicknamePrefix } from '@/lib/player-autocomplete'
-import { getRaceCompositionOptions, normalizeRaceComposition } from '@/lib/race-composition'
+import {
+  buildRaceCompositionUpdateFields,
+  getRaceCompositionOptions,
+  normalizeRaceComposition,
+  resolveRaceCompositionTeamSize,
+  resolveSharedRaceComposition,
+} from '@/lib/race-composition'
 import type {
   BalancePlayerOption,
   MatchResultResponse,
+  MatchResultUpdateRequest,
   RaceComposition,
   RecentMatchItem,
   TeamSide,
@@ -29,6 +36,7 @@ const manualTeamSizeOptions = [3, 2] as const
 type OperatorEntryMode = 'existing' | 'manual'
 type SupportedTeamSize = (typeof manualTeamSizeOptions)[number]
 type ManualWinnerTeam = TeamSide | ''
+type RecentRaceComposition = RaceComposition | ''
 type ManualSlotValue = number | ''
 type ManualSlotInputValue = string
 
@@ -201,6 +209,10 @@ export default function ResultsPage() {
   const [manualSubmitSuccess, setManualSubmitSuccess] = useState<string | null>(null)
   const [selectedRecentMatchId, setSelectedRecentMatchId] = useState<number | null>(null)
   const [selectedRecentWinnerTeam, setSelectedRecentWinnerTeam] = useState<TeamSide>('HOME')
+  const [selectedRecentRaceComposition, setSelectedRecentRaceComposition] =
+    useState<RecentRaceComposition>('')
+  const [isSelectedRecentRaceCompositionDirty, setIsSelectedRecentRaceCompositionDirty] =
+    useState<boolean>(false)
   const [isRecentSaving, setIsRecentSaving] = useState<boolean>(false)
   const [isRecentDeleting, setIsRecentDeleting] = useState<boolean>(false)
   const [recentActionMessage, setRecentActionMessage] = useState<string | null>(null)
@@ -321,9 +333,25 @@ export default function ResultsPage() {
         const selectedMatch = completedMatches.find((match) => match.matchId === selectedRecentMatchId)
         if (!selectedMatch || (selectedMatch.winningTeam !== 'HOME' && selectedMatch.winningTeam !== 'AWAY')) {
           setSelectedRecentMatchId(null)
+          setSelectedRecentRaceComposition('')
+          setIsSelectedRecentRaceCompositionDirty(false)
           setRecentActionMessage(null)
         } else {
           setSelectedRecentWinnerTeam(selectedMatch.winningTeam)
+          const selectedTeamSize = resolveRaceCompositionTeamSize(
+            selectedMatch.homeTeam.length,
+            selectedMatch.awayTeam.length,
+          )
+          setSelectedRecentRaceComposition(
+            selectedTeamSize === null
+              ? ''
+              : resolveSharedRaceComposition(
+                    selectedTeamSize,
+                    selectedMatch.homeRaceComposition,
+                    selectedMatch.awayRaceComposition,
+                  ) ?? '',
+          )
+          setIsSelectedRecentRaceCompositionDirty(false)
         }
       }
     } catch {
@@ -381,6 +409,8 @@ export default function ResultsPage() {
 
     if (requestedFromBalance) {
       setSelectedRecentMatchId(null)
+      setSelectedRecentRaceComposition('')
+      setIsSelectedRecentRaceCompositionDirty(false)
       setSelectedRecentWinnerTeam(
         requestedWinnerTeam ??
           (matched.winningTeam === 'HOME' || matched.winningTeam === 'AWAY'
@@ -403,6 +433,20 @@ export default function ResultsPage() {
           ? matched.winningTeam
           : 'HOME')
     )
+    const matchedTeamSize = resolveRaceCompositionTeamSize(
+      matched.homeTeam.length,
+      matched.awayTeam.length,
+    )
+    setSelectedRecentRaceComposition(
+      matchedTeamSize === null
+        ? ''
+        : resolveSharedRaceComposition(
+              matchedTeamSize,
+              matched.homeRaceComposition,
+              matched.awayRaceComposition,
+            ) ?? '',
+    )
+    setIsSelectedRecentRaceCompositionDirty(false)
 
     setAppliedSearchSelection(true)
   }, [
@@ -421,6 +465,8 @@ export default function ResultsPage() {
     }
 
     setSelectedRecentMatchId(null)
+    setSelectedRecentRaceComposition('')
+    setIsSelectedRecentRaceCompositionDirty(false)
     setRecentActionMessage(t('results.recent.submittedFromBalanceGeneric'))
     setAppliedSearchSelection(true)
   }, [appliedSearchSelection, requestedFromBalance, requestedMatchId])
@@ -431,6 +477,8 @@ export default function ResultsPage() {
     }
 
     setSelectedRecentMatchId(null)
+    setSelectedRecentRaceComposition('')
+    setIsSelectedRecentRaceCompositionDirty(false)
   }, [isAdmin])
 
   useEffect(() => {
@@ -661,6 +709,8 @@ export default function ResultsPage() {
 
       setResult(response)
       setSelectedRecentMatchId(null)
+      setSelectedRecentRaceComposition('')
+      setIsSelectedRecentRaceCompositionDirty(false)
       setSelectedRecentWinnerTeam(response.winnerTeam)
       setManualHomeSlots(createManualSlots(manualTeamSize))
       setManualAwaySlots(createManualSlots(manualTeamSize))
@@ -700,6 +750,20 @@ export default function ResultsPage() {
         ? recentMatch.winningTeam
         : 'HOME'
     setSelectedRecentWinnerTeam(pickedWinnerTeam)
+    const pickedTeamSize = resolveRaceCompositionTeamSize(
+      recentMatch.homeTeam.length,
+      recentMatch.awayTeam.length,
+    )
+    setSelectedRecentRaceComposition(
+      pickedTeamSize === null
+        ? ''
+        : resolveSharedRaceComposition(
+              pickedTeamSize,
+              recentMatch.homeRaceComposition,
+              recentMatch.awayRaceComposition,
+            ) ?? '',
+    )
+    setIsSelectedRecentRaceCompositionDirty(false)
     setError(null)
     setRecentActionMessage(null)
   }
@@ -718,14 +782,29 @@ export default function ResultsPage() {
     setRecentActionMessage(null)
     setIsRecentSaving(true)
     try {
-      const response = await apiClient.updateMatchResult(selectedRecentMatchId, {
+      const selectedRecentMatch = recentMatches.find(
+        (match) => match.matchId === selectedRecentMatchId,
+      )
+      const selectedRecentTeamSize = selectedRecentMatch
+        ? resolveRaceCompositionTeamSize(
+            selectedRecentMatch.homeTeam.length,
+            selectedRecentMatch.awayTeam.length,
+          )
+        : null
+      const updateRequest: MatchResultUpdateRequest = {
         winnerTeam: selectedRecentWinnerTeam,
-      })
+        ...buildRaceCompositionUpdateFields(
+          selectedRecentTeamSize,
+          selectedRecentRaceComposition,
+          isSelectedRecentRaceCompositionDirty,
+        ),
+      }
+
+      const response = await apiClient.updateMatchResult(selectedRecentMatchId, updateRequest)
       setResult(response)
       setRecentActionMessage(
         t('results.recent.updated', {
           matchReference: formatMatchReference(selectedRecentMatchId),
-          winner: formatTeamLabel(selectedRecentWinnerTeam),
         }),
       )
       await loadRecentMatches()
@@ -766,6 +845,8 @@ export default function ResultsPage() {
     try {
       await apiClient.deleteMatch(targetMatchId)
       setSelectedRecentMatchId(null)
+      setSelectedRecentRaceComposition('')
+      setIsSelectedRecentRaceCompositionDirty(false)
       setResult((previousResult) =>
         previousResult && previousResult.matchId === targetMatchId ? null : previousResult,
       )
@@ -1083,15 +1164,15 @@ export default function ResultsPage() {
 
         {!recentMatchesLoading && !recentMatchesError && recentMatches.length > 0 && (
           <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
-            <table className="min-w-[48rem] text-left text-sm">
+            <table className="min-w-[52rem] text-left text-sm">
               <thead className="bg-slate-50 text-xs tracking-wide text-slate-500 dark:bg-slate-800/80 dark:text-slate-300">
                 <tr>
                   <th className="px-3 py-2">{t('results.recent.table.displayOrder')}</th>
                   {isSuperAdmin && <th className="px-3 py-2">{t('results.recent.table.matchId')}</th>}
                   <th className="px-3 py-2">{t('results.recent.table.matchInputAt')}</th>
                   <th className="px-3 py-2">{t('results.recent.table.recordedBy')}</th>
-                  <th className="px-3 py-2">{t('results.recent.table.winner')}</th>
-                  <th className="px-3 py-2">{t('results.recent.table.raceComposition')}</th>
+                  <th className="whitespace-nowrap px-3 py-2">{t('results.recent.table.winner')}</th>
+                  <th className="whitespace-nowrap px-3 py-2">{t('results.recent.table.raceComposition')}</th>
                   <th className="min-w-[8rem] break-keep px-3 py-2">{t('results.recent.table.homeTeam')}</th>
                   <th className="min-w-[8rem] break-keep px-3 py-2">{t('results.recent.table.awayTeam')}</th>
                   {showMmr && <th className="px-3 py-2">{t('results.recent.table.mmrDiff')}</th>}
@@ -1099,7 +1180,15 @@ export default function ResultsPage() {
                 </tr>
               </thead>
               <tbody>
-                {recentMatches.map((recentMatch) => (
+                {recentMatches.map((recentMatch) => {
+                  const recentTeamSize = resolveRaceCompositionTeamSize(
+                    recentMatch.homeTeam.length,
+                    recentMatch.awayTeam.length,
+                  )
+                  const recentRaceCompositionOptions =
+                    recentTeamSize === null ? [] : getRaceCompositionOptions(recentTeamSize)
+
+                  return (
                   <tr
                     key={`recent-match-${recentMatch.matchId}`}
                     className={`border-t border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/60 ${
@@ -1119,7 +1208,8 @@ export default function ResultsPage() {
                         <select
                           value={selectedRecentWinnerTeam}
                           onChange={(event) => setSelectedRecentWinnerTeam(event.target.value as TeamSide)}
-                          className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                          disabled={isRecentSaving || isRecentDeleting}
+                          className="min-w-[4.5rem] whitespace-nowrap rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                         >
                           {winnerTeamOptions.map((team) => (
                             <option key={`${recentMatch.matchId}-${team}`} value={team}>
@@ -1131,8 +1221,39 @@ export default function ResultsPage() {
                         formatTeamLabel(recentMatch.winningTeam)
                       )}
                     </td>
-                    <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
-                      {formatRaceMatchup(recentMatch)}
+                    <td className="whitespace-nowrap px-3 py-2 text-slate-700 dark:text-slate-300">
+                      {selectedRecentMatchId === recentMatch.matchId && isAdmin ? (
+                        <select
+                          value={selectedRecentRaceComposition}
+                          onChange={(event) => {
+                            setSelectedRecentRaceComposition(
+                              recentTeamSize === null
+                                ? ''
+                                : normalizeRaceComposition(recentTeamSize, event.target.value) ?? '',
+                            )
+                            setIsSelectedRecentRaceCompositionDirty(true)
+                          }}
+                          disabled={
+                            recentTeamSize === null || isRecentSaving || isRecentDeleting
+                          }
+                          aria-label={t('results.recent.raceCompositionAriaLabel', {
+                            matchReference: formatMatchReference(recentMatch.matchId),
+                          })}
+                          className="min-w-[5.5rem] whitespace-nowrap rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                        >
+                          <option value="">{t('results.recent.keepRaceComposition')}</option>
+                          {recentRaceCompositionOptions.map((raceComposition) => (
+                            <option
+                              key={`${recentMatch.matchId}-${raceComposition}`}
+                              value={raceComposition}
+                            >
+                              {raceComposition}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        formatRaceMatchup(recentMatch)
+                      )}
                     </td>
                     <td
                       className={`min-w-[8rem] break-keep px-3 py-2 ${
@@ -1160,7 +1281,7 @@ export default function ResultsPage() {
                     {isAdmin && (
                       <td className="px-3 py-2">
                         {selectedRecentMatchId === recentMatch.matchId ? (
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 whitespace-nowrap">
                           <button
                             type="button"
                             onClick={handleUpdateRecentMatch}
@@ -1190,7 +1311,8 @@ export default function ResultsPage() {
                       </td>
                     )}
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
             {canAccess && recentMatchesHasMore && (

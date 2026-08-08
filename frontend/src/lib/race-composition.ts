@@ -24,3 +24,38 @@ export function normalizeRaceComposition(
     ? (normalized as RaceComposition)
     : null
 }
+
+export function resolveRaceCompositionTeamSize(
+  homeTeamSize: number,
+  awayTeamSize: number,
+): RaceCompositionTeamSize | null {
+  if (homeTeamSize !== awayTeamSize) {
+    return null
+  }
+
+  return homeTeamSize === 2 || homeTeamSize === 3 ? homeTeamSize : null
+}
+
+export function resolveSharedRaceComposition(
+  teamSize: RaceCompositionTeamSize,
+  homeRaceComposition: string | null | undefined,
+  awayRaceComposition: string | null | undefined,
+): RaceComposition | null {
+  const home = normalizeRaceComposition(teamSize, homeRaceComposition)
+  const away = normalizeRaceComposition(teamSize, awayRaceComposition)
+
+  return home !== null && home === away ? home : null
+}
+
+export function buildRaceCompositionUpdateFields(
+  teamSize: RaceCompositionTeamSize | null,
+  selectedRaceComposition: string | null | undefined,
+  touched: boolean,
+): { raceComposition?: RaceComposition } {
+  if (!touched || teamSize === null) {
+    return {}
+  }
+
+  const raceComposition = normalizeRaceComposition(teamSize, selectedRaceComposition)
+  return raceComposition === null ? {} : { raceComposition }
+}

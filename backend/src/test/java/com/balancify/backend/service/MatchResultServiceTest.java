@@ -3,19 +3,23 @@ package com.balancify.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.balancify.backend.api.match.dto.MatchResultRequest;
+import com.balancify.backend.api.match.dto.MatchResultUpdateRequest;
 import com.balancify.backend.api.match.dto.MatchResultParticipantResponse;
 import com.balancify.backend.api.match.dto.MatchResultResponse;
 import com.balancify.backend.domain.Group;
 import com.balancify.backend.domain.Match;
 import com.balancify.backend.domain.MatchParticipant;
+import com.balancify.backend.domain.MatchSource;
 import com.balancify.backend.domain.MatchStatus;
 import com.balancify.backend.domain.MmrHistory;
 import com.balancify.backend.domain.Player;
+import com.balancify.backend.repository.GroupRepository;
 import com.balancify.backend.repository.MatchParticipantRepository;
 import com.balancify.backend.repository.MatchRepository;
 import com.balancify.backend.repository.MmrHistoryRepository;
@@ -40,6 +44,9 @@ class MatchResultServiceTest {
     private MatchRepository matchRepository;
 
     @Mock
+    private GroupRepository groupRepository;
+
+    @Mock
     private MatchParticipantRepository matchParticipantRepository;
 
     @Mock
@@ -61,6 +68,7 @@ class MatchResultServiceTest {
     private MatchResultService createService(int baseKFactor) {
         return new MatchResultService(
             matchRepository,
+            groupRepository,
             matchParticipantRepository,
             playerRepository,
             mmrHistoryRepository,
@@ -75,6 +83,7 @@ class MatchResultServiceTest {
             1.5,
             5,
             2.0,
+            5,
             new GroupReadCacheService(0),
             playerStatsRefreshService
         );
@@ -249,10 +258,19 @@ class MatchResultServiceTest {
         match.setId(55L);
         match.setStatus(MatchStatus.COMPLETED);
         match.setWinningTeam("HOME");
+        match.setRaceComposition("PPP");
 
         List<MatchParticipant> participants = buildParticipants(match);
+        participants.forEach(participant -> {
+            participant.setRace("P");
+            participant.setAssignedRace("P");
+        });
 
         when(matchRepository.findByIdForUpdate(55L)).thenReturn(Optional.of(match));
+        when(groupRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(new Group()));
+        when(matchRepository.findRecentDuplicateCandidatesExcludingMatch(
+            any(), any(), any(), any(), any(), any(), any()
+        )).thenReturn(List.of());
         when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(55L)).thenReturn(participants);
         when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(playerRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -261,7 +279,7 @@ class MatchResultServiceTest {
 
         MatchResultService.MatchResultUpdateOutcome outcome = matchResultService.updateMatchResult(
             55L,
-            new MatchResultRequest("AWAY"),
+            new MatchResultUpdateRequest("AWAY", "PPT"),
             "ops@example.com",
             "OpsUser"
         );
@@ -272,6 +290,277 @@ class MatchResultServiceTest {
         assertThat(outcome.auditSnapshot().groupId()).isEqualTo(7L);
         assertThat(outcome.auditSnapshot().previousWinnerTeam()).isEqualTo("HOME");
         assertThat(outcome.auditSnapshot().nextWinnerTeam()).isEqualTo("AWAY");
+        assertThat(outcome.auditSnapshot().previousRaceComposition()).isEqualTo("PPP");
+        assertThat(outcome.auditSnapshot().nextRaceComposition()).isEqualTo("PPT");
+        assertThat(match.getRaceComposition()).isEqualTo("PPT");
+        assertThat(participants.stream().filter(participant -> "HOME".equals(participant.getTeam())))
+            .extracting(MatchParticipant::getAssignedRace)
+            .containsExactly("P", "P", "T");
+        assertThat(participants.stream().filter(participant -> "AWAY".equals(participant.getTeam())))
+            .extracting(MatchParticipant::getAssignedRace)
+            .containsExactly("P", "P", "T");
+    }
+
+    @Test
+    void updatesRaceCompositionWithoutReprocessingMmrOrResultMetadataWhenWinnerIsUnchanged() {
+        Match match = new Match();
+        match.setId(56L);
+        match.setStatus(MatchStatus.COMPLETED);
+        match.setWinningTeam("HOME");
+        match.setRaceComposition("PPP");
+        OffsetDateTime recordedAt = OffsetDateTime.parse("2026-08-01T01:00:00Z");
+        match.setResultRecordedAt(recordedAt);
+        match.setResultRecordedByEmail("recorded@example.test");
+        match.setResultRecordedByNickname("Recorder");
+
+        List<MatchParticipant> participants = buildParticipants(match);
+        participants.forEach(participant -> {
+            participant.setRace("P");
+            participant.setAssignedRace("P");
+            participant.setMmrBefore(participant.getPlayer().getMmr() - 10);
+            participant.setMmrAfter(participant.getPlayer().getMmr());
+            participant.setMmrDelta(10);
+        });
+        List<Integer> playerMmrBefore = participants.stream()
+            .map(participant -> participant.getPlayer().getMmr())
+            .toList();
+        List<Integer> participantBefore = participants.stream()
+            .map(MatchParticipant::getMmrBefore)
+            .toList();
+        List<Integer> participantAfter = participants.stream()
+            .map(MatchParticipant::getMmrAfter)
+            .toList();
+        List<Integer> participantDelta = participants.stream()
+            .map(MatchParticipant::getMmrDelta)
+            .toList();
+
+        when(matchRepository.findByIdForUpdate(56L)).thenReturn(Optional.of(match));
+        when(groupRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(new Group()));
+        when(matchRepository.findRecentDuplicateCandidatesExcludingMatch(
+            any(), any(), any(), any(), any(), any(), any()
+        )).thenReturn(List.of());
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(56L)).thenReturn(participants);
+        when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MatchResultService.MatchResultUpdateOutcome outcome = matchResultService.updateMatchResult(
+            56L,
+            new MatchResultUpdateRequest("HOME", "PPT"),
+            "editor@example.test",
+            "Editor"
+        );
+
+        assertThat(match.getRaceComposition()).isEqualTo("PPT");
+        assertThat(match.getResultRecordedAt()).isEqualTo(recordedAt);
+        assertThat(match.getResultRecordedByEmail()).isEqualTo("recorded@example.test");
+        assertThat(match.getResultRecordedByNickname()).isEqualTo("Recorder");
+        assertThat(participants.stream().map(participant -> participant.getPlayer().getMmr()).toList())
+            .isEqualTo(playerMmrBefore);
+        assertThat(participants.stream().map(MatchParticipant::getMmrBefore).toList())
+            .isEqualTo(participantBefore);
+        assertThat(participants.stream().map(MatchParticipant::getMmrAfter).toList())
+            .isEqualTo(participantAfter);
+        assertThat(participants.stream().map(MatchParticipant::getMmrDelta).toList())
+            .isEqualTo(participantDelta);
+        assertThat(outcome.response().winnerTeam()).isEqualTo("HOME");
+        assertThat(outcome.auditSnapshot().previousRaceComposition()).isEqualTo("PPP");
+        assertThat(outcome.auditSnapshot().nextRaceComposition()).isEqualTo("PPT");
+        verify(playerRepository, never()).saveAll(any());
+        verify(mmrHistoryRepository, never()).findByMatch_Id(any());
+        verify(mmrHistoryRepository, never()).saveAll(any());
+        verify(playerStatsRefreshService).rebuildGroupStats(7L);
+    }
+
+    @Test
+    void preservesRaceCompositionWhenPatchOmitsIt() {
+        Match match = new Match();
+        match.setId(64L);
+        match.setStatus(MatchStatus.COMPLETED);
+        match.setWinningTeam("HOME");
+        match.setRaceComposition("PPT");
+
+        List<MatchParticipant> participants = buildParticipants(match);
+        for (int index = 0; index < participants.size(); index++) {
+            MatchParticipant participant = participants.get(index);
+            participant.setRace("P");
+            participant.setAssignedRace(index % 3 == 2 ? "T" : "P");
+        }
+
+        when(matchRepository.findByIdForUpdate(64L)).thenReturn(Optional.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(64L)).thenReturn(participants);
+
+        MatchResultService.MatchResultUpdateOutcome outcome = matchResultService.updateMatchResult(
+            64L,
+            new MatchResultUpdateRequest("HOME", null),
+            null,
+            null
+        );
+
+        assertThat(match.getRaceComposition()).isEqualTo("PPT");
+        assertThat(participants.stream().map(MatchParticipant::getAssignedRace).toList())
+            .containsExactly("P", "P", "T", "P", "P", "T");
+        assertThat(outcome.auditSnapshot().previousRaceComposition()).isEqualTo("PPT");
+        assertThat(outcome.auditSnapshot().nextRaceComposition()).isEqualTo("PPT");
+        verify(groupRepository, never()).findByIdForUpdate(any());
+        verify(matchParticipantRepository, never()).saveAll(any());
+        verify(matchRepository, never()).save(any());
+        verify(playerStatsRefreshService, never()).rebuildGroupStats(any());
+    }
+
+    @Test
+    void rejectsRaceCompositionThatDoesNotMatchTeamSize() {
+        Match match = new Match();
+        match.setId(57L);
+        match.setStatus(MatchStatus.COMPLETED);
+        match.setWinningTeam("HOME");
+        match.setTeamSize(3);
+        List<MatchParticipant> participants = buildParticipants(match);
+
+        when(matchRepository.findByIdForUpdate(57L)).thenReturn(Optional.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(57L)).thenReturn(participants);
+
+        assertThatThrownBy(() -> matchResultService.updateMatchResult(
+            57L,
+            new MatchResultUpdateRequest("HOME", "PT"),
+            null,
+            null
+        )).isInstanceOf(IllegalArgumentException.class);
+
+        verify(matchParticipantRepository, never()).saveAll(any());
+        verify(matchRepository, never()).save(any());
+        verify(playerStatsRefreshService, never()).rebuildGroupStats(any());
+    }
+
+    @Test
+    void rejectsUpdateForCancelledMatchBeforeChangingRaceComposition() {
+        Match match = new Match();
+        match.setId(58L);
+        match.setStatus(MatchStatus.CANCELLED);
+        match.setWinningTeam("HOME");
+        match.setRaceComposition("PPP");
+        when(matchRepository.findByIdForUpdate(58L)).thenReturn(Optional.of(match));
+
+        assertThatThrownBy(() -> matchResultService.updateMatchResult(
+            58L,
+            new MatchResultUpdateRequest("HOME", "PPT"),
+            null,
+            null
+        )).isInstanceOf(MatchConflictException.class);
+
+        assertThat(match.getRaceComposition()).isEqualTo("PPP");
+        verify(matchParticipantRepository, never()).findByMatchIdWithPlayerAndMatch(any());
+    }
+
+    @Test
+    void rejectsDuplicateRaceCompositionAtFiveMinuteBoundaryRegardlessOfSourceAndTeamSwap() {
+        OffsetDateTime createdAt = OffsetDateTime.parse("2026-08-08T01:00:00Z");
+        Match match = new Match();
+        match.setId(59L);
+        match.setStatus(MatchStatus.COMPLETED);
+        match.setWinningTeam("HOME");
+        match.setTeamSize(3);
+        match.setRaceComposition("PPP");
+        match.setCreatedAt(createdAt);
+
+        List<MatchParticipant> participants = buildParticipants(match);
+        participants.forEach(participant -> {
+            participant.setRace("P");
+            participant.setAssignedRace("P");
+        });
+
+        Match duplicate = new Match();
+        duplicate.setId(60L);
+        duplicate.setStatus(MatchStatus.COMPLETED);
+        duplicate.setSource(MatchSource.MANUAL);
+        duplicate.setTeamSize(3);
+        duplicate.setRaceComposition("PPT");
+        duplicate.setCreatedAt(createdAt.plusMinutes(5));
+        duplicate.setParticipantSignature("1-2-3-4-5-6");
+        duplicate.setTeamSignature("HOME:4-5-6|AWAY:1-2-3");
+
+        when(matchRepository.findByIdForUpdate(59L)).thenReturn(Optional.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(59L)).thenReturn(participants);
+        when(groupRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(new Group()));
+        when(matchRepository.findRecentDuplicateCandidatesExcludingMatch(
+            eq(59L),
+            eq(7L),
+            eq(3),
+            eq("1-2-3-4-5-6"),
+            eq("PPT"),
+            eq(createdAt.minusMinutes(5)),
+            eq(createdAt.plusMinutes(5))
+        )).thenReturn(List.of(duplicate));
+
+        assertThatThrownBy(() -> matchResultService.updateMatchResult(
+            59L,
+            new MatchResultUpdateRequest("HOME", "PPT"),
+            null,
+            null
+        ))
+            .isInstanceOf(MatchConflictException.class)
+            .hasMessage(GroupMatchAdminService.duplicateConflictMessage());
+
+        assertThat(match.getRaceComposition()).isEqualTo("PPP");
+        assertThat(participants).extracting(MatchParticipant::getAssignedRace)
+            .containsOnly("P");
+        verify(matchParticipantRepository, never()).saveAll(any());
+        verify(matchRepository, never()).save(any());
+        verify(playerStatsRefreshService, never()).rebuildGroupStats(any());
+    }
+
+    @Test
+    void allowsRaceCompositionUpdateForOutsideWindowAndDifferentTeamPartition() {
+        OffsetDateTime createdAt = OffsetDateTime.parse("2026-08-08T02:00:00Z");
+        Match match = new Match();
+        match.setId(61L);
+        match.setStatus(MatchStatus.COMPLETED);
+        match.setWinningTeam("HOME");
+        match.setTeamSize(3);
+        match.setRaceComposition("PPP");
+        match.setCreatedAt(createdAt);
+
+        List<MatchParticipant> participants = buildParticipants(match);
+        participants.forEach(participant -> {
+            participant.setRace("P");
+            participant.setAssignedRace("P");
+        });
+
+        Match outsideWindow = new Match();
+        outsideWindow.setId(62L);
+        outsideWindow.setStatus(MatchStatus.COMPLETED);
+        outsideWindow.setTeamSize(3);
+        outsideWindow.setRaceComposition("PPT");
+        outsideWindow.setCreatedAt(createdAt.plusMinutes(5).plusSeconds(1));
+        outsideWindow.setParticipantSignature("1-2-3-4-5-6");
+        outsideWindow.setTeamSignature("TEAM1:1-2-3|TEAM2:4-5-6");
+
+        Match differentPartition = new Match();
+        differentPartition.setId(63L);
+        differentPartition.setStatus(MatchStatus.COMPLETED);
+        differentPartition.setTeamSize(3);
+        differentPartition.setRaceComposition("PPT");
+        differentPartition.setCreatedAt(createdAt.plusMinutes(1));
+        differentPartition.setParticipantSignature("1-2-3-4-5-6");
+        differentPartition.setTeamSignature("TEAM1:1-2-4|TEAM2:3-5-6");
+
+        when(matchRepository.findByIdForUpdate(61L)).thenReturn(Optional.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(61L)).thenReturn(participants);
+        when(groupRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(new Group()));
+        when(matchRepository.findRecentDuplicateCandidatesExcludingMatch(
+            any(), any(), any(), any(), any(), any(), any()
+        )).thenReturn(List.of(outsideWindow, differentPartition));
+
+        MatchResultService.MatchResultUpdateOutcome outcome = matchResultService.updateMatchResult(
+            61L,
+            new MatchResultUpdateRequest("HOME", "PPT"),
+            null,
+            null
+        );
+
+        assertThat(outcome.auditSnapshot().previousRaceComposition()).isEqualTo("PPP");
+        assertThat(outcome.auditSnapshot().nextRaceComposition()).isEqualTo("PPT");
+        assertThat(match.getRaceComposition()).isEqualTo("PPT");
+        verify(playerStatsRefreshService).rebuildGroupStats(7L);
     }
 
     @Test

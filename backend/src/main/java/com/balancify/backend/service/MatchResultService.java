@@ -3,12 +3,14 @@ package com.balancify.backend.service;
 import com.balancify.backend.api.match.dto.MatchResultParticipantResponse;
 import com.balancify.backend.api.match.dto.MatchResultRequest;
 import com.balancify.backend.api.match.dto.MatchResultResponse;
+import com.balancify.backend.api.match.dto.MatchResultUpdateRequest;
 import com.balancify.backend.domain.Match;
 import com.balancify.backend.domain.MatchParticipant;
 import com.balancify.backend.domain.MatchStatus;
 import com.balancify.backend.domain.MmrHistory;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.domain.PlayerTierPolicy;
+import com.balancify.backend.repository.GroupRepository;
 import com.balancify.backend.repository.MatchParticipantRepository;
 import com.balancify.backend.repository.MatchRepository;
 import com.balancify.backend.repository.MmrHistoryRepository;
@@ -21,6 +23,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.time.OffsetDateTime;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -34,6 +37,7 @@ public class MatchResultService {
     private static final String DELETED_MEMBER_LABEL = "\uD0C8\uD1F4\uD55C \uD68C\uC6D0";
 
     private final MatchRepository matchRepository;
+    private final GroupRepository groupRepository;
     private final MatchParticipantRepository matchParticipantRepository;
     private final PlayerRepository playerRepository;
     private final MmrHistoryRepository mmrHistoryRepository;
@@ -50,9 +54,11 @@ public class MatchResultService {
     private final double returnBoostMultiplier;
     private final GroupReadCacheService groupReadCacheService;
     private final PlayerStatsRefreshService playerStatsRefreshService;
+    private final long duplicateWindowMinutes;
 
     public MatchResultService(
         MatchRepository matchRepository,
+        GroupRepository groupRepository,
         MatchParticipantRepository matchParticipantRepository,
         PlayerRepository playerRepository,
         MmrHistoryRepository mmrHistoryRepository,
@@ -67,10 +73,12 @@ public class MatchResultService {
         @Value("${balancify.elo.underdog-upset-max-multiplier:1.5}") double underdogUpsetMaxMultiplier,
         @Value("${balancify.rank.return-boost.games:5}") int returnBoostGames,
         @Value("${balancify.rank.return-boost.multiplier:2.0}") double returnBoostMultiplier,
+        @Value("${balancify.match.confirm.duplicate-window-minutes:5}") long duplicateWindowMinutes,
         GroupReadCacheService groupReadCacheService,
         PlayerStatsRefreshService playerStatsRefreshService
     ) {
         this.matchRepository = matchRepository;
+        this.groupRepository = groupRepository;
         this.matchParticipantRepository = matchParticipantRepository;
         this.playerRepository = playerRepository;
         this.mmrHistoryRepository = mmrHistoryRepository;
@@ -87,6 +95,7 @@ public class MatchResultService {
         this.returnBoostMultiplier = Math.max(1.0, returnBoostMultiplier);
         this.groupReadCacheService = groupReadCacheService;
         this.playerStatsRefreshService = playerStatsRefreshService;
+        this.duplicateWindowMinutes = Math.max(1L, duplicateWindowMinutes);
     }
 
     @Transactional
@@ -128,18 +137,75 @@ public class MatchResultService {
     @Transactional
     public MatchResultUpdateOutcome updateMatchResult(
         Long matchId,
-        MatchResultRequest request,
+        MatchResultUpdateRequest request,
         String recordedByEmail,
         String recordedByNickname
     ) {
+        Match match = matchRepository.findByIdForUpdate(matchId)
+            .orElseThrow(() -> new NoSuchElementException("Match not found: " + matchId));
+        String winnerTeam = normalizeTeam(request == null ? null : request.winnerTeam());
+        String previousWinnerTeam = normalizeOptionalTeam(match.getWinningTeam());
+        MatchStatus currentStatus = normalizeMatchStatus(match);
+        if (currentStatus == MatchStatus.CANCELLED) {
+            throw new MatchConflictException("취소된 경기의 결과는 수정할 수 없습니다.");
+        }
+
+        ValidatedParticipants validatedParticipants = loadValidatedParticipants(matchId, match);
+        RaceCompositionUpdate raceCompositionUpdate = applyRaceCompositionUpdate(
+            match,
+            validatedParticipants,
+            request == null ? null : request.raceComposition()
+        );
+
+        boolean sameCompletedWinner = currentStatus == MatchStatus.COMPLETED
+            && previousWinnerTeam != null
+            && Objects.equals(previousWinnerTeam, winnerTeam);
+        if (sameCompletedWinner) {
+            Long groupId = resolveGroupId(match, validatedParticipants.all());
+            if (raceCompositionUpdate.changed()) {
+                matchParticipantRepository.saveAll(validatedParticipants.all());
+                matchRepository.save(match);
+                playerStatsRefreshService.rebuildGroupStats(groupId);
+                evictGroupReadCache(groupId);
+            }
+
+            MatchResultResponse response = buildExistingResultResponse(
+                match,
+                winnerTeam,
+                validatedParticipants
+            );
+            return new MatchResultUpdateOutcome(
+                response,
+                new MatchResultUpdateAuditSnapshot(
+                    match.getId(),
+                    groupId,
+                    previousWinnerTeam,
+                    winnerTeam,
+                    raceCompositionUpdate.previousRaceComposition(),
+                    raceCompositionUpdate.nextRaceComposition()
+                )
+            );
+        }
+
         MatchResultProcessOutcome outcome = processMatchResultInternal(
             matchId,
-            request,
+            new MatchResultRequest(winnerTeam),
             recordedByEmail,
             recordedByNickname,
             true
         );
-        return new MatchResultUpdateOutcome(outcome.response(), outcome.updateAuditSnapshot());
+        MatchResultUpdateAuditSnapshot winnerAudit = outcome.updateAuditSnapshot();
+        return new MatchResultUpdateOutcome(
+            outcome.response(),
+            new MatchResultUpdateAuditSnapshot(
+                winnerAudit.matchId(),
+                winnerAudit.groupId(),
+                winnerAudit.previousWinnerTeam(),
+                winnerAudit.nextWinnerTeam(),
+                raceCompositionUpdate.previousRaceComposition(),
+                raceCompositionUpdate.nextRaceComposition()
+            )
+        );
     }
 
     private MatchResultProcessOutcome processMatchResultInternal(
@@ -171,28 +237,11 @@ public class MatchResultService {
             throw new MatchConflictException("취소된 경기는 결과를 수정할 수 없습니다.");
         }
 
-        List<MatchParticipant> participants =
-            matchParticipantRepository.findByMatchIdWithPlayerAndMatch(matchId);
-        int teamSize = resolveRequiredTeamSize(match, participants);
-        int requiredParticipants = teamSize * 2;
-        if (participants.size() != requiredParticipants) {
-            throw new IllegalArgumentException(
-                "Exactly %d participants are required".formatted(requiredParticipants)
-            );
-        }
-
-        List<MatchParticipant> homeParticipants = participants.stream()
-            .filter(participant -> TEAM_HOME.equals(normalizeTeam(participant.getTeam())))
-            .toList();
-        List<MatchParticipant> awayParticipants = participants.stream()
-            .filter(participant -> TEAM_AWAY.equals(normalizeTeam(participant.getTeam())))
-            .toList();
-
-        if (homeParticipants.size() != teamSize || awayParticipants.size() != teamSize) {
-            throw new IllegalArgumentException(
-                "Match must have %d HOME and %d AWAY participants".formatted(teamSize, teamSize)
-            );
-        }
+        ValidatedParticipants validatedParticipants = loadValidatedParticipants(matchId, match);
+        List<MatchParticipant> participants = validatedParticipants.all();
+        int teamSize = validatedParticipants.teamSize();
+        List<MatchParticipant> homeParticipants = validatedParticipants.home();
+        List<MatchParticipant> awayParticipants = validatedParticipants.away();
 
         double homeAverageMmr = calculateAverageMmr(homeParticipants);
         double awayAverageMmr = calculateAverageMmr(awayParticipants);
@@ -305,6 +354,273 @@ public class MatchResultService {
 
     private String responseNickname(Player player) {
         return PlayerIdentityPolicy.responseNickname(player);
+    }
+
+    private ValidatedParticipants loadValidatedParticipants(Long matchId, Match match) {
+        List<MatchParticipant> participants =
+            matchParticipantRepository.findByMatchIdWithPlayerAndMatch(matchId);
+        int teamSize = resolveRequiredTeamSize(match, participants);
+        int requiredParticipants = teamSize * 2;
+        if (participants.size() != requiredParticipants) {
+            throw new IllegalArgumentException(
+                "Exactly %d participants are required".formatted(requiredParticipants)
+            );
+        }
+
+        List<MatchParticipant> homeParticipants = participants.stream()
+            .filter(participant -> TEAM_HOME.equals(normalizeTeam(participant.getTeam())))
+            .toList();
+        List<MatchParticipant> awayParticipants = participants.stream()
+            .filter(participant -> TEAM_AWAY.equals(normalizeTeam(participant.getTeam())))
+            .toList();
+        if (homeParticipants.size() != teamSize || awayParticipants.size() != teamSize) {
+            throw new IllegalArgumentException(
+                "Match must have %d HOME and %d AWAY participants".formatted(teamSize, teamSize)
+            );
+        }
+
+        return new ValidatedParticipants(
+            List.copyOf(participants),
+            homeParticipants,
+            awayParticipants,
+            teamSize
+        );
+    }
+
+    private RaceCompositionUpdate applyRaceCompositionUpdate(
+        Match match,
+        ValidatedParticipants participants,
+        String requestedRaceComposition
+    ) {
+        String previousRaceComposition = normalizeRaceCompositionForAudit(
+            match == null ? null : match.getRaceComposition(),
+            participants.teamSize()
+        );
+        if (requestedRaceComposition == null) {
+            return new RaceCompositionUpdate(
+                previousRaceComposition,
+                previousRaceComposition,
+                false
+            );
+        }
+        if (requestedRaceComposition.isBlank()) {
+            throw new IllegalArgumentException("raceComposition is required");
+        }
+
+        String nextRaceComposition = RaceCompositionPolicy.normalizeForTeamSize(
+            requestedRaceComposition,
+            participants.teamSize()
+        );
+        if (!Objects.equals(previousRaceComposition, nextRaceComposition)) {
+            rejectDuplicateRaceCompositionUpdate(
+                match,
+                participants,
+                nextRaceComposition
+            );
+        }
+        boolean matchAlreadyCanonical = Objects.equals(
+            nextRaceComposition,
+            match == null ? null : match.getRaceComposition()
+        );
+        boolean assignmentsAlreadyMatch = teamMatchesRaceComposition(
+            participants.home(),
+            nextRaceComposition
+        ) && teamMatchesRaceComposition(
+            participants.away(),
+            nextRaceComposition
+        );
+        if (matchAlreadyCanonical && assignmentsAlreadyMatch) {
+            return new RaceCompositionUpdate(
+                previousRaceComposition,
+                nextRaceComposition,
+                false
+            );
+        }
+
+        assignRaceComposition(participants.home(), nextRaceComposition);
+        assignRaceComposition(participants.away(), nextRaceComposition);
+        match.setRaceComposition(nextRaceComposition);
+        return new RaceCompositionUpdate(
+            previousRaceComposition,
+            nextRaceComposition,
+            true
+        );
+    }
+
+    private void assignRaceComposition(
+        List<MatchParticipant> participants,
+        String raceComposition
+    ) {
+        List<String> capabilities = participants.stream()
+            .map(this::resolveParticipantCapability)
+            .toList();
+        PlayerRacePolicy.TeamRaceAssignment assignment = PlayerRacePolicy.assignToComposition(
+            capabilities,
+            raceComposition,
+            true
+        );
+        if (assignment == null || assignment.assignedRaces().size() != participants.size()) {
+            throw new IllegalArgumentException("선택한 종족 조합으로 매치를 구성할 수 없습니다");
+        }
+        for (int index = 0; index < participants.size(); index++) {
+            participants.get(index).setAssignedRace(assignment.assignedRaces().get(index));
+        }
+    }
+
+    private boolean teamMatchesRaceComposition(
+        List<MatchParticipant> participants,
+        String raceComposition
+    ) {
+        List<String> assignedRaces = new ArrayList<>(participants.size());
+        for (MatchParticipant participant : participants) {
+            String assignedRace = participant.getAssignedRace();
+            if (assignedRace == null || assignedRace.isBlank()) {
+                return false;
+            }
+            assignedRaces.add(assignedRace);
+        }
+        try {
+            return RaceCompositionPolicy.matches(assignedRaces, raceComposition);
+        } catch (IllegalArgumentException exception) {
+            return false;
+        }
+    }
+
+    private String resolveParticipantCapability(MatchParticipant participant) {
+        String playerCapability = participant != null && participant.getPlayer() != null
+            ? PlayerRacePolicy.normalizeCapabilityOrDefault(participant.getPlayer().getRace(), "P")
+            : "P";
+        if (participant == null) {
+            return playerCapability;
+        }
+        return PlayerRacePolicy.normalizeCapabilityOrDefault(participant.getRace(), playerCapability);
+    }
+
+    private String normalizeRaceCompositionForAudit(String value, int teamSize) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return RaceCompositionPolicy.normalizeForTeamSize(value, teamSize);
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
+    }
+
+    private void rejectDuplicateRaceCompositionUpdate(
+        Match match,
+        ValidatedParticipants participants,
+        String nextRaceComposition
+    ) {
+        if (match == null || match.getId() == null) {
+            throw new IllegalArgumentException("Match identity is required");
+        }
+
+        Long groupId = resolveGroupId(match, participants.all());
+        groupRepository.findByIdForUpdate(groupId)
+            .orElseThrow(() -> new NoSuchElementException("Group not found: " + groupId));
+
+        MatchSignaturePolicy.Signature requestedSignature =
+            MatchSignaturePolicy.fromParticipants(participants.all());
+        if (requestedSignature == null) {
+            requestedSignature = MatchSignaturePolicy.fromStored(match);
+        }
+        if (requestedSignature == null) {
+            throw new IllegalArgumentException("Match participant signature is required");
+        }
+
+        OffsetDateTime createdAt = match.getCreatedAt();
+        if (createdAt == null) {
+            throw new IllegalArgumentException("Match creation time is required");
+        }
+        OffsetDateTime fromInclusive = createdAt.minusMinutes(duplicateWindowMinutes);
+        OffsetDateTime toInclusive = createdAt.plusMinutes(duplicateWindowMinutes);
+        List<Match> duplicateCandidates = matchRepository.findRecentDuplicateCandidatesExcludingMatch(
+            match.getId(),
+            groupId,
+            participants.teamSize(),
+            requestedSignature.participantSignature(),
+            nextRaceComposition,
+            fromInclusive,
+            toInclusive
+        );
+
+        for (Match candidate : duplicateCandidates) {
+            if (candidate == null
+                || candidate.getId() == null
+                || Objects.equals(candidate.getId(), match.getId())
+                || candidate.getStatus() == MatchStatus.CANCELLED
+                || resolveDuplicateTeamSize(candidate) != participants.teamSize()
+                || !Objects.equals(
+                    nextRaceComposition,
+                    normalizeRaceCompositionForAudit(candidate.getRaceComposition(), participants.teamSize())
+                )) {
+                continue;
+            }
+
+            OffsetDateTime candidateCreatedAt = candidate.getCreatedAt();
+            if (candidateCreatedAt == null
+                || candidateCreatedAt.isBefore(fromInclusive)
+                || candidateCreatedAt.isAfter(toInclusive)) {
+                continue;
+            }
+
+            MatchSignaturePolicy.Signature candidateSignature = MatchSignaturePolicy.fromStored(candidate);
+            if (candidateSignature == null) {
+                candidateSignature = MatchSignaturePolicy.fromParticipants(
+                    matchParticipantRepository.findByMatchIdWithPlayerAndMatch(candidate.getId())
+                );
+            }
+            if (requestedSignature.equals(candidateSignature)) {
+                throw new MatchConflictException(GroupMatchAdminService.duplicateConflictMessage());
+            }
+        }
+    }
+
+    private int resolveDuplicateTeamSize(Match match) {
+        Integer teamSize = match == null ? null : match.getTeamSize();
+        return teamSize == null || teamSize <= 0 ? 3 : teamSize;
+    }
+
+    private MatchResultResponse buildExistingResultResponse(
+        Match match,
+        String winnerTeam,
+        ValidatedParticipants participants
+    ) {
+        double homeAverageMmr = calculateAverageMmr(participants.home());
+        double awayAverageMmr = calculateAverageMmr(participants.away());
+        double homeExpectedWinRate = calculateExpectedWinRate(homeAverageMmr, awayAverageMmr);
+        List<MatchResultParticipantResponse> responseParticipants = participants.all()
+            .stream()
+            .map(participant -> {
+                Player player = participant.getPlayer();
+                int mmrBefore = participant.getMmrBefore() == null
+                    ? participantReferenceMmr(participant)
+                    : floorMmr(participant.getMmrBefore());
+                int mmrDelta = safeMmr(participant.getMmrDelta());
+                int mmrAfter = participant.getMmrAfter() == null
+                    ? floorMmr(mmrBefore + mmrDelta)
+                    : floorMmr(participant.getMmrAfter());
+                return new MatchResultParticipantResponse(
+                    responsePlayerId(player),
+                    responseNickname(player),
+                    normalizeTeam(participant.getTeam()),
+                    resolveAssignedRace(participant),
+                    mmrBefore,
+                    mmrAfter,
+                    mmrDelta
+                );
+            })
+            .toList();
+
+        return new MatchResultResponse(
+            match.getId(),
+            winnerTeam,
+            calculateEffectiveKFactor(participants.all(), homeAverageMmr, awayAverageMmr),
+            round4(homeExpectedWinRate),
+            round4(1.0 - homeExpectedWinRate),
+            responseParticipants
+        );
     }
 
     private double calculateAverageMmr(List<MatchParticipant> participants) {
@@ -632,13 +948,38 @@ public class MatchResultService {
         Long matchId,
         Long groupId,
         String previousWinnerTeam,
-        String nextWinnerTeam
+        String nextWinnerTeam,
+        String previousRaceComposition,
+        String nextRaceComposition
     ) {
+        public MatchResultUpdateAuditSnapshot(
+            Long matchId,
+            Long groupId,
+            String previousWinnerTeam,
+            String nextWinnerTeam
+        ) {
+            this(matchId, groupId, previousWinnerTeam, nextWinnerTeam, null, null);
+        }
     }
 
     private record MatchResultProcessOutcome(
         MatchResultResponse response,
         MatchResultUpdateAuditSnapshot updateAuditSnapshot
+    ) {
+    }
+
+    private record ValidatedParticipants(
+        List<MatchParticipant> all,
+        List<MatchParticipant> home,
+        List<MatchParticipant> away,
+        int teamSize
+    ) {
+    }
+
+    private record RaceCompositionUpdate(
+        String previousRaceComposition,
+        String nextRaceComposition,
+        boolean changed
     ) {
     }
 
