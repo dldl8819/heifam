@@ -16,6 +16,7 @@ import java.util.Set;
 import java.util.UUID;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +38,7 @@ public class PlayerAdminService {
     @PersistenceContext
     private EntityManager entityManager;
 
+    @Autowired
     public PlayerAdminService(
         PlayerRepository playerRepository,
         OperationAuditLogService operationAuditLogService,

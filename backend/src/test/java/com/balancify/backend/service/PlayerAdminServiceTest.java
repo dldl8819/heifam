@@ -29,6 +29,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -62,6 +63,24 @@ class PlayerAdminServiceTest {
             accountDeletionService
         );
         ReflectionTestUtils.setField(playerAdminService, "entityManager", entityManager);
+    }
+
+    @Test
+    void productionConstructorIsExplicitlyAutowired() {
+        var autowiredConstructors = java.util.Arrays.stream(
+                PlayerAdminService.class.getDeclaredConstructors()
+            )
+            .filter(constructor -> constructor.isAnnotationPresent(Autowired.class))
+            .toList();
+
+        assertThat(autowiredConstructors)
+            .singleElement()
+            .satisfies(constructor -> assertThat(constructor.getParameterTypes()).containsExactly(
+                PlayerRepository.class,
+                OperationAuditLogService.class,
+                GroupReadCacheService.class,
+                AccountDeletionService.class
+            ));
     }
 
     @Test
