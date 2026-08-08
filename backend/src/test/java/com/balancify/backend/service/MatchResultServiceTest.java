@@ -372,7 +372,7 @@ class MatchResultServiceTest {
     }
 
     @Test
-    void preservesRaceCompositionWhenPatchOmitsIt() {
+    void skipsNoOpUpdateWhenWinnerAndRaceCompositionAreUnchanged() {
         Match match = new Match();
         match.setId(64L);
         match.setStatus(MatchStatus.COMPLETED);
@@ -389,22 +389,72 @@ class MatchResultServiceTest {
         when(matchRepository.findByIdForUpdate(64L)).thenReturn(Optional.of(match));
         when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(64L)).thenReturn(participants);
 
-        MatchResultService.MatchResultUpdateOutcome outcome = matchResultService.updateMatchResult(
-            64L,
-            new MatchResultUpdateRequest("HOME", null),
-            null,
-            null
-        );
+        MatchResultService.MatchResultUpdateOutcome omittedRaceOutcome =
+            matchResultService.updateMatchResult(
+                64L,
+                new MatchResultUpdateRequest("HOME", null),
+                null,
+                null
+            );
+        MatchResultService.MatchResultUpdateOutcome repeatedRaceOutcome =
+            matchResultService.updateMatchResult(
+                64L,
+                new MatchResultUpdateRequest("HOME", "PPT"),
+                null,
+                null
+            );
 
         assertThat(match.getRaceComposition()).isEqualTo("PPT");
         assertThat(participants.stream().map(MatchParticipant::getAssignedRace).toList())
             .containsExactly("P", "P", "T", "P", "P", "T");
-        assertThat(outcome.auditSnapshot().previousRaceComposition()).isEqualTo("PPT");
-        assertThat(outcome.auditSnapshot().nextRaceComposition()).isEqualTo("PPT");
+        assertThat(omittedRaceOutcome.auditSnapshot()).isNull();
+        assertThat(repeatedRaceOutcome.auditSnapshot()).isNull();
         verify(groupRepository, never()).findByIdForUpdate(any());
         verify(matchParticipantRepository, never()).saveAll(any());
         verify(matchRepository, never()).save(any());
+        verify(playerRepository, never()).saveAll(any());
+        verify(mmrHistoryRepository, never()).saveAll(any());
         verify(playerStatsRefreshService, never()).rebuildGroupStats(any());
+    }
+
+    @Test
+    void repairsAssignedRacesWhenCompositionTextIsUnchanged() {
+        Match match = new Match();
+        match.setId(65L);
+        match.setStatus(MatchStatus.COMPLETED);
+        match.setWinningTeam("HOME");
+        match.setRaceComposition("PPT");
+
+        List<MatchParticipant> participants = buildParticipants(match);
+        for (int index = 0; index < participants.size(); index++) {
+            MatchParticipant participant = participants.get(index);
+            participant.setRace("P");
+            participant.setAssignedRace(index % 3 == 2 ? "T" : "P");
+        }
+        participants.get(0).setAssignedRace("Z");
+
+        when(matchRepository.findByIdForUpdate(65L)).thenReturn(Optional.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(65L)).thenReturn(participants);
+        when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MatchResultService.MatchResultUpdateOutcome outcome = matchResultService.updateMatchResult(
+            65L,
+            new MatchResultUpdateRequest("HOME", "PPT"),
+            null,
+            null
+        );
+
+        assertThat(outcome.auditSnapshot()).isNotNull();
+        assertThat(outcome.auditSnapshot().previousRaceComposition()).isEqualTo("PPT");
+        assertThat(outcome.auditSnapshot().nextRaceComposition()).isEqualTo("PPT");
+        assertThat(participants.stream().map(MatchParticipant::getAssignedRace).toList())
+            .containsExactly("P", "P", "T", "P", "P", "T");
+        verify(matchParticipantRepository).saveAll(participants);
+        verify(matchRepository).save(match);
+        verify(playerStatsRefreshService).rebuildGroupStats(7L);
+        verify(playerRepository, never()).saveAll(any());
+        verify(mmrHistoryRepository, never()).saveAll(any());
     }
 
     @Test

@@ -162,12 +162,17 @@ public class MatchResultService {
             && Objects.equals(previousWinnerTeam, winnerTeam);
         if (sameCompletedWinner) {
             Long groupId = resolveGroupId(match, validatedParticipants.all());
-            if (raceCompositionUpdate.changed()) {
-                matchParticipantRepository.saveAll(validatedParticipants.all());
-                matchRepository.save(match);
-                playerStatsRefreshService.rebuildGroupStats(groupId);
-                evictGroupReadCache(groupId);
+            if (!raceCompositionUpdate.changed()) {
+                return new MatchResultUpdateOutcome(
+                    buildExistingResultResponse(match, winnerTeam, validatedParticipants),
+                    null
+                );
             }
+
+            matchParticipantRepository.saveAll(validatedParticipants.all());
+            matchRepository.save(match);
+            playerStatsRefreshService.rebuildGroupStats(groupId);
+            evictGroupReadCache(groupId);
 
             MatchResultResponse response = buildExistingResultResponse(
                 match,

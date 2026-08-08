@@ -122,6 +122,9 @@ class AdminKeyFilterTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private AdminKeyProperties adminKeyProperties;
+
     @MockBean
     private MatchResultService matchResultService;
 
@@ -472,6 +475,42 @@ class AdminKeyFilterTest {
         );
     }
 
+    @Test
+    void skipsAuditLogWhenMatchResultPatchHasNoChanges() throws Exception {
+        String adminEmail = adminKeyProperties
+            .getNormalizedAdminEmails()
+            .stream()
+            .filter(email -> !adminKeyProperties.isConfiguredSuperAdminEmail(email))
+            .findFirst()
+            .orElseThrow();
+        String expectedNickname = adminEmail.substring(0, adminEmail.indexOf('@'));
+        when(matchResultService.updateMatchResult(eq(1L), any(MatchResultUpdateRequest.class), any(), any()))
+            .thenReturn(
+                new MatchResultService.MatchResultUpdateOutcome(
+                    new MatchResultResponse(1L, "HOME", 32, 0.5, 0.5, List.of()),
+                    null
+                )
+            );
+
+        mockMvc
+            .perform(
+                patch("/api/matches/1/result")
+                    .header("X-USER-EMAIL", adminEmail)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"winnerTeam\":\"HOME\",\"raceComposition\":\"PPT\"}")
+            )
+            .andExpect(status().isOk());
+
+        verify(matchResultService).updateMatchResult(
+            eq(1L),
+            argThat(request -> request != null
+                && "HOME".equals(request.winnerTeam())
+                && "PPT".equals(request.raceComposition())),
+            eq(adminEmail),
+            eq(expectedNickname)
+        );
+        verify(operationAuditLogService, never()).recordMatchResultUpdate(any(), any(), any());
+    }
     @Test
     void allowsMatchResultPatchWhenSuperAdminEmailIsValid() throws Exception {
         MatchResultService.MatchResultUpdateAuditSnapshot auditSnapshot =

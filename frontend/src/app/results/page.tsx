@@ -9,8 +9,8 @@ import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
 import { findUniquePlayerByNicknamePrefix } from '@/lib/player-autocomplete'
+import { buildMatchResultUpdateRequest } from '@/lib/match-result-edit'
 import {
-  buildRaceCompositionUpdateFields,
   getRaceCompositionOptions,
   normalizeRaceComposition,
   resolveRaceCompositionTeamSize,
@@ -19,7 +19,6 @@ import {
 import type {
   BalancePlayerOption,
   MatchResultResponse,
-  MatchResultUpdateRequest,
   RaceComposition,
   RecentMatchItem,
   TeamSide,
@@ -211,8 +210,6 @@ export default function ResultsPage() {
   const [selectedRecentWinnerTeam, setSelectedRecentWinnerTeam] = useState<TeamSide>('HOME')
   const [selectedRecentRaceComposition, setSelectedRecentRaceComposition] =
     useState<RecentRaceComposition>('')
-  const [isSelectedRecentRaceCompositionDirty, setIsSelectedRecentRaceCompositionDirty] =
-    useState<boolean>(false)
   const [isRecentSaving, setIsRecentSaving] = useState<boolean>(false)
   const [isRecentDeleting, setIsRecentDeleting] = useState<boolean>(false)
   const [recentActionMessage, setRecentActionMessage] = useState<string | null>(null)
@@ -266,6 +263,34 @@ export default function ResultsPage() {
         recentMatches.map((recentMatch, index) => [recentMatch.matchId, index + 1]),
       ),
     [recentMatches],
+  )
+
+  const selectedRecentMatch = useMemo(
+    () =>
+      selectedRecentMatchId === null
+        ? null
+        : recentMatches.find((match) => match.matchId === selectedRecentMatchId) ?? null,
+    [recentMatches, selectedRecentMatchId],
+  )
+
+  const pendingRecentUpdateRequest = useMemo(
+    () =>
+      selectedRecentMatch === null
+        ? null
+        : buildMatchResultUpdateRequest(
+            {
+              winnerTeam: selectedRecentMatch.winningTeam,
+              teamSize: resolveRaceCompositionTeamSize(
+                selectedRecentMatch.homeTeam.length,
+                selectedRecentMatch.awayTeam.length,
+              ),
+              homeRaceComposition: selectedRecentMatch.homeRaceComposition,
+              awayRaceComposition: selectedRecentMatch.awayRaceComposition,
+            },
+            selectedRecentWinnerTeam,
+            selectedRecentRaceComposition,
+          ),
+    [selectedRecentMatch, selectedRecentRaceComposition, selectedRecentWinnerTeam],
   )
 
   const formatMatchReference = useCallback(
@@ -334,7 +359,6 @@ export default function ResultsPage() {
         if (!selectedMatch || (selectedMatch.winningTeam !== 'HOME' && selectedMatch.winningTeam !== 'AWAY')) {
           setSelectedRecentMatchId(null)
           setSelectedRecentRaceComposition('')
-          setIsSelectedRecentRaceCompositionDirty(false)
           setRecentActionMessage(null)
         } else {
           setSelectedRecentWinnerTeam(selectedMatch.winningTeam)
@@ -351,7 +375,6 @@ export default function ResultsPage() {
                     selectedMatch.awayRaceComposition,
                   ) ?? '',
           )
-          setIsSelectedRecentRaceCompositionDirty(false)
         }
       }
     } catch {
@@ -410,7 +433,6 @@ export default function ResultsPage() {
     if (requestedFromBalance) {
       setSelectedRecentMatchId(null)
       setSelectedRecentRaceComposition('')
-      setIsSelectedRecentRaceCompositionDirty(false)
       setSelectedRecentWinnerTeam(
         requestedWinnerTeam ??
           (matched.winningTeam === 'HOME' || matched.winningTeam === 'AWAY'
@@ -446,7 +468,6 @@ export default function ResultsPage() {
               matched.awayRaceComposition,
             ) ?? '',
     )
-    setIsSelectedRecentRaceCompositionDirty(false)
 
     setAppliedSearchSelection(true)
   }, [
@@ -466,7 +487,6 @@ export default function ResultsPage() {
 
     setSelectedRecentMatchId(null)
     setSelectedRecentRaceComposition('')
-    setIsSelectedRecentRaceCompositionDirty(false)
     setRecentActionMessage(t('results.recent.submittedFromBalanceGeneric'))
     setAppliedSearchSelection(true)
   }, [appliedSearchSelection, requestedFromBalance, requestedMatchId])
@@ -478,7 +498,6 @@ export default function ResultsPage() {
 
     setSelectedRecentMatchId(null)
     setSelectedRecentRaceComposition('')
-    setIsSelectedRecentRaceCompositionDirty(false)
   }, [isAdmin])
 
   useEffect(() => {
@@ -710,7 +729,6 @@ export default function ResultsPage() {
       setResult(response)
       setSelectedRecentMatchId(null)
       setSelectedRecentRaceComposition('')
-      setIsSelectedRecentRaceCompositionDirty(false)
       setSelectedRecentWinnerTeam(response.winnerTeam)
       setManualHomeSlots(createManualSlots(manualTeamSize))
       setManualAwaySlots(createManualSlots(manualTeamSize))
@@ -763,7 +781,6 @@ export default function ResultsPage() {
               recentMatch.awayRaceComposition,
             ) ?? '',
     )
-    setIsSelectedRecentRaceCompositionDirty(false)
     setError(null)
     setRecentActionMessage(null)
   }
@@ -778,29 +795,20 @@ export default function ResultsPage() {
       return
     }
 
+    if (pendingRecentUpdateRequest === null) {
+      setError(null)
+      setRecentActionMessage(t('results.recent.noChanges'))
+      return
+    }
+
     setError(null)
     setRecentActionMessage(null)
     setIsRecentSaving(true)
     try {
-      const selectedRecentMatch = recentMatches.find(
-        (match) => match.matchId === selectedRecentMatchId,
+      const response = await apiClient.updateMatchResult(
+        selectedRecentMatchId,
+        pendingRecentUpdateRequest,
       )
-      const selectedRecentTeamSize = selectedRecentMatch
-        ? resolveRaceCompositionTeamSize(
-            selectedRecentMatch.homeTeam.length,
-            selectedRecentMatch.awayTeam.length,
-          )
-        : null
-      const updateRequest: MatchResultUpdateRequest = {
-        winnerTeam: selectedRecentWinnerTeam,
-        ...buildRaceCompositionUpdateFields(
-          selectedRecentTeamSize,
-          selectedRecentRaceComposition,
-          isSelectedRecentRaceCompositionDirty,
-        ),
-      }
-
-      const response = await apiClient.updateMatchResult(selectedRecentMatchId, updateRequest)
       setResult(response)
       setRecentActionMessage(
         t('results.recent.updated', {
@@ -810,7 +818,6 @@ export default function ResultsPage() {
       await loadRecentMatches()
       setSelectedRecentMatchId(null)
       setSelectedRecentRaceComposition('')
-      setIsSelectedRecentRaceCompositionDirty(false)
     } catch (updateError) {
       if (isApiForbiddenError(updateError)) {
         setError(t('common.permissionDenied'))
@@ -849,7 +856,6 @@ export default function ResultsPage() {
       await apiClient.deleteMatch(targetMatchId)
       setSelectedRecentMatchId(null)
       setSelectedRecentRaceComposition('')
-      setIsSelectedRecentRaceCompositionDirty(false)
       setResult((previousResult) =>
         previousResult && previousResult.matchId === targetMatchId ? null : previousResult,
       )
@@ -1234,7 +1240,6 @@ export default function ResultsPage() {
                                 ? ''
                                 : normalizeRaceComposition(recentTeamSize, event.target.value) ?? '',
                             )
-                            setIsSelectedRecentRaceCompositionDirty(true)
                           }}
                           disabled={
                             recentTeamSize === null || isRecentSaving || isRecentDeleting
@@ -1288,7 +1293,16 @@ export default function ResultsPage() {
                           <button
                             type="button"
                             onClick={handleUpdateRecentMatch}
-                            disabled={isRecentSaving || isRecentDeleting}
+                            disabled={
+                              isRecentSaving ||
+                              isRecentDeleting ||
+                              pendingRecentUpdateRequest === null
+                            }
+                            title={
+                              pendingRecentUpdateRequest === null
+                                ? t('results.recent.noChanges')
+                                : undefined
+                            }
                             className="rounded-md border border-slate-900 bg-slate-900 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-300 dark:border-slate-100 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:border-slate-700 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
                           >
                             {isRecentSaving ? t('results.recent.saving') : t('results.recent.save')}

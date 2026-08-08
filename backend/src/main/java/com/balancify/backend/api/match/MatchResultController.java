@@ -120,11 +120,13 @@ public class MatchResultController {
                 actorEmail,
                 actorNickname
             );
-            operationAuditLogService.recordMatchResultUpdate(
-                actorEmail,
-                actorNickname,
-                outcome.auditSnapshot()
-            );
+            if (outcome.auditSnapshot() != null) {
+                operationAuditLogService.recordMatchResultUpdate(
+                    actorEmail,
+                    actorNickname,
+                    outcome.auditSnapshot()
+                );
+            }
             MatchResultResponse response = outcome.response();
             if (mmrAccessRequestResolver.canViewMmr(httpRequest)) {
                 return response;
