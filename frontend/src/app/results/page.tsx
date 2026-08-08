@@ -1231,7 +1231,9 @@ export default function ResultsPage() {
                       )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-slate-700 dark:text-slate-300">
-                      {selectedRecentMatchId === recentMatch.matchId && isAdmin ? (
+                      {selectedRecentMatchId === recentMatch.matchId &&
+                        isAdmin &&
+                        recentTeamSize !== null ? (
                         <select
                           value={selectedRecentRaceComposition}
                           onChange={(event) => {
@@ -1241,15 +1243,17 @@ export default function ResultsPage() {
                                 : normalizeRaceComposition(recentTeamSize, event.target.value) ?? '',
                             )
                           }}
-                          disabled={
-                            recentTeamSize === null || isRecentSaving || isRecentDeleting
-                          }
+                          disabled={isRecentSaving || isRecentDeleting}
                           aria-label={t('results.recent.raceCompositionAriaLabel', {
                             matchReference: formatMatchReference(recentMatch.matchId),
                           })}
                           className="min-w-[5.5rem] whitespace-nowrap rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                         >
-                          <option value="">{t('results.recent.keepRaceComposition')}</option>
+                          {selectedRecentRaceComposition === '' && (
+                            <option value="" disabled>
+                              {t('results.recent.selectRaceComposition')}
+                            </option>
+                          )}
                           {recentRaceCompositionOptions.map((raceComposition) => (
                             <option
                               key={`${recentMatch.matchId}-${raceComposition}`}

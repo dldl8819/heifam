@@ -1006,7 +1006,7 @@
       "deleteFailure": "매치 삭제에 실패했습니다. 권한과 서버 상태를 확인해 주세요.",
       "deleteConfirm": "{matchReference}를 삭제하시겠습니까? MMR이 롤백됩니다.",
       "selectedHint": "{matchReference}를 선택했습니다. 승리 팀과 종족전을 확인하고 저장하세요.",
-      "keepRaceComposition": "변경 안 함",
+      "selectRaceComposition": "종족전 선택",
       "raceCompositionAriaLabel": "{matchReference} 종족전 수정",
       "noWinner": "미입력",
       "reference": {
