@@ -740,7 +740,7 @@ export default function ResultsPage() {
   }
 
   const handlePickRecentMatch = (recentMatch: RecentMatchItem) => {
-    if (!isAdmin) {
+    if (!isAdmin || isRecentSaving || isRecentDeleting) {
       return
     }
 
@@ -808,6 +808,9 @@ export default function ResultsPage() {
         }),
       )
       await loadRecentMatches()
+      setSelectedRecentMatchId(null)
+      setSelectedRecentRaceComposition('')
+      setIsSelectedRecentRaceCompositionDirty(false)
     } catch (updateError) {
       if (isApiForbiddenError(updateError)) {
         setError(t('common.permissionDenied'))
@@ -1303,7 +1306,8 @@ export default function ResultsPage() {
                           <button
                             type="button"
                             onClick={() => handlePickRecentMatch(recentMatch)}
-                            className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-slate-900 hover:bg-slate-900 hover:text-white dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-300 dark:hover:bg-slate-100 dark:hover:text-slate-900"
+                            disabled={isRecentSaving || isRecentDeleting}
+                            className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-slate-900 hover:bg-slate-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-300 dark:hover:bg-slate-100 dark:hover:text-slate-900"
                           >
                             {t('results.recent.pick')}
                           </button>
