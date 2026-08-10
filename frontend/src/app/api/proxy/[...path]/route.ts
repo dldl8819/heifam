@@ -1,4 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
+import {
+  PROXY_READ_TOTAL_TIMEOUT_MS,
+  isReadOnlyHttpMethod,
+  resolveConfiguredUpstreamTimeoutMs,
+  resolveProxyAttemptTimeoutMs,
+  resolveProxyCandidateLimit,
+} from '@/lib/proxy-timeout'
 
 const FALLBACK_BACKEND_BASE_URLS = [
   'https://heifam.onrender.com',
@@ -7,7 +14,6 @@ const FALLBACK_BACKEND_BASE_URLS = [
 ]
 
 const RETRYABLE_UPSTREAM_STATUSES = new Set([404, 502, 503, 504])
-const DEFAULT_UPSTREAM_TIMEOUT_MS = 45000
 
 const HOP_BY_HOP_HEADERS = new Set([
   'connection',
@@ -32,6 +38,7 @@ const UPSTREAM_RESPONSE_HEADER_ALLOWLIST = new Set([
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+// Keep this static literal aligned with PROXY_MAX_DURATION_MS for Vercel route analysis.
 export const maxDuration = 60
 
 function parseCsv(value: string | undefined): string[] {
@@ -107,17 +114,7 @@ function resolveBackendBaseUrls(): string[] {
 }
 
 function resolveUpstreamTimeoutMs(): number {
-  const raw = process.env.BACKEND_PROXY_UPSTREAM_TIMEOUT_MS?.trim()
-  if (!raw) {
-    return DEFAULT_UPSTREAM_TIMEOUT_MS
-  }
-
-  const parsed = Number(raw)
-  if (!Number.isFinite(parsed) || parsed < 1000 || parsed > 60000) {
-    return DEFAULT_UPSTREAM_TIMEOUT_MS
-  }
-
-  return Math.floor(parsed)
+  return resolveConfiguredUpstreamTimeoutMs(process.env.BACKEND_PROXY_UPSTREAM_TIMEOUT_MS)
 }
 
 function buildTargetUrl(baseUrl: string, path: string[], search: string): string {
@@ -179,14 +176,6 @@ function buildUnavailableResponse(): NextResponse {
   )
 }
 
-function isAccountDeletionRequest(method: string, path: string[]): boolean {
-  return method === 'DELETE'
-    && path.length === 3
-    && path[0] === 'api'
-    && path[1] === 'access'
-    && path[2] === 'me'
-}
-
 async function proxyRequest(
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> }
@@ -203,41 +192,89 @@ async function proxyRequest(
 
   const search = request.nextUrl.search ?? ''
   const headers = buildForwardHeaders(request)
+  const readOnlyRequest = isReadOnlyHttpMethod(request.method)
   const upstreamTimeoutMs = resolveUpstreamTimeoutMs()
-  const requestBaseUrls = isAccountDeletionRequest(request.method, path)
-    ? baseUrls.slice(0, 1)
-    : baseUrls
-  const body =
-    request.method === 'GET' || request.method === 'HEAD'
-      ? undefined
-      : await request.arrayBuffer()
+  const requestBaseUrls = baseUrls.slice(0, resolveProxyCandidateLimit(request.method))
+  const readDeadlineMs = readOnlyRequest ? Date.now() + PROXY_READ_TOTAL_TIMEOUT_MS : null
+  let activeUpstreamController: AbortController | null = null
+  let clientAborted = request.signal.aborted
+  let clientAbortListenerAttached = false
+  const handleClientAbort = (): void => {
+    clientAborted = true
+    activeUpstreamController?.abort()
+  }
 
-  for (const [index, baseUrl] of requestBaseUrls.entries()) {
-    const targetUrl = buildTargetUrl(baseUrl, path, search)
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), upstreamTimeoutMs)
+  if (!clientAborted) {
+    request.signal.addEventListener('abort', handleClientAbort, { once: true })
+    clientAbortListenerAttached = true
+    if (request.signal.aborted) {
+      handleClientAbort()
+    }
+  }
 
-    try {
-      const upstream = await fetch(targetUrl, {
-        method: request.method,
-        headers,
-        body,
-        redirect: 'manual',
-        cache: 'no-store',
-        signal: controller.signal,
-      })
+  try {
+    const body = readOnlyRequest ? undefined : await request.arrayBuffer()
+    if (clientAborted) {
+      return buildUnavailableResponse()
+    }
 
-      const hasNextCandidate = index < requestBaseUrls.length - 1
-      if (RETRYABLE_UPSTREAM_STATUSES.has(upstream.status) && hasNextCandidate) {
-        await upstream.body?.cancel()
-        continue
+    for (const [index, baseUrl] of requestBaseUrls.entries()) {
+      if (clientAborted) {
+        break
       }
 
-      return await buildProxyResponse(upstream)
-    } catch {
-      // The response intentionally omits upstream addresses and raw network errors.
-    } finally {
-      clearTimeout(timeoutId)
+      const remainingCandidateCount = requestBaseUrls.length - index
+      const remainingReadBudgetMs = readDeadlineMs === null
+        ? undefined
+        : Math.max(0, readDeadlineMs - Date.now())
+      const attemptTimeoutMs = resolveProxyAttemptTimeoutMs({
+        method: request.method,
+        configuredTimeoutMs: upstreamTimeoutMs,
+        remainingReadBudgetMs,
+        remainingCandidateCount,
+      })
+      if (attemptTimeoutMs <= 0) {
+        break
+      }
+
+      const targetUrl = buildTargetUrl(baseUrl, path, search)
+      const controller = new AbortController()
+      activeUpstreamController = controller
+      const timeoutId = setTimeout(() => controller.abort(), attemptTimeoutMs)
+
+      try {
+        const upstream = await fetch(targetUrl, {
+          method: request.method,
+          headers,
+          body,
+          redirect: 'manual',
+          cache: 'no-store',
+          signal: controller.signal,
+        })
+
+        const hasNextCandidate = index < requestBaseUrls.length - 1
+        if (RETRYABLE_UPSTREAM_STATUSES.has(upstream.status) && hasNextCandidate) {
+          await upstream.body?.cancel()
+          continue
+        }
+
+        return await buildProxyResponse(upstream)
+      } catch {
+        if (clientAborted) {
+          break
+        }
+        // The response intentionally omits upstream addresses and raw network errors.
+      } finally {
+        clearTimeout(timeoutId)
+        activeUpstreamController = null
+      }
+    }
+  } catch {
+    // The response intentionally omits request body and raw client abort errors.
+  } finally {
+    activeUpstreamController?.abort()
+    if (clientAbortListenerAttached) {
+      request.signal.removeEventListener('abort', handleClientAbort)
     }
   }
 

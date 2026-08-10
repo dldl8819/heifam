@@ -38,6 +38,10 @@ import type {
   TeamSide,
 } from '@/types/api'
 import { supabase } from '@/lib/supabase'
+import {
+  PROXY_MUTATION_CLIENT_TIMEOUT_MS,
+  resolveDefaultApiRequestTimeoutMs,
+} from '@/lib/proxy-timeout'
 
 const DEFAULT_DEV_API_BASE_URL = 'http://localhost:8080'
 const DEFAULT_PROD_API_BASE_URL = '/api/proxy'
@@ -51,9 +55,8 @@ const API_BASE_URL =
       : DEFAULT_DEV_API_BASE_URL
 const ACCESS_API_BASE_URL =
   RAW_ACCESS_API_BASE_URL.length > 0 ? RAW_ACCESS_API_BASE_URL : API_BASE_URL
-const DEFAULT_API_REQUEST_TIMEOUT_MS = 10000
-const ACCESS_API_REQUEST_TIMEOUT_MS = process.env.NODE_ENV === 'production' ? 45000 : 15000
-const MULTI_BALANCE_API_REQUEST_TIMEOUT_MS = 45000
+const ACCESS_API_REQUEST_TIMEOUT_MS = process.env.NODE_ENV === 'production' ? PROXY_MUTATION_CLIENT_TIMEOUT_MS : 15000
+const MULTI_BALANCE_API_REQUEST_TIMEOUT_MS = PROXY_MUTATION_CLIENT_TIMEOUT_MS
 const IMPORT_API_REQUEST_TIMEOUT_MS = 120000
 const RATING_RECALCULATION_API_REQUEST_TIMEOUT_MS = 300000
 const SESSION_IDENTITY_CACHE_TTL_MS = 5000
@@ -90,7 +93,7 @@ function createUrl(path: string, baseUrlOverride?: string): string {
   return `${normalizedBase}${normalizedPath}`
 }
 
-type ApiRequestOptions = {
+export type ApiRequestOptions = {
   adminOnly?: boolean
   requireUserEmail?: boolean
   includeUserEmail?: boolean
@@ -232,7 +235,7 @@ function appendOptionalSearchParam(params: URLSearchParams, key: string, value: 
   }
 }
 
-async function apiRequest<T>(
+export async function apiRequest<T>(
   path: string,
   init?: RequestInit,
   options?: ApiRequestOptions
@@ -255,64 +258,86 @@ async function apiRequest<T>(
     throw new ApiRequestError(401, '로그인이 필요합니다.')
   }
 
+  const requestMethod = (init?.method ?? 'GET').trim().toUpperCase()
+  const baseUrlOverride = options?.baseUrlOverride?.trim() ?? ''
+  const effectiveBaseUrl = baseUrlOverride.length > 0 ? baseUrlOverride : API_BASE_URL
+  const usesProductionProxy = process.env.NODE_ENV === 'production'
+    && effectiveBaseUrl.replace(/\/+$/, '') === DEFAULT_PROD_API_BASE_URL
+  const defaultTimeoutMs = resolveDefaultApiRequestTimeoutMs({
+    method: requestMethod,
+    usesProductionProxy,
+  })
   const controller = new AbortController()
   const timeoutMs = Number.isFinite(options?.timeoutMs) && (options?.timeoutMs ?? 0) > 0
     ? (options?.timeoutMs as number)
-    : DEFAULT_API_REQUEST_TIMEOUT_MS
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+    : defaultTimeoutMs
+  let requestTimedOut = false
+  let callerAborted = init?.signal?.aborted ?? false
+  const handleCallerAbort = (): void => {
+    callerAborted = true
+    controller.abort()
+  }
+  const shouldRemoveCallerAbortListener = Boolean(init?.signal && !callerAborted)
 
-  if (init?.signal) {
+  if (callerAborted) {
+    controller.abort()
+  } else if (init?.signal) {
+    init.signal.addEventListener('abort', handleCallerAbort, { once: true })
     if (init.signal.aborted) {
-      controller.abort()
-    } else {
-      init.signal.addEventListener(
-        'abort',
-        () => controller.abort(),
-        { once: true }
-      )
+      handleCallerAbort()
     }
   }
 
-  let response: Response
+  const timeoutId = setTimeout(() => {
+    if (!callerAborted) {
+      requestTimedOut = true
+      controller.abort()
+    }
+  }, timeoutMs)
+
   try {
-    response = await fetch(createUrl(path, options?.baseUrlOverride), {
+    const response = await fetch(createUrl(path, options?.baseUrlOverride), {
       ...init,
       headers: buildHeaders(init, options, userEmail, userNickname, accessToken),
       signal: controller.signal,
     })
+
+    if (!response.ok) {
+      const message = (await response.text()).trim()
+      throw new ApiRequestError(
+        response.status,
+        extractApiErrorMessage(response.status, message)
+      )
+    }
+
+    if (response.status === 204) {
+      return undefined as T
+    }
+
+    const text = await response.text()
+    if (text.trim().length === 0) {
+      return undefined as T
+    }
+
+    try {
+      return JSON.parse(text) as T
+    } catch {
+      return text as T
+    }
   } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') {
+    if (requestTimedOut && controller.signal.aborted) {
       throw new ApiRequestError(
         408,
         `API request timed out (${timeoutMs}ms)`
       )
     }
+
     throw error
   } finally {
     clearTimeout(timeoutId)
-  }
-
-  if (!response.ok) {
-    const message = (await response.text()).trim()
-    throw new ApiRequestError(
-      response.status,
-      extractApiErrorMessage(response.status, message)
-    )
-  }
-
-  if (response.status === 204) {
-    return undefined as T
-  }
-
-  const text = await response.text()
-  if (text.trim().length === 0) {
-    return undefined as T
-  }
-
-  try {
-    return JSON.parse(text) as T
-  } catch {
-    return text as T
+    if (shouldRemoveCallerAbortListener && init?.signal) {
+      init.signal.removeEventListener('abort', handleCallerAbort)
+    }
   }
 }
 
