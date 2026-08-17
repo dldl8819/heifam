@@ -414,6 +414,61 @@ class PlayerQueryServiceTest {
         assertThat(response.get(0).tierChangeAcknowledgedAt()).isEqualTo(chatRejoinedAt);
     }
 
+    @Test
+    void marksIsOwnPlayerTrueWhenRequesterAuthUserIdMatchesPlayer() {
+        Group group = new Group();
+        group.setId(1L);
+        java.util.UUID authUserId = java.util.UUID.randomUUID();
+        Player owned = player(1L, group, "본인", "P", "A", 1500);
+        owned.setAuthUserId(authUserId);
+
+        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
+            .thenReturn(List.of(owned));
+        when(playerStatsRepository.findByGroupId(1L))
+            .thenReturn(List.of());
+
+        List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L, false, authUserId);
+
+        assertThat(response).hasSize(1);
+        assertThat(response.get(0).isOwnPlayer()).isTrue();
+    }
+
+    @Test
+    void marksIsOwnPlayerFalseWhenRequesterAuthUserIdDoesNotMatch() {
+        Group group = new Group();
+        group.setId(1L);
+        Player other = player(1L, group, "타인", "P", "A", 1500);
+        other.setAuthUserId(java.util.UUID.randomUUID());
+
+        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
+            .thenReturn(List.of(other));
+        when(playerStatsRepository.findByGroupId(1L))
+            .thenReturn(List.of());
+
+        List<GroupPlayerResponse> response =
+            playerQueryService.getGroupPlayers(1L, false, java.util.UUID.randomUUID());
+
+        assertThat(response).hasSize(1);
+        assertThat(response.get(0).isOwnPlayer()).isFalse();
+    }
+
+    @Test
+    void marksIsOwnPlayerFalseWhenRequesterAuthUserIdIsNull() {
+        Group group = new Group();
+        group.setId(1L);
+        Player unlinked = player(1L, group, "미연결", "P", "A", 1500);
+
+        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
+            .thenReturn(List.of(unlinked));
+        when(playerStatsRepository.findByGroupId(1L))
+            .thenReturn(List.of());
+
+        List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L, false, null);
+
+        assertThat(response).hasSize(1);
+        assertThat(response.get(0).isOwnPlayer()).isFalse();
+    }
+
     private Player player(
         Long id,
         Group group,

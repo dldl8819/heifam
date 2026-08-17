@@ -496,6 +496,7 @@ function normalizeRecentMatchItem(value: unknown): RecentMatchItem | null {
     homeMmr: homeMmr ?? undefined,
     awayMmr: awayMmr ?? undefined,
     mmrDiff: mmrDiff ?? undefined,
+    canEditRaceComposition: source.canEditRaceComposition === true,
   }
 }
 
@@ -613,6 +614,7 @@ export function normalizePlayerRosterItem(value: unknown, index = 0): PlayerRost
       !identityHidden && !retainedInactive && typeof source.chatRejoinedAt === 'string'
         ? source.chatRejoinedAt
         : undefined,
+    isOwnPlayer: !identityHidden && source.isOwnPlayer === true,
   }
 }
 

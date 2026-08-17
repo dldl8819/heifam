@@ -15,6 +15,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -81,12 +82,15 @@ public class GroupPlayerController {
         HttpServletRequest request,
         HttpServletResponse httpResponse
     ) {
+        AuthenticatedRequestResolver.ResolvedRequestIdentity identity =
+            authenticatedRequestResolver.resolve(request);
         AccessControlService.AccessProfile accessProfile = accessControlService.resolveAccessProfile(
-            authenticatedRequestResolver.resolve(request).email()
+            identity.email()
         );
         List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(
             groupId,
-            accessProfile.admin() && includeInactive
+            accessProfile.admin() && includeInactive,
+            resolveVerifiedAuthUserId(identity)
         );
         if (accessProfile.admin() && includeInactive) {
             preventSensitiveResponseCaching(httpResponse);
@@ -172,6 +176,17 @@ public class GroupPlayerController {
         }
 
         return playerQueryService.getGroupPlayerTierBoard(groupId);
+    }
+
+    private UUID resolveVerifiedAuthUserId(AuthenticatedRequestResolver.ResolvedRequestIdentity identity) {
+        if (identity == null || !identity.jwtVerified() || identity.userId() == null || identity.userId().isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(identity.userId().trim());
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
     }
 
     private void requireAdmin(HttpServletRequest request, String message) {

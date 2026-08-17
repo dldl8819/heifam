@@ -10,6 +10,7 @@ import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
 import { toTierOrder } from '@/lib/player-tier'
 import {
+  buildOwnPlayerRaceUpdateRequest,
   buildPlayerProfileUpdateRequest,
   resolveDefaultMmrForTier,
   resolveEditableMmrValue,
@@ -355,6 +356,11 @@ export default function PlayersPage() {
   const [gameTypeStatsLoading, setGameTypeStatsLoading] = useState<boolean>(false)
   const [gameTypeStatsError, setGameTypeStatsError] = useState<string | null>(null)
   const [lastParticipation, setLastParticipation] = useState<LastParticipationState | null>(null)
+  const [ownRaceEditingPlayerId, setOwnRaceEditingPlayerId] = useState<number | null>(null)
+  const [ownRaceEditingValue, setOwnRaceEditingValue] = useState<PlayerRace>('P')
+  const [ownRaceSavingPlayerId, setOwnRaceSavingPlayerId] = useState<number | null>(null)
+  const [ownRaceActionError, setOwnRaceActionError] = useState<string | null>(null)
+  const [ownRaceActionSuccess, setOwnRaceActionSuccess] = useState<string | null>(null)
   const rosterRequestId = useRef(0)
   const lastParticipationRequestId = useRef(0)
   const effectiveRosterView: PlayerRosterView = isAdmin ? rosterView : 'active'
@@ -478,6 +484,51 @@ export default function PlayersPage() {
       }
     } finally {
       setImporting(false)
+    }
+  }
+
+  const handleStartOwnRaceEdit = (player: PlayerRosterItem) => {
+    if (isAdmin || player.isOwnPlayer !== true) {
+      return
+    }
+
+    setOwnRaceEditingPlayerId(player.id)
+    setOwnRaceEditingValue(player.race)
+    setOwnRaceActionError(null)
+    setOwnRaceActionSuccess(null)
+  }
+
+  const handleCancelOwnRaceEdit = () => {
+    setOwnRaceEditingPlayerId(null)
+  }
+
+  const handleSaveOwnRace = async (player: PlayerRosterItem) => {
+    if (isAdmin || player.isOwnPlayer !== true) {
+      return
+    }
+
+    const payload = buildOwnPlayerRaceUpdateRequest(player, ownRaceEditingValue)
+    if (payload === null) {
+      setOwnRaceEditingPlayerId(null)
+      return
+    }
+
+    setOwnRaceSavingPlayerId(player.id)
+    setOwnRaceActionError(null)
+    setOwnRaceActionSuccess(null)
+    try {
+      await apiClient.updateGroupPlayer(TEMP_GROUP_ID, player.id, payload)
+      setOwnRaceEditingPlayerId(null)
+      setOwnRaceActionSuccess(t('players.ownRace.success'))
+      await fetchRoster()
+    } catch (actionError) {
+      if (isApiForbiddenError(actionError)) {
+        setOwnRaceActionError(t('common.permissionDenied'))
+      } else {
+        setOwnRaceActionError(t('players.ownRace.failure'))
+      }
+    } finally {
+      setOwnRaceSavingPlayerId(null)
     }
   }
 
@@ -1049,22 +1100,28 @@ export default function PlayersPage() {
         </article>
       )}
 
-      {(playerActionError || playerActionSuccess) && (
+      {(playerActionError || playerActionSuccess || ownRaceActionError || ownRaceActionSuccess) && (
         <div className="space-y-2">
-          {playerActionError && (
+          {(playerActionError || ownRaceActionError) && (
             <Alert variant="destructive" appearance="light" size="sm">
               <AlertIcon icon="destructive">!</AlertIcon>
               <AlertContent>
-                <AlertDescription>{playerActionError}</AlertDescription>
+                <AlertDescription>{playerActionError ?? ownRaceActionError}</AlertDescription>
               </AlertContent>
             </Alert>
           )}
-          {playerActionSuccess && (
+          {(playerActionSuccess || ownRaceActionSuccess) && (
           <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
-              {playerActionSuccess}
+              {playerActionSuccess ?? ownRaceActionSuccess}
             </p>
           )}
         </div>
+      )}
+
+      {!isAdmin && !loading && !rows.some((row) => row.isOwnPlayer) && (
+        <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+          {t('players.ownRace.notLinkedNotice')}
+        </p>
       )}
 
       {activityForm !== null && (
@@ -1450,6 +1507,48 @@ export default function PlayersPage() {
                             </option>
                           ))}
                         </select>
+                      ) : !isAdmin && isActive && row.isOwnPlayer === true && ownRaceEditingPlayerId === row.id ? (
+                        <div className="flex items-center gap-1.5 whitespace-nowrap">
+                          <select
+                            value={ownRaceEditingValue}
+                            onChange={(event) => setOwnRaceEditingValue(event.target.value as PlayerRace)}
+                            disabled={ownRaceSavingPlayerId === row.id}
+                            className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                          >
+                            {PLAYER_RACE_OPTIONS.map((raceOption) => (
+                              <option key={raceOption} value={raceOption}>
+                                {raceOption}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => void handleSaveOwnRace(row)}
+                            disabled={ownRaceSavingPlayerId === row.id}
+                            className="rounded-md border border-slate-900 bg-slate-900 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:border-slate-100 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700"
+                          >
+                            {ownRaceSavingPlayerId === row.id
+                              ? t('players.ownRace.saving')
+                              : t('players.ownRace.save')}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCancelOwnRaceEdit}
+                            disabled={ownRaceSavingPlayerId === row.id}
+                            className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                          >
+                            {t('players.ownRace.cancel')}
+                          </button>
+                        </div>
+                      ) : !isAdmin && isActive && row.isOwnPlayer === true ? (
+                        <button
+                          type="button"
+                          onClick={() => handleStartOwnRaceEdit(row)}
+                          className="inline-flex items-center gap-1 rounded-md border border-transparent px-1 py-0.5 text-left underline decoration-slate-300 underline-offset-4 transition-colors hover:decoration-amber-500 dark:decoration-slate-600 dark:hover:decoration-amber-400"
+                          title={t('players.ownRace.edit')}
+                        >
+                          {row.race}
+                        </button>
                       ) : (
                         row.race
                       )}

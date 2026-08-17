@@ -58,6 +58,33 @@ describe('normalizePlayerRosterItem', () => {
     expect(item?.lifecycleStatus).toBe('ACTIVE')
   })
 
+  it('passes through the server-computed isOwnPlayer flag for an active player', () => {
+    const item = normalizePlayerRosterItem({
+      id: 7,
+      nickname: 'ACTIVE_PLAYER',
+      race: 'P',
+      tier: 'A',
+      active: true,
+      isOwnPlayer: true,
+    })
+
+    expect(item?.isOwnPlayer).toBe(true)
+  })
+
+  it('forces isOwnPlayer false for a masked identity-hidden player', () => {
+    const item = normalizePlayerRosterItem({
+      nickname: '탈퇴한 회원',
+      wins: 0,
+      losses: 0,
+      games: 0,
+      active: false,
+      isOwnPlayer: true,
+    })
+
+    expect(item?.identityHidden).toBe(true)
+    expect(item?.isOwnPlayer).toBe(false)
+  })
+
   it('keeps only the administrator-facing retained fields for an inactive player', () => {
     const inactiveAt = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
     const retainedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()

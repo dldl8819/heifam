@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -18,6 +19,7 @@ import com.balancify.backend.domain.Group;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.domain.PlayerLifecycleStatus;
 import com.balancify.backend.repository.PlayerRepository;
+import com.balancify.backend.service.exception.PlayerEditForbiddenException;
 import jakarta.persistence.EntityManager;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -47,6 +49,9 @@ class PlayerAdminServiceTest {
     private AccountDeletionService accountDeletionService;
 
     @Mock
+    private AccessControlService accessControlService;
+
+    @Mock
     private EntityManager entityManager;
 
 
@@ -56,11 +61,15 @@ class PlayerAdminServiceTest {
             .doNothing()
             .when(accountDeletionService)
             .deactivatePlayer(anyLong(), any(OffsetDateTime.class), anyString());
+        // Most tests exercise the admin-driven flow (matches the previous filter-level
+        // admin-only gate); tests for the non-admin self-service race path override this.
+        lenient().when(accessControlService.isAdminEmail(any())).thenReturn(true);
         playerAdminService = new PlayerAdminService(
             playerRepository,
             operationAuditLogService,
             new GroupReadCacheService(0),
-            accountDeletionService
+            accountDeletionService,
+            accessControlService
         );
         ReflectionTestUtils.setField(playerAdminService, "entityManager", entityManager);
     }
@@ -79,7 +88,8 @@ class PlayerAdminServiceTest {
                 PlayerRepository.class,
                 OperationAuditLogService.class,
                 GroupReadCacheService.class,
-                AccountDeletionService.class
+                AccountDeletionService.class,
+                AccessControlService.class
             ));
     }
 
@@ -115,6 +125,89 @@ class PlayerAdminServiceTest {
 
         verify(playerRepository, never()).findByGroup_IdAndNicknameIgnoreCase(anyLong(), anyString());
         verify(playerRepository).save(player);
+    }
+
+    @Test
+    void allowsNonAdminToUpdateOwnRaceOnly() {
+        UUID authUserId = UUID.randomUUID();
+        Player player = player(10L, 1L, "기존닉");
+        player.setAuthUserId(authUserId);
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+        when(playerRepository.save(any(Player.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(accessControlService.isAdminEmail("member@example.test")).thenReturn(false);
+
+        playerAdminService.updatePlayer(
+            1L,
+            10L,
+            new GroupPlayerUpdateRequest(null, "PTZ", null, null, null, null, null),
+            "member@example.test",
+            "MemberUser",
+            authUserId
+        );
+
+        assertThat(player.getRace()).isEqualTo("PTZ");
+        verify(playerRepository).save(player);
+    }
+
+    @Test
+    void rejectsNonAdminUpdatingRaceOnSomeoneElsesPlayer() {
+        Player player = player(10L, 1L, "기존닉");
+        player.setAuthUserId(UUID.randomUUID());
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+        when(accessControlService.isAdminEmail("outsider@example.test")).thenReturn(false);
+
+        assertThatThrownBy(() -> playerAdminService.updatePlayer(
+            1L,
+            10L,
+            new GroupPlayerUpdateRequest(null, "PTZ", null, null, null, null, null),
+            "outsider@example.test",
+            "Outsider",
+            UUID.randomUUID()
+        )).isInstanceOf(PlayerEditForbiddenException.class);
+
+        assertThat(player.getRace()).isEqualTo("P");
+        verify(playerRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectsNonAdminUpdatingRaceWhenAccountIsNotLinkedToAnyPlayer() {
+        Player player = player(10L, 1L, "기존닉");
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+        when(accessControlService.isAdminEmail("member@example.test")).thenReturn(false);
+
+        assertThatThrownBy(() -> playerAdminService.updatePlayer(
+            1L,
+            10L,
+            new GroupPlayerUpdateRequest(null, "PTZ", null, null, null, null, null),
+            "member@example.test",
+            "MemberUser",
+            null
+        )).isInstanceOf(PlayerEditForbiddenException.class);
+
+        assertThat(player.getRace()).isEqualTo("P");
+        verify(playerRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectsNonAdminUpdatingNicknameEvenOnOwnPlayer() {
+        UUID authUserId = UUID.randomUUID();
+        Player player = player(10L, 1L, "기존닉");
+        player.setAuthUserId(authUserId);
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+        when(accessControlService.isAdminEmail("member@example.test")).thenReturn(false);
+
+        assertThatThrownBy(() -> playerAdminService.updatePlayer(
+            1L,
+            10L,
+            new GroupPlayerUpdateRequest("새닉네임", "PTZ", null, null, null, null, null),
+            "member@example.test",
+            "MemberUser",
+            authUserId
+        )).isInstanceOf(PlayerEditForbiddenException.class);
+
+        assertThat(player.getNickname()).isEqualTo("기존닉");
+        assertThat(player.getRace()).isEqualTo("P");
+        verify(playerRepository, never()).save(any());
     }
 
     @Test

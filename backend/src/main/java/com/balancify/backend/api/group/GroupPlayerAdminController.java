@@ -7,8 +7,10 @@ import com.balancify.backend.security.MmrAccessRequestResolver;
 import com.balancify.backend.security.SuperAdminRequestResolver;
 import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.PlayerAdminService;
+import com.balancify.backend.service.exception.PlayerEditForbiddenException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.NoSuchElementException;
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -70,7 +72,14 @@ public class GroupPlayerAdminController {
                 playerId,
                 request,
                 identity.email(),
-                resolveActorNickname(identity)
+                resolveActorNickname(identity),
+                resolveVerifiedAuthUserId(identity)
+            );
+        } catch (PlayerEditForbiddenException playerEditForbiddenException) {
+            throw new ResponseStatusException(
+                HttpStatus.FORBIDDEN,
+                playerEditForbiddenException.getMessage(),
+                playerEditForbiddenException
             );
         } catch (IllegalArgumentException illegalArgumentException) {
             throw new ResponseStatusException(
@@ -140,6 +149,17 @@ public class GroupPlayerAdminController {
 
     private boolean hasDormancyMmrFloorTier(GroupPlayerUpdateRequest request) {
         return request != null && request.dormancyMmrFloorTier() != null;
+    }
+
+    private UUID resolveVerifiedAuthUserId(AuthenticatedRequestResolver.ResolvedRequestIdentity identity) {
+        if (identity == null || !identity.jwtVerified() || identity.userId() == null || identity.userId().isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(identity.userId().trim());
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
     }
 
     private String resolveActorNickname(AuthenticatedRequestResolver.ResolvedRequestIdentity identity) {

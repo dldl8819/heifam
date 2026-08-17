@@ -44,7 +44,8 @@ class MmrMaskingMapperTest {
             chatRejoinedAt,
             "A",
             chatRejoinedAt,
-            "B+"
+            "B+",
+            false
         );
 
         GroupPlayerResponse masked = MmrMaskingMapper.maskGroupPlayersForMember(List.of(source)).getFirst();
@@ -90,7 +91,8 @@ class MmrMaskingMapperTest {
             chatRejoinedAt,
             "A",
             chatRejoinedAt,
-            "B+"
+            "B+",
+            false
         );
 
         GroupPlayerResponse masked = MmrMaskingMapper.maskGroupPlayersForAdmin(List.of(source)).getFirst();
@@ -134,7 +136,8 @@ class MmrMaskingMapperTest {
             null,
             null,
             null,
-            "B+"
+            "B+",
+            false
         );
 
         GroupPlayerResponse masked = MmrMaskingMapper.maskGroupPlayersForMmrViewer(List.of(source)).getFirst();

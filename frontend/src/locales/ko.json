@@ -631,6 +631,15 @@
       "deleteNotFound": "선수 삭제 API를 찾지 못했습니다. 백엔드를 재시작하고 최신 코드인지 확인해 주세요.",
       "deleteConfirm": "{nickname} 선수를 삭제하시겠습니까?"
     },
+    "ownRace": {
+      "edit": "종족 수정",
+      "save": "저장",
+      "saving": "저장 중...",
+      "cancel": "취소",
+      "success": "본인 종족이 수정되었습니다.",
+      "failure": "종족 수정에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+      "notLinkedNotice": "본인 계정과 연결된 선수 항목을 찾을 수 없습니다. 종족 수정이 필요하면 관리자에게 요청해 주세요."
+    },
     "activityForm": {
       "deactivateTitle": "비활성 처리",
       "reactivateTitle": "복구 처리",

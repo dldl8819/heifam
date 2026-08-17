@@ -16,6 +16,7 @@ import com.balancify.backend.repository.MatchRepository;
 import com.balancify.backend.repository.MmrHistoryRepository;
 import com.balancify.backend.repository.PlayerRepository;
 import com.balancify.backend.service.exception.MatchConflictException;
+import com.balancify.backend.service.exception.MatchEditForbiddenException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -55,6 +56,7 @@ public class MatchResultService {
     private final GroupReadCacheService groupReadCacheService;
     private final PlayerStatsRefreshService playerStatsRefreshService;
     private final long duplicateWindowMinutes;
+    private final AccessControlService accessControlService;
 
     public MatchResultService(
         MatchRepository matchRepository,
@@ -75,7 +77,8 @@ public class MatchResultService {
         @Value("${balancify.rank.return-boost.multiplier:2.0}") double returnBoostMultiplier,
         @Value("${balancify.match.confirm.duplicate-window-minutes:5}") long duplicateWindowMinutes,
         GroupReadCacheService groupReadCacheService,
-        PlayerStatsRefreshService playerStatsRefreshService
+        PlayerStatsRefreshService playerStatsRefreshService,
+        AccessControlService accessControlService
     ) {
         this.matchRepository = matchRepository;
         this.groupRepository = groupRepository;
@@ -96,6 +99,7 @@ public class MatchResultService {
         this.groupReadCacheService = groupReadCacheService;
         this.playerStatsRefreshService = playerStatsRefreshService;
         this.duplicateWindowMinutes = Math.max(1L, duplicateWindowMinutes);
+        this.accessControlService = accessControlService;
     }
 
     @Transactional
@@ -148,6 +152,15 @@ public class MatchResultService {
         MatchStatus currentStatus = normalizeMatchStatus(match);
         if (currentStatus == MatchStatus.CANCELLED) {
             throw new MatchConflictException("취소된 경기의 결과는 수정할 수 없습니다.");
+        }
+
+        if (!accessControlService.isAdminEmail(recordedByEmail)) {
+            if (!isSameRecordedByEmail(match.getResultRecordedByEmail(), recordedByEmail)) {
+                throw new MatchEditForbiddenException("본인이 입력한 경기만 종족전을 수정할 수 있습니다.");
+            }
+            if (!Objects.equals(winnerTeam, previousWinnerTeam)) {
+                throw new MatchEditForbiddenException("승리 팀 변경은 관리자만 가능합니다.");
+            }
         }
 
         ValidatedParticipants validatedParticipants = loadValidatedParticipants(matchId, match);
@@ -857,6 +870,12 @@ public class MatchResultService {
             return null;
         }
         return value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private boolean isSameRecordedByEmail(String storedEmail, String actorEmail) {
+        String normalizedStoredEmail = normalizeRecordedByEmail(storedEmail);
+        String normalizedActorEmail = normalizeRecordedByEmail(actorEmail);
+        return normalizedStoredEmail != null && normalizedStoredEmail.equals(normalizedActorEmail);
     }
 
     private String normalizeRecordedByNickname(String value) {

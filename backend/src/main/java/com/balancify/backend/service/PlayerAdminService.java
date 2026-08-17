@@ -6,6 +6,7 @@ import com.balancify.backend.domain.Player;
 import com.balancify.backend.domain.PlayerLifecycleStatus;
 import com.balancify.backend.domain.PlayerTierPolicy;
 import com.balancify.backend.repository.PlayerRepository;
+import com.balancify.backend.service.exception.PlayerEditForbiddenException;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -33,6 +34,7 @@ public class PlayerAdminService {
     private final OperationAuditLogService operationAuditLogService;
     private final GroupReadCacheService groupReadCacheService;
     private final AccountDeletionService accountDeletionService;
+    private final AccessControlService accessControlService;
     private final Clock clock;
 
     @PersistenceContext
@@ -43,13 +45,15 @@ public class PlayerAdminService {
         PlayerRepository playerRepository,
         OperationAuditLogService operationAuditLogService,
         GroupReadCacheService groupReadCacheService,
-        AccountDeletionService accountDeletionService
+        AccountDeletionService accountDeletionService,
+        AccessControlService accessControlService
     ) {
         this(
             playerRepository,
             operationAuditLogService,
             groupReadCacheService,
             accountDeletionService,
+            accessControlService,
             Clock.systemUTC()
         );
     }
@@ -59,12 +63,14 @@ public class PlayerAdminService {
         OperationAuditLogService operationAuditLogService,
         GroupReadCacheService groupReadCacheService,
         AccountDeletionService accountDeletionService,
+        AccessControlService accessControlService,
         Clock clock
     ) {
         this.playerRepository = playerRepository;
         this.operationAuditLogService = operationAuditLogService;
         this.groupReadCacheService = groupReadCacheService;
         this.accountDeletionService = accountDeletionService;
+        this.accessControlService = accessControlService;
         this.clock = clock == null ? Clock.systemUTC() : clock;
     }
 
@@ -74,7 +80,7 @@ public class PlayerAdminService {
         Long playerId,
         GroupPlayerUpdateRequest request
     ) {
-        updatePlayer(groupId, playerId, request, null, null);
+        updatePlayer(groupId, playerId, request, null, null, null);
     }
 
     @Transactional
@@ -84,6 +90,18 @@ public class PlayerAdminService {
         GroupPlayerUpdateRequest request,
         String actorEmail,
         String actorNickname
+    ) {
+        updatePlayer(groupId, playerId, request, actorEmail, actorNickname, null);
+    }
+
+    @Transactional
+    public void updatePlayer(
+        Long groupId,
+        Long playerId,
+        GroupPlayerUpdateRequest request,
+        String actorEmail,
+        String actorNickname,
+        UUID actorAuthUserId
     ) {
         Player player = playerRepository.findByIdAndGroup_Id(playerId, groupId)
             .orElseThrow(() -> new NoSuchElementException("Player not found"));
@@ -108,6 +126,24 @@ public class PlayerAdminService {
             ? normalizeDormancyMmrFloorTier(request.dormancyMmrFloorTier())
             : null;
         String normalizedRace = race.isEmpty() ? "" : race.toUpperCase(Locale.ROOT);
+
+        if (!accessControlService.isAdminEmail(actorEmail)) {
+            boolean raceOnlyRequest = nickname.isEmpty()
+                && tier.isEmpty()
+                && active == null
+                && chatLeftAt == null
+                && chatLeftReason.isEmpty()
+                && chatRejoinedAt == null
+                && tierChangeAcknowledgedTier.isEmpty()
+                && !hasDormancyMmrFloorTier
+                && !normalizedRace.isEmpty();
+            if (!raceOnlyRequest) {
+                throw new PlayerEditForbiddenException("본인 종족만 스스로 수정할 수 있습니다.");
+            }
+            if (actorAuthUserId == null || !actorAuthUserId.equals(player.getAuthUserId())) {
+                throw new PlayerEditForbiddenException("본인 선수 정보만 수정할 수 있습니다.");
+            }
+        }
 
         if (
             nickname.isEmpty()

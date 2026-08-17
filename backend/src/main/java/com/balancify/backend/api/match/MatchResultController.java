@@ -12,6 +12,7 @@ import com.balancify.backend.service.ManualMatchService;
 import com.balancify.backend.service.MatchResultService;
 import com.balancify.backend.service.OperationAuditLogService;
 import com.balancify.backend.service.exception.MatchConflictException;
+import com.balancify.backend.service.exception.MatchEditForbiddenException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.NoSuchElementException;
 import org.springframework.http.HttpStatus;
@@ -133,6 +134,8 @@ public class MatchResultController {
             }
 
             return MmrMaskingMapper.maskMatchResult(response);
+        } catch (MatchEditForbiddenException exception) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, exception.getMessage());
         } catch (MatchConflictException | ObjectOptimisticLockingFailureException exception) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, exception.getMessage());
         } catch (NoSuchElementException exception) {

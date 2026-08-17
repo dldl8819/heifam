@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  buildOwnPlayerRaceUpdateRequest,
   buildPlayerProfileUpdateRequest,
   resolveDefaultMmrForTier,
   resolveEditableMmrValue,
@@ -84,6 +85,20 @@ describe('buildPlayerProfileUpdateRequest', () => {
     })
 
     expect(payload).toEqual({ dormancyMmrFloorTier: 'UNASSIGNED' })
+  })
+})
+
+describe('buildOwnPlayerRaceUpdateRequest', () => {
+  it('sends race when it changes', () => {
+    const payload = buildOwnPlayerRaceUpdateRequest(player(), 'PTZ')
+
+    expect(payload).toEqual({ race: 'PTZ' })
+  })
+
+  it('returns null when race is unchanged', () => {
+    const payload = buildOwnPlayerRaceUpdateRequest(player({ race: 'PTZ' }), 'PTZ')
+
+    expect(payload).toBeNull()
   })
 })
 

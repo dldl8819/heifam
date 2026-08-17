@@ -758,7 +758,7 @@ export default function ResultsPage() {
   }
 
   const handlePickRecentMatch = (recentMatch: RecentMatchItem) => {
-    if (!isAdmin || isRecentSaving || isRecentDeleting) {
+    if ((!isAdmin && !recentMatch.canEditRaceComposition) || isRecentSaving || isRecentDeleting) {
       return
     }
 
@@ -786,12 +786,12 @@ export default function ResultsPage() {
   }
 
   const handleUpdateRecentMatch = async () => {
-    if (!isAdmin) {
-      setError(t('common.adminOnlyAction'))
+    if (selectedRecentMatchId === null) {
       return
     }
 
-    if (selectedRecentMatchId === null) {
+    if (!isAdmin && !selectedRecentMatch?.canEditRaceComposition) {
+      setError(t('common.adminOnlyAction'))
       return
     }
 
@@ -1185,7 +1185,9 @@ export default function ResultsPage() {
                   <th className="min-w-[8rem] break-keep px-3 py-2">{t('results.recent.table.homeTeam')}</th>
                   <th className="min-w-[8rem] break-keep px-3 py-2">{t('results.recent.table.awayTeam')}</th>
                   {showMmr && <th className="px-3 py-2">{t('results.recent.table.mmrDiff')}</th>}
-                  {isAdmin && <th className="px-3 py-2">{t('results.recent.table.action')}</th>}
+                  {(isAdmin || recentMatches.some((recentMatch) => recentMatch.canEditRaceComposition)) && (
+                    <th className="px-3 py-2">{t('results.recent.table.action')}</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -1232,7 +1234,7 @@ export default function ResultsPage() {
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-slate-700 dark:text-slate-300">
                       {selectedRecentMatchId === recentMatch.matchId &&
-                        isAdmin &&
+                        (isAdmin || recentMatch.canEditRaceComposition) &&
                         recentTeamSize !== null ? (
                         <select
                           value={selectedRecentRaceComposition}
@@ -1290,7 +1292,7 @@ export default function ResultsPage() {
                         {typeof recentMatch.mmrDiff === 'number' ? recentMatch.mmrDiff : '-'}
                       </td>
                     )}
-                    {isAdmin && (
+                    {(isAdmin || recentMatch.canEditRaceComposition) && (
                       <td className="px-3 py-2">
                         {selectedRecentMatchId === recentMatch.matchId ? (
                         <div className="flex items-center gap-1.5 whitespace-nowrap">
@@ -1311,14 +1313,16 @@ export default function ResultsPage() {
                           >
                             {isRecentSaving ? t('results.recent.saving') : t('results.recent.save')}
                           </button>
-                          <button
-                            type="button"
-                            onClick={handleDeleteRecentMatch}
-                            disabled={isRecentSaving || isRecentDeleting}
-                            className="rounded-md border border-rose-300 bg-white px-2.5 py-1 text-xs font-medium text-rose-700 transition-colors hover:border-rose-500 hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 dark:border-rose-700 dark:bg-slate-900 dark:text-rose-300 dark:hover:border-rose-400 dark:hover:bg-rose-950/40 dark:disabled:border-slate-700 dark:disabled:text-slate-500"
-                          >
-                            {isRecentDeleting ? t('results.recent.deleting') : t('results.recent.delete')}
-                          </button>
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              onClick={handleDeleteRecentMatch}
+                              disabled={isRecentSaving || isRecentDeleting}
+                              className="rounded-md border border-rose-300 bg-white px-2.5 py-1 text-xs font-medium text-rose-700 transition-colors hover:border-rose-500 hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 dark:border-rose-700 dark:bg-slate-900 dark:text-rose-300 dark:hover:border-rose-400 dark:hover:bg-rose-950/40 dark:disabled:border-slate-700 dark:disabled:text-slate-500"
+                            >
+                              {isRecentDeleting ? t('results.recent.deleting') : t('results.recent.delete')}
+                            </button>
+                          )}
                         </div>
                         ) : (
                           <button

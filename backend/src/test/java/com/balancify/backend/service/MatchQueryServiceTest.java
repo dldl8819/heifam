@@ -352,6 +352,72 @@ class MatchQueryServiceTest {
         assertThat(pageableCaptor.getValue().getOffset()).isEqualTo(40);
     }
 
+    @Test
+    void marksCanEditRaceCompositionTrueForAdminRequesterRegardlessOfRecorder() {
+        Group group = new Group();
+        group.setId(1L);
+        Match match = new Match();
+        match.setId(210L);
+        match.setGroup(group);
+        match.setWinningTeam("HOME");
+        match.setPlayedAt(OffsetDateTime.parse("2026-03-23T15:00:00Z"));
+        match.setResultRecordedByEmail("recorder@hei.gg");
+
+        when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(210L)).thenReturn(List.of());
+        when(accessControlService.isAdminEmail("admin@hei.gg")).thenReturn(true);
+
+        List<GroupRecentMatchResponse> responses =
+            matchQueryService.getRecentMatches(1L, 10, 0, "admin@hei.gg");
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).canEditRaceComposition()).isTrue();
+    }
+
+    @Test
+    void marksCanEditRaceCompositionTrueForNonAdminMatchRecorder() {
+        Group group = new Group();
+        group.setId(1L);
+        Match match = new Match();
+        match.setId(211L);
+        match.setGroup(group);
+        match.setWinningTeam("HOME");
+        match.setPlayedAt(OffsetDateTime.parse("2026-03-23T16:00:00Z"));
+        match.setResultRecordedByEmail("recorder@hei.gg");
+
+        when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(211L)).thenReturn(List.of());
+        when(accessControlService.isAdminEmail("recorder@hei.gg")).thenReturn(false);
+
+        List<GroupRecentMatchResponse> responses =
+            matchQueryService.getRecentMatches(1L, 10, 0, "recorder@hei.gg");
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).canEditRaceComposition()).isTrue();
+    }
+
+    @Test
+    void marksCanEditRaceCompositionFalseForUnrelatedNonAdminMember() {
+        Group group = new Group();
+        group.setId(1L);
+        Match match = new Match();
+        match.setId(212L);
+        match.setGroup(group);
+        match.setWinningTeam("HOME");
+        match.setPlayedAt(OffsetDateTime.parse("2026-03-23T17:00:00Z"));
+        match.setResultRecordedByEmail("recorder@hei.gg");
+
+        when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(212L)).thenReturn(List.of());
+        when(accessControlService.isAdminEmail("member@hei.gg")).thenReturn(false);
+
+        List<GroupRecentMatchResponse> responses =
+            matchQueryService.getRecentMatches(1L, 10, 0, "member@hei.gg");
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).canEditRaceComposition()).isFalse();
+    }
+
     private Player player(Long id, Group group, String nickname, int mmr) {
         Player player = new Player();
         player.setId(id);
