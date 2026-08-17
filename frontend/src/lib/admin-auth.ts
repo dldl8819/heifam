@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { useAuth } from '@/components/auth-session-provider'
 import { ApiRequestError, apiClient } from '@/lib/api'
 import type { AccessMeResponse, AccessRole, PlayerRace } from '@/types/api'
@@ -42,7 +42,13 @@ function resolveRole(profile: AccessMeResponse | null): AccessRole {
   return profile.role
 }
 
-export function useAdminAuth(): AdminAuthState {
+const AdminAuthContext = createContext<AdminAuthState | undefined>(undefined)
+
+/**
+ * Fetches and owns the access profile. Call exactly once, from AdminAuthProvider,
+ * so the whole app shares a single /api/access/me subscription instead of one per consumer.
+ */
+export function useAdminAuthState(): AdminAuthState {
   const { user, accessToken, loading } = useAuth()
   const email = user?.email?.trim().toLowerCase() ?? null
   const [accessProfile, setAccessProfile] = useState<AccessMeResponse | null>(null)
@@ -63,6 +69,8 @@ export function useAdminAuth(): AdminAuthState {
     setAccessError(false)
 
     try {
+      let lastErrorWasBlocked = false
+
       for (let attempt = 0; attempt <= ACCESS_FETCH_RETRY_DELAYS_MS.length; attempt += 1) {
         try {
           const profile = await apiClient.getMyAccess({
@@ -74,26 +82,11 @@ export function useAdminAuth(): AdminAuthState {
           setAccessError(false)
           return
         } catch (error) {
-          if (
-            error instanceof ApiRequestError &&
-            (error.status === 401 || error.status === 403)
-          ) {
-            const blockedProfile: AccessMeResponse = {
-              email,
-              nickname: null,
-              role: 'BLOCKED',
-              admin: false,
-              superAdmin: false,
-              allowed: false,
-              canViewMmr: false,
-              preferredRace: null,
-            }
-            cachedAccessEmail = email
-            cachedAccessProfile = blockedProfile
-            setAccessProfile(blockedProfile)
-            setAccessError(false)
-            return
-          }
+          // A single 401/403 can be a transient auth-refresh race, not a real block.
+          // Retry it the same as any other failure and only decide BLOCKED once retries
+          // are exhausted and the last failure was still 401/403.
+          lastErrorWasBlocked =
+            error instanceof ApiRequestError && (error.status === 401 || error.status === 403)
 
           if (attempt < ACCESS_FETCH_RETRY_DELAYS_MS.length) {
             const delayMs = ACCESS_FETCH_RETRY_DELAYS_MS[attempt]
@@ -102,6 +95,24 @@ export function useAdminAuth(): AdminAuthState {
           }
           break
         }
+      }
+
+      if (lastErrorWasBlocked) {
+        const blockedProfile: AccessMeResponse = {
+          email,
+          nickname: null,
+          role: 'BLOCKED',
+          admin: false,
+          superAdmin: false,
+          allowed: false,
+          canViewMmr: false,
+          preferredRace: null,
+        }
+        cachedAccessEmail = email
+        cachedAccessProfile = blockedProfile
+        setAccessProfile(blockedProfile)
+        setAccessError(false)
+        return
       }
 
       if (cachedAccessEmail === email && cachedAccessProfile) {
@@ -174,4 +185,15 @@ export function useAdminAuth(): AdminAuthState {
     preferredRace: accessProfile?.preferredRace ?? null,
     refreshAccess,
   }
+}
+
+/** Internal: consumed by AdminAuthProvider to supply AdminAuthContext. */
+export { AdminAuthContext }
+
+export function useAdminAuth(): AdminAuthState {
+  const context = useContext(AdminAuthContext)
+  if (context === undefined) {
+    throw new Error('useAdminAuth must be used within an AdminAuthProvider')
+  }
+  return context
 }

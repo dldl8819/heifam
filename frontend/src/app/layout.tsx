@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import { AppShell } from '@/components/app-shell'
+import { AdminAuthProvider } from '@/components/admin-auth-provider'
 import { AuthProvider } from '@/components/auth-session-provider'
 import { t } from '@/lib/i18n'
 import { THEME_STORAGE_KEY } from '@/lib/theme'
@@ -81,7 +82,9 @@ export default function RootLayout({
       </head>
       <body className={inter.className}>
         <AuthProvider>
-          <AppShell>{children}</AppShell>
+          <AdminAuthProvider>
+            <AppShell>{children}</AppShell>
+          </AdminAuthProvider>
         </AuthProvider>
         <Analytics />
         <SpeedInsights sampleRate={0.5} />
