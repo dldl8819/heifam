@@ -623,6 +623,15 @@ export default function BalancePage() {
       return
     }
 
+    const winningTeamPlayers = resultWinnerTeam === 'HOME' ? result.homeTeam : result.awayTeam
+    const winningTeamNames = winningTeamPlayers.map((player) => player.name).join(', ')
+    const confirmed = window.confirm(
+      t('balance.quickResult.confirmWinner', { players: winningTeamNames })
+    )
+    if (!confirmed) {
+      return
+    }
+
     setResultSubmitting(true)
     try {
       let parsedMatchId = Number(resultMatchId)
