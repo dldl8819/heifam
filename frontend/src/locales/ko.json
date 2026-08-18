@@ -760,6 +760,7 @@
       "matchNotReady": "밸런스 매치를 먼저 생성해 주세요.",
       "winnerPlaceholder": "승리 팀을 선택해 주세요.",
       "winnerRequired": "승리 팀을 선택해 주세요.",
+      "confirmWinner": "승리팀 {players} 입력하시겠습니까?",
       "submit": "결과 바로 반영",
       "submitting": "반영 중...",
       "success": "매치 {matchId} 결과 반영이 완료되었습니다.",
