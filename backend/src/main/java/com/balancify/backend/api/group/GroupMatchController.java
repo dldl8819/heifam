@@ -2,6 +2,7 @@ package com.balancify.backend.api.group;
 
 import com.balancify.backend.api.MmrMaskingMapper;
 import com.balancify.backend.api.group.dto.GroupRecentMatchResponse;
+import com.balancify.backend.security.AuthenticatedRequestResolver;
 import com.balancify.backend.security.MmrAccessRequestResolver;
 import com.balancify.backend.service.MatchQueryService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,13 +19,16 @@ public class GroupMatchController {
 
     private final MatchQueryService matchQueryService;
     private final MmrAccessRequestResolver mmrAccessRequestResolver;
+    private final AuthenticatedRequestResolver authenticatedRequestResolver;
 
     public GroupMatchController(
         MatchQueryService matchQueryService,
-        MmrAccessRequestResolver mmrAccessRequestResolver
+        MmrAccessRequestResolver mmrAccessRequestResolver,
+        AuthenticatedRequestResolver authenticatedRequestResolver
     ) {
         this.matchQueryService = matchQueryService;
         this.mmrAccessRequestResolver = mmrAccessRequestResolver;
+        this.authenticatedRequestResolver = authenticatedRequestResolver;
     }
 
     @GetMapping("/{groupId}/matches/recent")
@@ -34,7 +38,9 @@ public class GroupMatchController {
         @RequestParam(required = false) Integer offset,
         HttpServletRequest request
     ) {
-        List<GroupRecentMatchResponse> response = matchQueryService.getRecentMatches(groupId, limit, offset);
+        String requesterEmail = authenticatedRequestResolver.resolve(request).email();
+        List<GroupRecentMatchResponse> response =
+            matchQueryService.getRecentMatches(groupId, limit, offset, requesterEmail);
         if (mmrAccessRequestResolver.canViewMmr(request)) {
             return response;
         }

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -25,6 +26,7 @@ import com.balancify.backend.repository.MatchRepository;
 import com.balancify.backend.repository.MmrHistoryRepository;
 import com.balancify.backend.repository.PlayerRepository;
 import com.balancify.backend.service.exception.MatchConflictException;
+import com.balancify.backend.service.exception.MatchEditForbiddenException;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -58,10 +60,16 @@ class MatchResultServiceTest {
     @Mock
     private PlayerStatsRefreshService playerStatsRefreshService;
 
+    @Mock
+    private AccessControlService accessControlService;
+
     private MatchResultService matchResultService;
 
     @BeforeEach
     void setUp() {
+        // Most tests exercise the admin-driven flow (matches the previous filter-level
+        // admin-only gate); tests for the non-admin recorder path override this per-case.
+        lenient().when(accessControlService.isAdminEmail(any())).thenReturn(true);
         matchResultService = createService(DEFAULT_BASE_K_FACTOR);
     }
 
@@ -85,7 +93,8 @@ class MatchResultServiceTest {
             2.0,
             5,
             new GroupReadCacheService(0),
-            playerStatsRefreshService
+            playerStatsRefreshService,
+            accessControlService
         );
     }
 
@@ -369,6 +378,92 @@ class MatchResultServiceTest {
         verify(mmrHistoryRepository, never()).findByMatch_Id(any());
         verify(mmrHistoryRepository, never()).saveAll(any());
         verify(playerStatsRefreshService).rebuildGroupStats(7L);
+    }
+
+    @Test
+    void allowsNonAdminRecorderToEditRaceCompositionOnOwnMatch() {
+        Match match = new Match();
+        match.setId(65L);
+        match.setStatus(MatchStatus.COMPLETED);
+        match.setWinningTeam("HOME");
+        match.setRaceComposition("PPP");
+        match.setResultRecordedByEmail("recorder@example.test");
+        match.setResultRecordedByNickname("Recorder");
+
+        List<MatchParticipant> participants = buildParticipants(match);
+        participants.forEach(participant -> {
+            participant.setRace("P");
+            participant.setAssignedRace("P");
+        });
+
+        when(accessControlService.isAdminEmail("recorder@example.test")).thenReturn(false);
+        when(matchRepository.findByIdForUpdate(65L)).thenReturn(Optional.of(match));
+        when(groupRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(new Group()));
+        when(matchRepository.findRecentDuplicateCandidatesExcludingMatch(
+            any(), any(), any(), any(), any(), any(), any()
+        )).thenReturn(List.of());
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(65L)).thenReturn(participants);
+        when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MatchResultService.MatchResultUpdateOutcome outcome = matchResultService.updateMatchResult(
+            65L,
+            new MatchResultUpdateRequest("HOME", "PPT"),
+            "recorder@example.test",
+            "Recorder"
+        );
+
+        assertThat(match.getRaceComposition()).isEqualTo("PPT");
+        assertThat(outcome.response().winnerTeam()).isEqualTo("HOME");
+    }
+
+    @Test
+    void rejectsNonAdminEditingRaceCompositionOnMatchRecordedBySomeoneElse() {
+        Match match = new Match();
+        match.setId(66L);
+        match.setStatus(MatchStatus.COMPLETED);
+        match.setWinningTeam("HOME");
+        match.setRaceComposition("PPP");
+        match.setResultRecordedByEmail("recorder@example.test");
+
+        when(accessControlService.isAdminEmail("outsider@example.test")).thenReturn(false);
+        when(matchRepository.findByIdForUpdate(66L)).thenReturn(Optional.of(match));
+
+        assertThatThrownBy(() -> matchResultService.updateMatchResult(
+            66L,
+            new MatchResultUpdateRequest("HOME", "PPT"),
+            "outsider@example.test",
+            "Outsider"
+        )).isInstanceOf(MatchEditForbiddenException.class);
+
+        assertThat(match.getRaceComposition()).isEqualTo("PPP");
+        verify(matchParticipantRepository, never()).findByMatchIdWithPlayerAndMatch(any());
+        verify(matchRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectsNonAdminChangingWinnerTeamEvenOnOwnMatch() {
+        Match match = new Match();
+        match.setId(67L);
+        match.setStatus(MatchStatus.COMPLETED);
+        match.setWinningTeam("HOME");
+        match.setRaceComposition("PPP");
+        match.setResultRecordedByEmail("recorder@example.test");
+
+        when(accessControlService.isAdminEmail("recorder@example.test")).thenReturn(false);
+        when(matchRepository.findByIdForUpdate(67L)).thenReturn(Optional.of(match));
+
+        assertThatThrownBy(() -> matchResultService.updateMatchResult(
+            67L,
+            new MatchResultUpdateRequest("AWAY", "PPT"),
+            "recorder@example.test",
+            "Recorder"
+        )).isInstanceOf(MatchEditForbiddenException.class);
+
+        assertThat(match.getWinningTeam()).isEqualTo("HOME");
+        assertThat(match.getRaceComposition()).isEqualTo("PPP");
+        verify(matchParticipantRepository, never()).findByMatchIdWithPlayerAndMatch(any());
+        verify(matchRepository, never()).save(any());
     }
 
     @Test

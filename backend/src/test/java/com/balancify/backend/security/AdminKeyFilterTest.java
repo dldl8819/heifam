@@ -413,7 +413,40 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void returnsForbiddenWhenMemberAttemptsMatchResultPatch() throws Exception {
+    void returnsForbiddenWhenNonMemberAttemptsMatchResultPatch() throws Exception {
+        mockMvc
+            .perform(
+                patch("/api/matches/1/result")
+                    .header("X-USER-EMAIL", "stranger@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"winnerTeam\":\"HOME\",\"raceComposition\":\"PPT\"}")
+            )
+            .andExpect(status().isForbidden());
+
+        verify(matchResultService, never()).updateMatchResult(any(), any(), any(), any());
+    }
+
+    @Test
+    void allowsMemberThroughFilterForMatchResultPatchSoServiceCanDecidePerMatchOwnership() throws Exception {
+        // The filter only checks group membership now; MatchResultService enforces that a
+        // non-admin may only edit raceComposition on a match they personally recorded.
+        MatchResultService.MatchResultUpdateAuditSnapshot auditSnapshot =
+            new MatchResultService.MatchResultUpdateAuditSnapshot(
+                1L,
+                1L,
+                "HOME",
+                "HOME",
+                "PPP",
+                "PPT"
+            );
+        when(matchResultService.updateMatchResult(eq(1L), any(MatchResultUpdateRequest.class), any(), any()))
+            .thenReturn(
+                new MatchResultService.MatchResultUpdateOutcome(
+                    new MatchResultResponse(1L, "HOME", 32, 0.5, 0.5, List.of()),
+                    auditSnapshot
+                )
+            );
+
         mockMvc
             .perform(
                 patch("/api/matches/1/result")
@@ -421,9 +454,14 @@ class AdminKeyFilterTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"winnerTeam\":\"HOME\",\"raceComposition\":\"PPT\"}")
             )
-            .andExpect(status().isForbidden());
+            .andExpect(status().isOk());
 
-        verify(matchResultService, never()).updateMatchResult(any(), any(), any(), any());
+        verify(matchResultService).updateMatchResult(
+            eq(1L),
+            any(MatchResultUpdateRequest.class),
+            eq("member@hei.gg"),
+            any()
+        );
     }
 
     @Test
@@ -1055,7 +1093,7 @@ class AdminKeyFilterTest {
 
     @Test
     void hidesMmrFieldsFromMemberForGroupPlayers() throws Exception {
-        when(playerQueryService.getGroupPlayers(eq(1L), eq(false)))
+        when(playerQueryService.getGroupPlayers(eq(1L), eq(false), any()))
             .thenReturn(List.of(groupPlayerResponseWithOperationalMetadata()));
         mockMvc
             .perform(
@@ -1079,7 +1117,7 @@ class AdminKeyFilterTest {
 
     @Test
     void hidesOnlyMmrFieldsFromAdminWithoutMmrAccessForGroupPlayers() throws Exception {
-        when(playerQueryService.getGroupPlayers(eq(1L), eq(false)))
+        when(playerQueryService.getGroupPlayers(eq(1L), eq(false), any()))
             .thenReturn(List.of(groupPlayerResponseWithOperationalMetadata()));
         mockMvc
             .perform(
@@ -1103,7 +1141,7 @@ class AdminKeyFilterTest {
 
     @Test
     void returnsMmrFieldsForMmrAllowedAdminForGroupPlayers() throws Exception {
-        when(playerQueryService.getGroupPlayers(eq(1L), eq(false)))
+        when(playerQueryService.getGroupPlayers(eq(1L), eq(false), any()))
             .thenReturn(List.of(groupPlayerResponseWithOperationalMetadata()));
         mockMvc
             .perform(
@@ -1127,7 +1165,7 @@ class AdminKeyFilterTest {
 
     @Test
     void ignoresIncludeInactiveForMemberGroupPlayersRequest() throws Exception {
-        when(playerQueryService.getGroupPlayers(eq(1L), eq(false))).thenReturn(List.of());
+        when(playerQueryService.getGroupPlayers(eq(1L), eq(false), any())).thenReturn(List.of());
 
         mockMvc
             .perform(
@@ -1136,12 +1174,12 @@ class AdminKeyFilterTest {
             )
             .andExpect(status().isOk());
 
-        verify(playerQueryService).getGroupPlayers(eq(1L), eq(false));
+        verify(playerQueryService).getGroupPlayers(eq(1L), eq(false), any());
     }
 
     @Test
     void allowsIncludeInactiveForAdminGroupPlayersRequest() throws Exception {
-        when(playerQueryService.getGroupPlayers(eq(1L), eq(true)))
+        when(playerQueryService.getGroupPlayers(eq(1L), eq(true), any()))
             .thenReturn(List.of(retainedInactiveGroupPlayerResponse()));
 
         mockMvc
@@ -1176,7 +1214,7 @@ class AdminKeyFilterTest {
             .andExpect(jsonPath("$[0].lifecycleStatus").value("INACTIVE"))
             .andExpect(jsonPath("$[0].identityRetainedUntil").exists());
 
-        verify(playerQueryService).getGroupPlayers(eq(1L), eq(true));
+        verify(playerQueryService).getGroupPlayers(eq(1L), eq(true), any());
     }
 
     @Test
@@ -1522,7 +1560,7 @@ class AdminKeyFilterTest {
 
     @Test
     void returnsMmrFieldsForMmrAllowedAdminForRecentMatches() throws Exception {
-        when(matchQueryService.getRecentMatches(eq(1L), any(), any()))
+        when(matchQueryService.getRecentMatches(eq(1L), any(), any(), any()))
             .thenReturn(
                 List.of(
                     new GroupRecentMatchResponse(
@@ -1538,7 +1576,8 @@ class AdminKeyFilterTest {
                         List.of(new GroupRecentMatchPlayerResponse(20L, "bravo", "AWAY", 1184)),
                         3600,
                         3552,
-                        48
+                        48,
+                        false
                     )
                 )
             );
@@ -1557,7 +1596,7 @@ class AdminKeyFilterTest {
 
     @Test
     void hidesMmrFieldsFromAdminWithoutMmrAccessForRecentMatches() throws Exception {
-        when(matchQueryService.getRecentMatches(eq(1L), any(), any()))
+        when(matchQueryService.getRecentMatches(eq(1L), any(), any(), any()))
             .thenReturn(
                 List.of(
                     new GroupRecentMatchResponse(
@@ -1573,7 +1612,8 @@ class AdminKeyFilterTest {
                         List.of(new GroupRecentMatchPlayerResponse(20L, "bravo", "AWAY", 1184)),
                         3600,
                         3552,
-                        48
+                        48,
+                        false
                     )
                 )
             );
@@ -1934,7 +1974,7 @@ class AdminKeyFilterTest {
 
     @Test
     void allowsRecentMatchesEndpointWithoutUserEmailHeader() throws Exception {
-        when(matchQueryService.getRecentMatches(eq(1L), any(), any())).thenReturn(List.of());
+        when(matchQueryService.getRecentMatches(eq(1L), any(), any(), any())).thenReturn(List.of());
         mockMvc
             .perform(get("/api/groups/1/matches/recent"))
             .andExpect(status().isOk());
@@ -1964,7 +2004,8 @@ class AdminKeyFilterTest {
             "Synthetic note",
             chatRejoinedAt,
             "A",
-            chatRejoinedAt
+            chatRejoinedAt,
+            false
         );
     }
 
@@ -1992,7 +2033,8 @@ class AdminKeyFilterTest {
             null,
             null,
             "INACTIVE",
-            OffsetDateTime.parse("2031-07-12T03:00:00Z")
+            OffsetDateTime.parse("2031-07-12T03:00:00Z"),
+            false
         );
     }
 }

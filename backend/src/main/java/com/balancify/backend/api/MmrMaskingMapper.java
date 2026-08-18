@@ -46,7 +46,8 @@ public final class MmrMaskingMapper {
                     null,
                     null,
                     null,
-                    null
+                    null,
+                    response.isOwnPlayer()
                 )
             )
             .toList();
@@ -79,7 +80,8 @@ public final class MmrMaskingMapper {
                     response.tierChangeAcknowledgedAt(),
                     null,
                     response.lifecycleStatus(),
-                    response.identityRetainedUntil()
+                    response.identityRetainedUntil(),
+                    response.isOwnPlayer()
                 )
             )
             .toList();
@@ -112,7 +114,8 @@ public final class MmrMaskingMapper {
                     response.tierChangeAcknowledgedAt(),
                     null,
                     response.lifecycleStatus(),
-                    response.identityRetainedUntil()
+                    response.identityRetainedUntil(),
+                    response.isOwnPlayer()
                 )
             )
             .toList();
@@ -216,7 +219,8 @@ public final class MmrMaskingMapper {
                     maskRecentMatchPlayers(response.awayTeam()),
                     null,
                     null,
-                    null
+                    null,
+                    response.canEditRaceComposition()
                 )
             )
             .toList();

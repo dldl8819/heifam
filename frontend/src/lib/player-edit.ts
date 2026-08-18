@@ -63,3 +63,14 @@ export function buildPlayerProfileUpdateRequest(
 
   return payload
 }
+
+export function buildOwnPlayerRaceUpdateRequest(
+  current: PlayerRosterItem,
+  nextRace: PlayerRace
+): GroupPlayerUpdateRequest | null {
+  if (nextRace === current.race) {
+    return null
+  }
+
+  return { race: nextRace }
+}

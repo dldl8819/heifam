@@ -34,10 +34,20 @@ public class MatchQueryService {
     }
 
     public List<GroupRecentMatchResponse> getRecentMatches(Long groupId, Integer limit) {
-        return getRecentMatches(groupId, limit, DEFAULT_OFFSET);
+        return getRecentMatches(groupId, limit, DEFAULT_OFFSET, null);
     }
 
     public List<GroupRecentMatchResponse> getRecentMatches(Long groupId, Integer limit, Integer offset) {
+        return getRecentMatches(groupId, limit, offset, null);
+    }
+
+    public List<GroupRecentMatchResponse> getRecentMatches(
+        Long groupId,
+        Integer limit,
+        Integer offset,
+        String requesterEmail
+    ) {
+        boolean requesterIsAdmin = accessControlService.isAdminEmail(requesterEmail);
         int normalizedLimit = normalizeLimit(limit);
         int normalizedOffset = normalizeOffset(offset);
         int page = normalizedOffset / normalizedLimit;
@@ -100,7 +110,8 @@ public class MatchQueryService {
                 awayTeam,
                 homeMmr,
                 awayMmr,
-                Math.abs(homeMmr - awayMmr)
+                Math.abs(homeMmr - awayMmr),
+                requesterIsAdmin || isSameRecordedByEmail(match.getResultRecordedByEmail(), requesterEmail)
             ));
         }
 
@@ -172,6 +183,12 @@ public class MatchQueryService {
 
     private String safeTrim(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private boolean isSameRecordedByEmail(String storedEmail, String requesterEmail) {
+        String normalizedStored = safeTrim(storedEmail).toLowerCase(Locale.ROOT);
+        String normalizedRequester = safeTrim(requesterEmail).toLowerCase(Locale.ROOT);
+        return !normalizedStored.isEmpty() && normalizedStored.equals(normalizedRequester);
     }
 
     private String resolveTeamRaceComposition(

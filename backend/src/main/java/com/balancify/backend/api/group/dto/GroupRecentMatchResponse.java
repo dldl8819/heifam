@@ -18,6 +18,7 @@ public record GroupRecentMatchResponse(
     List<GroupRecentMatchPlayerResponse> awayTeam,
     Integer homeMmr,
     Integer awayMmr,
-    Integer mmrDiff
+    Integer mmrDiff,
+    boolean canEditRaceComposition
 ) {
 }

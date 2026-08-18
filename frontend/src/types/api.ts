@@ -182,6 +182,7 @@ export type RecentMatchItem = {
   homeMmr?: number
   awayMmr?: number
   mmrDiff?: number
+  canEditRaceComposition: boolean
 }
 
 export type RankingItem = {
@@ -241,6 +242,7 @@ export type PlayerRosterItem = {
   chatLeftAt?: string
   chatLeftReason?: string
   chatRejoinedAt?: string
+  isOwnPlayer?: boolean
 }
 
 export type GroupPlayerLastParticipationResponse = {

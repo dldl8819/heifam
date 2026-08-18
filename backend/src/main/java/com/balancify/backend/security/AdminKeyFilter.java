@@ -47,7 +47,7 @@ public class AdminKeyFilter extends OncePerRequestFilter {
         new ProtectedRoute(
             "PATCH",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/players/{playerId}"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SERVICE_ACCESS
         ),
         new ProtectedRoute(
             "DELETE",
@@ -72,7 +72,7 @@ public class AdminKeyFilter extends OncePerRequestFilter {
         new ProtectedRoute(
             "PATCH",
             PathPatternParser.defaultInstance.parse("/api/matches/{id}/result"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SERVICE_ACCESS
         ),
         new ProtectedRoute(
             "DELETE",

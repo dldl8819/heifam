@@ -27,7 +27,8 @@ public record GroupPlayerResponse(
     OffsetDateTime tierChangeAcknowledgedAt,
     String dormancyMmrFloorTier,
     String lifecycleStatus,
-    OffsetDateTime identityRetainedUntil
+    OffsetDateTime identityRetainedUntil,
+    boolean isOwnPlayer
 ) {
     public GroupPlayerResponse(
         Long id,
@@ -49,7 +50,8 @@ public record GroupPlayerResponse(
         String chatLeftReason,
         OffsetDateTime chatRejoinedAt,
         String tierChangeAcknowledgedTier,
-        OffsetDateTime tierChangeAcknowledgedAt
+        OffsetDateTime tierChangeAcknowledgedAt,
+        boolean isOwnPlayer
     ) {
         this(
             id,
@@ -74,7 +76,8 @@ public record GroupPlayerResponse(
             tierChangeAcknowledgedAt,
             null,
             null,
-            null
+            null,
+            isOwnPlayer
         );
     }
 
@@ -99,7 +102,8 @@ public record GroupPlayerResponse(
         OffsetDateTime chatRejoinedAt,
         String tierChangeAcknowledgedTier,
         OffsetDateTime tierChangeAcknowledgedAt,
-        String dormancyMmrFloorTier
+        String dormancyMmrFloorTier,
+        boolean isOwnPlayer
     ) {
         this(
             id,
@@ -124,7 +128,8 @@ public record GroupPlayerResponse(
             tierChangeAcknowledgedAt,
             dormancyMmrFloorTier,
             null,
-            null
+            null,
+            isOwnPlayer
         );
     }
 }

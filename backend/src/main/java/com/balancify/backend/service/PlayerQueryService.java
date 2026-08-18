@@ -14,6 +14,8 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -47,12 +49,24 @@ public class PlayerQueryService {
     }
 
     public List<GroupPlayerResponse> getGroupPlayers(Long groupId, boolean includeInactive) {
-        // Player identity changes must be visible immediately across application instances.
-        // The local read cache cannot be invalidated reliably after withdrawal or anonymization.
-        return List.copyOf(loadGroupPlayers(groupId, includeInactive));
+        return getGroupPlayers(groupId, includeInactive, null);
     }
 
-    private List<GroupPlayerResponse> loadGroupPlayers(Long groupId, boolean includeInactive) {
+    public List<GroupPlayerResponse> getGroupPlayers(
+        Long groupId,
+        boolean includeInactive,
+        UUID requesterAuthUserId
+    ) {
+        // Player identity changes must be visible immediately across application instances.
+        // The local read cache cannot be invalidated reliably after withdrawal or anonymization.
+        return List.copyOf(loadGroupPlayers(groupId, includeInactive, requesterAuthUserId));
+    }
+
+    private List<GroupPlayerResponse> loadGroupPlayers(
+        Long groupId,
+        boolean includeInactive,
+        UUID requesterAuthUserId
+    ) {
         OffsetDateTime now = OffsetDateTime.now(clock);
         List<Player> players = new ArrayList<>(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId)
             .stream()
@@ -126,7 +140,8 @@ public class PlayerQueryService {
                     ? null
                     : PlayerTierPolicy.normalizeRankedTier(player.getDormancyMmrFloorTier()),
                 player.getLifecycleStatus() == null ? null : player.getLifecycleStatus().name(),
-                player.getIdentityRetainedUntil()
+                player.getIdentityRetainedUntil(),
+                requesterAuthUserId != null && Objects.equals(requesterAuthUserId, player.getAuthUserId())
             ));
         }
 
@@ -187,7 +202,8 @@ public class PlayerQueryService {
             null,
             null,
             player.getLifecycleStatus() == null ? null : player.getLifecycleStatus().name(),
-            player.getIdentityRetainedUntil()
+            player.getIdentityRetainedUntil(),
+            false
         );
     }
 
