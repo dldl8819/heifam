@@ -317,7 +317,7 @@ function getTierBadgeClass(tier: PlayerTierStatus): string {
 }
 
 export default function PlayersPage() {
-  const { isAdmin, isSuperAdmin, canViewMmr } = useAdminAuth()
+  const { isAdmin, isSuperAdmin, canViewMmr, isLoading: isAdminAuthLoading } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
   const showMmrColumn = canViewMmr && mmrVisible
   const [rows, setRows] = useState<PlayerRosterItem[]>([])
@@ -377,7 +377,7 @@ export default function PlayersPage() {
       if (rosterRequestId.current !== requestId) {
         return
       }
-      setRows(sortRosterRows(response, showMmrColumn))
+      setRows(response)
       setDormantPlayerIds(new Set(dormantPlayers.map((player) => player.playerId)))
     } catch {
       if (rosterRequestId.current !== requestId) {
@@ -391,14 +391,19 @@ export default function PlayersPage() {
         setLoading(false)
       }
     }
-  }, [effectiveRosterView, isAdmin, showMmrColumn])
+  }, [effectiveRosterView, isAdmin])
 
   useEffect(() => {
+    // Wait until admin-auth has fully resolved (isAdmin/effectiveRosterView settled) so the
+    // roster is fetched once, not once per intermediate loading state.
+    if (isAdminAuthLoading) {
+      return
+    }
     void fetchRoster()
     return () => {
       rosterRequestId.current += 1
     }
-  }, [fetchRoster])
+  }, [fetchRoster, isAdminAuthLoading])
 
   useEffect(() => {
     if (isAdmin) {
@@ -714,7 +719,7 @@ export default function PlayersPage() {
           return nextRows.filter((row) => row.id !== player.id)
         }
 
-        return sortRosterRows(nextRows, showMmrColumn)
+        return nextRows
       })
       if (editingPlayerId === player.id) {
         setEditingPlayerId(null)
@@ -823,9 +828,13 @@ export default function PlayersPage() {
     [isAdmin, lastParticipation?.playerId, rosterView]
   )
 
+  const sortedRows = useMemo(
+    () => sortRosterRows(rows, showMmrColumn),
+    [rows, showMmrColumn]
+  )
   const activityRows = useMemo(
-    () => filterPlayerRosterByView(rows, effectiveRosterView, dormantPlayerIds),
-    [dormantPlayerIds, effectiveRosterView, rows]
+    () => filterPlayerRosterByView(sortedRows, effectiveRosterView, dormantPlayerIds),
+    [dormantPlayerIds, effectiveRosterView, sortedRows]
   )
   const filteredRows = useMemo(() => {
     const searchText = search.trim().toLowerCase()
