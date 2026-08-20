@@ -15,6 +15,8 @@ const AUDIT_ACTION_FILTER_OPTIONS = [
   'ALL',
   'PLAYER_REGISTERED',
   'PLAYER_REGISTRATION_UPDATED',
+  'PLAYER_NICKNAME_UPDATED',
+  'PLAYER_PROFILE_UPDATED',
   'PLAYER_REACTIVATED_BY_REGISTRATION',
   'PLAYER_TIER_UPDATED',
   'PLAYER_DEACTIVATED',
@@ -90,6 +92,10 @@ function getActionLabel(action: string): string {
       return t('audit.actions.playerRegistered')
     case 'PLAYER_REGISTRATION_UPDATED':
       return t('audit.actions.playerRegistrationUpdated')
+    case 'PLAYER_NICKNAME_UPDATED':
+      return t('audit.actions.playerNicknameUpdated')
+    case 'PLAYER_PROFILE_UPDATED':
+      return t('audit.actions.playerProfileUpdated')
     case 'PLAYER_REACTIVATED_BY_REGISTRATION':
       return t('audit.actions.playerReactivatedByRegistration')
     case 'PLAYER_TIER_UPDATED':

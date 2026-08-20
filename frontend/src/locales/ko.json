@@ -337,6 +337,8 @@
     "actions": {
       "playerRegistered": "선수 등록",
       "playerRegistrationUpdated": "종족 수정",
+      "playerNicknameUpdated": "닉네임 수정",
+      "playerProfileUpdated": "선수 정보 수정",
       "playerReactivatedByRegistration": "선수 재등록",
       "playerTierUpdated": "티어 수정",
       "playerDeactivated": "비활성",
