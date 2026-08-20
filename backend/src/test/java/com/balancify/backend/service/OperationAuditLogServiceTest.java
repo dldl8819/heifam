@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -175,6 +176,81 @@ class OperationAuditLogServiceTest {
         assertThat(log.getTargetLabel()).isEqualTo("PlayerAlpha");
         assertThat(log.getSummary()).isEqualTo("종족 수정");
         assertThat(log.getDetails()).isEqualTo("race=P -> PTZ");
+    }
+
+    @Test
+    void recordsPlayerNicknameUpdateAuditLogWhenOnlyNicknameChanges() {
+        Player player = new Player();
+        player.setId(10L);
+        player.setNickname("NewNickname");
+        player.setRace("P");
+
+        operationAuditLogService.recordPlayerProfileUpdate(
+            "ops@example.com",
+            "OpsUser",
+            1L,
+            player,
+            "OldNickname",
+            "NewNickname",
+            "P",
+            "P"
+        );
+
+        ArgumentCaptor<OperationAuditLog> logCaptor = ArgumentCaptor.forClass(OperationAuditLog.class);
+        verify(operationAuditLogRepository).save(logCaptor.capture());
+        OperationAuditLog log = logCaptor.getValue();
+
+        assertThat(log.getAction()).isEqualTo(OperationAuditLogService.ACTION_PLAYER_NICKNAME_UPDATED);
+        assertThat(log.getSummary()).isEqualTo("닉네임 수정");
+        assertThat(log.getDetails()).isEqualTo("nickname=OldNickname -> NewNickname");
+    }
+
+    @Test
+    void recordsPlayerProfileUpdateAuditLogWhenNicknameAndRaceBothChange() {
+        Player player = new Player();
+        player.setId(10L);
+        player.setNickname("NewNickname");
+        player.setRace("PTZ");
+
+        operationAuditLogService.recordPlayerProfileUpdate(
+            "ops@example.com",
+            "OpsUser",
+            1L,
+            player,
+            "OldNickname",
+            "NewNickname",
+            "P",
+            "PTZ"
+        );
+
+        ArgumentCaptor<OperationAuditLog> logCaptor = ArgumentCaptor.forClass(OperationAuditLog.class);
+        verify(operationAuditLogRepository).save(logCaptor.capture());
+        OperationAuditLog log = logCaptor.getValue();
+
+        assertThat(log.getAction()).isEqualTo(OperationAuditLogService.ACTION_PLAYER_PROFILE_UPDATED);
+        assertThat(log.getSummary()).isEqualTo("선수 정보 수정");
+        assertThat(log.getDetails()).isEqualTo("nickname=OldNickname -> NewNickname, race=P -> PTZ");
+    }
+
+    @Test
+    void skipsPlayerProfileUpdateAuditLogWhenNothingChanges() {
+        Player player = new Player();
+        player.setId(10L);
+        player.setNickname("PlayerAlpha");
+        player.setRace("P");
+
+        operationAuditLogService.recordPlayerProfileUpdate(
+            "ops@example.com",
+            "OpsUser",
+            1L,
+            player,
+            "PlayerAlpha",
+            "PlayerAlpha",
+            "P",
+            "P"
+        );
+
+        verify(operationAuditLogRepository, never()).save(any());
     }
 
     @Test

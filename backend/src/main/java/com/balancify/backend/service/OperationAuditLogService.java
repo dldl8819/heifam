@@ -25,7 +25,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class OperationAuditLogService {
 
     public static final String ACTION_PLAYER_REGISTERED = "PLAYER_REGISTERED";
+    // Kept name for backward compatibility with existing logs/filters: means race-only changes now
+    // that nickname-only changes are split into ACTION_PLAYER_NICKNAME_UPDATED below.
     public static final String ACTION_PLAYER_REGISTRATION_UPDATED = "PLAYER_REGISTRATION_UPDATED";
+    public static final String ACTION_PLAYER_NICKNAME_UPDATED = "PLAYER_NICKNAME_UPDATED";
+    public static final String ACTION_PLAYER_PROFILE_UPDATED = "PLAYER_PROFILE_UPDATED";
     public static final String ACTION_PLAYER_REACTIVATED_BY_REGISTRATION = "PLAYER_REACTIVATED_BY_REGISTRATION";
     public static final String ACTION_PLAYER_TIER_UPDATED = "PLAYER_TIER_UPDATED";
     public static final String ACTION_PLAYER_DEACTIVATED = "PLAYER_DEACTIVATED";
@@ -209,22 +213,34 @@ public class OperationAuditLogService {
             return;
         }
 
-        String details = buildPlayerProfileUpdateDetails(previousNickname, nextNickname, previousRace, nextRace);
-        if (details == null) {
+        boolean nicknameChanged = hasAuditChange(previousNickname, nextNickname);
+        boolean raceChanged = hasAuditChange(previousRace, nextRace);
+        if (!nicknameChanged && !raceChanged) {
             return;
         }
+
+        String action = nicknameChanged && raceChanged
+            ? ACTION_PLAYER_PROFILE_UPDATED
+            : nicknameChanged
+                ? ACTION_PLAYER_NICKNAME_UPDATED
+                : ACTION_PLAYER_REGISTRATION_UPDATED;
+        String summary = nicknameChanged && raceChanged
+            ? "선수 정보 수정"
+            : nicknameChanged
+                ? "닉네임 수정"
+                : "종족 수정";
 
         OperationAuditLog log = baseLog(
             actorEmail,
             actorNickname,
-            ACTION_PLAYER_REGISTRATION_UPDATED,
+            action,
             "PLAYER",
             player.getId(),
             player.getNickname(),
             groupId
         );
-        log.setSummary("종족 수정");
-        log.setDetails(details);
+        log.setSummary(summary);
+        log.setDetails(buildPlayerProfileUpdateDetails(previousNickname, nextNickname, previousRace, nextRace));
         operationAuditLogRepository.save(log);
     }
 
@@ -395,12 +411,19 @@ public class OperationAuditLogService {
     }
 
     private void addAuditChange(List<String> changes, String field, String previousValue, String nextValue) {
-        String previous = trimToNull(previousValue);
-        String next = trimToNull(nextValue);
-        if (previous == null ? next == null : previous.equals(next)) {
+        if (!hasAuditChange(previousValue, nextValue)) {
             return;
         }
-        changes.add(field + "=" + formatTextForAudit(previous) + " -> " + formatTextForAudit(next));
+        changes.add(
+            field + "=" + formatTextForAudit(trimToNull(previousValue))
+                + " -> " + formatTextForAudit(trimToNull(nextValue))
+        );
+    }
+
+    private boolean hasAuditChange(String previousValue, String nextValue) {
+        String previous = trimToNull(previousValue);
+        String next = trimToNull(nextValue);
+        return previous == null ? next != null : !previous.equals(next);
     }
 
     private String formatTextForAudit(String value) {
