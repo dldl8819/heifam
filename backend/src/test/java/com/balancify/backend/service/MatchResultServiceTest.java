@@ -4,8 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -41,6 +43,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class MatchResultServiceTest {
 
     private static final int DEFAULT_BASE_K_FACTOR = 36;
+    // rebuildGroupStats now runs on TransactionAfterCommit's background executor, so assertions
+    // on it must poll instead of checking immediately after the service call returns.
+    private static final long ASYNC_STATS_REBUILD_TIMEOUT_MS = 500L;
 
     @Mock
     private MatchRepository matchRepository;
@@ -174,7 +179,7 @@ class MatchResultServiceTest {
             assertThat(history.getAfterMmr()).isNotNull();
             assertThat(history.getDelta()).isNotNull();
         });
-        verify(playerStatsRefreshService).rebuildGroupStats(7L);
+        verify(playerStatsRefreshService, timeout(ASYNC_STATS_REBUILD_TIMEOUT_MS)).rebuildGroupStats(7L);
     }
 
     @Test
@@ -227,7 +232,7 @@ class MatchResultServiceTest {
         assertThat(historyCaptor.getValue())
             .extracting(history -> history.getPlayer().getId())
             .containsExactlyInAnyOrder(7L, 8L);
-        verify(playerStatsRefreshService).rebuildGroupStats(8L);
+        verify(playerStatsRefreshService, timeout(ASYNC_STATS_REBUILD_TIMEOUT_MS)).rebuildGroupStats(8L);
     }
 
     @Test
@@ -377,7 +382,7 @@ class MatchResultServiceTest {
         verify(playerRepository, never()).saveAll(any());
         verify(mmrHistoryRepository, never()).findByMatch_Id(any());
         verify(mmrHistoryRepository, never()).saveAll(any());
-        verify(playerStatsRefreshService).rebuildGroupStats(7L);
+        verify(playerStatsRefreshService, timeout(ASYNC_STATS_REBUILD_TIMEOUT_MS)).rebuildGroupStats(7L);
     }
 
     @Test
@@ -509,7 +514,7 @@ class MatchResultServiceTest {
         verify(matchRepository, never()).save(any());
         verify(playerRepository, never()).saveAll(any());
         verify(mmrHistoryRepository, never()).saveAll(any());
-        verify(playerStatsRefreshService, never()).rebuildGroupStats(any());
+        verify(playerStatsRefreshService, after(ASYNC_STATS_REBUILD_TIMEOUT_MS).never()).rebuildGroupStats(any());
     }
 
     @Test
@@ -547,7 +552,7 @@ class MatchResultServiceTest {
             .containsExactly("P", "P", "T", "P", "P", "T");
         verify(matchParticipantRepository).saveAll(participants);
         verify(matchRepository).save(match);
-        verify(playerStatsRefreshService).rebuildGroupStats(7L);
+        verify(playerStatsRefreshService, timeout(ASYNC_STATS_REBUILD_TIMEOUT_MS)).rebuildGroupStats(7L);
         verify(playerRepository, never()).saveAll(any());
         verify(mmrHistoryRepository, never()).saveAll(any());
     }
@@ -573,7 +578,7 @@ class MatchResultServiceTest {
 
         verify(matchParticipantRepository, never()).saveAll(any());
         verify(matchRepository, never()).save(any());
-        verify(playerStatsRefreshService, never()).rebuildGroupStats(any());
+        verify(playerStatsRefreshService, after(ASYNC_STATS_REBUILD_TIMEOUT_MS).never()).rebuildGroupStats(any());
     }
 
     @Test
@@ -650,7 +655,7 @@ class MatchResultServiceTest {
             .containsOnly("P");
         verify(matchParticipantRepository, never()).saveAll(any());
         verify(matchRepository, never()).save(any());
-        verify(playerStatsRefreshService, never()).rebuildGroupStats(any());
+        verify(playerStatsRefreshService, after(ASYNC_STATS_REBUILD_TIMEOUT_MS).never()).rebuildGroupStats(any());
     }
 
     @Test
@@ -705,7 +710,7 @@ class MatchResultServiceTest {
         assertThat(outcome.auditSnapshot().previousRaceComposition()).isEqualTo("PPP");
         assertThat(outcome.auditSnapshot().nextRaceComposition()).isEqualTo("PPT");
         assertThat(match.getRaceComposition()).isEqualTo("PPT");
-        verify(playerStatsRefreshService).rebuildGroupStats(7L);
+        verify(playerStatsRefreshService, timeout(ASYNC_STATS_REBUILD_TIMEOUT_MS)).rebuildGroupStats(7L);
     }
 
     @Test
@@ -910,7 +915,7 @@ class MatchResultServiceTest {
         verify(mmrHistoryRepository).deleteByMatch_Id(99L);
         verify(matchParticipantRepository).deleteByMatch_Id(99L);
         verify(matchRepository).delete(match);
-        verify(playerStatsRefreshService).rebuildGroupStats(1L);
+        verify(playerStatsRefreshService, timeout(ASYNC_STATS_REBUILD_TIMEOUT_MS)).rebuildGroupStats(1L);
     }
 
     @Test
