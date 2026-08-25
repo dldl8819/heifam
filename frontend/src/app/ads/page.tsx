@@ -105,6 +105,21 @@ const promotions: Promotion[] = [
     highlights: ['주문 접수 마감', '김해 대동농장', '다음 판매 일정 추후 안내'],
     note: '기존 주문 건은 판매자 안내에 따라 확인해 주세요.',
   },
+  {
+    title: '다마포켓',
+    eyebrow: '란이',
+    description: '산리오, 디즈니 등 캐릭터 굿즈를 판매하는 온라인 스토어입니다.',
+    imageSrc: '/promotions/damapocket-photo.png',
+    imageAlt: '다마포켓 스마트스토어 배너',
+    highlights: [
+      '산리오·디즈니·짱구·캐치! 티니핑·치이카와 캐릭터 상품 판매',
+      '온라인 전용 스토어 (네이버 스마트스토어)',
+      '주 7일 배송, 당일 출고',
+    ],
+    note: '주문 가능 상품과 배송 조건은 스마트스토어에서 확인해 주세요.',
+    orderHref: 'https://smartstore.naver.com/damapocket',
+    orderCtaLabel: '스마트스토어 주문',
+  },
 ]
 
 export default function AdsPage() {
