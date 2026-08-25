@@ -2,7 +2,7 @@ import Image from 'next/image'
 
 type Promotion = {
   title: string
-  eyebrow: string
+  eyebrow?: string
   description: string
   imageSrc: string
   imageAlt: string
@@ -107,7 +107,6 @@ const promotions: Promotion[] = [
   },
   {
     title: '다마포켓',
-    eyebrow: '란이',
     description: '산리오, 디즈니 등 캐릭터 굿즈를 판매하는 온라인 스토어입니다.',
     imageSrc: '/promotions/damapocket-photo.png',
     imageAlt: '다마포켓 스마트스토어 배너',
@@ -189,9 +188,11 @@ export default function AdsPage() {
             )}
             <div className="space-y-4 p-5">
               <div className="space-y-2">
-                <span className="inline-flex rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200">
-                  {promotion.eyebrow}
-                </span>
+                {promotion.eyebrow && (
+                  <span className="inline-flex rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200">
+                    {promotion.eyebrow}
+                  </span>
+                )}
                 {promotion.href ? (
                   <h3 className="text-xl font-bold text-slate-950 dark:text-slate-100">
                     <a
