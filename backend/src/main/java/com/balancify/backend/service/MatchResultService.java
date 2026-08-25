@@ -184,8 +184,10 @@ public class MatchResultService {
 
             matchParticipantRepository.saveAll(validatedParticipants.all());
             matchRepository.save(match);
-            playerStatsRefreshService.rebuildGroupStats(groupId);
-            evictGroupReadCache(groupId);
+            TransactionAfterCommit.runAfterCommitAsync(() -> {
+                playerStatsRefreshService.rebuildGroupStats(groupId);
+                evictGroupReadCache(groupId);
+            });
 
             MatchResultResponse response = buildExistingResultResponse(
                 match,
@@ -348,8 +350,10 @@ public class MatchResultService {
         mmrHistoryRepository.saveAll(mmrHistories);
         matchRepository.save(match);
         Long groupId = resolveGroupId(match, participants);
-        playerStatsRefreshService.rebuildGroupStats(groupId);
-        evictGroupReadCache(groupId);
+        TransactionAfterCommit.runAfterCommitAsync(() -> {
+            playerStatsRefreshService.rebuildGroupStats(groupId);
+            evictGroupReadCache(groupId);
+        });
 
         MatchResultResponse response = new MatchResultResponse(
             match.getId(),
@@ -926,8 +930,10 @@ public class MatchResultService {
         mmrHistoryRepository.deleteByMatch_Id(matchId);
         matchParticipantRepository.deleteByMatch_Id(matchId);
         matchRepository.delete(match);
-        playerStatsRefreshService.rebuildGroupStats(groupId);
-        evictGroupReadCache(groupId);
+        TransactionAfterCommit.runAfterCommitAsync(() -> {
+            playerStatsRefreshService.rebuildGroupStats(groupId);
+            evictGroupReadCache(groupId);
+        });
 
         return new DeletedMatchAuditSnapshot(matchId, groupId, playedAt, matchHadResult);
     }
