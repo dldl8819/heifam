@@ -64,7 +64,7 @@ class MatchQueryServiceTest {
         MatchParticipant awayParticipant = participant(match, bravo, "AWAY", 830);
 
         when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of(match));
-        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(200L))
+        when(matchParticipantRepository.findByMatchIdInWithPlayerAndMatch(List.of(200L)))
             .thenReturn(List.of(homeParticipant, awayParticipant));
         when(accessControlService.resolveAccessProfile(eq("kim@hei.gg")))
             .thenReturn(
@@ -123,7 +123,7 @@ class MatchQueryServiceTest {
         awayT.setAssignedRace("T");
 
         when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of(match));
-        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(203L))
+        when(matchParticipantRepository.findByMatchIdInWithPlayerAndMatch(List.of(203L)))
             .thenReturn(List.of(homeP, homeT, awayP, awayT));
         when(accessControlService.resolveAccessProfile(eq("kim@hei.gg")))
             .thenReturn(
@@ -166,7 +166,7 @@ class MatchQueryServiceTest {
         Player awayThree = player(16L, group, "워터", 740);
 
         when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of(match));
-        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(204L))
+        when(matchParticipantRepository.findByMatchIdInWithPlayerAndMatch(List.of(204L)))
             .thenReturn(List.of(
                 participant(match, homeOne, "HOME", 805),
                 participant(match, homeTwo, "HOME", 775),
@@ -213,7 +213,7 @@ class MatchQueryServiceTest {
         Player bravo = player(4L, group, "보이", 900);
 
         when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of(match));
-        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(201L))
+        when(matchParticipantRepository.findByMatchIdInWithPlayerAndMatch(List.of(201L)))
             .thenReturn(List.of(
                 participant(match, alpha, "HOME", 610),
                 participant(match, bravo, "AWAY", 880)
@@ -254,7 +254,7 @@ class MatchQueryServiceTest {
         Player bravo = player(6L, group, "웃음", 500);
 
         when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of(match));
-        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(202L))
+        when(matchParticipantRepository.findByMatchIdInWithPlayerAndMatch(List.of(202L)))
             .thenReturn(List.of(
                 participant(match, alpha, "HOME", 405),
                 participant(match, bravo, "AWAY", 495)
@@ -283,7 +283,7 @@ class MatchQueryServiceTest {
         MatchParticipant participant = participant(match, anonymizedPlayer, "HOME", 1180);
 
         when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of(match));
-        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(205L))
+        when(matchParticipantRepository.findByMatchIdInWithPlayerAndMatch(List.of(205L)))
             .thenReturn(List.of(participant));
 
         List<GroupRecentMatchResponse> responses = matchQueryService.getRecentMatches(1L, 10);
@@ -316,7 +316,7 @@ class MatchQueryServiceTest {
         MatchParticipant activeParticipant = participant(match, activePlayer, "AWAY", 1090);
 
         when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of(match));
-        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(206L))
+        when(matchParticipantRepository.findByMatchIdInWithPlayerAndMatch(List.of(206L)))
             .thenReturn(List.of(inactiveParticipant, activeParticipant));
 
         List<GroupRecentMatchResponse> responses = matchQueryService.getRecentMatches(1L, 10);
@@ -364,7 +364,7 @@ class MatchQueryServiceTest {
         match.setResultRecordedByEmail("recorder@hei.gg");
 
         when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of(match));
-        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(210L)).thenReturn(List.of());
+        when(matchParticipantRepository.findByMatchIdInWithPlayerAndMatch(List.of(210L))).thenReturn(List.of());
         when(accessControlService.isAdminEmail("admin@hei.gg")).thenReturn(true);
 
         List<GroupRecentMatchResponse> responses =
@@ -386,7 +386,7 @@ class MatchQueryServiceTest {
         match.setResultRecordedByEmail("recorder@hei.gg");
 
         when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of(match));
-        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(211L)).thenReturn(List.of());
+        when(matchParticipantRepository.findByMatchIdInWithPlayerAndMatch(List.of(211L))).thenReturn(List.of());
         when(accessControlService.isAdminEmail("recorder@hei.gg")).thenReturn(false);
 
         List<GroupRecentMatchResponse> responses =
@@ -408,7 +408,7 @@ class MatchQueryServiceTest {
         match.setResultRecordedByEmail("recorder@hei.gg");
 
         when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of(match));
-        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(212L)).thenReturn(List.of());
+        when(matchParticipantRepository.findByMatchIdInWithPlayerAndMatch(List.of(212L))).thenReturn(List.of());
         when(accessControlService.isAdminEmail("member@hei.gg")).thenReturn(false);
 
         List<GroupRecentMatchResponse> responses =
