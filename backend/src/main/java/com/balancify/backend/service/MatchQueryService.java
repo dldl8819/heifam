@@ -7,8 +7,14 @@ import com.balancify.backend.domain.MatchParticipant;
 import com.balancify.backend.repository.MatchParticipantRepository;
 import com.balancify.backend.repository.MatchRepository;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
@@ -56,6 +62,9 @@ public class MatchQueryService {
             PageRequest.of(page, normalizedLimit)
         );
 
+        Map<Long, List<MatchParticipant>> participantsByMatchId = loadParticipantsByMatchId(matches);
+        Map<String, String> nicknameByRecordedByEmail = loadRecordedByNicknamesByEmail(matches);
+
         List<GroupRecentMatchResponse> responses = new ArrayList<>();
         for (Match match : matches) {
             if (match.getId() == null) {
@@ -63,7 +72,7 @@ public class MatchQueryService {
             }
 
             List<MatchParticipant> participants =
-                matchParticipantRepository.findByMatchIdWithPlayerAndMatch(match.getId());
+                participantsByMatchId.getOrDefault(match.getId(), List.of());
 
             List<GroupRecentMatchPlayerResponse> homeTeam = new ArrayList<>();
             List<GroupRecentMatchPlayerResponse> awayTeam = new ArrayList<>();
@@ -103,7 +112,7 @@ public class MatchQueryService {
                 normalizeStatus(match.getStatus()),
                 normalizeWinningTeam(match.getWinningTeam()),
                 match.getResultRecordedAt(),
-                resolveRecordedByNickname(match),
+                resolveRecordedByNickname(match, nicknameByRecordedByEmail),
                 resolveTeamRaceComposition(match, participants, "HOME"),
                 resolveTeamRaceComposition(match, participants, "AWAY"),
                 homeTeam,
@@ -167,18 +176,65 @@ public class MatchQueryService {
         return value == null ? 0 : value;
     }
 
-    private String resolveRecordedByNickname(Match match) {
+    /**
+     * Fetches all participants for the given matches in a single IN-clause query instead of one
+     * query per match, then groups them back by match id. findByMatchIdInWithPlayerAndMatch orders
+     * by (playedAt, match id, participant id), so within any single match id the relative order is
+     * still participant id ascending — identical to the old per-match query's own ordering.
+     */
+    private Map<Long, List<MatchParticipant>> loadParticipantsByMatchId(List<Match> matches) {
+        List<Long> matchIds = matches.stream()
+            .map(Match::getId)
+            .filter(Objects::nonNull)
+            .toList();
+        if (matchIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return matchParticipantRepository.findByMatchIdInWithPlayerAndMatch(matchIds)
+            .stream()
+            .collect(Collectors.groupingBy(
+                participant -> participant.getMatch().getId(),
+                LinkedHashMap::new,
+                Collectors.toList()
+            ));
+    }
+
+    /**
+     * Resolves the recorder nickname for each distinct result_recorded_by_email across the given
+     * matches in one pass, instead of re-querying AccessControlService (which itself issues several
+     * lookups per email) once per match.
+     */
+    private Map<String, String> loadRecordedByNicknamesByEmail(List<Match> matches) {
+        Set<String> recordedByEmails = new LinkedHashSet<>();
+        for (Match match : matches) {
+            String email = safeTrim(match.getResultRecordedByEmail()).toLowerCase(Locale.ROOT);
+            if (!email.isEmpty()) {
+                recordedByEmails.add(email);
+            }
+        }
+
+        Map<String, String> nicknameByEmail = new LinkedHashMap<>();
+        for (String email : recordedByEmails) {
+            String nickname = safeTrim(accessControlService.resolveAccessProfile(email).nickname());
+            if (!nickname.isEmpty()) {
+                nicknameByEmail.put(email, nickname);
+            }
+        }
+        return nicknameByEmail;
+    }
+
+    private String resolveRecordedByNickname(Match match, Map<String, String> nicknameByRecordedByEmail) {
         if (match == null) {
             return null;
         }
 
-        String recordedByEmail = safeTrim(match.getResultRecordedByEmail());
+        String recordedByEmail = safeTrim(match.getResultRecordedByEmail()).toLowerCase(Locale.ROOT);
         if (recordedByEmail.isEmpty()) {
             return null;
         }
 
-        String accessNickname = safeTrim(accessControlService.resolveAccessProfile(recordedByEmail).nickname());
-        return accessNickname.isEmpty() ? null : accessNickname;
+        return nicknameByRecordedByEmail.get(recordedByEmail);
     }
 
     private String safeTrim(String value) {
