@@ -2,6 +2,9 @@ package com.balancify.backend.service;
 
 import com.balancify.backend.api.admin.dto.OperationAuditLogPageResponse;
 import com.balancify.backend.api.admin.dto.OperationAuditLogResponse;
+import com.balancify.backend.domain.LedgerExpenseEntry;
+import com.balancify.backend.domain.LedgerIncomeEntry;
+import com.balancify.backend.domain.Notice;
 import com.balancify.backend.domain.OperationAuditLog;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.OperationAuditLogRepository;
@@ -36,6 +39,17 @@ public class OperationAuditLogService {
     public static final String ACTION_PLAYER_REACTIVATED = "PLAYER_REACTIVATED";
     public static final String ACTION_MATCH_DELETED = "MATCH_DELETED";
     public static final String ACTION_MATCH_RESULT_UPDATED = "MATCH_RESULT_UPDATED";
+    public static final String ACTION_NOTICE_POSTED = "NOTICE_POSTED";
+    public static final String ACTION_NOTICE_UPDATED = "NOTICE_UPDATED";
+    public static final String ACTION_NOTICE_DELETED = "NOTICE_DELETED";
+    public static final String ACTION_LEDGER_INCOME_ADDED = "LEDGER_INCOME_ADDED";
+    public static final String ACTION_LEDGER_INCOME_UPDATED = "LEDGER_INCOME_UPDATED";
+    public static final String ACTION_LEDGER_INCOME_DELETED = "LEDGER_INCOME_DELETED";
+    public static final String ACTION_LEDGER_INCOME_IMPORTED = "LEDGER_INCOME_IMPORTED";
+    public static final String ACTION_LEDGER_EXPENSE_ADDED = "LEDGER_EXPENSE_ADDED";
+    public static final String ACTION_LEDGER_EXPENSE_UPDATED = "LEDGER_EXPENSE_UPDATED";
+    public static final String ACTION_LEDGER_EXPENSE_DELETED = "LEDGER_EXPENSE_DELETED";
+    public static final String ACTION_LEDGER_EXPENSE_IMPORTED = "LEDGER_EXPENSE_IMPORTED";
 
     private static final int MAX_PAGE_SIZE = 200;
 
@@ -361,6 +375,163 @@ public class OperationAuditLogService {
                 + formatRaceCompositionForAudit(snapshot.nextRaceComposition())
         );
         operationAuditLogRepository.save(log);
+    }
+
+    @Transactional
+    public void recordNoticePosted(String actorEmail, String actorNickname, Long groupId, Notice notice) {
+        if (notice == null) {
+            return;
+        }
+
+        OperationAuditLog log = baseLog(
+            actorEmail, actorNickname, ACTION_NOTICE_POSTED, "NOTICE", notice.getId(), notice.getTitle(), groupId
+        );
+        log.setSummary("공지 등록");
+        operationAuditLogRepository.save(log);
+    }
+
+    @Transactional
+    public void recordNoticeUpdated(String actorEmail, String actorNickname, Long groupId, Notice notice) {
+        if (notice == null) {
+            return;
+        }
+
+        OperationAuditLog log = baseLog(
+            actorEmail, actorNickname, ACTION_NOTICE_UPDATED, "NOTICE", notice.getId(), notice.getTitle(), groupId
+        );
+        log.setSummary("공지 수정");
+        operationAuditLogRepository.save(log);
+    }
+
+    @Transactional
+    public void recordNoticeDeleted(
+        String actorEmail,
+        String actorNickname,
+        Long groupId,
+        Long noticeId,
+        String noticeTitle
+    ) {
+        OperationAuditLog log = baseLog(
+            actorEmail, actorNickname, ACTION_NOTICE_DELETED, "NOTICE", noticeId, noticeTitle, groupId
+        );
+        log.setSummary("공지 삭제");
+        operationAuditLogRepository.save(log);
+    }
+
+    @Transactional
+    public void recordLedgerIncomeAdded(String actorEmail, String actorNickname, Long groupId, LedgerIncomeEntry entry) {
+        if (entry == null) {
+            return;
+        }
+
+        OperationAuditLog log = baseLog(
+            actorEmail, actorNickname, ACTION_LEDGER_INCOME_ADDED, "LEDGER_INCOME", entry.getId(),
+            formatLedgerIncomeLabel(entry), groupId
+        );
+        log.setSummary("수입 내역 추가");
+        operationAuditLogRepository.save(log);
+    }
+
+    @Transactional
+    public void recordLedgerIncomeUpdated(String actorEmail, String actorNickname, Long groupId, LedgerIncomeEntry entry) {
+        if (entry == null) {
+            return;
+        }
+
+        OperationAuditLog log = baseLog(
+            actorEmail, actorNickname, ACTION_LEDGER_INCOME_UPDATED, "LEDGER_INCOME", entry.getId(),
+            formatLedgerIncomeLabel(entry), groupId
+        );
+        log.setSummary("수입 내역 수정");
+        operationAuditLogRepository.save(log);
+    }
+
+    @Transactional
+    public void recordLedgerIncomeDeleted(
+        String actorEmail,
+        String actorNickname,
+        Long groupId,
+        Long entryId,
+        String entryLabel
+    ) {
+        OperationAuditLog log = baseLog(
+            actorEmail, actorNickname, ACTION_LEDGER_INCOME_DELETED, "LEDGER_INCOME", entryId, entryLabel, groupId
+        );
+        log.setSummary("수입 내역 삭제");
+        operationAuditLogRepository.save(log);
+    }
+
+    @Transactional
+    public void recordLedgerIncomeImported(String actorEmail, String actorNickname, Long groupId, int importedCount) {
+        OperationAuditLog log = baseLog(
+            actorEmail, actorNickname, ACTION_LEDGER_INCOME_IMPORTED, "LEDGER_INCOME", null,
+            importedCount + "건 일괄 등록", groupId
+        );
+        log.setSummary("수입 내역 일괄 업로드");
+        log.setDetails("importedCount=" + importedCount);
+        operationAuditLogRepository.save(log);
+    }
+
+    @Transactional
+    public void recordLedgerExpenseAdded(String actorEmail, String actorNickname, Long groupId, LedgerExpenseEntry entry) {
+        if (entry == null) {
+            return;
+        }
+
+        OperationAuditLog log = baseLog(
+            actorEmail, actorNickname, ACTION_LEDGER_EXPENSE_ADDED, "LEDGER_EXPENSE", entry.getId(),
+            formatLedgerExpenseLabel(entry), groupId
+        );
+        log.setSummary("지출 내역 추가");
+        operationAuditLogRepository.save(log);
+    }
+
+    @Transactional
+    public void recordLedgerExpenseUpdated(String actorEmail, String actorNickname, Long groupId, LedgerExpenseEntry entry) {
+        if (entry == null) {
+            return;
+        }
+
+        OperationAuditLog log = baseLog(
+            actorEmail, actorNickname, ACTION_LEDGER_EXPENSE_UPDATED, "LEDGER_EXPENSE", entry.getId(),
+            formatLedgerExpenseLabel(entry), groupId
+        );
+        log.setSummary("지출 내역 수정");
+        operationAuditLogRepository.save(log);
+    }
+
+    @Transactional
+    public void recordLedgerExpenseDeleted(
+        String actorEmail,
+        String actorNickname,
+        Long groupId,
+        Long entryId,
+        String entryLabel
+    ) {
+        OperationAuditLog log = baseLog(
+            actorEmail, actorNickname, ACTION_LEDGER_EXPENSE_DELETED, "LEDGER_EXPENSE", entryId, entryLabel, groupId
+        );
+        log.setSummary("지출 내역 삭제");
+        operationAuditLogRepository.save(log);
+    }
+
+    @Transactional
+    public void recordLedgerExpenseImported(String actorEmail, String actorNickname, Long groupId, int importedCount) {
+        OperationAuditLog log = baseLog(
+            actorEmail, actorNickname, ACTION_LEDGER_EXPENSE_IMPORTED, "LEDGER_EXPENSE", null,
+            importedCount + "건 일괄 등록", groupId
+        );
+        log.setSummary("지출 내역 일괄 업로드");
+        log.setDetails("importedCount=" + importedCount);
+        operationAuditLogRepository.save(log);
+    }
+
+    private String formatLedgerIncomeLabel(LedgerIncomeEntry entry) {
+        return entry.getEntryDate() + " " + entry.getCategory();
+    }
+
+    private String formatLedgerExpenseLabel(LedgerExpenseEntry entry) {
+        return entry.getEntryDate() + " " + entry.getExpenseType() + " " + entry.getCategory();
     }
 
     private OperationAuditLog baseLog(
