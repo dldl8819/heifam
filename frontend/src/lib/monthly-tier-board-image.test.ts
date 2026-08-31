@@ -72,9 +72,9 @@ describe('monthly tier board image', () => {
     expect(model.rowCount).toBe(11)
   })
 
-  it('resolves the as-of timestamp label and file name in Korea time', () => {
+  it('resolves the as-of date label and file name in Korea time', () => {
     expect(resolveMonthlyTierBoardPeriod(new Date('2026-07-31T15:30:00.000Z'))).toEqual({
-      periodLabel: '2026-08-01 00:30 기준',
+      periodLabel: '2026-08-01 기준',
       fileName: 'heifam-tier-board-20260801-0030.png',
     })
   })

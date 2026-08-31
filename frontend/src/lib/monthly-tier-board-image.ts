@@ -121,7 +121,7 @@ export function resolveMonthlyTierBoardPeriod(date: Date): {
   const hour = rawHour === '24' ? '00' : rawHour
 
   return {
-    periodLabel: `${year}-${month}-${day} ${hour}:${minute} 기준`,
+    periodLabel: `${year}-${month}-${day} 기준`,
     fileName: `heifam-tier-board-${year}${month}${day}-${hour}${minute}.png`,
   }
 }
