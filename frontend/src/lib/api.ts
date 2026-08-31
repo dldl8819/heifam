@@ -17,6 +17,15 @@ import type {
   GroupPlayerUpdateRequest,
   GroupPlayerTierBoardItem,
   HealthResponse,
+  LedgerCategoriesResponse,
+  LedgerExpenseEntry,
+  LedgerExpenseEntryCreateRequest,
+  LedgerExpenseEntryUpdateRequest,
+  LedgerImportResponse,
+  LedgerIncomeEntry,
+  LedgerIncomeEntryCreateRequest,
+  LedgerIncomeEntryUpdateRequest,
+  LedgerMonthlySummaryResponse,
   MatchTeamSide,
   MultiBalanceRequest,
   MultiBalanceResponse,
@@ -24,6 +33,9 @@ import type {
   MatchResultResponse,
   MatchResultUpdateRequest,
   ManualMatchCreateRequest,
+  NoticeCreateRequest,
+  NoticeItem,
+  NoticeUpdateRequest,
   OperationAuditLogFilters,
   OperationAuditLogItem,
   OperationAuditLogPage,
@@ -1229,6 +1241,130 @@ export const apiClient = {
         timeoutMs: ACCESS_API_REQUEST_TIMEOUT_MS,
         baseUrlOverride: ACCESS_API_BASE_URL,
       }
+    ),
+  getNotices: (groupId: number) =>
+    apiRequest<NoticeItem[]>(`/api/groups/${groupId}/notices`, undefined, {
+      includeUserEmail: true,
+    }),
+  getNotice: (groupId: number, noticeId: number) =>
+    apiRequest<NoticeItem>(`/api/groups/${groupId}/notices/${noticeId}`, undefined, {
+      includeUserEmail: true,
+    }),
+  createNotice: (groupId: number, payload: NoticeCreateRequest) =>
+    apiRequest<NoticeItem>(
+      `/api/groups/${groupId}/notices`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      { adminOnly: true }
+    ),
+  updateNotice: (groupId: number, noticeId: number, payload: NoticeUpdateRequest) =>
+    apiRequest<NoticeItem>(
+      `/api/groups/${groupId}/notices/${noticeId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      },
+      { adminOnly: true }
+    ),
+  deleteNotice: (groupId: number, noticeId: number) =>
+    apiRequest<void>(
+      `/api/groups/${groupId}/notices/${noticeId}`,
+      { method: 'DELETE' },
+      { adminOnly: true }
+    ),
+  getLedgerIncome: (groupId: number) =>
+    apiRequest<LedgerIncomeEntry[]>(`/api/groups/${groupId}/ledger/income`, undefined, {
+      includeUserEmail: true,
+    }),
+  getLedgerIncomeCategories: (groupId: number) =>
+    apiRequest<LedgerCategoriesResponse>(`/api/groups/${groupId}/ledger/income/categories`, undefined, {
+      includeUserEmail: true,
+    }),
+  createLedgerIncomeEntry: (groupId: number, payload: LedgerIncomeEntryCreateRequest) =>
+    apiRequest<LedgerIncomeEntry>(
+      `/api/groups/${groupId}/ledger/income`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      { adminOnly: true }
+    ),
+  updateLedgerIncomeEntry: (groupId: number, entryId: number, payload: LedgerIncomeEntryUpdateRequest) =>
+    apiRequest<LedgerIncomeEntry>(
+      `/api/groups/${groupId}/ledger/income/${entryId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      },
+      { adminOnly: true }
+    ),
+  deleteLedgerIncomeEntry: (groupId: number, entryId: number) =>
+    apiRequest<void>(
+      `/api/groups/${groupId}/ledger/income/${entryId}`,
+      { method: 'DELETE' },
+      { adminOnly: true }
+    ),
+  importLedgerIncomeEntries: (groupId: number, csvContent: string) =>
+    apiRequest<LedgerImportResponse>(
+      `/api/groups/${groupId}/ledger/income/import`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ csvContent }),
+      },
+      { adminOnly: true }
+    ),
+  getLedgerExpense: (groupId: number, expenseType?: LedgerExpenseEntry['expenseType']) =>
+    apiRequest<LedgerExpenseEntry[]>(
+      `/api/groups/${groupId}/ledger/expense${expenseType ? `?expense_type=${expenseType}` : ''}`,
+      undefined,
+      { includeUserEmail: true }
+    ),
+  getLedgerExpenseCategories: (groupId: number, expenseType: LedgerExpenseEntry['expenseType']) =>
+    apiRequest<LedgerCategoriesResponse>(
+      `/api/groups/${groupId}/ledger/expense/categories?expense_type=${expenseType}`,
+      undefined,
+      { includeUserEmail: true }
+    ),
+  createLedgerExpenseEntry: (groupId: number, payload: LedgerExpenseEntryCreateRequest) =>
+    apiRequest<LedgerExpenseEntry>(
+      `/api/groups/${groupId}/ledger/expense`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      { adminOnly: true }
+    ),
+  updateLedgerExpenseEntry: (groupId: number, entryId: number, payload: LedgerExpenseEntryUpdateRequest) =>
+    apiRequest<LedgerExpenseEntry>(
+      `/api/groups/${groupId}/ledger/expense/${entryId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      },
+      { adminOnly: true }
+    ),
+  deleteLedgerExpenseEntry: (groupId: number, entryId: number) =>
+    apiRequest<void>(
+      `/api/groups/${groupId}/ledger/expense/${entryId}`,
+      { method: 'DELETE' },
+      { adminOnly: true }
+    ),
+  importLedgerExpenseEntries: (groupId: number, csvContent: string, expenseType: LedgerExpenseEntry['expenseType']) =>
+    apiRequest<LedgerImportResponse>(
+      `/api/groups/${groupId}/ledger/expense/import`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ csvContent, expenseType }),
+      },
+      { adminOnly: true }
+    ),
+  getLedgerSummary: (groupId: number, year: number) =>
+    apiRequest<LedgerMonthlySummaryResponse>(
+      `/api/groups/${groupId}/ledger/summary?year=${year}`,
+      undefined,
+      { includeUserEmail: true }
     ),
   updateMyPreferredRace: (race: PlayerRace) =>
     apiRequest<AccessMeResponse>(

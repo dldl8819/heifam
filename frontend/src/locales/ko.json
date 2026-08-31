@@ -19,7 +19,8 @@
     "auditLogs": "운영 로그",
     "ads": "파트너스",
     "results": "경기 결과",
-    "ranking": "랭킹"
+    "ranking": "랭킹",
+    "notices": "공지사항"
   },
   "landing": {
     "title": "Hei`Fam 내전 운영 플랫폼",
@@ -302,6 +303,112 @@
       "invalidEmail": "올바른 이메일 형식을 입력해 주세요.",
       "invalidNickname": "닉네임을 입력해 주세요. (최대 100자)",
       "nicknameSaved": "{email}의 닉네임이 {nickname}(으)로 업데이트되었습니다."
+    }
+  },
+  "notices": {
+    "title": "공지사항",
+    "description": "공지사항과 후원금 사용 내역을 확인합니다.",
+    "loadError": "불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    "tabs": {
+      "posts": "공지사항",
+      "donations": "후원금 내역"
+    },
+    "posts": {
+      "empty": "등록된 공지가 없습니다.",
+      "writeButton": "글쓰기",
+      "editButton": "수정",
+      "deleteButton": "삭제",
+      "deleteConfirm": "\"{title}\" 공지를 삭제하시겠습니까?",
+      "backToList": "목록으로",
+      "titlePlaceholder": "제목을 입력하세요",
+      "contentPlaceholder": "내용을 입력하세요",
+      "contentLimitHint": "최대 {max}자까지 작성할 수 있습니다.",
+      "contentTooLong": "본문은 {max}자를 넘을 수 없습니다.",
+      "titleRequired": "제목을 입력해 주세요.",
+      "contentRequired": "내용을 입력해 주세요.",
+      "save": "저장",
+      "saving": "저장 중...",
+      "cancel": "취소",
+      "saveSuccess": "공지가 저장되었습니다.",
+      "deleteSuccess": "공지가 삭제되었습니다.",
+      "updatedAt": "수정: {date}",
+      "notFound": "공지를 찾을 수 없습니다."
+    },
+    "donations": {
+      "subTabs": {
+        "income": "수입",
+        "expense": "지출",
+        "summary": "월별 요약"
+      },
+      "memoHint": "팸 내부 공개 정보이니 참고해서 작성해주세요.",
+      "addButton": "내역 추가",
+      "editButton": "수정",
+      "deleteButton": "삭제",
+      "deleteConfirm": "이 내역을 삭제하시겠습니까?",
+      "save": "저장",
+      "saving": "저장 중...",
+      "cancel": "취소",
+      "dateRequired": "날짜를 입력해 주세요.",
+      "categoryRequired": "분류를 입력해 주세요.",
+      "amountRequired": "금액을 올바르게 입력해 주세요.",
+      "saveSuccess": "저장되었습니다.",
+      "deleteSuccess": "삭제되었습니다.",
+      "uploadButton": "일괄 업로드",
+      "uploadHint": "CSV 파일을 선택하면 자동으로 일괄 등록됩니다.",
+      "importSuccess": "{count}건이 등록되었습니다.",
+      "importSkipped": "{count}건은 형식 오류로 건너뛰었습니다.",
+      "importError": "업로드에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+      "income": {
+        "empty": "등록된 수입 내역이 없습니다.",
+        "downloadCsv": "수입 내역 다운로드",
+        "table": {
+          "date": "날짜",
+          "category": "분류",
+          "amount": "금액",
+          "memo": "내용",
+          "author": "작성자"
+        },
+        "datePlaceholder": "날짜",
+        "categoryPlaceholder": "분류 (예: 회비, 기초 잔액)",
+        "amountPlaceholder": "금액",
+        "memoPlaceholder": "내용"
+      },
+      "expense": {
+        "empty": "등록된 지출 내역이 없습니다.",
+        "downloadCsv": "지출 내역 다운로드",
+        "typeFixed": "고정비용",
+        "typeVariable": "소비지출",
+        "typeAll": "전체",
+        "table": {
+          "date": "날짜",
+          "type": "구분",
+          "category": "분류",
+          "target": "지급 대상 / 결제 수단",
+          "amount": "금액",
+          "memo": "내용",
+          "author": "작성자"
+        },
+        "expenseTypeRequired": "지출 구분을 선택해 주세요.",
+        "datePlaceholder": "날짜",
+        "categoryPlaceholder": "분류",
+        "targetPlaceholder": "지급 대상 (콤마로 여러 명 구분) 또는 결제 수단",
+        "amountPlaceholder": "금액",
+        "memoPlaceholder": "내용",
+        "uploadTypeLabel": "업로드할 지출 구분"
+      },
+      "summary": {
+        "yearLabel": "연도",
+        "table": {
+          "month": "월",
+          "income": "수입",
+          "fixedExpense": "고정비용",
+          "variableExpense": "소비지출",
+          "totalExpense": "지출 합계",
+          "net": "수지",
+          "cumulativeBalance": "누적 잔액"
+        },
+        "cumulativeHint": "누적 잔액은 \"기초 잔액\" 수입 항목부터 시간순으로 누적됩니다."
+      }
     }
   },
   "adminGuard": {

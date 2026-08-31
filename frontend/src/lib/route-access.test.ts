@@ -47,6 +47,51 @@ describe('route access', () => {
     })
   })
 
+  it('blocks a regular member from viewing notices', () => {
+    const decision = getRouteAccessDecision('/notices', {
+      isLoggedIn: true,
+      canAccess: true,
+      isAdmin: false,
+      isSuperAdmin: false,
+    })
+
+    expect(decision).toEqual({
+      allowed: false,
+      redirectTo: '/players',
+      blocked: false,
+    })
+  })
+
+  it('blocks a regular admin from viewing notices', () => {
+    const decision = getRouteAccessDecision('/notices', {
+      isLoggedIn: true,
+      canAccess: true,
+      isAdmin: true,
+      isSuperAdmin: false,
+    })
+
+    expect(decision).toEqual({
+      allowed: false,
+      redirectTo: '/players',
+      blocked: false,
+    })
+  })
+
+  it('allows a super admin to view notices', () => {
+    const decision = getRouteAccessDecision('/notices', {
+      isLoggedIn: true,
+      canAccess: true,
+      isAdmin: true,
+      isSuperAdmin: true,
+    })
+
+    expect(decision).toEqual({
+      allowed: true,
+      redirectTo: null,
+      blocked: false,
+    })
+  })
+
   it('keeps super admin routes restricted to super admins', () => {
     const decision = getRouteAccessDecision('/admin/access', {
       isLoggedIn: true,

@@ -194,3 +194,7 @@ ehthumbs.db
 # Local prompt notes and request logs.
 # These may include private operational context and should stay local.
 docs/prompts/
+
+# Local reference material (e.g. real spreadsheets used as a data-model reference).
+# May contain real financial figures/nicknames and must never be committed.
+docs/참고/

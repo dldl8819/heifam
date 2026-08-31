@@ -525,3 +525,95 @@ export type OperationAuditLogFilters = {
   content?: string
   target?: string
 }
+
+export type NoticeItem = {
+  id: number
+  title: string
+  content: string
+  authorNickname?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type NoticeCreateRequest = {
+  title: string
+  content: string
+}
+
+export type NoticeUpdateRequest = {
+  title: string
+  content: string
+}
+
+export type LedgerExpenseType = 'FIXED' | 'VARIABLE'
+
+export type LedgerIncomeEntry = {
+  id: number
+  entryDate: string
+  category: string
+  amount: number
+  memo?: string
+  authorNickname?: string
+  createdAt: string
+}
+
+export type LedgerIncomeEntryCreateRequest = {
+  entryDate: string
+  category: string
+  amount: number
+  memo?: string
+}
+
+export type LedgerIncomeEntryUpdateRequest = LedgerIncomeEntryCreateRequest
+
+export type LedgerExpenseEntry = {
+  id: number
+  entryDate: string
+  expenseType: LedgerExpenseType
+  category: string
+  target?: string
+  amount: number
+  memo?: string
+  authorNickname?: string
+  createdAt: string
+}
+
+export type LedgerExpenseEntryCreateRequest = {
+  entryDate: string
+  expenseType: LedgerExpenseType
+  category: string
+  target?: string
+  amount: number
+  memo?: string
+}
+
+export type LedgerExpenseEntryUpdateRequest = LedgerExpenseEntryCreateRequest
+
+export type LedgerCategoriesResponse = {
+  categories: string[]
+}
+
+export type LedgerMonthlySummaryItem = {
+  month: number
+  totalIncome: number
+  totalFixedExpense: number
+  totalVariableExpense: number
+  totalExpense: number
+  net: number
+  cumulativeBalance: number
+}
+
+export type LedgerMonthlySummaryResponse = {
+  year: number
+  months: LedgerMonthlySummaryItem[]
+}
+
+export type LedgerImportRowError = {
+  rowNumber: number
+  reason: string
+}
+
+export type LedgerImportResponse = {
+  importedCount: number
+  skippedRows: LedgerImportRowError[]
+}
