@@ -78,7 +78,6 @@ public final class MmrMaskingMapper {
                     response.chatRejoinedAt(),
                     response.tierChangeAcknowledgedTier(),
                     response.tierChangeAcknowledgedAt(),
-                    null,
                     response.lifecycleStatus(),
                     response.identityRetainedUntil(),
                     response.isOwnPlayer()
@@ -112,7 +111,6 @@ public final class MmrMaskingMapper {
                     response.chatRejoinedAt(),
                     response.tierChangeAcknowledgedTier(),
                     response.tierChangeAcknowledgedAt(),
-                    null,
                     response.lifecycleStatus(),
                     response.identityRetainedUntil(),
                     response.isOwnPlayer()

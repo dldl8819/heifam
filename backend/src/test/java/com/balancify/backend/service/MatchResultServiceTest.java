@@ -95,8 +95,6 @@ class MatchResultServiceTest {
             800,
             1.5,
             5,
-            2.0,
-            5,
             new GroupReadCacheService(0),
             playerStatsRefreshService,
             accessControlService
@@ -832,48 +830,6 @@ class MatchResultServiceTest {
                 assertThat(history.getAfterMmr()).isZero();
                 assertThat(history.getDelta()).isEqualTo(-5);
             });
-    }
-
-    @Test
-    void returnBoostMultipliesDormantReturningPlayerDeltaAndConsumesOneGame() {
-        Match match = new Match();
-        match.setId(23L);
-        match.setStatus(MatchStatus.CONFIRMED);
-        match.setTeamSize(2);
-
-        Group group = new Group();
-        group.setId(1L);
-
-        Player returningPlayer = player(33L, group, "A1", 1000);
-        returningPlayer.setDormantSince(OffsetDateTime.parse("2026-03-01T00:00:00Z"));
-        returningPlayer.setDormancyEpisodeFloorTier("B-");
-        returningPlayer.setReturnBoostMultiplier(2.0);
-
-        List<MatchParticipant> participants = List.of(
-            participant(51L, match, player(31L, group, "H1", 1000), "HOME"),
-            participant(52L, match, player(32L, group, "H2", 1000), "HOME"),
-            participant(53L, match, returningPlayer, "AWAY"),
-            participant(54L, match, player(34L, group, "A2", 1000), "AWAY")
-        );
-
-        when(matchRepository.findByIdForUpdate(23L)).thenReturn(Optional.of(match));
-        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(23L)).thenReturn(participants);
-        when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(playerRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(mmrHistoryRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        MatchResultResponse response = matchResultService.processMatchResult(
-            23L,
-            new MatchResultRequest("AWAY")
-        );
-
-        assertThat(participantDelta(response, "AWAY", "A1")).isEqualTo(36);
-        assertThat(participantDelta(response, "AWAY", "A2")).isEqualTo(18);
-        assertThat(returningPlayer.getReturnedAt()).isNotNull();
-        assertThat(returningPlayer.getDormancyEpisodeFloorTier()).isEqualTo("B-");
-        assertThat(returningPlayer.getReturnBoostGamesRemaining()).isEqualTo(4);
-        assertThat(returningPlayer.getMmr()).isEqualTo(1036);
     }
 
     @Test

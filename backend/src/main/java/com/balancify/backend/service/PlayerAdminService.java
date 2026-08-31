@@ -12,7 +12,6 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.NoSuchElementException;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import jakarta.persistence.EntityManager;
@@ -121,10 +120,6 @@ public class PlayerAdminService {
         OffsetDateTime chatRejoinedAt = request == null ? null : request.chatRejoinedAt();
         String tierChangeAcknowledgedTier =
             normalizeTierChangeAcknowledgement(request == null ? null : request.tierChangeAcknowledgedTier());
-        boolean hasDormancyMmrFloorTier = request != null && request.dormancyMmrFloorTier() != null;
-        String dormancyMmrFloorTier = hasDormancyMmrFloorTier
-            ? normalizeDormancyMmrFloorTier(request.dormancyMmrFloorTier())
-            : null;
         String normalizedRace = race.isEmpty() ? "" : race.toUpperCase(Locale.ROOT);
 
         if (!accessControlService.isAdminEmail(actorEmail)) {
@@ -135,7 +130,6 @@ public class PlayerAdminService {
                 && chatLeftReason.isEmpty()
                 && chatRejoinedAt == null
                 && tierChangeAcknowledgedTier.isEmpty()
-                && !hasDormancyMmrFloorTier
                 && !normalizedRace.isEmpty();
             if (!raceOnlyRequest) {
                 throw new PlayerEditForbiddenException("본인 종족만 스스로 수정할 수 있습니다.");
@@ -154,7 +148,6 @@ public class PlayerAdminService {
                 && chatLeftReason.isEmpty()
                 && chatRejoinedAt == null
                 && tierChangeAcknowledgedTier.isEmpty()
-                && !hasDormancyMmrFloorTier
         ) {
             throw new IllegalArgumentException("At least one field is required");
         }
@@ -174,8 +167,7 @@ public class PlayerAdminService {
                 || !tier.isEmpty()
                 || chatLeftAt != null
                 || !chatLeftReason.isEmpty()
-                || !tierChangeAcknowledgedTier.isEmpty()
-                || hasDormancyMmrFloorTier) {
+                || !tierChangeAcknowledgedTier.isEmpty()) {
                 throw new IllegalArgumentException("Reactivation request contains unsupported fields");
             }
             boolean duplicateActiveNickname = playerRepository
@@ -235,8 +227,7 @@ public class PlayerAdminService {
                 || !normalizedRace.isEmpty()
                 || !tier.isEmpty()
                 || chatRejoinedAt != null
-                || !tierChangeAcknowledgedTier.isEmpty()
-                || hasDormancyMmrFloorTier) {
+                || !tierChangeAcknowledgedTier.isEmpty()) {
                 throw new IllegalArgumentException("Deactivation request contains unsupported fields");
             }
 
@@ -304,10 +295,6 @@ public class PlayerAdminService {
         if (!tierChangeAcknowledgedTier.isEmpty()) {
             player.setTierChangeAcknowledgedTier(tierChangeAcknowledgedTier);
             player.setTierChangeAcknowledgedAt(OffsetDateTime.now());
-        }
-
-        if (hasDormancyMmrFloorTier && !Objects.equals(dormancyMmrFloorTier, player.getDormancyMmrFloorTier())) {
-            player.setDormancyMmrFloorTier(dormancyMmrFloorTier);
         }
 
         playerRepository.save(player);
@@ -441,23 +428,6 @@ public class PlayerAdminService {
             throw new IllegalArgumentException("Tier is invalid");
         }
         return normalized;
-    }
-
-    private String normalizeDormancyMmrFloorTier(String value) {
-        String normalized = safeTrim(value).toUpperCase(Locale.ROOT);
-        if (normalized.isEmpty()
-            || "UNASSIGNED".equals(normalized)
-            || "NONE".equals(normalized)
-            || "PENDING".equals(normalized)
-            || "TBD".equals(normalized)) {
-            return null;
-        }
-
-        String rankedTier = PlayerTierPolicy.normalizeRankedTier(normalized);
-        if (rankedTier.isEmpty()) {
-            throw new IllegalArgumentException("Dormancy MMR floor tier is invalid");
-        }
-        return rankedTier;
     }
 
     private String normalizeAuditTier(String value) {

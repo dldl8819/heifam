@@ -227,7 +227,6 @@ export type PlayerRosterItem = {
   baseMmr?: number
   baseTier?: PlayerTierStatus
   currentMmr?: number
-  dormancyMmrFloorTier?: PlayerTierStatus
   lastTierSnapshotAt?: string
   lastTierSnapshotMmr?: number
   lastTierSnapshotTier?: PlayerTierStatus
@@ -267,7 +266,6 @@ export type GroupPlayerUpdateRequest = {
   chatLeftAt?: string | null
   chatLeftReason?: string | null
   chatRejoinedAt?: string | null
-  dormancyMmrFloorTier?: PlayerTierStatus
 }
 
 export type GroupPlayerMmrUpdateRequest = {

@@ -41,7 +41,6 @@ public final class PlayerTierPolicy {
     private static final int PLACEMENT_GAME_COUNT = 5;
     private static final int PROMOTION_MMR_BUFFER = 30;
     private static final int DEMOTION_MMR_BUFFER = 50;
-    private static final int MAX_DORMANCY_DEMOTION_STEPS = 2;
 
     private PlayerTierPolicy() {
     }
@@ -153,69 +152,6 @@ public final class PlayerTierPolicy {
         return stepTier(normalizedTier, -steps);
     }
 
-    public static int resolveDormancyAdjustedMmr(String currentTier, Integer mmr, int demoteSteps) {
-        int normalizedMmr = Math.max(0, mmr == null ? 0 : mmr);
-        int cappedDemoteSteps = capDormancyDemoteSteps(demoteSteps);
-        if (normalizedMmr <= 0 || cappedDemoteSteps <= 0) {
-            return normalizedMmr;
-        }
-
-        String normalizedCurrentTier = canonicalTier(currentTier, resolveTier(normalizedMmr));
-        String demotedTier = demoteTier(normalizedCurrentTier, cappedDemoteSteps);
-        if (demotedTier.equals(normalizedCurrentTier)) {
-            return normalizedMmr;
-        }
-
-        int upperMmrNearTop = nearTopMmrForTier(demotedTier);
-        return Math.min(normalizedMmr, upperMmrNearTop);
-    }
-
-    public static int resolveDormancyMinimumMmr(String currentTier, Integer mmr, int demoteSteps) {
-        int normalizedMmr = Math.max(0, mmr == null ? 0 : mmr);
-        int cappedDemoteSteps = capDormancyDemoteSteps(demoteSteps);
-        if (normalizedMmr <= 0 || cappedDemoteSteps <= 0) {
-            return 0;
-        }
-
-        String demotedTier = resolveDormancyFloorTier(currentTier, normalizedMmr, cappedDemoteSteps);
-        return TIER_FLOOR_MMR.getOrDefault(demotedTier, 0);
-    }
-
-    public static String resolveDormancyFloorTier(
-        String currentTier,
-        Integer mmr,
-        int demoteSteps
-    ) {
-        int normalizedMmr = Math.max(0, mmr == null ? 0 : mmr);
-        int cappedDemoteSteps = capDormancyDemoteSteps(demoteSteps);
-        if (normalizedMmr <= 0 || cappedDemoteSteps <= 0) {
-            return TIER_NONE;
-        }
-
-        String normalizedCurrentTier = canonicalTier(currentTier, resolveTier(normalizedMmr));
-        return demoteTier(normalizedCurrentTier, cappedDemoteSteps);
-    }
-
-    public static int resolveDormancyMinimumMmr(
-        String currentTier,
-        Integer mmr,
-        int demoteSteps,
-        String dormancyFloorTier
-    ) {
-        int policyMinimumMmr = resolveDormancyMinimumMmr(currentTier, mmr, demoteSteps);
-        int normalizedMmr = Math.max(0, mmr == null ? 0 : mmr);
-        if (normalizedMmr <= 0) {
-            return 0;
-        }
-
-        String normalizedFloorTier = normalizeRankedTier(dormancyFloorTier);
-        if (normalizedFloorTier.isEmpty()) {
-            return policyMinimumMmr;
-        }
-
-        return Math.max(policyMinimumMmr, TIER_FLOOR_MMR.getOrDefault(normalizedFloorTier, 0));
-    }
-
     public static boolean isLowTier(Integer mmr) {
         String tier = resolveTier(mmr);
         return TIER_NONE.equals(tier) || "C+".equals(tier) || "C".equals(tier) || "C-".equals(tier) || "D".equals(tier);
@@ -248,10 +184,6 @@ public final class PlayerTierPolicy {
         return ORDERED_TIERS.get(nextIndex);
     }
 
-    private static int capDormancyDemoteSteps(int steps) {
-        return Math.max(0, Math.min(MAX_DORMANCY_DEMOTION_STEPS, steps));
-    }
-
     private static boolean canPromote(String currentTier, int mmr) {
         String nextTier = stepTier(currentTier, 1);
         if (nextTier.equals(currentTier)) {
@@ -270,22 +202,5 @@ public final class PlayerTierPolicy {
 
         int currentTierFloor = TIER_FLOOR_MMR.getOrDefault(currentTier, 0);
         return mmr < (currentTierFloor - DEMOTION_MMR_BUFFER);
-    }
-
-    private static int nearTopMmrForTier(String tier) {
-        String normalizedTier = canonicalTier(tier, TIER_NONE);
-        if (TIER_NONE.equals(normalizedTier)) {
-            return 0;
-        }
-
-        int currentFloor = TIER_FLOOR_MMR.getOrDefault(normalizedTier, 0);
-        String nextTier = stepTier(normalizedTier, 1);
-        if (nextTier.equals(normalizedTier)) {
-            return currentFloor + 90;
-        }
-
-        int nextFloor = TIER_FLOOR_MMR.getOrDefault(nextTier, currentFloor + 200);
-        int upperBound = Math.max(currentFloor, nextFloor - 1);
-        return Math.max(currentFloor, upperBound - 9);
     }
 }

@@ -101,42 +101,7 @@ class PlayerTierPolicyTest {
     }
 
     @Test
-    void resolvesDormancyAdjustedMmrToNearTopOfDemotedTier() {
-        assertThat(PlayerTierPolicy.resolveDormancyAdjustedMmr("A+", 1930, 1)).isEqualTo(1790);
-        assertThat(PlayerTierPolicy.resolveDormancyAdjustedMmr("A", 1680, 1)).isEqualTo(1590);
-    }
-
-    @Test
-    void capsDormancyAdjustedMmrAtTwoDemotionSteps() {
-        assertThat(PlayerTierPolicy.resolveDormancyAdjustedMmr("A", 1680, 2)).isEqualTo(1390);
-        assertThat(PlayerTierPolicy.resolveDormancyAdjustedMmr("A", 1680, 3)).isEqualTo(1390);
-        assertThat(PlayerTierPolicy.resolveDormancyAdjustedMmr("B+", 1320, 5)).isEqualTo(990);
-    }
-
-    @Test
-    void resolvesDormancyMinimumMmrAtTwoDemotionSteps() {
-        assertThat(PlayerTierPolicy.resolveDormancyMinimumMmr("A", 1680, 2)).isEqualTo(1200);
-        assertThat(PlayerTierPolicy.resolveDormancyMinimumMmr("A", 1680, 3)).isEqualTo(1200);
-        assertThat(PlayerTierPolicy.resolveDormancyMinimumMmr("B+", 1320, 5)).isEqualTo(800);
-        assertThat(PlayerTierPolicy.resolveDormancyMinimumMmr("D", 150, 5)).isEqualTo(1);
-    }
-
-    @Test
-    void resolvesDormancyEpisodeFloorTierFromStoredTier() {
-        assertThat(PlayerTierPolicy.resolveDormancyFloorTier("A+", 1930, 2)).isEqualTo("A-");
-        assertThat(PlayerTierPolicy.resolveDormancyFloorTier("B+", 1320, 2)).isEqualTo("B-");
-        assertThat(PlayerTierPolicy.resolveDormancyFloorTier("UNKNOWN", 1930, 2)).isEqualTo("A-");
-    }
-
-    @Test
-    void appliesConfiguredDormancyFloorTierWhenItIsHigherThanDefaultCap() {
-        assertThat(PlayerTierPolicy.resolveDormancyMinimumMmr("A+", 1930, 2, "A")).isEqualTo(1600);
-        assertThat(PlayerTierPolicy.resolveDormancyMinimumMmr("A", 1680, 2, "B+")).isEqualTo(1200);
-        assertThat(PlayerTierPolicy.resolveDormancyMinimumMmr("A", 1680, 2, "UNASSIGNED")).isEqualTo(1200);
-    }
-
-    @Test
-    void normalizesRankedTierForDormancyFloorSettings() {
+    void normalizesRankedTier() {
         assertThat(PlayerTierPolicy.normalizeRankedTier(" b+ ")).isEqualTo("B+");
         assertThat(PlayerTierPolicy.normalizeRankedTier("UNASSIGNED")).isEmpty();
         assertThat(PlayerTierPolicy.normalizeRankedTier("diamond")).isEmpty();
@@ -160,12 +125,5 @@ class PlayerTierPolicyTest {
 
         assertThat(player.getTier()).isEqualTo("B+");
         assertThat(player.getHighestAchievedTier()).isEqualTo("A-");
-    }
-
-    @Test
-    void doesNotIncreaseMmrWhenDormancyTargetIsHigherThanCurrent() {
-        assertThat(PlayerTierPolicy.resolveDormancyAdjustedMmr("A+", 1750, 1)).isEqualTo(1750);
-        assertThat(PlayerTierPolicy.resolveDormancyAdjustedMmr("NONE", 0, 1)).isEqualTo(0);
-        assertThat(PlayerTierPolicy.resolveDormancyMinimumMmr("UNASSIGNED", 0, 2)).isEqualTo(0);
     }
 }

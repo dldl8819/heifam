@@ -598,10 +598,6 @@
       "tierSuffix": "티어",
       "totalSuffix": "명"
     },
-    "dormancyFloor": {
-      "inlineLabel": "휴면 최대 하한",
-      "defaultPolicy": "기본 정책"
-    },
     "actions": {
       "edit": "수정",
       "save": "저장",

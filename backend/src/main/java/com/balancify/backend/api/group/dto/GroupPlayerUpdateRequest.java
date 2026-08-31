@@ -10,41 +10,17 @@ public record GroupPlayerUpdateRequest(
     OffsetDateTime chatLeftAt,
     String chatLeftReason,
     OffsetDateTime chatRejoinedAt,
-    String tierChangeAcknowledgedTier,
-    String dormancyMmrFloorTier
+    String tierChangeAcknowledgedTier
 ) {
     public GroupPlayerUpdateRequest(
         String nickname,
         String race,
-        String tier,
         Boolean active,
         OffsetDateTime chatLeftAt,
         String chatLeftReason,
         OffsetDateTime chatRejoinedAt,
         String tierChangeAcknowledgedTier
     ) {
-        this(
-            nickname,
-            race,
-            tier,
-            active,
-            chatLeftAt,
-            chatLeftReason,
-            chatRejoinedAt,
-            tierChangeAcknowledgedTier,
-            null
-        );
-    }
-
-    public GroupPlayerUpdateRequest(
-        String nickname,
-        String race,
-        Boolean active,
-        OffsetDateTime chatLeftAt,
-        String chatLeftReason,
-        OffsetDateTime chatRejoinedAt,
-        String tierChangeAcknowledgedTier
-    ) {
-        this(nickname, race, null, active, chatLeftAt, chatLeftReason, chatRejoinedAt, tierChangeAcknowledgedTier, null);
+        this(nickname, race, null, active, chatLeftAt, chatLeftReason, chatRejoinedAt, tierChangeAcknowledgedTier);
     }
 }
