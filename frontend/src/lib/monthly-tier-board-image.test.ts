@@ -22,7 +22,7 @@ function tierBoardItem(
 }
 
 describe('monthly tier board image', () => {
-  it('uses the monthly tier instead of the live MMR tier', () => {
+  it('uses the live MMR tier instead of the stored monthly tier', () => {
     const players = selectMonthlyTierBoardPlayers([
       tierBoardItem('YOUR_USERNAME_1', 'B+', { liveTier: 'A+' }),
     ])
@@ -31,8 +31,8 @@ describe('monthly tier board image', () => {
       new Date('2026-08-08T00:00:00.000Z'),
     )
 
-    expect(model.buckets['B+']).toEqual(['YOUR_USERNAME_1'])
-    expect(model.buckets['A+']).toEqual([])
+    expect(model.buckets['A+']).toEqual(['YOUR_USERNAME_1'])
+    expect(model.buckets['B+']).toEqual([])
   })
 
   it('excludes inactive players and trims placeholder nicknames', () => {
@@ -72,10 +72,10 @@ describe('monthly tier board image', () => {
     expect(model.rowCount).toBe(11)
   })
 
-  it('resolves the board month and file name in Korea time', () => {
+  it('resolves the as-of timestamp label and file name in Korea time', () => {
     expect(resolveMonthlyTierBoardPeriod(new Date('2026-07-31T15:30:00.000Z'))).toEqual({
-      periodLabel: '2026-08',
-      fileName: 'heifam-tier-board-2026-08.png',
+      periodLabel: '2026-08-01 00:30 기준',
+      fileName: 'heifam-tier-board-20260801-0030.png',
     })
   })
 })

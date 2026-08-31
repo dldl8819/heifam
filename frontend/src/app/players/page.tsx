@@ -108,8 +108,12 @@ const PLAYER_DORMANCY_FLOOR_TIER_OPTIONS: PlayerTierStatus[] = [
 ]
 const REASSIGNMENT_IMPORT_TIER = '\uC7AC\uBC30\uC815\uB300\uC0C1'
 
+function displayTier(row: Pick<PlayerRosterItem, 'tier' | 'liveTier'>): PlayerTierStatus {
+  return row.liveTier ?? row.tier
+}
+
 function comparePlayersByTierThenNickname(a: PlayerRosterItem, b: PlayerRosterItem): number {
-  const tierDiff = toTierOrder(a.tier) - toTierOrder(b.tier)
+  const tierDiff = toTierOrder(displayTier(a)) - toTierOrder(displayTier(b))
   if (tierDiff !== 0) {
     return tierDiff
   }
@@ -954,7 +958,7 @@ export default function PlayersPage() {
       ...downloadableRows.map((row, index) =>
         [
           String(index + 1),
-          row.tier === 'UNASSIGNED' ? t('players.table.unassigned') : row.tier,
+          displayTier(row) === 'UNASSIGNED' ? t('players.table.unassigned') : displayTier(row),
           row.nickname,
         ]
           .map(escapeCsvCell)
@@ -1589,10 +1593,12 @@ export default function PlayersPage() {
                         ) : (
                           <span
                             className={`rounded-md px-2 py-1 text-xs font-semibold ${getTierBadgeClass(
-                              row.tier
+                              displayTier(row)
                             )}`}
                           >
-                            {row.tier === 'UNASSIGNED' ? t('players.table.unassigned') : row.tier}
+                            {displayTier(row) === 'UNASSIGNED'
+                              ? t('players.table.unassigned')
+                              : displayTier(row)}
                           </span>
                         )}
                       </td>

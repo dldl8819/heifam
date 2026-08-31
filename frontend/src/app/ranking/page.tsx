@@ -132,7 +132,7 @@ export default function RankingPage() {
           new Map(
             rosterResponse.map((player) => [
               player.nickname,
-              player.tier,
+              player.liveTier ?? player.tier,
             ])
           )
         )

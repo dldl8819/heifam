@@ -540,7 +540,7 @@ export default function ResultsPage() {
             nickname: player.nickname,
             race: player.race,
             currentMmr: player.currentMmr,
-            tier: player.tier,
+            tier: player.liveTier ?? player.tier,
           }))
           .sort((left, right) => {
             if (!showMmr) {

@@ -15,7 +15,6 @@ import java.util.ArrayList;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,15 +52,6 @@ public class MonthlyTierRefreshService {
         this.settlementZone = resolveSettlementZone(settlementZoneId);
         this.groupReadCacheService = groupReadCacheService;
         this.clock = clock;
-    }
-
-    @Scheduled(
-        cron = "${balancify.rank.monthly-tier-refresh.cron:59 59 23 28-31 * *}",
-        zone = "${balancify.rank.monthly-tier-refresh.zone:" + DEFAULT_SETTLEMENT_ZONE_ID + "}"
-    )
-    @Transactional
-    public void refreshTiersOnMonthlySchedule() {
-        applyMonthlyTierRefreshIfDue();
     }
 
     @Transactional
