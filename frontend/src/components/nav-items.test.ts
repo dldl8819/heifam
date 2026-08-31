@@ -29,5 +29,28 @@ describe('navigation items', () => {
     expect(items.map((item) => item.href)).toContain('/ads')
     expect(items.map((item) => item.href)).not.toContain('/admin/access')
     expect(items.map((item) => item.href)).not.toContain('/admin/audit')
+    expect(items.map((item) => item.href)).not.toContain('/notices')
+  })
+
+  it('hides notices from regular members', () => {
+    const items = getVisibleNavItems({
+      isLoggedIn: true,
+      canAccess: true,
+      isAdmin: false,
+      isSuperAdmin: false,
+    })
+
+    expect(items.map((item) => item.href)).not.toContain('/notices')
+  })
+
+  it('shows notices only to super admins', () => {
+    const items = getVisibleNavItems({
+      isLoggedIn: true,
+      canAccess: true,
+      isAdmin: true,
+      isSuperAdmin: true,
+    })
+
+    expect(items.map((item) => item.href)).toContain('/notices')
   })
 })
