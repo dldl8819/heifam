@@ -80,7 +80,7 @@ function createEmptyBuckets(): Record<PlayerTierStatus, string[]> {
 }
 
 export function selectMonthlyTierBoardPlayers(
-  items: Array<Pick<GroupPlayerTierBoardItem, 'nickname' | 'tier' | 'active'>>,
+  items: Array<Pick<GroupPlayerTierBoardItem, 'nickname' | 'tier' | 'liveTier' | 'active'>>,
 ): MonthlyTierBoardPlayer[] {
   return items.flatMap((item) => {
     const nickname = item.nickname.trim()
@@ -88,7 +88,7 @@ export function selectMonthlyTierBoardPlayers(
       return []
     }
 
-    return [{ nickname, tier: item.tier }]
+    return [{ nickname, tier: item.liveTier ?? item.tier }]
   })
 }
 
@@ -104,17 +104,25 @@ export function resolveMonthlyTierBoardPeriod(date: Date): {
     timeZone: 'Asia/Seoul',
     year: 'numeric',
     month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
   }).formatToParts(date)
-  const year = parts.find((part) => part.type === 'year')?.value
-  const month = parts.find((part) => part.type === 'month')?.value
-  if (!year || !month) {
+  const part = (type: string) => parts.find((entry) => entry.type === type)?.value
+  const year = part('year')
+  const month = part('month')
+  const day = part('day')
+  const rawHour = part('hour')
+  const minute = part('minute')
+  if (!year || !month || !day || !rawHour || !minute) {
     throw new Error('Unable to resolve tier board period')
   }
+  const hour = rawHour === '24' ? '00' : rawHour
 
-  const periodLabel = `${year}-${month}`
   return {
-    periodLabel,
-    fileName: `heifam-tier-board-${periodLabel}.png`,
+    periodLabel: `${year}-${month}-${day} ${hour}:${minute} 기준`,
+    fileName: `heifam-tier-board-${year}${month}${day}-${hour}${minute}.png`,
   }
 }
 

@@ -5,6 +5,7 @@ export type SelectableParticipant = {
   nickname: string
   race: string
   tier?: PlayerTierStatus
+  liveTier?: PlayerTierStatus
   currentMmr?: number
 }
 
@@ -91,7 +92,8 @@ export function formatParticipantSlotLabel(
   player: SelectableParticipant,
   showMmr: boolean,
 ): string {
-  const tierText = player.tier ? ` [${player.tier}]` : ''
+  const tier = player.liveTier ?? player.tier
+  const tierText = tier ? ` [${tier}]` : ''
   const mmrText =
     showMmr && typeof player.currentMmr === 'number' ? ` · ${player.currentMmr} MMR` : ''
   return `${player.nickname} (${player.race})${tierText}${mmrText}`

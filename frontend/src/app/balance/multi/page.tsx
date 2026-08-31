@@ -183,7 +183,7 @@ export default function MultiBalancePage() {
             nickname: player.nickname,
             race: player.race,
             currentMmr: player.currentMmr,
-            tier: player.tier,
+            tier: player.liveTier ?? player.tier,
           }))
           .sort((a, b) => {
             if (!showMmr) {

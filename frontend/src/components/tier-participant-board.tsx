@@ -106,7 +106,7 @@ export function TierParticipantBoard({
   )
 
   selectedPlayers.forEach((player) => {
-    buckets[normalizeTier(player.tier)].push(player)
+    buckets[normalizeTier(player.liveTier ?? player.tier)].push(player)
   })
 
   const boardColumnCount = Math.max(
