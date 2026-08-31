@@ -6,6 +6,7 @@ import com.balancify.backend.api.access.dto.AccessEmailEntryResponse;
 import com.balancify.backend.api.access.dto.AccessEmailUpsertRequest;
 import com.balancify.backend.api.access.dto.AccessMeResponse;
 import com.balancify.backend.api.access.dto.AccessMmrPermissionUpdateRequest;
+import com.balancify.backend.api.access.dto.AccessNicknameUpdateRequest;
 import com.balancify.backend.api.access.dto.AccessRaceUpdateRequest;
 import com.balancify.backend.security.AuthenticatedRequestResolver;
 import com.balancify.backend.service.AccessControlService;
@@ -266,6 +267,35 @@ public class AccessControlController {
             AccessControlService.AllowedEmailSnapshot snapshot = accessControlService.removeAllowedUserEmail(
                 requestEmail,
                 decodePathValue(email)
+            );
+            return new AccessAllowedEmailListResponse(toEntryResponses(snapshot.allowedUsers()));
+        } catch (IllegalArgumentException illegalArgumentException) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                illegalArgumentException.getMessage(),
+                illegalArgumentException
+            );
+        }
+    }
+
+    @PutMapping("/allowed-users/{email}/nickname")
+    public AccessAllowedEmailListResponse updateAllowedEmailNickname(
+        @PathVariable String email,
+        @RequestBody AccessNicknameUpdateRequest requestBody,
+        HttpServletRequest request
+    ) {
+        String requestEmail = requireRequestEmail(request);
+        requireAdmin(requestEmail);
+        String targetNickname = safeTrim(requestBody == null ? null : requestBody.nickname());
+        if (targetNickname.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nickname is required");
+        }
+
+        try {
+            AccessControlService.AllowedEmailSnapshot snapshot = accessControlService.updateAllowedUserEmailNickname(
+                requestEmail,
+                decodePathValue(email),
+                targetNickname
             );
             return new AccessAllowedEmailListResponse(toEntryResponses(snapshot.allowedUsers()));
         } catch (IllegalArgumentException illegalArgumentException) {

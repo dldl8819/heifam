@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useCallback, useEffect, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { AdminOnlyContent } from '@/components/admin-only-content'
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
@@ -49,6 +49,9 @@ export default function AccessControlPage() {
   const [newAdminNickname, setNewAdminNickname] = useState<string>('')
   const [newAllowedEmail, setNewAllowedEmail] = useState<string>('')
   const [newAllowedNickname, setNewAllowedNickname] = useState<string>('')
+  const [allowedSearch, setAllowedSearch] = useState<string>('')
+  const [editingAllowedEmail, setEditingAllowedEmail] = useState<string | null>(null)
+  const [editingAllowedNickname, setEditingAllowedNickname] = useState<string>('')
   const [saving, setSaving] = useState<boolean>(false)
 
   const loadLists = useCallback(async () => {
@@ -222,6 +225,54 @@ export default function AccessControlPage() {
       setSaving(false)
     }
   }
+
+  const handleStartEditAllowedNickname = (target: AccessEmailEntry) => {
+    setError(null)
+    setMessage(null)
+    setEditingAllowedEmail(target.email)
+    setEditingAllowedNickname(target.nickname ?? '')
+  }
+
+  const handleCancelEditAllowedNickname = () => {
+    setEditingAllowedEmail(null)
+    setEditingAllowedNickname('')
+  }
+
+  const handleSaveAllowedNickname = async (targetEmail: string) => {
+    setError(null)
+    setMessage(null)
+
+    const normalizedNickname = normalizeNickname(editingAllowedNickname)
+    if (!isNicknameFormatValid(normalizedNickname)) {
+      setError(t('access.messages.invalidNickname'))
+      return
+    }
+
+    setSaving(true)
+    try {
+      const response = await apiClient.updateAllowedEmailNickname(targetEmail, normalizedNickname)
+      setAllowedList(response)
+      setMessage(t('access.messages.nicknameSaved', { email: targetEmail, nickname: normalizedNickname }))
+      setEditingAllowedEmail(null)
+      setEditingAllowedNickname('')
+    } catch {
+      setError(t('access.loadError'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const filteredAllowedUsers = useMemo(() => {
+    const searchText = allowedSearch.trim().toLowerCase()
+    const allowedUsers = allowedList?.allowedUsers ?? []
+    if (searchText.length === 0) {
+      return allowedUsers
+    }
+    return allowedUsers.filter((entry) => {
+      const nickname = normalizeNickname(entry.nickname ?? '').toLowerCase()
+      return nickname.includes(searchText) || entry.email.toLowerCase().includes(searchText)
+    })
+  }, [allowedList, allowedSearch])
 
   return (
     <section className="space-y-6">
@@ -416,24 +467,78 @@ export default function AccessControlPage() {
             </button>
           </form>
 
+          <input
+            type="text"
+            value={allowedSearch}
+            onChange={(event) => setAllowedSearch(event.target.value)}
+            placeholder={t('access.form.searchPlaceholder')}
+            className="mt-3 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
+          />
+
           <ul className="mt-3 space-y-2">
-            {(allowedList?.allowedUsers ?? []).map((allowedUser) => (
+            {filteredAllowedUsers.map((allowedUser) => (
               <li
                 key={`allowed-${allowedUser.email}`}
-                className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-200"
+                className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-200"
               >
-                <span>
-                  <span className="font-medium">{allowedUser.nickname ?? t('access.labels.nicknameNotSet')}</span>
-                  <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">({allowedUser.email})</span>
-                </span>
-                <button
-                  type="button"
-                  disabled={saving}
-                  onClick={() => handleRemoveAllowed(allowedUser)}
-                  className="rounded-md border border-rose-300 bg-white px-2 py-1 text-xs font-medium text-rose-700 transition-colors hover:border-rose-500 hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 dark:border-rose-800 dark:bg-slate-900 dark:text-rose-300 dark:hover:border-rose-600 dark:hover:bg-rose-950/40 dark:disabled:border-slate-700 dark:disabled:text-slate-500"
-                >
-                  {t('access.actions.remove')}
-                </button>
+                {editingAllowedEmail === allowedUser.email ? (
+                  <>
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                      <input
+                        type="text"
+                        value={editingAllowedNickname}
+                        onChange={(event) => setEditingAllowedNickname(event.target.value)}
+                        placeholder={t('access.form.nicknamePlaceholder')}
+                        autoFocus
+                        className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
+                      />
+                      <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">({allowedUser.email})</span>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => void handleSaveAllowedNickname(allowedUser.email)}
+                        className="rounded-md bg-slate-900 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
+                      >
+                        {t('access.actions.save')}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={handleCancelEditAllowedNickname}
+                        className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:cursor-not-allowed disabled:text-slate-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-400 dark:hover:bg-slate-800"
+                      >
+                        {t('access.actions.cancel')}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <span className="min-w-0 flex-1 truncate">
+                      <span className="font-medium">{allowedUser.nickname ?? t('access.labels.nicknameNotSet')}</span>
+                      <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">({allowedUser.email})</span>
+                    </span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => handleStartEditAllowedNickname(allowedUser)}
+                        className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:cursor-not-allowed disabled:text-slate-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-400 dark:hover:bg-slate-800"
+                      >
+                        {t('access.actions.editNickname')}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => handleRemoveAllowed(allowedUser)}
+                        className="rounded-md border border-rose-300 bg-white px-2 py-1 text-xs font-medium text-rose-700 transition-colors hover:border-rose-500 hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 dark:border-rose-800 dark:bg-slate-900 dark:text-rose-300 dark:hover:border-rose-600 dark:hover:bg-rose-950/40 dark:disabled:border-slate-700 dark:disabled:text-slate-500"
+                      >
+                        {t('access.actions.remove')}
+                      </button>
+                    </div>
+                  </>
+                )}
               </li>
             ))}
           </ul>
