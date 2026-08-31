@@ -20,6 +20,7 @@ import {
   type PlayerRosterView,
 } from '@/lib/player-roster-filter'
 import { applyPlayerActivityTransition } from '@/lib/player-activity'
+import { escapeCsvCell, triggerBlobDownload } from '@/lib/csv-download'
 import {
   createMonthlyTierBoardPng,
   selectMonthlyTierBoardPlayers,
@@ -126,25 +127,6 @@ function sortRosterRows(rows: PlayerRosterItem[], showMmrColumn: boolean): Playe
     }
     return a.nickname.localeCompare(b.nickname, 'ko-KR')
   })
-}
-
-function escapeCsvCell(value: string): string {
-  return `"${value.replace(/"/g, '""')}"`
-}
-
-function triggerBlobDownload(blob: Blob, fileName: string): void {
-  const downloadUrl = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = downloadUrl
-  anchor.download = fileName
-
-  try {
-    document.body.append(anchor)
-    anchor.click()
-  } finally {
-    anchor.remove()
-    window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000)
-  }
 }
 
 function formatMmrValue(value: number | undefined): string {

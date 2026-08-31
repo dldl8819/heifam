@@ -47,6 +47,21 @@ describe('route access', () => {
     })
   })
 
+  it('allows any logged-in member with access to view notices', () => {
+    const decision = getRouteAccessDecision('/notices', {
+      isLoggedIn: true,
+      canAccess: true,
+      isAdmin: false,
+      isSuperAdmin: false,
+    })
+
+    expect(decision).toEqual({
+      allowed: true,
+      redirectTo: null,
+      blocked: false,
+    })
+  })
+
   it('keeps super admin routes restricted to super admins', () => {
     const decision = getRouteAccessDecision('/admin/access', {
       isLoggedIn: true,
