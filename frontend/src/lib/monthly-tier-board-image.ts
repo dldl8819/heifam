@@ -121,7 +121,7 @@ export function resolveMonthlyTierBoardPeriod(date: Date): {
   const hour = rawHour === '24' ? '00' : rawHour
 
   return {
-    periodLabel: `${year}-${month}-${day} 기준`,
+    periodLabel: `${year}-${month}-${day}`,
     fileName: `heifam-tier-board-${year}${month}${day}-${hour}${minute}.png`,
   }
 }
@@ -325,7 +325,7 @@ function renderMonthlyTierBoardCanvas(
     if (column.tier === 'D') {
       drawCellText(
         context,
-        `${model.periodLabel} ${labels.tierSuffix}`,
+        model.periodLabel,
         x,
         footerY,
         width,
