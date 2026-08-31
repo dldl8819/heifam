@@ -98,14 +98,6 @@ balancify:
     dormancy:
       enabled: ${RANK_DORMANCY_ENABLED:true}
       inactive-days: ${RANK_DORMANCY_INACTIVE_DAYS:15}
-      mmr-drop-per-period: ${RANK_DORMANCY_MMR_DROP_PER_PERIOD:30}
-      sweep-cron: "${RANK_DORMANCY_SWEEP_CRON:0 0 4 * * *}"
-    monthly-tier-refresh:
-      enabled: ${RANK_MONTHLY_TIER_REFRESH_ENABLED:true}
-      zone: ${RANK_MONTHLY_TIER_REFRESH_ZONE:Asia/Seoul}
-    return-boost:
-      games: ${RANK_RETURN_BOOST_GAMES:5}
-      multiplier: ${RANK_RETURN_BOOST_MULTIPLIER:2.0}
   match:
     confirm:
       duplicate-window-minutes: ${MATCH_CONFIRM_DUPLICATE_WINDOW_MINUTES:5}

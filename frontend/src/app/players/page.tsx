@@ -92,20 +92,6 @@ const PLAYER_REGISTRATION_TIER_OPTIONS: PlayerRegistrationTier[] = [
   'D',
   'UNASSIGNED',
 ]
-const PLAYER_DORMANCY_FLOOR_TIER_OPTIONS: PlayerTierStatus[] = [
-  'UNASSIGNED',
-  'S',
-  'A+',
-  'A',
-  'A-',
-  'B+',
-  'B',
-  'B-',
-  'C+',
-  'C',
-  'C-',
-  'D',
-]
 const REASSIGNMENT_IMPORT_TIER = '\uC7AC\uBC30\uC815\uB300\uC0C1'
 
 function displayTier(row: Pick<PlayerRosterItem, 'tier' | 'liveTier'>): PlayerTierStatus {
@@ -166,13 +152,6 @@ function formatMmrValue(value: number | undefined): string {
     return '-'
   }
   return value === 0 ? 'None' : String(value)
-}
-
-function formatTierOption(tier: PlayerTierStatus | undefined): string {
-  if (tier === undefined || tier === 'UNASSIGNED') {
-    return t('players.dormancyFloor.defaultPolicy')
-  }
-  return tier
 }
 
 function formatDateTimeLocalInputValue(date: Date): string {
@@ -341,8 +320,6 @@ export default function PlayersPage() {
   const [editingRace, setEditingRace] = useState<PlayerRace>('P')
   const [editingTier, setEditingTier] = useState<PlayerTierStatus>('UNASSIGNED')
   const [editingInlineMmrValue, setEditingInlineMmrValue] = useState<string>('')
-  const [editingDormancyFloorTier, setEditingDormancyFloorTier] =
-    useState<PlayerTierStatus>('UNASSIGNED')
   const [savingPlayerId, setSavingPlayerId] = useState<number | null>(null)
   const [deletingPlayerId, setDeletingPlayerId] = useState<number | null>(null)
   const [togglingPlayerId, setTogglingPlayerId] = useState<number | null>(null)
@@ -551,7 +528,6 @@ export default function PlayersPage() {
     setEditingRace(player.race)
     setEditingTier(player.tier)
     setEditingInlineMmrValue(resolveEditableMmrValue(player))
-    setEditingDormancyFloorTier(player.dormancyMmrFloorTier ?? 'UNASSIGNED')
     setActivityForm(null)
     setPlayerActionError(null)
     setPlayerActionSuccess(null)
@@ -563,7 +539,6 @@ export default function PlayersPage() {
     setEditingRace('P')
     setEditingTier('UNASSIGNED')
     setEditingInlineMmrValue('')
-    setEditingDormancyFloorTier('UNASSIGNED')
   }
 
   const handleSaveEdit = async (playerId: number) => {
@@ -608,7 +583,6 @@ export default function PlayersPage() {
         nickname: nextNickname,
         race: editingRace,
         tier: editingTier,
-        dormancyMmrFloorTier: isSuperAdmin ? editingDormancyFloorTier : undefined,
       })
       if (Object.keys(profilePayload).length > 0) {
         await apiClient.updateGroupPlayer(TEMP_GROUP_ID, playerId, profilePayload)
@@ -627,7 +601,6 @@ export default function PlayersPage() {
       setEditingRace('P')
       setEditingTier('UNASSIGNED')
       setEditingInlineMmrValue('')
-      setEditingDormancyFloorTier('UNASSIGNED')
       setPlayerActionSuccess(
         didUpdateMmr ? t('players.actions.updateAndMmrSuccess') : t('players.actions.updateSuccess')
       )
@@ -666,7 +639,6 @@ export default function PlayersPage() {
         setEditingRace('P')
         setEditingTier('UNASSIGNED')
         setEditingInlineMmrValue('')
-        setEditingDormancyFloorTier('UNASSIGNED')
       }
       if (activityForm?.player.id === player.id) {
         setActivityForm(null)
@@ -782,7 +754,6 @@ export default function PlayersPage() {
         setEditingRace('P')
         setEditingTier('UNASSIGNED')
         setEditingInlineMmrValue('')
-        setEditingDormancyFloorTier('UNASSIGNED')
       }
       setPlayerActionSuccess(
         nextActive ? t('players.actions.reactivateSuccess') : t('players.actions.deactivateSuccess')
@@ -916,7 +887,6 @@ export default function PlayersPage() {
   const showInactiveRetentionColumns = rosterView === 'inactive'
   const showTierColumn = !showInactiveRetentionColumns
   const showStatusColumn = isAdmin
-  const showDormancyFloorColumn = isSuperAdmin && !showInactiveRetentionColumns
   const showRosterMmrColumn = showMmrColumn && !showInactiveRetentionColumns
   const showGameTypeStatsColumn = !showInactiveRetentionColumns
   const showActionsColumn = isAdmin
@@ -924,7 +894,6 @@ export default function PlayersPage() {
     5 +
     (showTierColumn ? 1 : 0) +
     (showStatusColumn ? 1 : 0) +
-    (showDormancyFloorColumn ? 1 : 0) +
     (showRosterMmrColumn ? 1 : 0) +
     (showGameTypeStatsColumn ? 1 : 0) +
     (showActionsColumn ? 1 : 0)
@@ -1365,9 +1334,6 @@ export default function PlayersPage() {
               <th className="whitespace-nowrap px-4 py-3">{t('players.table.race')}</th>
               {showTierColumn && <th className="whitespace-nowrap px-4 py-3">{t('players.table.tier')}</th>}
               {showStatusColumn && <th className="min-w-[11rem] whitespace-nowrap px-4 py-3">{t('players.table.status')}</th>}
-              {showDormancyFloorColumn && (
-                <th className="whitespace-nowrap px-4 py-3">{t('players.dormancyFloor.inlineLabel')}</th>
-              )}
               {showRosterMmrColumn && <th className="whitespace-nowrap px-4 py-3">{t('players.table.currentMmr')}</th>}
               <th className="whitespace-nowrap px-4 py-3">{t('players.table.wins')}</th>
               <th className="whitespace-nowrap px-4 py-3">{t('players.table.losses')}</th>
@@ -1651,31 +1617,6 @@ export default function PlayersPage() {
                             </div>
                           )}
                         </div>
-                      </td>
-                    )}
-                    {showDormancyFloorColumn && (
-                      <td className="px-4 py-3">
-                        {identityHidden ? (
-                          <span className="text-slate-500 dark:text-slate-400" aria-hidden="true">—</span>
-                        ) : isEditing ? (
-                          <select
-                            value={editingDormancyFloorTier}
-                            onChange={(event) =>
-                              setEditingDormancyFloorTier(event.target.value as PlayerTierStatus)
-                            }
-                            className="w-32 rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
-                          >
-                            {PLAYER_DORMANCY_FLOOR_TIER_OPTIONS.map((tierOption) => (
-                              <option key={`dormancy-floor-option-${tierOption}`} value={tierOption}>
-                                {formatTierOption(tierOption)}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
-                            {formatTierOption(row.dormancyMmrFloorTier)}
-                          </span>
-                        )}
                       </td>
                     )}
                     {showRosterMmrColumn && (

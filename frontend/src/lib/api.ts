@@ -519,7 +519,6 @@ export function normalizePlayerRosterItem(value: unknown, index = 0): PlayerRost
   const lastTierSnapshotMmr = toNumber(source.lastTierSnapshotMmr)
   const lastTierSnapshotTier = normalizeTier(source.lastTierSnapshotTier)
   const liveTier = normalizeTier(source.liveTier)
-  const dormancyMmrFloorTier = normalizeTier(source.dormancyMmrFloorTier)
   const wins = toNumber(source.wins) ?? 0
   const losses = toNumber(source.losses) ?? 0
   const games = toNumber(source.games) ?? wins + losses
@@ -589,8 +588,6 @@ export function normalizePlayerRosterItem(value: unknown, index = 0): PlayerRost
     baseMmr: identityHidden || retainedInactive ? undefined : baseMmr ?? undefined,
     baseTier: identityHidden || retainedInactive ? undefined : baseTier ?? undefined,
     currentMmr: identityHidden || retainedInactive ? undefined : currentMmr ?? undefined,
-    dormancyMmrFloorTier:
-      identityHidden || retainedInactive ? undefined : dormancyMmrFloorTier ?? undefined,
     lastTierSnapshotAt:
       !identityHidden && !retainedInactive && typeof source.lastTierSnapshotAt === 'string'
         ? source.lastTierSnapshotAt

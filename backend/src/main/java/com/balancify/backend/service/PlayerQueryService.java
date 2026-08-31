@@ -136,9 +136,6 @@ public class PlayerQueryService {
                 player.getChatRejoinedAt(),
                 player.getTierChangeAcknowledgedTier(),
                 player.getTierChangeAcknowledgedAt(),
-                PlayerTierPolicy.normalizeRankedTier(player.getDormancyMmrFloorTier()).isEmpty()
-                    ? null
-                    : PlayerTierPolicy.normalizeRankedTier(player.getDormancyMmrFloorTier()),
                 player.getLifecycleStatus() == null ? null : player.getLifecycleStatus().name(),
                 player.getIdentityRetainedUntil(),
                 requesterAuthUserId != null && Objects.equals(requesterAuthUserId, player.getAuthUserId())
@@ -197,7 +194,6 @@ public class PlayerQueryService {
             false,
             player.getChatLeftAt(),
             player.getChatLeftReason(),
-            null,
             null,
             null,
             null,

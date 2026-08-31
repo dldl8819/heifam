@@ -44,7 +44,6 @@ class MmrMaskingMapperTest {
             chatRejoinedAt,
             "A",
             chatRejoinedAt,
-            "B+",
             false
         );
 
@@ -62,7 +61,6 @@ class MmrMaskingMapperTest {
         assertThat(masked.chatRejoinedAt()).isNull();
         assertThat(masked.tierChangeAcknowledgedTier()).isNull();
         assertThat(masked.tierChangeAcknowledgedAt()).isNull();
-        assertThat(masked.dormancyMmrFloorTier()).isNull();
     }
 
     @Test
@@ -91,7 +89,6 @@ class MmrMaskingMapperTest {
             chatRejoinedAt,
             "A",
             chatRejoinedAt,
-            "B+",
             false
         );
 
@@ -109,11 +106,10 @@ class MmrMaskingMapperTest {
         assertThat(masked.chatRejoinedAt()).isEqualTo(chatRejoinedAt);
         assertThat(masked.tierChangeAcknowledgedTier()).isEqualTo("A");
         assertThat(masked.tierChangeAcknowledgedAt()).isEqualTo(chatRejoinedAt);
-        assertThat(masked.dormancyMmrFloorTier()).isNull();
     }
 
     @Test
-    void maskGroupPlayersForMmrViewerKeepsMmrButRemovesDormancyFloorTier() {
+    void maskGroupPlayersForMmrViewerKeepsMmr() {
         OffsetDateTime snapshotAt = OffsetDateTime.parse("2026-04-30T23:59:59+09:00");
         GroupPlayerResponse source = new GroupPlayerResponse(
             1L,
@@ -136,7 +132,6 @@ class MmrMaskingMapperTest {
             null,
             null,
             null,
-            "B+",
             false
         );
 
@@ -145,7 +140,6 @@ class MmrMaskingMapperTest {
         assertThat(masked.currentMmr()).isEqualTo(1520);
         assertThat(masked.lastTierSnapshotMmr()).isEqualTo(1500);
         assertThat(masked.liveTier()).isEqualTo("A+");
-        assertThat(masked.dormancyMmrFloorTier()).isNull();
     }
 
     @Test

@@ -51,8 +51,6 @@ public class MatchResultService {
     private final double underdogUpsetBonusThreshold;
     private final double underdogUpsetBonusRange;
     private final double underdogUpsetMaxMultiplier;
-    private final int returnBoostGames;
-    private final double returnBoostMultiplier;
     private final GroupReadCacheService groupReadCacheService;
     private final PlayerStatsRefreshService playerStatsRefreshService;
     private final long duplicateWindowMinutes;
@@ -73,8 +71,6 @@ public class MatchResultService {
         @Value("${balancify.elo.underdog-upset-bonus-threshold:200}") double underdogUpsetBonusThreshold,
         @Value("${balancify.elo.underdog-upset-bonus-range:800}") double underdogUpsetBonusRange,
         @Value("${balancify.elo.underdog-upset-max-multiplier:1.5}") double underdogUpsetMaxMultiplier,
-        @Value("${balancify.rank.return-boost.games:5}") int returnBoostGames,
-        @Value("${balancify.rank.return-boost.multiplier:2.0}") double returnBoostMultiplier,
         @Value("${balancify.match.confirm.duplicate-window-minutes:5}") long duplicateWindowMinutes,
         GroupReadCacheService groupReadCacheService,
         PlayerStatsRefreshService playerStatsRefreshService,
@@ -94,8 +90,6 @@ public class MatchResultService {
         this.underdogUpsetBonusThreshold = Math.max(0.0, underdogUpsetBonusThreshold);
         this.underdogUpsetBonusRange = underdogUpsetBonusRange <= 0 ? 800 : underdogUpsetBonusRange;
         this.underdogUpsetMaxMultiplier = Math.max(1.0, underdogUpsetMaxMultiplier);
-        this.returnBoostGames = Math.max(0, returnBoostGames);
-        this.returnBoostMultiplier = Math.max(1.0, returnBoostMultiplier);
         this.groupReadCacheService = groupReadCacheService;
         this.playerStatsRefreshService = playerStatsRefreshService;
         this.duplicateWindowMinutes = Math.max(1L, duplicateWindowMinutes);
@@ -285,10 +279,9 @@ public class MatchResultService {
             boolean homeSide = TEAM_HOME.equals(normalizeTeam(participant.getTeam()));
             double expected = homeSide ? homeExpectedWinRate : awayExpectedWinRate;
             double actual = winnerTeam.equals(normalizeTeam(participant.getTeam())) ? 1.0 : 0.0;
-            double playerReturnBoostMultiplier = resolveReturnBoostMultiplier(player, alreadyProcessed);
 
             int rawMmrDelta = (int) Math.round(
-                effectiveKFactor * outcomeMultiplier * playerReturnBoostMultiplier * (actual - expected)
+                effectiveKFactor * outcomeMultiplier * (actual - expected)
             );
             int mmrAfter = floorMmr(baseMmrBefore + rawMmrDelta);
             int mmrDelta = mmrAfter - baseMmrBefore;
@@ -311,7 +304,6 @@ public class MatchResultService {
                 completedRankedGamesByPlayerId
             );
             player.applyRankedMmr(updatedPlayerMmr, completedRankedGames);
-            applyReturnBoostStateAfterResult(player, alreadyProcessed);
             updatedPlayers.put(player.getId(), player);
 
             MmrHistory mmrHistory = existingHistoriesByPlayerId.get(player.getId());
@@ -776,50 +768,6 @@ public class MatchResultService {
 
         double progressed = Math.min(1.0, (upsetGap - underdogUpsetBonusThreshold) / underdogUpsetBonusRange);
         return 1.0 + ((underdogUpsetMaxMultiplier - 1.0) * progressed);
-    }
-
-    private double resolveReturnBoostMultiplier(Player player, boolean alreadyProcessed) {
-        if (alreadyProcessed || player == null || player.getDormantSince() == null) {
-            return 1.0;
-        }
-        if (player.getReturnedAt() == null) {
-            return configuredReturnBoostMultiplier(player);
-        }
-        if (safeBoostGames(player) > 0) {
-            return configuredReturnBoostMultiplier(player);
-        }
-        return 1.0;
-    }
-
-    private void applyReturnBoostStateAfterResult(Player player, boolean alreadyProcessed) {
-        if (alreadyProcessed || player == null || player.getDormantSince() == null) {
-            return;
-        }
-
-        if (player.getReturnedAt() == null) {
-            player.setReturnedAt(OffsetDateTime.now());
-            player.setReturnBoostMultiplier(configuredReturnBoostMultiplier(player));
-            player.setReturnBoostGamesRemaining(Math.max(0, returnBoostGames - 1));
-            return;
-        }
-
-        int remainingGames = safeBoostGames(player);
-        if (remainingGames > 0) {
-            player.setReturnBoostGamesRemaining(remainingGames - 1);
-        }
-    }
-
-    private double configuredReturnBoostMultiplier(Player player) {
-        Double storedMultiplier = player.getReturnBoostMultiplier();
-        if (storedMultiplier != null && storedMultiplier > 1.0) {
-            return storedMultiplier;
-        }
-        return returnBoostMultiplier;
-    }
-
-    private int safeBoostGames(Player player) {
-        Integer remainingGames = player.getReturnBoostGamesRemaining();
-        return remainingGames == null ? 0 : Math.max(0, remainingGames);
     }
 
     private String resolveAssignedRace(MatchParticipant participant) {

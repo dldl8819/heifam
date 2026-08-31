@@ -94,15 +94,6 @@ public class Player {
     @JsonIgnore
     private String retentionSubjectHash;
 
-    @Column(name = "last_dormancy_mmr_decay_at")
-    private OffsetDateTime lastDormancyMmrDecayAt;
-
-    @Column(name = "dormancy_mmr_floor_tier", length = 20)
-    private String dormancyMmrFloorTier;
-
-    @Column(name = "dormancy_episode_floor_tier", length = 20)
-    private String dormancyEpisodeFloorTier;
-
     @Column(name = "last_tier_recalculated_at")
     private OffsetDateTime lastTierRecalculatedAt;
 
@@ -111,18 +102,6 @@ public class Player {
 
     @Column(name = "last_tier_snapshot_mmr")
     private Integer lastTierSnapshotMmr;
-
-    @Column(name = "dormant_since")
-    private OffsetDateTime dormantSince;
-
-    @Column(name = "returned_at")
-    private OffsetDateTime returnedAt;
-
-    @Column(name = "return_boost_games_remaining", nullable = false)
-    private Integer returnBoostGamesRemaining = 0;
-
-    @Column(name = "return_boost_multiplier", nullable = false)
-    private Double returnBoostMultiplier = 1.0;
 
     public Long getId() {
         return id;
@@ -305,30 +284,6 @@ public class Player {
         this.retentionSubjectHash = retentionSubjectHash;
     }
 
-    public OffsetDateTime getLastDormancyMmrDecayAt() {
-        return lastDormancyMmrDecayAt;
-    }
-
-    public void setLastDormancyMmrDecayAt(OffsetDateTime lastDormancyMmrDecayAt) {
-        this.lastDormancyMmrDecayAt = lastDormancyMmrDecayAt;
-    }
-
-    public String getDormancyMmrFloorTier() {
-        return dormancyMmrFloorTier;
-    }
-
-    public void setDormancyMmrFloorTier(String dormancyMmrFloorTier) {
-        this.dormancyMmrFloorTier = dormancyMmrFloorTier;
-    }
-
-    public String getDormancyEpisodeFloorTier() {
-        return dormancyEpisodeFloorTier;
-    }
-
-    public void setDormancyEpisodeFloorTier(String dormancyEpisodeFloorTier) {
-        this.dormancyEpisodeFloorTier = dormancyEpisodeFloorTier;
-    }
-
     public OffsetDateTime getLastTierRecalculatedAt() {
         return lastTierRecalculatedAt;
     }
@@ -353,49 +308,11 @@ public class Player {
         this.lastTierSnapshotMmr = lastTierSnapshotMmr;
     }
 
-    public OffsetDateTime getDormantSince() {
-        return dormantSince;
-    }
-
-    public void setDormantSince(OffsetDateTime dormantSince) {
-        this.dormantSince = dormantSince;
-    }
-
-    public OffsetDateTime getReturnedAt() {
-        return returnedAt;
-    }
-
-    public void setReturnedAt(OffsetDateTime returnedAt) {
-        this.returnedAt = returnedAt;
-    }
-
-    public Integer getReturnBoostGamesRemaining() {
-        return returnBoostGamesRemaining;
-    }
-
-    public void setReturnBoostGamesRemaining(Integer returnBoostGamesRemaining) {
-        this.returnBoostGamesRemaining = returnBoostGamesRemaining == null ? 0 : Math.max(0, returnBoostGamesRemaining);
-    }
-
-    public Double getReturnBoostMultiplier() {
-        return returnBoostMultiplier;
-    }
-
-    public void setReturnBoostMultiplier(Double returnBoostMultiplier) {
-        this.returnBoostMultiplier = returnBoostMultiplier == null ? 1.0 : Math.max(1.0, returnBoostMultiplier);
-    }
-
     @PrePersist
     @PreUpdate
     void syncTierWithMmr() {
         this.race = PlayerRacePolicy.normalizeCapabilityOrDefault(this.race, "P");
         this.mmr = normalizeMmr(this.mmr);
-        this.returnBoostGamesRemaining = this.returnBoostGamesRemaining == null
-            ? 0
-            : Math.max(0, this.returnBoostGamesRemaining);
-        this.returnBoostMultiplier = this.returnBoostMultiplier == null
-            ? 1.0
-            : Math.max(1.0, this.returnBoostMultiplier);
         if (this.tier == null || this.tier.isBlank()) {
             this.tier = PlayerTierPolicy.resolveTier(this.mmr);
         }

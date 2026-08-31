@@ -1210,7 +1210,6 @@ class AdminKeyFilterTest {
             .andExpect(jsonPath("$[0].chatRejoinedAt").doesNotExist())
             .andExpect(jsonPath("$[0].tierChangeAcknowledgedTier").doesNotExist())
             .andExpect(jsonPath("$[0].tierChangeAcknowledgedAt").doesNotExist())
-            .andExpect(jsonPath("$[0].dormancyMmrFloorTier").doesNotExist())
             .andExpect(jsonPath("$[0].lifecycleStatus").value("INACTIVE"))
             .andExpect(jsonPath("$[0].identityRetainedUntil").exists());
 
@@ -2028,7 +2027,6 @@ class AdminKeyFilterTest {
             false,
             OffsetDateTime.parse("2026-07-12T03:00:00Z"),
             "운영 비활성",
-            null,
             null,
             null,
             null,

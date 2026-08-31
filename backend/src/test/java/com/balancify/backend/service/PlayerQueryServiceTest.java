@@ -101,13 +101,12 @@ class PlayerQueryServiceTest {
     }
 
     @Test
-    void returnsPersistedMmrAfterDormancyDecayHasRun() {
+    void returnsPersistedMmrAndTier() {
         Group group = new Group();
         group.setId(1L);
 
         Player robo = player(9L, group, "로보", "P", "A+", 920);
         robo.setCreatedAt(OffsetDateTime.parse("2026-02-20T00:00:00Z"));
-        robo.setDormancyMmrFloorTier("B+");
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
             .thenReturn(List.of(robo));
@@ -119,7 +118,6 @@ class PlayerQueryServiceTest {
         assertThat(response).hasSize(1);
         assertThat(response.get(0).tier()).isEqualTo("A+");
         assertThat(response.get(0).currentMmr()).isEqualTo(920);
-        assertThat(response.get(0).dormancyMmrFloorTier()).isEqualTo("B+");
         assertThat(response.get(0).games()).isZero();
     }
 
@@ -305,7 +303,6 @@ class PlayerQueryServiceTest {
         assertThat(retainedInactive.chatRejoinedAt()).isNull();
         assertThat(retainedInactive.tierChangeAcknowledgedTier()).isNull();
         assertThat(retainedInactive.tierChangeAcknowledgedAt()).isNull();
-        assertThat(retainedInactive.dormancyMmrFloorTier()).isNull();
         assertThat(retainedInactive.lifecycleStatus()).isEqualTo("INACTIVE");
         assertThat(retainedInactive.identityRetainedUntil())
             .isEqualTo(OffsetDateTime.parse("2027-05-02T12:41:00+09:00"));
