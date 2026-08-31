@@ -327,6 +327,35 @@ public class AccessControlService {
         return getAllowedEmailSnapshot();
     }
 
+    @Transactional
+    public AllowedEmailSnapshot updateAllowedUserEmailNickname(
+        String actorEmail,
+        String targetEmail,
+        String targetNickname
+    ) {
+        String normalizedActorEmail = normalizeEmail(actorEmail);
+        String normalizedTargetEmail = normalizeEmail(targetEmail);
+        String normalizedTargetNickname = normalizeNickname(targetNickname);
+        validateEmail(normalizedTargetEmail);
+        validateNickname(normalizedTargetNickname);
+
+        if (!isAdminEmail(normalizedActorEmail)) {
+            throw new IllegalArgumentException("Only admins can update allowed member nicknames");
+        }
+        if (isAdminEmail(normalizedTargetEmail)) {
+            throw new IllegalArgumentException("Admin email nickname cannot be updated here");
+        }
+
+        AllowedUserEmail allowedUserEmail = allowedUserEmailRepository
+            .findByNormalizedEmail(normalizedTargetEmail)
+            .orElseThrow(() -> new IllegalArgumentException("Target email is not registered"));
+        allowedUserEmail.setNickname(normalizedTargetNickname);
+        allowedUserEmailRepository.save(allowedUserEmail);
+        invalidateAccessState(normalizedTargetEmail);
+
+        return getAllowedEmailSnapshot();
+    }
+
     private AccessState resolveAccessState(String normalizedEmail) {
         if (accessStateCacheTtlMs <= 0L) {
             return loadAccessState(normalizedEmail);

@@ -123,6 +123,11 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             "DELETE",
             PathPatternParser.defaultInstance.parse("/api/access/allowed-users/{email}"),
             AuthType.ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "PUT",
+            PathPatternParser.defaultInstance.parse("/api/access/allowed-users/{email}/nickname"),
+            AuthType.ADMIN_EMAIL
         )
     );
 

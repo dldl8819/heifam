@@ -1216,6 +1216,20 @@ export const apiClient = {
         baseUrlOverride: ACCESS_API_BASE_URL,
       }
     ),
+  updateAllowedEmailNickname: (email: string, nickname: string) =>
+    apiRequest<AccessAllowedEmailListResponse>(
+      `/api/access/allowed-users/${encodeURIComponent(email)}/nickname`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ nickname }),
+      },
+      {
+        requireUserEmail: true,
+        includeUserEmail: true,
+        timeoutMs: ACCESS_API_REQUEST_TIMEOUT_MS,
+        baseUrlOverride: ACCESS_API_BASE_URL,
+      }
+    ),
   updateMyPreferredRace: (race: PlayerRace) =>
     apiRequest<AccessMeResponse>(
       '/api/access/me/race',

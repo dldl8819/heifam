@@ -257,6 +257,56 @@ class AccessControlServiceTest {
     }
 
     @Test
+    void allowsAdminToUpdateAllowedMemberNickname() {
+        AllowedUserEmail allowedUserEmail = new AllowedUserEmail();
+        allowedUserEmail.setEmail("fan@hei.gg");
+        allowedUserEmail.setNickname("팬");
+        when(allowedUserEmailRepository.findByNormalizedEmail("fan@hei.gg"))
+            .thenReturn(Optional.of(allowedUserEmail));
+
+        accessControlService.updateAllowedUserEmailNickname("ops@hei.gg", "fan@hei.gg", "새닉네임");
+
+        assertThat(allowedUserEmail.getNickname()).isEqualTo("새닉네임");
+        verify(allowedUserEmailRepository).save(allowedUserEmail);
+    }
+
+    @Test
+    void rejectsAllowedNicknameUpdateWhenActorIsNotAdmin() {
+        assertThatThrownBy(() ->
+            accessControlService.updateAllowedUserEmailNickname("fan@hei.gg", "fan@hei.gg", "새닉네임")
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Only admins can update allowed member nicknames");
+
+        verify(allowedUserEmailRepository, never()).save(any(AllowedUserEmail.class));
+    }
+
+    @Test
+    void rejectsAllowedNicknameUpdateWhenTargetIsNotRegistered() {
+        when(allowedUserEmailRepository.findByNormalizedEmail("ghost@hei.gg"))
+            .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() ->
+            accessControlService.updateAllowedUserEmailNickname("ops@hei.gg", "ghost@hei.gg", "새닉네임")
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Target email is not registered");
+
+        verify(allowedUserEmailRepository, never()).save(any(AllowedUserEmail.class));
+    }
+
+    @Test
+    void rejectsAllowedNicknameUpdateWhenTargetIsAdmin() {
+        assertThatThrownBy(() ->
+            accessControlService.updateAllowedUserEmailNickname("superadmin@hei.gg", "ops@hei.gg", "새닉네임")
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Admin email nickname cannot be updated here");
+
+        verify(allowedUserEmailRepository, never()).save(any(AllowedUserEmail.class));
+    }
+
+    @Test
     void resolvesPreferredRaceWhenStored() {
         UserRacePreference preference = new UserRacePreference();
         preference.setEmail("member@hei.gg");

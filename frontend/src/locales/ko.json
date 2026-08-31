@@ -276,7 +276,8 @@
       "emailPlaceholder": "example@gmail.com",
       "nicknamePlaceholder": "닉네임",
       "addAdmin": "운영진 추가",
-      "addAllowed": "허용 이메일 추가"
+      "addAllowed": "허용 이메일 추가",
+      "searchPlaceholder": "닉네임 또는 이메일 검색"
     },
     "actions": {
       "remove": "삭제",
@@ -285,7 +286,10 @@
       "mmrAllowed": "MMR 허용",
       "mmrDenied": "MMR 차단",
       "mmrAlwaysAllowed": "MMR 항상 허용",
-      "saving": "처리 중..."
+      "saving": "처리 중...",
+      "editNickname": "닉네임 수정",
+      "save": "저장",
+      "cancel": "취소"
     },
     "messages": {
       "adminSaved": "운영진 관리자 목록이 업데이트되었습니다.",
@@ -296,7 +300,8 @@
       "removeSavedTarget": "{target} 권한을 삭제했습니다.",
       "removeConfirm": "{target} 권한을 삭제하시겠습니까?",
       "invalidEmail": "올바른 이메일 형식을 입력해 주세요.",
-      "invalidNickname": "닉네임을 입력해 주세요. (최대 100자)"
+      "invalidNickname": "닉네임을 입력해 주세요. (최대 100자)",
+      "nicknameSaved": "{email}의 닉네임이 {nickname}(으)로 업데이트되었습니다."
     }
   },
   "adminGuard": {
