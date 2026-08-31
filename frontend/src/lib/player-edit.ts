@@ -50,7 +50,8 @@ export function buildPlayerProfileUpdateRequest(
   if (next.race !== current.race) {
     payload.race = next.race
   }
-  if (next.tier !== current.tier) {
+  const currentEditableTier = current.liveTier ?? current.tier
+  if (next.tier !== currentEditableTier) {
     payload.tier = next.tier
   }
 

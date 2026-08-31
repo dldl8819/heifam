@@ -526,7 +526,7 @@ export default function PlayersPage() {
     setEditingPlayerId(player.id)
     setEditingNickname(player.nickname)
     setEditingRace(player.race)
-    setEditingTier(player.tier)
+    setEditingTier(player.liveTier ?? player.tier)
     setEditingInlineMmrValue(resolveEditableMmrValue(player))
     setActivityForm(null)
     setPlayerActionError(null)

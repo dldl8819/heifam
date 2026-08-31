@@ -54,6 +54,25 @@ describe('buildPlayerProfileUpdateRequest', () => {
     expect(payload).toEqual({ tier: 'A' })
   })
 
+  it('does not send tier when the live tier is unchanged, even if it differs from the stored snapshot', () => {
+    const payload = buildPlayerProfileUpdateRequest(player({ tier: 'B+', liveTier: 'A-' }), {
+      nickname: 'PlayerAlpha',
+      race: 'P',
+      tier: 'A-',
+    })
+
+    expect(payload).toEqual({})
+  })
+
+  it('sends tier when it differs from the live tier the form was initialized with', () => {
+    const payload = buildPlayerProfileUpdateRequest(player({ tier: 'B+', liveTier: 'A-' }), {
+      nickname: 'PlayerAlpha',
+      race: 'P',
+      tier: 'S',
+    })
+
+    expect(payload).toEqual({ tier: 'S' })
+  })
 })
 
 describe('buildOwnPlayerRaceUpdateRequest', () => {
