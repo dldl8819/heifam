@@ -34,7 +34,9 @@ type TierBoardColumn = {
 }
 
 export const MONTHLY_TIER_BOARD_COLUMNS: TierBoardColumn[] = [
+  { tier: 'S+', headerFill: '#f7f7f7' },
   { tier: 'S', headerFill: '#f7f7f7' },
+  { tier: 'S-', headerFill: '#f7f7f7' },
   { tier: 'A+', headerFill: '#b9d3e8' },
   { tier: 'A', headerFill: '#b9d3e8' },
   { tier: 'A-', headerFill: '#b9d3e8' },
@@ -64,7 +66,9 @@ const BOTTOM_MARGIN = 12
 
 function createEmptyBuckets(): Record<PlayerTierStatus, string[]> {
   return {
+    'S+': [],
     S: [],
+    'S-': [],
     'A+': [],
     A: [],
     'A-': [],

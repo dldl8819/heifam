@@ -35,6 +35,22 @@ describe('monthly tier board image', () => {
     expect(model.buckets['B+']).toEqual([])
   })
 
+  it('buckets the S sub-tiers separately', () => {
+    const players = selectMonthlyTierBoardPlayers([
+      tierBoardItem('YOUR_USERNAME_1', 'S-'),
+      tierBoardItem('YOUR_USERNAME_2', 'S'),
+      tierBoardItem('YOUR_USERNAME_3', 'S+'),
+    ])
+    const model = buildMonthlyTierBoardModel(
+      players,
+      new Date('2026-08-08T00:00:00.000Z'),
+    )
+
+    expect(model.buckets['S-']).toEqual(['YOUR_USERNAME_1'])
+    expect(model.buckets.S).toEqual(['YOUR_USERNAME_2'])
+    expect(model.buckets['S+']).toEqual(['YOUR_USERNAME_3'])
+  })
+
   it('excludes inactive players and trims placeholder nicknames', () => {
     const players = selectMonthlyTierBoardPlayers([
       tierBoardItem('  YOUR_USERNAME_1  ', 'A'),

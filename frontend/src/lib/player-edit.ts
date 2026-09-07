@@ -7,7 +7,9 @@ type PlayerProfileEditInput = {
 }
 
 const DEFAULT_MMR_BY_TIER: Record<PlayerTierStatus, number> = {
-  S: 2000,
+  'S+': 2400,
+  S: 2200,
+  'S-': 2000,
   'A+': 1800,
   A: 1600,
   'A-': 1400,

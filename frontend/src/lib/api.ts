@@ -394,7 +394,9 @@ function normalizeTier(value: unknown): PlayerTierStatus | undefined {
 
   const normalized = value.trim().toUpperCase()
   switch (normalized) {
+    case 'S+':
     case 'S':
+    case 'S-':
     case 'A+':
     case 'A':
     case 'A-':

@@ -248,7 +248,9 @@ public class PlayerImportService {
 
     private static Map<String, Integer> defaultBaseMmrByTier() {
         Map<String, Integer> mapping = new HashMap<>();
-        mapping.put("S", 2000);
+        mapping.put("S+", 2400);
+        mapping.put("S", 2200);
+        mapping.put("S-", 2000);
         mapping.put("A+", 1800);
         mapping.put("A", 1600);
         mapping.put("A-", 1400);

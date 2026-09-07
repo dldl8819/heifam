@@ -8,7 +8,7 @@ public final class PlayerTierPolicy {
 
     private static final String TIER_NONE = "NONE";
     private static final List<String> ORDERED_TIERS = List.of(
-        TIER_NONE, "D", "C-", "C", "C+", "B-", "B", "B+", "A-", "A", "A+", "S"
+        TIER_NONE, "D", "C-", "C", "C+", "B-", "B", "B+", "A-", "A", "A+", "S-", "S", "S+"
     );
     private static final Map<String, Integer> TIER_INDEX = Map.ofEntries(
         Map.entry(TIER_NONE, 0),
@@ -22,7 +22,9 @@ public final class PlayerTierPolicy {
         Map.entry("A-", 8),
         Map.entry("A", 9),
         Map.entry("A+", 10),
-        Map.entry("S", 11)
+        Map.entry("S-", 11),
+        Map.entry("S", 12),
+        Map.entry("S+", 13)
     );
     private static final Map<String, Integer> TIER_FLOOR_MMR = Map.ofEntries(
         Map.entry(TIER_NONE, 0),
@@ -36,7 +38,9 @@ public final class PlayerTierPolicy {
         Map.entry("A-", 1400),
         Map.entry("A", 1600),
         Map.entry("A+", 1800),
-        Map.entry("S", 2000)
+        Map.entry("S-", 2000),
+        Map.entry("S", 2200),
+        Map.entry("S+", 2400)
     );
     private static final int PLACEMENT_GAME_COUNT = 5;
     private static final int PROMOTION_MMR_BUFFER = 30;
@@ -81,7 +85,13 @@ public final class PlayerTierPolicy {
         if (normalizedMmr < 2000) {
             return "A+";
         }
-        return "S";
+        if (normalizedMmr < 2200) {
+            return "S-";
+        }
+        if (normalizedMmr < 2400) {
+            return "S";
+        }
+        return "S+";
     }
 
     public static String resolveTierForRankedMatch(
