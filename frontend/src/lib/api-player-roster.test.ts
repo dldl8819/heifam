@@ -58,6 +58,21 @@ describe('normalizePlayerRosterItem', () => {
     expect(item?.lifecycleStatus).toBe('ACTIVE')
   })
 
+  it.each(['S+', 'S', 'S-'] as const)(
+    'preserves the %s sub-tier instead of falling back to UNASSIGNED',
+    (tier) => {
+      const item = normalizePlayerRosterItem({
+        id: 7,
+        nickname: 'ACTIVE_PLAYER',
+        race: 'P',
+        tier,
+        active: true,
+      })
+
+      expect(item?.tier).toBe(tier)
+    }
+  )
+
   it('passes through the server-computed isOwnPlayer flag for an active player', () => {
     const item = normalizePlayerRosterItem({
       id: 7,

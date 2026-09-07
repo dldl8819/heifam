@@ -98,6 +98,12 @@ describe('resolveDefaultMmrForTier', () => {
     expect(resolveDefaultMmrForTier('D')).toBe(1)
     expect(resolveDefaultMmrForTier('UNASSIGNED')).toBe(0)
   })
+
+  it('keeps the S sub-tier floors 200 MMR apart, matching the A sub-tier spacing', () => {
+    expect(resolveDefaultMmrForTier('S-')).toBe(2000)
+    expect(resolveDefaultMmrForTier('S')).toBe(2200)
+    expect(resolveDefaultMmrForTier('S+')).toBe(2400)
+  })
 })
 
 describe('resolveEditableMmrValue', () => {

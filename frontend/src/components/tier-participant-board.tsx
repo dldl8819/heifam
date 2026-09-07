@@ -36,7 +36,9 @@ type TierRow = {
 }
 
 const TIER_ROWS: TierRow[] = [
+  { key: 'S+', label: 'S+', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950 dark:bg-[#5b4438] dark:text-slate-100' },
   { key: 'S', label: 'S', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950 dark:bg-[#5b4438] dark:text-slate-100' },
+  { key: 'S-', label: 'S-', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950 dark:bg-[#5b4438] dark:text-slate-100' },
   { key: 'A+', label: 'A+', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950 dark:bg-[#5b4438] dark:text-slate-100' },
   { key: 'A', label: 'A', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950 dark:bg-[#5b4438] dark:text-slate-100' },
   { key: 'A-', label: 'A-', rowHeaderClassName: 'bg-[#f5e2d2] text-slate-950 dark:bg-[#5b4438] dark:text-slate-100' },
@@ -90,7 +92,9 @@ export function TierParticipantBoard({
       [row.key]: [],
     }),
     {
+      'S+': [],
       S: [],
+      'S-': [],
       'A+': [],
       A: [],
       'A-': [],

@@ -30,7 +30,7 @@ import type { GroupPlayerRaceStatsItem, PlayerRace, PlayerRosterItem, PlayerTier
 const TEMP_GROUP_ID = 1
 
 type RaceFilter = PlayerRace | 'ALL'
-type PlayerRegistrationTier = Exclude<PlayerTierStatus, 'S'>
+type PlayerRegistrationTier = Exclude<PlayerTierStatus, 'S+' | 'S' | 'S-'>
 type PlayerImportRow = {
   nickname: string
   tier: string
@@ -67,7 +67,9 @@ type LastParticipationState = {
 const PLAYER_RACE_OPTIONS: PlayerRace[] = ['P', 'T', 'Z', 'PT', 'PZ', 'TZ', 'PTZ']
 const PLAYER_INACTIVE_REASON_OPTIONS = ['장기 미참여', '본인 요청', '운영 정책', '기타'] as const
 const PLAYER_EDIT_TIER_OPTIONS: PlayerTierStatus[] = [
+  'S+',
   'S',
+  'S-',
   'A+',
   'A',
   'A-',
@@ -260,7 +262,9 @@ function formatImportFailureMessage(result: PlayerImportResult): string {
 
 function getTierBadgeClass(tier: PlayerTierStatus): string {
   switch (tier) {
+    case 'S+':
     case 'S':
+    case 'S-':
       return 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200'
     case 'A+':
     case 'A':

@@ -9,4 +9,10 @@ describe('toTierOrder', () => {
     expect(toTierOrder('C-')).toBeLessThan(toTierOrder('D'))
     expect(toTierOrder('D')).toBeLessThan(toTierOrder('UNASSIGNED'))
   })
+
+  it('orders the S sub-tiers S+ above S above S-, all above A+', () => {
+    expect(toTierOrder('S+')).toBeLessThan(toTierOrder('S'))
+    expect(toTierOrder('S')).toBeLessThan(toTierOrder('S-'))
+    expect(toTierOrder('S-')).toBeLessThan(toTierOrder('A+'))
+  })
 })

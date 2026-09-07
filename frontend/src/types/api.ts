@@ -203,7 +203,9 @@ export type RankingItem = {
 export type RankingResponse = RankingItem[]
 
 export type PlayerTier =
+  | 'S+'
   | 'S'
+  | 'S-'
   | 'A+'
   | 'A'
   | 'A-'
