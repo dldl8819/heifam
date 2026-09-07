@@ -30,7 +30,40 @@ class PlayerTierPolicyTest {
         assertThat(PlayerTierPolicy.resolveTier(1799)).isEqualTo("A");
         assertThat(PlayerTierPolicy.resolveTier(1800)).isEqualTo("A+");
         assertThat(PlayerTierPolicy.resolveTier(1999)).isEqualTo("A+");
-        assertThat(PlayerTierPolicy.resolveTier(2000)).isEqualTo("S");
+        assertThat(PlayerTierPolicy.resolveTier(2000)).isEqualTo("S-");
+        assertThat(PlayerTierPolicy.resolveTier(2199)).isEqualTo("S-");
+        assertThat(PlayerTierPolicy.resolveTier(2200)).isEqualTo("S");
+        assertThat(PlayerTierPolicy.resolveTier(2399)).isEqualTo("S");
+        assertThat(PlayerTierPolicy.resolveTier(2400)).isEqualTo("S+");
+        assertThat(PlayerTierPolicy.resolveTier(5000)).isEqualTo("S+");
+    }
+
+    @Test
+    void promotesThroughEachSSubTierWithBuffer() {
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("A+", 2000, 10))
+            .isEqualTo("A+");
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("A+", 2030, 10))
+            .isEqualTo("S-");
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("S-", 2230, 10))
+            .isEqualTo("S");
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("S", 2430, 10))
+            .isEqualTo("S+");
+    }
+
+    @Test
+    void doesNotPromoteBeyondSPlus() {
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("S+", 9999, 10))
+            .isEqualTo("S+");
+    }
+
+    @Test
+    void demotesThroughEachSSubTierWithBuffer() {
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("S+", 2349, 10))
+            .isEqualTo("S");
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("S", 2149, 10))
+            .isEqualTo("S-");
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("S-", 1949, 10))
+            .isEqualTo("A+");
     }
 
     @Test

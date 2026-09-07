@@ -192,8 +192,8 @@ class PlayerImportServiceTest {
         ArgumentCaptor<Player> playerCaptor = ArgumentCaptor.forClass(Player.class);
         verify(playerRepository).save(playerCaptor.capture());
         assertThat(playerCaptor.getValue().getTier()).isEqualTo("S");
-        assertThat(playerCaptor.getValue().getBaseMmr()).isEqualTo(2000);
-        assertThat(playerCaptor.getValue().getMmr()).isEqualTo(2000);
+        assertThat(playerCaptor.getValue().getBaseMmr()).isEqualTo(2200);
+        assertThat(playerCaptor.getValue().getMmr()).isEqualTo(2200);
     }
 
     @Test

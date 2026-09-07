@@ -25,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PlayerAdminService {
 
     private static final Set<String> ACKNOWLEDGEABLE_TIERS = Set.of(
-        "S", "A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D", "UNASSIGNED"
+        "S+", "S", "S-", "A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D", "UNASSIGNED"
     );
     private static final Set<String> EDITABLE_TIERS = ACKNOWLEDGEABLE_TIERS;
 
