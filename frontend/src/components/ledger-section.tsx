@@ -17,6 +17,7 @@ import type {
 } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
+const CUSTOM_CATEGORY_OPTION = '__custom__'
 
 type LedgerSubTab = 'income' | 'expense' | 'summary'
 
@@ -71,6 +72,7 @@ export function LedgerSection() {
   const [incomeLoading, setIncomeLoading] = useState<boolean>(true)
   const [incomeError, setIncomeError] = useState<string | null>(null)
   const [incomeForm, setIncomeForm] = useState<IncomeFormState | null>(null)
+  const [incomeCategoryCustomEntry, setIncomeCategoryCustomEntry] = useState<boolean>(false)
   const [incomeActionError, setIncomeActionError] = useState<string | null>(null)
   const [incomeActionSuccess, setIncomeActionSuccess] = useState<string | null>(null)
   const [incomeUploading, setIncomeUploading] = useState<boolean>(false)
@@ -439,7 +441,10 @@ export function LedgerSection() {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => setIncomeForm(emptyIncomeForm())}
+                onClick={() => {
+                  setIncomeForm(emptyIncomeForm())
+                  setIncomeCategoryCustomEntry(incomeCategories.length === 0)
+                }}
                 className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
               >
                 {t('notices.donations.addButton')}
@@ -508,19 +513,52 @@ export function LedgerSection() {
                 </label>
                 <label className="block space-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
                   {t('notices.donations.income.table.category')}
-                  <input
-                    type="text"
-                    list="income-category-suggestions"
-                    value={incomeForm.category}
-                    placeholder={t('notices.donations.income.categoryPlaceholder')}
-                    onChange={(event) => setIncomeForm({ ...incomeForm, category: event.target.value })}
-                    className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-900"
-                  />
-                  <datalist id="income-category-suggestions">
-                    {incomeCategories.map((category) => (
-                      <option key={category} value={category} />
-                    ))}
-                  </datalist>
+                  {incomeCategoryCustomEntry || incomeCategories.length === 0 ? (
+                    <input
+                      type="text"
+                      value={incomeForm.category}
+                      placeholder={t('notices.donations.income.categoryPlaceholder')}
+                      onChange={(event) => setIncomeForm({ ...incomeForm, category: event.target.value })}
+                      className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-900"
+                    />
+                  ) : (
+                    <select
+                      value={incomeForm.category}
+                      onChange={(event) => {
+                        if (event.target.value === CUSTOM_CATEGORY_OPTION) {
+                          setIncomeCategoryCustomEntry(true)
+                          setIncomeForm({ ...incomeForm, category: '' })
+                          return
+                        }
+                        setIncomeForm({ ...incomeForm, category: event.target.value })
+                      }}
+                      className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-900"
+                    >
+                      <option value="" disabled>
+                        {t('notices.donations.income.categorySelectPlaceholder')}
+                      </option>
+                      {incomeCategories.map((category) => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                      <option value={CUSTOM_CATEGORY_OPTION}>
+                        {t('notices.donations.income.categoryCustomOption')}
+                      </option>
+                    </select>
+                  )}
+                  {incomeCategoryCustomEntry && incomeCategories.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIncomeCategoryCustomEntry(false)
+                        setIncomeForm({ ...incomeForm, category: '' })
+                      }}
+                      className="text-[11px] font-medium text-slate-500 hover:underline dark:text-slate-400"
+                    >
+                      {t('notices.donations.income.categorySelectToggle')}
+                    </button>
+                  )}
                 </label>
                 <label className="block space-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
                   {t('notices.donations.income.table.amount')}
@@ -614,7 +652,7 @@ export function LedgerSection() {
                         <td className="whitespace-nowrap px-4 py-3 text-right">
                           <button
                             type="button"
-                            onClick={() =>
+                            onClick={() => {
                               setIncomeForm({
                                 id: entry.id,
                                 entryDate: entry.entryDate,
@@ -622,7 +660,8 @@ export function LedgerSection() {
                                 amount: String(entry.amount),
                                 memo: entry.memo ?? '',
                               })
-                            }
+                              setIncomeCategoryCustomEntry(!incomeCategories.includes(entry.category))
+                            }}
                             className="mr-2 text-xs font-medium text-slate-600 hover:underline dark:text-slate-300"
                           >
                             {t('notices.donations.editButton')}

@@ -370,6 +370,9 @@
         },
         "datePlaceholder": "날짜",
         "categoryPlaceholder": "분류 (예: 회비, 기초 잔액)",
+        "categorySelectPlaceholder": "분류 선택",
+        "categoryCustomOption": "+ 새 분류 직접 입력",
+        "categorySelectToggle": "목록에서 선택",
         "amountPlaceholder": "금액",
         "memoPlaceholder": "내용"
       },
