@@ -49,13 +49,44 @@ function formatStreak(value: string): string {
   return value
 }
 
-function isHotWinStreak(value: string): boolean {
-  if (!value || value.charAt(0) !== 'W') {
-    return false
+function resolveStreakEmoji(value: string): string | null {
+  if (!value || value.length < 2) {
+    return null
   }
 
+  const sign = value.charAt(0)
   const count = Number(value.slice(1))
-  return Number.isInteger(count) && count >= 3
+  if (!Number.isInteger(count)) {
+    return null
+  }
+
+  if (sign === 'W') {
+    if (count >= 10) {
+      return '👑🔥'
+    }
+    if (count >= 5) {
+      return '🔥🔥'
+    }
+    if (count >= 3) {
+      return '🔥'
+    }
+    return null
+  }
+
+  if (sign === 'L') {
+    if (count >= 10) {
+      return '💀'
+    }
+    if (count >= 5) {
+      return '🧊'
+    }
+    if (count >= 3) {
+      return '🥶'
+    }
+    return null
+  }
+
+  return null
 }
 
 function formatLast10(value: string): string {
@@ -312,7 +343,7 @@ export default function RankingPage() {
                 const playerId = playerIdByNickname.get(row.nickname) ?? null
                 const isStatsLoadingForRow =
                   gameTypeStatsLoading && gameTypeStatsPlayer?.id === playerId
-                const hotStreak = isHotWinStreak(row.streak)
+                const streakEmoji = resolveStreakEmoji(row.streak)
 
                 return (
                   <tr
@@ -321,14 +352,14 @@ export default function RankingPage() {
                   >
                     <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">{row.rank}</td>
                     <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">
-                      {hotStreak && (
+                      {streakEmoji && (
                         <span
                           className="mr-1.5 inline-block"
-                          title={t('ranking.hotStreakLabel')}
-                          aria-label={t('ranking.hotStreakLabel')}
+                          title={formatStreak(row.streak)}
+                          aria-label={formatStreak(row.streak)}
                           role="img"
                         >
-                          🔥
+                          {streakEmoji}
                         </span>
                       )}
                       {row.nickname}
