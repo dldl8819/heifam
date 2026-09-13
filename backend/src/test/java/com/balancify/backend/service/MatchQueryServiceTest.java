@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.balancify.backend.api.group.dto.GroupMatchPageResponse;
 import com.balancify.backend.api.group.dto.GroupRecentMatchResponse;
 import com.balancify.backend.domain.Group;
 import com.balancify.backend.domain.Match;
@@ -14,15 +15,21 @@ import com.balancify.backend.domain.MatchParticipant;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.MatchParticipantRepository;
 import com.balancify.backend.repository.MatchRepository;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 @ExtendWith(MockitoExtension.class)
 class MatchQueryServiceTest {
@@ -416,6 +423,55 @@ class MatchQueryServiceTest {
 
         assertThat(responses).hasSize(1);
         assertThat(responses.get(0).canEditRaceComposition()).isFalse();
+    }
+
+    @Test
+    void returnsMatchHistoryPageUsingRepositorySpecificationAndPageMetadata() {
+        Group group = new Group();
+        group.setId(1L);
+        Match match = new Match();
+        match.setId(300L);
+        match.setGroup(group);
+        match.setWinningTeam("HOME");
+        match.setPlayedAt(OffsetDateTime.parse("2026-03-15T08:00:00Z"));
+
+        Page<Match> page = new PageImpl<>(List.of(match), PageRequest.of(1, 20), 45);
+        when(matchRepository.findAll(ArgumentMatchers.<Specification<Match>>any(), any(Pageable.class)))
+            .thenReturn(page);
+        when(matchParticipantRepository.findByMatchIdInWithPlayerAndMatch(List.of(300L)))
+            .thenReturn(List.of());
+
+        GroupMatchPageResponse response = matchQueryService.getMatchHistoryPage(
+            1L,
+            1,
+            20,
+            LocalDate.parse("2026-03-01"),
+            LocalDate.parse("2026-03-31"),
+            "superadmin@hei.gg"
+        );
+
+        assertThat(response.items()).hasSize(1);
+        assertThat(response.items().get(0).matchId()).isEqualTo(300L);
+        assertThat(response.page()).isEqualTo(1);
+        assertThat(response.size()).isEqualTo(20);
+        assertThat(response.totalElements()).isEqualTo(45);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(matchRepository).findAll(ArgumentMatchers.<Specification<Match>>any(), pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getPageNumber()).isEqualTo(1);
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(20);
+    }
+
+    @Test
+    void capsMatchHistoryPageSizeAtMaximum() {
+        when(matchRepository.findAll(ArgumentMatchers.<Specification<Match>>any(), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of()));
+
+        matchQueryService.getMatchHistoryPage(1L, 0, 5000, null, null, "superadmin@hei.gg");
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(matchRepository).findAll(ArgumentMatchers.<Specification<Match>>any(), pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(200);
     }
 
     private Player player(Long id, Group group, String nickname, int mmr) {

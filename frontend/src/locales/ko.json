@@ -20,7 +20,8 @@
     "ads": "파트너스",
     "results": "경기 결과",
     "ranking": "랭킹",
-    "notices": "공지사항"
+    "notices": "공지사항",
+    "matchHistory": "전체 경기 기록"
   },
   "landing": {
     "title": "Hei`Fam 내전 운영 플랫폼",
@@ -1259,6 +1260,37 @@
     "last10": {
       "win": "승",
       "loss": "패"
+    }
+  },
+  "matchHistory": {
+    "title": "전체 경기 기록",
+    "description": "날짜 구간으로 좁혀 그룹의 전체 경기 결과를 페이지 단위로 조회합니다.",
+    "superOnly": "최상위 관리자만 전체 경기 기록을 볼 수 있습니다.",
+    "loadError": "경기 기록을 불러오지 못했습니다. 백엔드 상태를 확인해 주세요.",
+    "listTitle": "경기 목록",
+    "listDescription": "최신순으로 정렬되며 페이지당 20건씩 표시됩니다.",
+    "count": "총 {count}건",
+    "empty": "조건에 맞는 경기 기록이 없습니다.",
+    "filters": {
+      "fromDate": "시작일",
+      "toDate": "종료일",
+      "apply": "조회",
+      "reset": "초기화"
+    },
+    "table": {
+      "matchId": "경기 번호",
+      "playedAt": "경기 일시",
+      "recordedBy": "입력자",
+      "winner": "승리 팀",
+      "raceComposition": "종족 조합",
+      "homeTeam": "Home",
+      "awayTeam": "Away",
+      "mmrDiff": "MMR 차이"
+    },
+    "pagination": {
+      "status": "페이지 {page} / {totalPages}",
+      "previous": "이전",
+      "next": "다음"
     }
   }
 }

@@ -29,6 +29,7 @@ describe('navigation items', () => {
     expect(items.map((item) => item.href)).toContain('/ads')
     expect(items.map((item) => item.href)).not.toContain('/admin/access')
     expect(items.map((item) => item.href)).not.toContain('/admin/audit')
+    expect(items.map((item) => item.href)).not.toContain('/admin/matches')
     expect(items.map((item) => item.href)).not.toContain('/notices')
   })
 
@@ -52,5 +53,6 @@ describe('navigation items', () => {
     })
 
     expect(items.map((item) => item.href)).toContain('/notices')
+    expect(items.map((item) => item.href)).toContain('/admin/matches')
   })
 })

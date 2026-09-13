@@ -1,11 +1,17 @@
 package com.balancify.backend.service;
 
+import com.balancify.backend.api.group.dto.GroupMatchPageResponse;
 import com.balancify.backend.api.group.dto.GroupRecentMatchPlayerResponse;
 import com.balancify.backend.api.group.dto.GroupRecentMatchResponse;
 import com.balancify.backend.domain.Match;
 import com.balancify.backend.domain.MatchParticipant;
+import com.balancify.backend.domain.MatchStatus;
 import com.balancify.backend.repository.MatchParticipantRepository;
 import com.balancify.backend.repository.MatchRepository;
+import jakarta.persistence.criteria.Predicate;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -15,7 +21,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -24,6 +33,10 @@ public class MatchQueryService {
     private static final int DEFAULT_LIMIT = 10;
     private static final int MAX_LIMIT = 50;
     private static final int DEFAULT_OFFSET = 0;
+    // The full-history endpoint is super-admin only, so it is allowed a much larger page size
+    // than the member/admin-facing "recent matches" endpoint above.
+    private static final int MAX_HISTORY_PAGE_SIZE = 200;
+    private static final ZoneOffset HISTORY_FILTER_ZONE_OFFSET = ZoneOffset.ofHours(9);
 
     private final MatchRepository matchRepository;
     private final MatchParticipantRepository matchParticipantRepository;
@@ -62,6 +75,89 @@ public class MatchQueryService {
             PageRequest.of(page, normalizedLimit)
         );
 
+        return buildResponses(matches, requesterIsAdmin, requesterEmail);
+    }
+
+    /**
+     * Returns the group's full completed-match history as a database-backed page, optionally
+     * narrowed to a playedAt date range (interpreted in KST, inclusive of both endpoints). This is
+     * gated to super admins at the route layer (see AdminKeyFilter), so unlike getRecentMatches it
+     * is not limited to a small "recent" window or capped page size.
+     */
+    public GroupMatchPageResponse getMatchHistoryPage(
+        Long groupId,
+        Integer page,
+        Integer size,
+        LocalDate fromDate,
+        LocalDate toDate,
+        String requesterEmail
+    ) {
+        boolean requesterIsAdmin = accessControlService.isAdminEmail(requesterEmail);
+        int normalizedPage = page == null || page < 0 ? 0 : page;
+        int normalizedSize = normalizeHistorySize(size);
+        PageRequest pageRequest = PageRequest.of(
+            normalizedPage,
+            normalizedSize,
+            Sort.by(Sort.Order.desc("playedAt"), Sort.Order.desc("id"))
+        );
+
+        Page<Match> matchPage = matchRepository.findAll(
+            buildHistorySpecification(groupId, fromDate, toDate),
+            pageRequest
+        );
+        List<GroupRecentMatchResponse> items =
+            buildResponses(matchPage.getContent(), requesterIsAdmin, requesterEmail);
+
+        return new GroupMatchPageResponse(
+            items,
+            matchPage.getNumber(),
+            matchPage.getSize(),
+            matchPage.getTotalElements(),
+            matchPage.getTotalPages(),
+            matchPage.isFirst(),
+            matchPage.isLast()
+        );
+    }
+
+    private int normalizeHistorySize(Integer size) {
+        if (size == null || size <= 0) {
+            return DEFAULT_LIMIT;
+        }
+        return Math.min(size, MAX_HISTORY_PAGE_SIZE);
+    }
+
+    private Specification<Match> buildHistorySpecification(Long groupId, LocalDate fromDate, LocalDate toDate) {
+        return (root, query, criteriaBuilder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(criteriaBuilder.equal(root.get("group").get("id"), groupId));
+            predicates.add(criteriaBuilder.equal(root.get("status"), MatchStatus.COMPLETED));
+
+            if (fromDate != null) {
+                predicates.add(criteriaBuilder.greaterThanOrEqualTo(
+                    root.<OffsetDateTime>get("playedAt"),
+                    fromDate.atStartOfDay().atOffset(HISTORY_FILTER_ZONE_OFFSET)
+                ));
+            }
+            if (toDate != null) {
+                predicates.add(criteriaBuilder.lessThan(
+                    root.<OffsetDateTime>get("playedAt"),
+                    toDate.plusDays(1).atStartOfDay().atOffset(HISTORY_FILTER_ZONE_OFFSET)
+                ));
+            }
+
+            return criteriaBuilder.and(predicates.toArray(Predicate[]::new));
+        };
+    }
+
+    /**
+     * Builds the response DTOs for a list of matches, resolving participants and recorder
+     * nicknames in batch. Shared by both the "recent matches" and full-history queries above.
+     */
+    private List<GroupRecentMatchResponse> buildResponses(
+        List<Match> matches,
+        boolean requesterIsAdmin,
+        String requesterEmail
+    ) {
         Map<Long, List<MatchParticipant>> participantsByMatchId = loadParticipantsByMatchId(matches);
         Map<String, String> nicknameByRecordedByEmail = loadRecordedByNicknamesByEmail(matches);
 

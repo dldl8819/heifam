@@ -26,6 +26,8 @@ import type {
   LedgerIncomeEntryCreateRequest,
   LedgerIncomeEntryUpdateRequest,
   LedgerMonthlySummaryResponse,
+  MatchHistoryFilters,
+  MatchHistoryPage,
   MatchTeamSide,
   MultiBalanceRequest,
   MultiBalanceResponse,
@@ -786,6 +788,36 @@ function normalizeOperationAuditLogPage(value: unknown): OperationAuditLogPage {
   }
 }
 
+function normalizeMatchHistoryPage(value: unknown): MatchHistoryPage {
+  if (value === null || typeof value !== 'object') {
+    throw new Error('Invalid match history response format')
+  }
+
+  const source = value as Record<string, unknown>
+  const rawItems = Array.isArray(source.items) ? source.items : []
+  const items = rawItems
+    .map(normalizeRecentMatchItem)
+    .filter((item): item is RecentMatchItem => item !== null)
+  const page = Math.max(0, Math.floor(toNumber(source.page) ?? 0))
+  const fallbackSize = items.length > 0 ? items.length : 1
+  const size = Math.max(1, Math.floor(toNumber(source.size) ?? fallbackSize))
+  const totalElements = Math.max(0, Math.floor(toNumber(source.totalElements) ?? items.length))
+  const totalPages = Math.max(
+    0,
+    Math.floor(toNumber(source.totalPages) ?? (totalElements === 0 ? 0 : Math.ceil(totalElements / size))),
+  )
+
+  return {
+    items,
+    page,
+    size,
+    totalElements,
+    totalPages,
+    first: typeof source.first === 'boolean' ? source.first : page <= 0,
+    last: typeof source.last === 'boolean' ? source.last : totalPages === 0 || page >= totalPages - 1,
+  }
+}
+
 function normalizePlayerRaceStat(value: unknown) {
   if (value === null || typeof value !== 'object') {
     return null
@@ -1086,6 +1118,27 @@ export const apiClient = {
     return payload
       .map(normalizeRecentMatchItem)
       .filter((item): item is RecentMatchItem => item !== null)
+  },
+  getMatchHistoryPage: async (
+    groupId: number,
+    options: ({ page?: number; size?: number } & MatchHistoryFilters) = {}
+  ): Promise<MatchHistoryPage> => {
+    const requestedPage = Number.isFinite(options.page) ? Math.floor(options.page ?? 0) : 0
+    const requestedSize = Number.isFinite(options.size) ? Math.floor(options.size ?? 20) : 20
+    const safePage = Math.max(0, requestedPage)
+    const safeSize = Math.max(1, Math.min(200, requestedSize))
+    const params = new URLSearchParams({
+      page: String(safePage),
+      size: String(safeSize),
+    })
+    appendOptionalSearchParam(params, 'fromDate', options.fromDate)
+    appendOptionalSearchParam(params, 'toDate', options.toDate)
+    const payload = await apiRequest<unknown>(
+      `/api/groups/${groupId}/matches/history?${params.toString()}`,
+      undefined,
+      { requireUserEmail: true, includeUserEmail: true }
+    )
+    return normalizeMatchHistoryPage(payload)
   },
   createCaptainDraft: (groupId: number, payload: CaptainDraftCreateRequest) =>
     apiRequest<CaptainDraftResponse>(`/api/groups/${groupId}/captain-drafts`, {

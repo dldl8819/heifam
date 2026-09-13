@@ -35,6 +35,7 @@ import com.balancify.backend.api.group.dto.DashboardKpiSummaryResponse;
 import com.balancify.backend.api.group.dto.DashboardRecentBalancePreviewResponse;
 import com.balancify.backend.api.group.dto.DashboardRecentBalanceTeamPlayerResponse;
 import com.balancify.backend.api.group.dto.DashboardTopRankingPreviewItemResponse;
+import com.balancify.backend.api.group.dto.GroupMatchPageResponse;
 import com.balancify.backend.api.group.dto.GroupPlayerResponse;
 import com.balancify.backend.api.group.dto.GroupPlayerGameTypeStatResponse;
 import com.balancify.backend.api.group.dto.GroupPlayerRaceStatResponse;
@@ -862,6 +863,36 @@ class AdminKeyFilterTest {
             .andExpect(status().isOk())
             .andExpect(header().string("Cache-Control", "no-store, max-age=0"))
             .andExpect(header().string("Pragma", "no-cache"));
+    }
+
+    @Test
+    void returnsForbiddenForMatchHistoryWithAdminEmail() throws Exception {
+        mockMvc
+            .perform(
+                get("/api/groups/1/matches/history")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void returnsForbiddenForMatchHistoryWithoutUserEmail() throws Exception {
+        mockMvc
+            .perform(get("/api/groups/1/matches/history"))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void allowsMatchHistoryWithSuperAdminEmail() throws Exception {
+        when(matchQueryService.getMatchHistoryPage(eq(1L), anyInt(), any(), any(), any(), any()))
+            .thenReturn(new GroupMatchPageResponse(List.of(), 0, 20, 0, 0, true, true));
+
+        mockMvc
+            .perform(
+                get("/api/groups/1/matches/history")
+                    .header("X-USER-EMAIL", "superadmin@hei.gg")
+            )
+            .andExpect(status().isOk());
     }
 
     @Test

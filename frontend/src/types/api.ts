@@ -185,6 +185,21 @@ export type RecentMatchItem = {
   canEditRaceComposition: boolean
 }
 
+export type MatchHistoryPage = {
+  items: RecentMatchItem[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+  first: boolean
+  last: boolean
+}
+
+export type MatchHistoryFilters = {
+  fromDate?: string
+  toDate?: string
+}
+
 export type RankingItem = {
   rank: number
   nickname: string
