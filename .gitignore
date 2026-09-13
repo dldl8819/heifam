@@ -176,6 +176,7 @@ exports/
 .vscode/
 .vscode-test/
 .idea/
+.claude/
 .fleet/
 *.iml
 *.ipr
