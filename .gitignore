@@ -145,6 +145,13 @@ compose.override.yaml
 *.docker.env
 .env.docker
 
+# Local scratch/working directories and generated output assets.
+# These are machine-local working files and generated media, not project source.
+.codex_tmp/
+**/.codex_tmp/
+generated/
+**/generated/
+
 # Local databases, caches, backups, and exports.
 # These frequently contain real user or operational data and should stay out of source control.
 *.sqlite
