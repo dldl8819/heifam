@@ -30,6 +30,7 @@ const RECENT_MATCH_ADMIN_INITIAL_LIMIT = 20
 const RECENT_MATCH_LOAD_MORE_LIMIT = 10
 const RECENT_MATCH_MEMBER_MAX_LIMIT = 20
 const RECENT_MATCH_ADMIN_MAX_LIMIT = 30
+const MATCH_HISTORY_PAGE_SIZE = 20
 const winnerTeamOptions: TeamSide[] = ['HOME', 'AWAY']
 const manualTeamSizeOptions = [3, 2] as const
 type OperatorEntryMode = 'existing' | 'manual'
@@ -226,6 +227,13 @@ export default function ResultsPage() {
   const [recentMatchesFetchedCount, setRecentMatchesFetchedCount] = useState<number>(0)
   const [recentMatchesError, setRecentMatchesError] = useState<string | null>(null)
   const [appliedSearchSelection, setAppliedSearchSelection] = useState<boolean>(false)
+  const [historyPage, setHistoryPage] = useState<number>(0)
+  const [historyTotalPages, setHistoryTotalPages] = useState<number>(0)
+  const [historyTotalElements, setHistoryTotalElements] = useState<number>(0)
+  const [draftFromDate, setDraftFromDate] = useState<string>('')
+  const [draftToDate, setDraftToDate] = useState<string>('')
+  const [appliedFromDate, setAppliedFromDate] = useState<string>('')
+  const [appliedToDate, setAppliedToDate] = useState<string>('')
   const manualHomeInputRefs = useRef<Array<HTMLInputElement | null>>([])
   const manualAwayInputRefs = useRef<Array<HTMLInputElement | null>>([])
   const manualWinnerTeamRef = useRef<HTMLSelectElement | null>(null)
@@ -311,6 +319,68 @@ export default function ResultsPage() {
 
   const loadRecentMatches = async (options: { append?: boolean } = {}) => {
     const append = options.append ?? false
+
+    if (isSuperAdmin) {
+      if (append) {
+        return
+      }
+
+      setRecentMatchesLoading(true)
+      setRecentMatchesError(null)
+
+      try {
+        const response = await apiClient.getMatchHistoryPage(TEMP_GROUP_ID, {
+          page: historyPage,
+          size: MATCH_HISTORY_PAGE_SIZE,
+          fromDate: appliedFromDate || undefined,
+          toDate: appliedToDate || undefined,
+        })
+        setRecentMatches(response.items)
+        setHistoryTotalPages(response.totalPages)
+        setHistoryTotalElements(response.totalElements)
+        setRecentMatchesHasMore(false)
+        setRecentMatchesFetchedCount(response.items.length)
+
+        if (selectedRecentMatchId !== null) {
+          const selectedMatch = response.items.find((match) => match.matchId === selectedRecentMatchId)
+          if (!selectedMatch) {
+            setSelectedRecentMatchId(null)
+            setSelectedRecentRaceComposition('')
+            setRecentActionMessage(null)
+          } else {
+            setSelectedRecentWinnerTeam(
+              selectedMatch.winningTeam === 'HOME' || selectedMatch.winningTeam === 'AWAY'
+                ? selectedMatch.winningTeam
+                : 'HOME',
+            )
+            const selectedTeamSize = resolveRaceCompositionTeamSize(
+              selectedMatch.homeTeam.length,
+              selectedMatch.awayTeam.length,
+            )
+            setSelectedRecentRaceComposition(
+              selectedTeamSize === null
+                ? ''
+                : resolveSharedRaceComposition(
+                      selectedTeamSize,
+                      selectedMatch.homeRaceComposition,
+                      selectedMatch.awayRaceComposition,
+                    ) ?? '',
+            )
+          }
+        }
+      } catch {
+        setRecentMatches([])
+        setHistoryTotalPages(0)
+        setHistoryTotalElements(0)
+        setRecentMatchesHasMore(false)
+        setRecentMatchesFetchedCount(0)
+        setRecentMatchesError(t('results.recent.loadError'))
+      } finally {
+        setRecentMatchesLoading(false)
+      }
+      return
+    }
+
     const initialLimit = isAdmin ? RECENT_MATCH_ADMIN_INITIAL_LIMIT : RECENT_MATCH_MEMBER_INITIAL_LIMIT
     const maxLimit = isAdmin ? RECENT_MATCH_ADMIN_MAX_LIMIT : RECENT_MATCH_MEMBER_MAX_LIMIT
     const offset = append ? recentMatchesFetchedCount : 0
@@ -414,7 +484,40 @@ export default function ResultsPage() {
 
     void loadRecentMatches()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminAuthLoading, isAdmin])
+  }, [adminAuthLoading, isAdmin, isSuperAdmin, historyPage, appliedFromDate, appliedToDate])
+
+  useEffect(() => {
+    if (!isSuperAdmin) {
+      setHistoryPage(0)
+      setDraftFromDate('')
+      setDraftToDate('')
+      setAppliedFromDate('')
+      setAppliedToDate('')
+    }
+  }, [isSuperAdmin])
+
+  const handleApplyHistoryFilters = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setAppliedFromDate(draftFromDate)
+    setAppliedToDate(draftToDate)
+    setHistoryPage(0)
+  }
+
+  const handleResetHistoryFilters = () => {
+    setDraftFromDate('')
+    setDraftToDate('')
+    setAppliedFromDate('')
+    setAppliedToDate('')
+    setHistoryPage(0)
+  }
+
+  const handlePreviousHistoryPage = () => {
+    setHistoryPage((previous) => Math.max(0, previous - 1))
+  }
+
+  const handleNextHistoryPage = () => {
+    setHistoryPage((previous) => (previous + 1 < historyTotalPages ? previous + 1 : previous))
+  }
 
   useEffect(() => {
     setAppliedSearchSelection(false)
@@ -1138,7 +1241,54 @@ export default function ResultsPage() {
 
       <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('results.recent.title')}</h3>
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('results.recent.description')}</p>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          {isSuperAdmin ? t('results.recent.history.description') : t('results.recent.description')}
+        </p>
+
+        {isSuperAdmin && (
+          <form
+            onSubmit={handleApplyHistoryFilters}
+            className="mt-3 flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-slate-50/60 p-3 dark:border-slate-700 dark:bg-slate-800/60"
+          >
+            <label className="space-y-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+              {t('results.recent.history.filters.fromDate')}
+              <input
+                type="date"
+                value={draftFromDate}
+                onChange={(event) => setDraftFromDate(event.target.value)}
+                className="mt-1 block rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+              />
+            </label>
+            <label className="space-y-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+              {t('results.recent.history.filters.toDate')}
+              <input
+                type="date"
+                value={draftToDate}
+                onChange={(event) => setDraftToDate(event.target.value)}
+                className="mt-1 block rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+              />
+            </label>
+            <button
+              type="submit"
+              className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+            >
+              {t('results.recent.history.filters.apply')}
+            </button>
+            <button
+              type="button"
+              onClick={handleResetHistoryFilters}
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-slate-900 hover:bg-slate-900 hover:text-white dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-300 dark:hover:bg-slate-100 dark:hover:text-slate-900"
+            >
+              {t('results.recent.history.filters.reset')}
+            </button>
+            {!recentMatchesLoading && (
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                {t('results.recent.history.count', { count: historyTotalElements })}
+              </span>
+            )}
+          </form>
+        )}
+
         {recentActionMessage && (
           <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
             {recentActionMessage}
@@ -1341,19 +1491,47 @@ export default function ResultsPage() {
                 })}
               </tbody>
             </table>
-            {canAccess && recentMatchesHasMore && (
-              <div className="border-t border-slate-100 bg-white px-3 py-3 text-center dark:border-slate-800 dark:bg-slate-900">
+            {isSuperAdmin ? (
+              <div className="flex items-center justify-between border-t border-slate-100 bg-white px-3 py-3 dark:border-slate-800 dark:bg-slate-900">
                 <button
                   type="button"
-                  onClick={handleLoadMoreRecentMatches}
-                  disabled={recentMatchesLoadingMore}
+                  onClick={handlePreviousHistoryPage}
+                  disabled={historyPage <= 0 || recentMatchesLoading}
                   className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-slate-900 hover:bg-slate-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-300 dark:hover:bg-slate-100 dark:hover:text-slate-900"
                 >
-                  {recentMatchesLoadingMore
-                    ? t('results.recent.loadingMore')
-                    : t('results.recent.loadMore')}
+                  {t('results.recent.history.pagination.previous')}
+                </button>
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  {t('results.recent.history.pagination.status', {
+                    page: historyPage + 1,
+                    totalPages: Math.max(historyTotalPages, 1),
+                  })}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleNextHistoryPage}
+                  disabled={historyPage + 1 >= historyTotalPages || recentMatchesLoading}
+                  className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-slate-900 hover:bg-slate-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-300 dark:hover:bg-slate-100 dark:hover:text-slate-900"
+                >
+                  {t('results.recent.history.pagination.next')}
                 </button>
               </div>
+            ) : (
+              canAccess &&
+              recentMatchesHasMore && (
+                <div className="border-t border-slate-100 bg-white px-3 py-3 text-center dark:border-slate-800 dark:bg-slate-900">
+                  <button
+                    type="button"
+                    onClick={handleLoadMoreRecentMatches}
+                    disabled={recentMatchesLoadingMore}
+                    className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-slate-900 hover:bg-slate-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-300 dark:hover:bg-slate-100 dark:hover:text-slate-900"
+                  >
+                    {recentMatchesLoadingMore
+                      ? t('results.recent.loadingMore')
+                      : t('results.recent.loadMore')}
+                  </button>
+                </div>
+              )
             )}
           </div>
         )}
