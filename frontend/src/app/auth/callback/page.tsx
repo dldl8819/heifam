@@ -147,7 +147,10 @@ export default function AuthCallbackPage() {
         }
 
         if (!access.allowed) {
-          await supabase.auth.signOut()
+          // Keep the session. Signing out here bounced the applicant back to a normal-looking
+          // home page with no explanation; staying signed in lets the home screen tell them
+          // access is by application and show the address they signed in with, which is the
+          // one they have to submit.
           router.replace('/')
           return
         }

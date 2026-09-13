@@ -87,6 +87,17 @@ export function getRouteAccessDecision(
       }
     }
 
+    // Someone who signed in but has not been granted access lands here, and the navigation is
+    // empty for them, so the landing page would leave them with no idea what went wrong or what
+    // to do next. Show them the access notice instead. Other public pages stay public.
+    if (pathname === '/' && context.isLoggedIn && !context.canAccess) {
+      return {
+        allowed: false,
+        redirectTo: null,
+        blocked: true,
+      }
+    }
+
     return {
       allowed: true,
       redirectTo: null,

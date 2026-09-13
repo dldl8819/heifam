@@ -103,4 +103,49 @@ describe('route access', () => {
     expect(decision.allowed).toBe(false)
     expect(decision.redirectTo).toBe('/players')
   })
+
+  it('shows the access notice on home to a signed-in applicant without access', () => {
+    const decision = getRouteAccessDecision('/', {
+      isLoggedIn: true,
+      canAccess: false,
+      isAdmin: false,
+      isSuperAdmin: false,
+    })
+
+    expect(decision).toEqual({
+      allowed: false,
+      redirectTo: null,
+      blocked: true,
+    })
+  })
+
+  it('keeps home public for visitors who are not signed in', () => {
+    const decision = getRouteAccessDecision('/', {
+      isLoggedIn: false,
+      canAccess: false,
+      isAdmin: false,
+      isSuperAdmin: false,
+    })
+
+    expect(decision).toEqual({
+      allowed: true,
+      redirectTo: null,
+      blocked: false,
+    })
+  })
+
+  it('keeps other public pages readable for a signed-in applicant without access', () => {
+    const decision = getRouteAccessDecision('/results', {
+      isLoggedIn: true,
+      canAccess: false,
+      isAdmin: false,
+      isSuperAdmin: false,
+    })
+
+    expect(decision).toEqual({
+      allowed: true,
+      redirectTo: null,
+      blocked: false,
+    })
+  })
 })

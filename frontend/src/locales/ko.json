@@ -249,8 +249,10 @@
   },
   "access": {
     "blockedTitle": "접속 권한이 없습니다",
-    "blockedDescription": "운영진이 등록한 허용 이메일이 아니면 Hei`Fam 서비스에 접근할 수 없습니다.",
+    "blockedDescription": "홈페이지는 신청하신 구글 이메일만 로그인 가능하도록 운영하고 있습니다. 이용 희망 시 아래 구글폼으로 신청해 주세요.",
+    "blockedApply": "구글폼으로 이용 신청하기",
     "blockedEmail": "현재 로그인: {email}",
+    "blockedEmailHint": "신청서에는 위 이메일 주소를 그대로 적어 주세요.",
     "title": "권한 관리",
     "description": "최상위 관리자/운영진/접속 허용 이메일을 관리합니다.",
     "loadError": "권한 목록을 불러오지 못했습니다.",
@@ -1200,6 +1202,7 @@
       "successWithMatchId": "수동 경기 입력을 완료했습니다. 매치 ID: {matchId}",
       "failure": "수동 경기 입력에 실패했습니다. 입력값과 서버 상태를 확인해 주세요.",
       "loadPlayersError": "수동 입력용 선수 목록을 불러오지 못했습니다.",
+      "confirmSubmit": "홈 팀: {homeTeam}\n어웨이 팀: {awayTeam}\n승리 팀: {winner}\n\n이대로 저장할까요?",
       "validation": {
         "playersRequired": "홈 팀과 어웨이 팀 선수를 모두 선택해 주세요.",
         "duplicatePlayers": "같은 선수를 양 팀에 중복 선택할 수 없습니다.",
