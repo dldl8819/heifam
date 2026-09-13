@@ -44,8 +44,10 @@ class LedgerExpenseAdminServiceTest {
         ledgerExpenseAdminService = new LedgerExpenseAdminService(
             ledgerExpenseEntryRepository, accessControlService, operationAuditLogService
         );
-        when(accessControlService.isAdminEmail("ops@hei.gg")).thenReturn(true);
+        when(accessControlService.isAdminEmail("superadmin@hei.gg")).thenReturn(true);
         when(accessControlService.isAdminEmail("member@hei.gg")).thenReturn(false);
+        when(accessControlService.isSuperAdminEmail("superadmin@hei.gg")).thenReturn(true);
+        when(accessControlService.isAdminEmail("ops@hei.gg")).thenReturn(true);
         when(ledgerExpenseEntryRepository.save(any(LedgerExpenseEntry.class))).thenAnswer(invocation -> {
             LedgerExpenseEntry entry = invocation.getArgument(0);
             if (entry.getId() == null) {
@@ -56,19 +58,19 @@ class LedgerExpenseAdminServiceTest {
     }
 
     @Test
-    void createsFixedExpenseEntryForAdmin() {
+    void createsFixedExpenseEntryForSuperAdmin() {
         LedgerExpenseEntryResponse response = ledgerExpenseAdminService.createEntry(
             1L,
             new LedgerExpenseEntryCreateRequest(
                 LocalDate.of(2026, 1, 5), "fixed", "YOUR_CATEGORY", "YOUR_PAYMENT_METHOD", 5000L, "YOUR_MEMO"
             ),
-            "ops@hei.gg",
-            "OpsUser"
+            "superadmin@hei.gg",
+            "SuperAdmin"
         );
 
         assertThat(response.expenseType()).isEqualTo("FIXED");
         assertThat(response.target()).isEqualTo("YOUR_PAYMENT_METHOD");
-        verify(operationAuditLogService).recordLedgerExpenseAdded(eq("ops@hei.gg"), eq("OpsUser"), eq(1L), any());
+        verify(operationAuditLogService).recordLedgerExpenseAdded(eq("superadmin@hei.gg"), eq("SuperAdmin"), eq(1L), any());
     }
 
     @Test
@@ -79,8 +81,8 @@ class LedgerExpenseAdminServiceTest {
                 new LedgerExpenseEntryCreateRequest(
                     LocalDate.of(2026, 1, 5), "UNKNOWN", "YOUR_CATEGORY", "YOUR_TARGET", 5000L, null
                 ),
-                "ops@hei.gg",
-                "OpsUser"
+                "superadmin@hei.gg",
+                "SuperAdmin"
             )
         )
             .isInstanceOf(IllegalArgumentException.class)
@@ -100,7 +102,25 @@ class LedgerExpenseAdminServiceTest {
             )
         )
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Only admins can manage the ledger");
+            .hasMessage("Only super admins can manage the ledger");
+
+        verify(ledgerExpenseEntryRepository, never()).save(any(LedgerExpenseEntry.class));
+    }
+
+    @Test
+    void rejectsCreateWhenActorIsAdminButNotSuperAdmin() {
+        assertThatThrownBy(() ->
+            ledgerExpenseAdminService.createEntry(
+                1L,
+                new LedgerExpenseEntryCreateRequest(
+                    LocalDate.of(2026, 1, 5), "VARIABLE", "YOUR_CATEGORY", "YOUR_TARGET", 5000L, null
+                ),
+                "ops@hei.gg",
+                "Member"
+            )
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Only super admins can manage the ledger");
 
         verify(ledgerExpenseEntryRepository, never()).save(any(LedgerExpenseEntry.class));
     }
@@ -109,7 +129,7 @@ class LedgerExpenseAdminServiceTest {
     void throwsWhenDeletingMissingEntry() {
         when(ledgerExpenseEntryRepository.findByIdAndGroupId(99L, 1L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> ledgerExpenseAdminService.deleteEntry(1L, 99L, "ops@hei.gg", "OpsUser"))
+        assertThatThrownBy(() -> ledgerExpenseAdminService.deleteEntry(1L, 99L, "superadmin@hei.gg", "SuperAdmin"))
             .isInstanceOf(java.util.NoSuchElementException.class)
             .hasMessage("Ledger expense entry not found");
     }
@@ -122,20 +142,20 @@ class LedgerExpenseAdminServiceTest {
             + "2026-01-07,7000,YOUR_CATEGORY,YOUR_TARGET_C,YOUR_MEMO\n";
 
         LedgerImportResponse response = ledgerExpenseAdminService.importEntries(
-            1L, new LedgerImportRequest(csv, "variable"), "ops@hei.gg", "OpsUser"
+            1L, new LedgerImportRequest(csv, "variable"), "superadmin@hei.gg", "SuperAdmin"
         );
 
         assertThat(response.importedCount()).isEqualTo(2);
         assertThat(response.skippedRows()).hasSize(1);
         assertThat(response.skippedRows().get(0).rowNumber()).isEqualTo(3);
-        verify(operationAuditLogService).recordLedgerExpenseImported(eq("ops@hei.gg"), eq("OpsUser"), eq(1L), eq(2));
+        verify(operationAuditLogService).recordLedgerExpenseImported(eq("superadmin@hei.gg"), eq("SuperAdmin"), eq(1L), eq(2));
     }
 
     @Test
     void rejectsImportWithoutValidExpenseType() {
         assertThatThrownBy(() ->
             ledgerExpenseAdminService.importEntries(
-                1L, new LedgerImportRequest("date,amount,category,target,memo\n", null), "ops@hei.gg", "OpsUser"
+                1L, new LedgerImportRequest("date,amount,category,target,memo\n", null), "superadmin@hei.gg", "SuperAdmin"
             )
         )
             .isInstanceOf(IllegalArgumentException.class)

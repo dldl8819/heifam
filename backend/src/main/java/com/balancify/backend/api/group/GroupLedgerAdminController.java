@@ -52,7 +52,7 @@ public class GroupLedgerAdminController {
         HttpServletRequest httpRequest
     ) {
         String requestEmail = requireRequestEmail(httpRequest);
-        requireAdmin(requestEmail);
+        requireSuperAdmin(requestEmail);
         try {
             return ledgerIncomeAdminService.createEntry(groupId, request, requestEmail, resolveActorNickname(requestEmail));
         } catch (IllegalArgumentException illegalArgumentException) {
@@ -68,7 +68,7 @@ public class GroupLedgerAdminController {
         HttpServletRequest httpRequest
     ) {
         String requestEmail = requireRequestEmail(httpRequest);
-        requireAdmin(requestEmail);
+        requireSuperAdmin(requestEmail);
         try {
             return ledgerIncomeAdminService.updateEntry(
                 groupId, entryId, request, requestEmail, resolveActorNickname(requestEmail)
@@ -83,7 +83,7 @@ public class GroupLedgerAdminController {
     @DeleteMapping("/{groupId}/ledger/income/{entryId}")
     public void deleteIncomeEntry(@PathVariable Long groupId, @PathVariable Long entryId, HttpServletRequest httpRequest) {
         String requestEmail = requireRequestEmail(httpRequest);
-        requireAdmin(requestEmail);
+        requireSuperAdmin(requestEmail);
         try {
             ledgerIncomeAdminService.deleteEntry(groupId, entryId, requestEmail, resolveActorNickname(requestEmail));
         } catch (NoSuchElementException noSuchElementException) {
@@ -98,7 +98,7 @@ public class GroupLedgerAdminController {
         HttpServletRequest httpRequest
     ) {
         String requestEmail = requireRequestEmail(httpRequest);
-        requireAdmin(requestEmail);
+        requireSuperAdmin(requestEmail);
         try {
             return ledgerIncomeAdminService.importEntries(groupId, request, requestEmail, resolveActorNickname(requestEmail));
         } catch (IllegalArgumentException illegalArgumentException) {
@@ -113,7 +113,7 @@ public class GroupLedgerAdminController {
         HttpServletRequest httpRequest
     ) {
         String requestEmail = requireRequestEmail(httpRequest);
-        requireAdmin(requestEmail);
+        requireSuperAdmin(requestEmail);
         try {
             return ledgerExpenseAdminService.createEntry(groupId, request, requestEmail, resolveActorNickname(requestEmail));
         } catch (IllegalArgumentException illegalArgumentException) {
@@ -129,7 +129,7 @@ public class GroupLedgerAdminController {
         HttpServletRequest httpRequest
     ) {
         String requestEmail = requireRequestEmail(httpRequest);
-        requireAdmin(requestEmail);
+        requireSuperAdmin(requestEmail);
         try {
             return ledgerExpenseAdminService.updateEntry(
                 groupId, entryId, request, requestEmail, resolveActorNickname(requestEmail)
@@ -144,7 +144,7 @@ public class GroupLedgerAdminController {
     @DeleteMapping("/{groupId}/ledger/expense/{entryId}")
     public void deleteExpenseEntry(@PathVariable Long groupId, @PathVariable Long entryId, HttpServletRequest httpRequest) {
         String requestEmail = requireRequestEmail(httpRequest);
-        requireAdmin(requestEmail);
+        requireSuperAdmin(requestEmail);
         try {
             ledgerExpenseAdminService.deleteEntry(groupId, entryId, requestEmail, resolveActorNickname(requestEmail));
         } catch (NoSuchElementException noSuchElementException) {
@@ -159,7 +159,7 @@ public class GroupLedgerAdminController {
         HttpServletRequest httpRequest
     ) {
         String requestEmail = requireRequestEmail(httpRequest);
-        requireAdmin(requestEmail);
+        requireSuperAdmin(requestEmail);
         try {
             return ledgerExpenseAdminService.importEntries(groupId, request, requestEmail, resolveActorNickname(requestEmail));
         } catch (IllegalArgumentException illegalArgumentException) {
@@ -175,9 +175,10 @@ public class GroupLedgerAdminController {
         return new ResponseStatusException(HttpStatus.NOT_FOUND, noSuchElementException.getMessage(), noSuchElementException);
     }
 
-    private void requireAdmin(String email) {
-        if (!accessControlService.isAdminEmail(email)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin role required");
+    // Admins can read the ledger (see AdminKeyFilter); adding, editing, importing and deleting is for super admins.
+    private void requireSuperAdmin(String email) {
+        if (!accessControlService.isSuperAdminEmail(email)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Super admin role required");
         }
     }
 

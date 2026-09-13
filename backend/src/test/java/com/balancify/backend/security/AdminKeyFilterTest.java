@@ -25,6 +25,8 @@ import com.balancify.backend.api.admin.OperationAuditLogController;
 import com.balancify.backend.api.admin.dto.OperationAuditLogPageResponse;
 import com.balancify.backend.api.group.GroupMatchAdminController;
 import com.balancify.backend.api.group.GroupMatchController;
+import com.balancify.backend.api.group.GroupLedgerAdminController;
+import com.balancify.backend.api.group.GroupLedgerController;
 import com.balancify.backend.api.group.GroupNoticeAdminController;
 import com.balancify.backend.api.group.GroupDashboardController;
 import com.balancify.backend.api.group.GroupPlayerController;
@@ -66,6 +68,11 @@ import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.AccountDeletionService;
 import com.balancify.backend.service.DashboardQueryService;
 import com.balancify.backend.service.GroupMatchAdminService;
+import com.balancify.backend.service.LedgerExpenseAdminService;
+import com.balancify.backend.service.LedgerExpenseService;
+import com.balancify.backend.service.LedgerIncomeAdminService;
+import com.balancify.backend.service.LedgerIncomeService;
+import com.balancify.backend.service.LedgerSummaryService;
 import com.balancify.backend.service.MatchQueryService;
 import com.balancify.backend.service.MatchImportService;
 import com.balancify.backend.service.MatchResultService;
@@ -111,7 +118,9 @@ import org.springframework.test.web.servlet.MockMvc;
     GroupPlayerAdminController.class,
     GroupMatchAdminController.class,
     OperationAuditLogController.class,
-    GroupNoticeAdminController.class
+    GroupNoticeAdminController.class,
+    GroupLedgerController.class,
+    GroupLedgerAdminController.class
 })
 @Import({ AdminKeyFilter.class, ServiceAccessFilter.class, AdminKeyProperties.class })
 @TestPropertySource(properties = {
@@ -179,6 +188,21 @@ class AdminKeyFilterTest {
 
     @MockBean
     private NoticeAdminService noticeAdminService;
+
+    @MockBean
+    private LedgerIncomeService ledgerIncomeService;
+
+    @MockBean
+    private LedgerExpenseService ledgerExpenseService;
+
+    @MockBean
+    private LedgerSummaryService ledgerSummaryService;
+
+    @MockBean
+    private LedgerIncomeAdminService ledgerIncomeAdminService;
+
+    @MockBean
+    private LedgerExpenseAdminService ledgerExpenseAdminService;
 
     @MockBean
     private AdminRequestResolver adminRequestResolver;
@@ -1981,6 +2005,84 @@ class AdminKeyFilterTest {
                     .header("X-USER-EMAIL", "superadmin@hei.gg")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"mmr\":1200}")
+            )
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void returnsForbiddenForLedgerSummaryWithMemberEmail() throws Exception {
+        mockMvc
+            .perform(
+                get("/api/groups/1/ledger/summary")
+                    .param("year", "2026")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void allowsLedgerSummaryWithAdminEmail() throws Exception {
+        mockMvc
+            .perform(
+                get("/api/groups/1/ledger/summary")
+                    .param("year", "2026")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+            )
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void allowsLedgerIncomeListWithAdminEmail() throws Exception {
+        mockMvc
+            .perform(
+                get("/api/groups/1/ledger/income")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+            )
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void returnsForbiddenForLedgerIncomeCreateWithAdminEmail() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/groups/1/ledger/income")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"entryDate\":\"2026-09-01\",\"category\":\"후원\",\"amount\":10000,\"memo\":\"테스트\"}")
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void allowsLedgerIncomeCreateWithSuperAdminEmail() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/groups/1/ledger/income")
+                    .header("X-USER-EMAIL", "superadmin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"entryDate\":\"2026-09-01\",\"category\":\"후원\",\"amount\":10000,\"memo\":\"테스트\"}")
+            )
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void returnsForbiddenForLedgerExpenseDeleteWithAdminEmail() throws Exception {
+        mockMvc
+            .perform(
+                delete("/api/groups/1/ledger/expense/3")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void allowsLedgerExpenseImportWithSuperAdminEmail() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/groups/1/ledger/expense/import")
+                    .header("X-USER-EMAIL", "superadmin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"csvContent\":\"\",\"expenseType\":\"VARIABLE\"}")
             )
             .andExpect(status().isOk());
     }

@@ -44,7 +44,7 @@ public class LedgerIncomeAdminService {
         String actorEmail,
         String actorNickname
     ) {
-        requireAdmin(actorEmail);
+        requireSuperAdmin(actorEmail);
 
         LedgerIncomeEntry entry = new LedgerIncomeEntry();
         entry.setGroupId(groupId);
@@ -68,7 +68,7 @@ public class LedgerIncomeAdminService {
         String actorEmail,
         String actorNickname
     ) {
-        requireAdmin(actorEmail);
+        requireSuperAdmin(actorEmail);
 
         LedgerIncomeEntry entry = ledgerIncomeEntryRepository.findByIdAndGroupId(entryId, groupId)
             .orElseThrow(() -> new NoSuchElementException("Ledger income entry not found"));
@@ -86,7 +86,7 @@ public class LedgerIncomeAdminService {
 
     @Transactional
     public void deleteEntry(Long groupId, Long entryId, String actorEmail, String actorNickname) {
-        requireAdmin(actorEmail);
+        requireSuperAdmin(actorEmail);
 
         LedgerIncomeEntry entry = ledgerIncomeEntryRepository.findByIdAndGroupId(entryId, groupId)
             .orElseThrow(() -> new NoSuchElementException("Ledger income entry not found"));
@@ -103,7 +103,7 @@ public class LedgerIncomeAdminService {
         String actorEmail,
         String actorNickname
     ) {
-        requireAdmin(actorEmail);
+        requireSuperAdmin(actorEmail);
 
         String csvContent = request == null ? null : request.csvContent();
         List<List<String>> rows = LedgerCsvParser.parseDataRows(csvContent);
@@ -159,9 +159,10 @@ public class LedgerIncomeAdminService {
         }
     }
 
-    private void requireAdmin(String actorEmail) {
-        if (!accessControlService.isAdminEmail(actorEmail)) {
-            throw new IllegalArgumentException("Only admins can manage the ledger");
+    // Admins can read the ledger; only super admins change it.
+    private void requireSuperAdmin(String actorEmail) {
+        if (!accessControlService.isSuperAdminEmail(actorEmail)) {
+            throw new IllegalArgumentException("Only super admins can manage the ledger");
         }
     }
 

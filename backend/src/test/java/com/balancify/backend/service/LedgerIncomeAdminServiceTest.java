@@ -45,8 +45,10 @@ class LedgerIncomeAdminServiceTest {
         ledgerIncomeAdminService = new LedgerIncomeAdminService(
             ledgerIncomeEntryRepository, accessControlService, operationAuditLogService
         );
-        when(accessControlService.isAdminEmail("ops@hei.gg")).thenReturn(true);
+        when(accessControlService.isAdminEmail("superadmin@hei.gg")).thenReturn(true);
         when(accessControlService.isAdminEmail("member@hei.gg")).thenReturn(false);
+        when(accessControlService.isSuperAdminEmail("superadmin@hei.gg")).thenReturn(true);
+        when(accessControlService.isAdminEmail("ops@hei.gg")).thenReturn(true);
         when(ledgerIncomeEntryRepository.save(any(LedgerIncomeEntry.class))).thenAnswer(invocation -> {
             LedgerIncomeEntry entry = invocation.getArgument(0);
             if (entry.getId() == null) {
@@ -57,18 +59,18 @@ class LedgerIncomeAdminServiceTest {
     }
 
     @Test
-    void createsEntryForAdmin() {
+    void createsEntryForSuperAdmin() {
         LedgerIncomeEntryResponse response = ledgerIncomeAdminService.createEntry(
             1L,
             new LedgerIncomeEntryCreateRequest(LocalDate.of(2026, 1, 5), "YOUR_CATEGORY", 10000L, "YOUR_MEMO"),
-            "ops@hei.gg",
-            "OpsUser"
+            "superadmin@hei.gg",
+            "SuperAdmin"
         );
 
         assertThat(response.category()).isEqualTo("YOUR_CATEGORY");
         assertThat(response.amount()).isEqualTo(10000L);
-        assertThat(response.authorNickname()).isEqualTo("OpsUser");
-        verify(operationAuditLogService).recordLedgerIncomeAdded(eq("ops@hei.gg"), eq("OpsUser"), eq(1L), any());
+        assertThat(response.authorNickname()).isEqualTo("SuperAdmin");
+        verify(operationAuditLogService).recordLedgerIncomeAdded(eq("superadmin@hei.gg"), eq("SuperAdmin"), eq(1L), any());
     }
 
     @Test
@@ -82,7 +84,23 @@ class LedgerIncomeAdminServiceTest {
             )
         )
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Only admins can manage the ledger");
+            .hasMessage("Only super admins can manage the ledger");
+
+        verify(ledgerIncomeEntryRepository, never()).save(any(LedgerIncomeEntry.class));
+    }
+
+    @Test
+    void rejectsCreateWhenActorIsAdminButNotSuperAdmin() {
+        assertThatThrownBy(() ->
+            ledgerIncomeAdminService.createEntry(
+                1L,
+                new LedgerIncomeEntryCreateRequest(LocalDate.of(2026, 1, 5), "YOUR_CATEGORY", 10000L, null),
+                "ops@hei.gg",
+                "Member"
+            )
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Only super admins can manage the ledger");
 
         verify(ledgerIncomeEntryRepository, never()).save(any(LedgerIncomeEntry.class));
     }
@@ -93,8 +111,8 @@ class LedgerIncomeAdminServiceTest {
             ledgerIncomeAdminService.createEntry(
                 1L,
                 new LedgerIncomeEntryCreateRequest(LocalDate.of(2026, 1, 5), "YOUR_CATEGORY", 0L, null),
-                "ops@hei.gg",
-                "OpsUser"
+                "superadmin@hei.gg",
+                "SuperAdmin"
             )
         )
             .isInstanceOf(IllegalArgumentException.class)
@@ -110,11 +128,11 @@ class LedgerIncomeAdminServiceTest {
         entry.setCategory("YOUR_CATEGORY");
         when(ledgerIncomeEntryRepository.findByIdAndGroupId(7L, 1L)).thenReturn(Optional.of(entry));
 
-        ledgerIncomeAdminService.deleteEntry(1L, 7L, "ops@hei.gg", "OpsUser");
+        ledgerIncomeAdminService.deleteEntry(1L, 7L, "superadmin@hei.gg", "SuperAdmin");
 
         verify(ledgerIncomeEntryRepository).delete(entry);
         verify(operationAuditLogService)
-            .recordLedgerIncomeDeleted(eq("ops@hei.gg"), eq("OpsUser"), eq(1L), eq(7L), any());
+            .recordLedgerIncomeDeleted(eq("superadmin@hei.gg"), eq("SuperAdmin"), eq(1L), eq(7L), any());
     }
 
     @Test
@@ -126,8 +144,8 @@ class LedgerIncomeAdminServiceTest {
                 1L,
                 99L,
                 new LedgerIncomeEntryUpdateRequest(LocalDate.of(2026, 1, 5), "YOUR_CATEGORY", 1000L, null),
-                "ops@hei.gg",
-                "OpsUser"
+                "superadmin@hei.gg",
+                "SuperAdmin"
             )
         )
             .isInstanceOf(java.util.NoSuchElementException.class)
@@ -143,7 +161,7 @@ class LedgerIncomeAdminServiceTest {
             + "2026-01-07,20000,,YOUR_MEMO\n";
 
         LedgerImportResponse response = ledgerIncomeAdminService.importEntries(
-            1L, new LedgerImportRequest(csv, null), "ops@hei.gg", "OpsUser"
+            1L, new LedgerImportRequest(csv, null), "superadmin@hei.gg", "SuperAdmin"
         );
 
         assertThat(response.importedCount()).isEqualTo(1);
@@ -151,7 +169,7 @@ class LedgerIncomeAdminServiceTest {
         assertThat(response.skippedRows().get(0).rowNumber()).isEqualTo(3);
         assertThat(response.skippedRows().get(1).rowNumber()).isEqualTo(4);
         assertThat(response.skippedRows().get(2).rowNumber()).isEqualTo(5);
-        verify(operationAuditLogService).recordLedgerIncomeImported(eq("ops@hei.gg"), eq("OpsUser"), eq(1L), eq(1));
+        verify(operationAuditLogService).recordLedgerIncomeImported(eq("superadmin@hei.gg"), eq("SuperAdmin"), eq(1L), eq(1));
     }
 
     @Test
@@ -162,7 +180,7 @@ class LedgerIncomeAdminServiceTest {
             )
         )
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Only admins can manage the ledger");
+            .hasMessage("Only super admins can manage the ledger");
 
         verify(ledgerIncomeEntryRepository, never()).save(any(LedgerIncomeEntry.class));
     }

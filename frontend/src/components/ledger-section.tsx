@@ -62,7 +62,8 @@ function emptyExpenseForm(expenseType: LedgerExpenseType): ExpenseFormState {
 }
 
 export function LedgerSection() {
-  const { isAdmin } = useAdminAuth()
+  // Admins can read the ledger; adding, editing, importing and deleting entries is for super admins.
+  const { isSuperAdmin: canManage } = useAdminAuth()
   const [subTab, setSubTab] = useState<LedgerSubTab>('income')
 
   const [roster, setRoster] = useState<PlayerRosterItem[]>([])
@@ -157,7 +158,7 @@ export function LedgerSection() {
   }, [loadSummary, summaryYear])
 
   useEffect(() => {
-    if (!isAdmin) {
+    if (!canManage) {
       return
     }
     let active = true
@@ -172,7 +173,7 @@ export function LedgerSection() {
     return () => {
       active = false
     }
-  }, [isAdmin])
+  }, [canManage])
 
   const handleIncomeSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -437,7 +438,7 @@ export function LedgerSection() {
 
       {subTab === 'income' && (
         <div className="space-y-4">
-          {isAdmin && (
+          {canManage && (
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
@@ -474,7 +475,7 @@ export function LedgerSection() {
             </div>
           )}
 
-          {!isAdmin && (
+          {!canManage && (
             <button
               type="button"
               onClick={handleIncomeDownload}
@@ -609,20 +610,20 @@ export function LedgerSection() {
                   <th className="px-4 py-3">{t('notices.donations.income.table.amount')}</th>
                   <th className="px-4 py-3">{t('notices.donations.income.table.memo')}</th>
                   <th className="px-4 py-3">{t('notices.donations.income.table.author')}</th>
-                  {isAdmin && <th className="px-4 py-3" />}
+                  {canManage && <th className="px-4 py-3" />}
                 </tr>
               </thead>
               <tbody>
                 {incomeLoading && (
                   <tr>
-                    <td className="px-4 py-3" colSpan={isAdmin ? 6 : 5}>
+                    <td className="px-4 py-3" colSpan={canManage ? 6 : 5}>
                       <LoadingIndicator label={t('common.loading')} />
                     </td>
                   </tr>
                 )}
                 {!incomeLoading && incomeError && (
                   <tr>
-                    <td className="px-4 py-8 text-center" colSpan={isAdmin ? 6 : 5}>
+                    <td className="px-4 py-8 text-center" colSpan={canManage ? 6 : 5}>
                       <Alert variant="destructive" appearance="light">
                         <AlertIcon icon="destructive">!</AlertIcon>
                         <AlertContent>
@@ -634,7 +635,7 @@ export function LedgerSection() {
                 )}
                 {!incomeLoading && !incomeError && incomeEntries.length === 0 && (
                   <tr>
-                    <td className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400" colSpan={isAdmin ? 6 : 5}>
+                    <td className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400" colSpan={canManage ? 6 : 5}>
                       {t('notices.donations.income.empty')}
                     </td>
                   </tr>
@@ -648,7 +649,7 @@ export function LedgerSection() {
                       <td className="px-4 py-3">{formatAmount(entry.amount)}</td>
                       <td className="px-4 py-3">{entry.memo}</td>
                       <td className="px-4 py-3">{entry.authorNickname}</td>
-                      {isAdmin && (
+                      {canManage && (
                         <td className="whitespace-nowrap px-4 py-3 text-right">
                           <button
                             type="button"
@@ -706,7 +707,7 @@ export function LedgerSection() {
             ))}
           </div>
 
-          {isAdmin && (
+          {canManage && (
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
@@ -751,7 +752,7 @@ export function LedgerSection() {
             </div>
           )}
 
-          {!isAdmin && (
+          {!canManage && (
             <button
               type="button"
               onClick={handleExpenseDownload}
@@ -889,20 +890,20 @@ export function LedgerSection() {
                   <th className="px-4 py-3">{t('notices.donations.expense.table.amount')}</th>
                   <th className="px-4 py-3">{t('notices.donations.expense.table.memo')}</th>
                   <th className="px-4 py-3">{t('notices.donations.expense.table.author')}</th>
-                  {isAdmin && <th className="px-4 py-3" />}
+                  {canManage && <th className="px-4 py-3" />}
                 </tr>
               </thead>
               <tbody>
                 {expenseLoading && (
                   <tr>
-                    <td className="px-4 py-3" colSpan={isAdmin ? 8 : 7}>
+                    <td className="px-4 py-3" colSpan={canManage ? 8 : 7}>
                       <LoadingIndicator label={t('common.loading')} />
                     </td>
                   </tr>
                 )}
                 {!expenseLoading && expenseError && (
                   <tr>
-                    <td className="px-4 py-8 text-center" colSpan={isAdmin ? 8 : 7}>
+                    <td className="px-4 py-8 text-center" colSpan={canManage ? 8 : 7}>
                       <Alert variant="destructive" appearance="light">
                         <AlertIcon icon="destructive">!</AlertIcon>
                         <AlertContent>
@@ -914,7 +915,7 @@ export function LedgerSection() {
                 )}
                 {!expenseLoading && !expenseError && expenseEntries.length === 0 && (
                   <tr>
-                    <td className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400" colSpan={isAdmin ? 8 : 7}>
+                    <td className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400" colSpan={canManage ? 8 : 7}>
                       {t('notices.donations.expense.empty')}
                     </td>
                   </tr>
@@ -934,7 +935,7 @@ export function LedgerSection() {
                       <td className="px-4 py-3">{formatAmount(entry.amount)}</td>
                       <td className="px-4 py-3">{entry.memo}</td>
                       <td className="px-4 py-3">{entry.authorNickname}</td>
-                      {isAdmin && (
+                      {canManage && (
                         <td className="whitespace-nowrap px-4 py-3 text-right">
                           <button
                             type="button"

@@ -162,67 +162,67 @@ public class AdminKeyFilter extends OncePerRequestFilter {
         new ProtectedRoute(
             "GET",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/ledger/income"),
-            AuthType.SERVICE_ACCESS
+            AuthType.ADMIN_EMAIL
         ),
         new ProtectedRoute(
             "GET",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/ledger/income/categories"),
-            AuthType.SERVICE_ACCESS
+            AuthType.ADMIN_EMAIL
         ),
         new ProtectedRoute(
             "POST",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/ledger/income"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SUPER_ADMIN_EMAIL
         ),
         new ProtectedRoute(
             "PUT",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/ledger/income/{entryId}"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SUPER_ADMIN_EMAIL
         ),
         new ProtectedRoute(
             "DELETE",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/ledger/income/{entryId}"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SUPER_ADMIN_EMAIL
         ),
         new ProtectedRoute(
             "POST",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/ledger/income/import"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SUPER_ADMIN_EMAIL
         ),
         new ProtectedRoute(
             "GET",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/ledger/expense"),
-            AuthType.SERVICE_ACCESS
+            AuthType.ADMIN_EMAIL
         ),
         new ProtectedRoute(
             "GET",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/ledger/expense/categories"),
-            AuthType.SERVICE_ACCESS
+            AuthType.ADMIN_EMAIL
         ),
         new ProtectedRoute(
             "POST",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/ledger/expense"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SUPER_ADMIN_EMAIL
         ),
         new ProtectedRoute(
             "PUT",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/ledger/expense/{entryId}"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SUPER_ADMIN_EMAIL
         ),
         new ProtectedRoute(
             "DELETE",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/ledger/expense/{entryId}"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SUPER_ADMIN_EMAIL
         ),
         new ProtectedRoute(
             "POST",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/ledger/expense/import"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SUPER_ADMIN_EMAIL
         ),
         new ProtectedRoute(
             "GET",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/ledger/summary"),
-            AuthType.SERVICE_ACCESS
+            AuthType.ADMIN_EMAIL
         )
     );
 

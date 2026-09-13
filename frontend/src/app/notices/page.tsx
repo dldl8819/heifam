@@ -24,10 +24,10 @@ function formatDate(value: string): string {
 }
 
 export default function NoticesPage() {
-  const { isAdmin, isSuperAdmin } = useAdminAuth()
+  const { isAdmin } = useAdminAuth()
   const [topTab, setTopTab] = useState<TopTab>('posts')
-  // Admins run the notice board; the donation ledger stays limited to super admins.
-  const visibleTabs: TopTab[] = isSuperAdmin ? ['posts', 'donations'] : ['posts']
+  // Admins can read the donation ledger; LedgerSection limits changes to super admins.
+  const visibleTabs: TopTab[] = isAdmin ? ['posts', 'donations'] : ['posts']
 
   const [notices, setNotices] = useState<NoticeItem[]>([])
   const [loading, setLoading] = useState<boolean>(true)
@@ -237,7 +237,7 @@ export default function NoticesPage() {
         </div>
       )}
 
-      {topTab === 'donations' && isSuperAdmin && <LedgerSection />}
+      {topTab === 'donations' && isAdmin && <LedgerSection />}
     </section>
   )
 }

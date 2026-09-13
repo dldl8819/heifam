@@ -47,7 +47,7 @@ public class LedgerExpenseAdminService {
         String actorEmail,
         String actorNickname
     ) {
-        requireAdmin(actorEmail);
+        requireSuperAdmin(actorEmail);
 
         LedgerExpenseEntry entry = new LedgerExpenseEntry();
         entry.setGroupId(groupId);
@@ -73,7 +73,7 @@ public class LedgerExpenseAdminService {
         String actorEmail,
         String actorNickname
     ) {
-        requireAdmin(actorEmail);
+        requireSuperAdmin(actorEmail);
 
         LedgerExpenseEntry entry = ledgerExpenseEntryRepository.findByIdAndGroupId(entryId, groupId)
             .orElseThrow(() -> new NoSuchElementException("Ledger expense entry not found"));
@@ -93,7 +93,7 @@ public class LedgerExpenseAdminService {
 
     @Transactional
     public void deleteEntry(Long groupId, Long entryId, String actorEmail, String actorNickname) {
-        requireAdmin(actorEmail);
+        requireSuperAdmin(actorEmail);
 
         LedgerExpenseEntry entry = ledgerExpenseEntryRepository.findByIdAndGroupId(entryId, groupId)
             .orElseThrow(() -> new NoSuchElementException("Ledger expense entry not found"));
@@ -110,7 +110,7 @@ public class LedgerExpenseAdminService {
         String actorEmail,
         String actorNickname
     ) {
-        requireAdmin(actorEmail);
+        requireSuperAdmin(actorEmail);
 
         String expenseType = requireExpenseType(request == null ? null : request.expenseType());
         String csvContent = request == null ? null : request.csvContent();
@@ -169,9 +169,10 @@ public class LedgerExpenseAdminService {
         }
     }
 
-    private void requireAdmin(String actorEmail) {
-        if (!accessControlService.isAdminEmail(actorEmail)) {
-            throw new IllegalArgumentException("Only admins can manage the ledger");
+    // Admins can read the ledger; only super admins change it.
+    private void requireSuperAdmin(String actorEmail) {
+        if (!accessControlService.isSuperAdminEmail(actorEmail)) {
+            throw new IllegalArgumentException("Only super admins can manage the ledger");
         }
     }
 
