@@ -24,8 +24,10 @@ function formatDate(value: string): string {
 }
 
 export default function NoticesPage() {
-  const { isAdmin } = useAdminAuth()
+  const { isAdmin, isSuperAdmin } = useAdminAuth()
   const [topTab, setTopTab] = useState<TopTab>('posts')
+  // Admins run the notice board; the donation ledger stays limited to super admins.
+  const visibleTabs: TopTab[] = isSuperAdmin ? ['posts', 'donations'] : ['posts']
 
   const [notices, setNotices] = useState<NoticeItem[]>([])
   const [loading, setLoading] = useState<boolean>(true)
@@ -97,7 +99,7 @@ export default function NoticesPage() {
       </div>
 
       <div className="flex gap-2 border-b border-slate-200 dark:border-slate-700">
-        {(['posts', 'donations'] as TopTab[]).map((tab) => (
+        {visibleTabs.map((tab) => (
           <button
             key={tab}
             type="button"
@@ -235,7 +237,7 @@ export default function NoticesPage() {
         </div>
       )}
 
-      {topTab === 'donations' && <LedgerSection />}
+      {topTab === 'donations' && isSuperAdmin && <LedgerSection />}
     </section>
   )
 }

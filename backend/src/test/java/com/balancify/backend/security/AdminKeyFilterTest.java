@@ -25,6 +25,7 @@ import com.balancify.backend.api.admin.OperationAuditLogController;
 import com.balancify.backend.api.admin.dto.OperationAuditLogPageResponse;
 import com.balancify.backend.api.group.GroupMatchAdminController;
 import com.balancify.backend.api.group.GroupMatchController;
+import com.balancify.backend.api.group.GroupNoticeAdminController;
 import com.balancify.backend.api.group.GroupDashboardController;
 import com.balancify.backend.api.group.GroupPlayerController;
 import com.balancify.backend.api.group.GroupPlayerAdminController;
@@ -70,6 +71,7 @@ import com.balancify.backend.service.MatchImportService;
 import com.balancify.backend.service.MatchResultService;
 import com.balancify.backend.service.ManualMatchService;
 import com.balancify.backend.service.MultiMatchBalancingService;
+import com.balancify.backend.service.NoticeAdminService;
 import com.balancify.backend.service.OperationAuditLogService;
 import com.balancify.backend.service.PlayerActivityQueryService;
 import com.balancify.backend.service.PlayerAdminService;
@@ -108,7 +110,8 @@ import org.springframework.test.web.servlet.MockMvc;
     GroupPlayerImportController.class,
     GroupPlayerAdminController.class,
     GroupMatchAdminController.class,
-    OperationAuditLogController.class
+    OperationAuditLogController.class,
+    GroupNoticeAdminController.class
 })
 @Import({ AdminKeyFilter.class, ServiceAccessFilter.class, AdminKeyProperties.class })
 @TestPropertySource(properties = {
@@ -173,6 +176,9 @@ class AdminKeyFilterTest {
 
     @MockBean
     private OperationAuditLogService operationAuditLogService;
+
+    @MockBean
+    private NoticeAdminService noticeAdminService;
 
     @MockBean
     private AdminRequestResolver adminRequestResolver;
@@ -1977,6 +1983,77 @@ class AdminKeyFilterTest {
                     .content("{\"mmr\":1200}")
             )
             .andExpect(status().isOk());
+    }
+
+    @Test
+    void returnsForbiddenForNoticeCreateWithMemberEmail() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/groups/1/notices")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"title\":\"제목\",\"content\":\"내용\"}")
+            )
+            .andExpect(status().isForbidden());
+
+        verify(noticeAdminService, never()).createNotice(any(), any(), any(), any());
+    }
+
+    @Test
+    void allowsNoticeCreateWithAdminEmail() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/groups/1/notices")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"title\":\"제목\",\"content\":\"내용\"}")
+            )
+            .andExpect(status().isOk());
+
+        verify(noticeAdminService).createNotice(
+            eq(1L),
+            argThat(request -> request != null && "제목".equals(request.title())),
+            eq("admin@hei.gg"),
+            eq("admin")
+        );
+    }
+
+    @Test
+    void allowsNoticeUpdateWithAdminEmail() throws Exception {
+        mockMvc
+            .perform(
+                put("/api/groups/1/notices/5")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"title\":\"수정한 제목\",\"content\":\"내용\"}")
+            )
+            .andExpect(status().isOk());
+
+        verify(noticeAdminService).updateNotice(eq(1L), eq(5L), any(), eq("admin@hei.gg"), eq("admin"));
+    }
+
+    @Test
+    void returnsForbiddenForNoticeDeleteWithAdminEmail() throws Exception {
+        mockMvc
+            .perform(
+                delete("/api/groups/1/notices/5")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+            )
+            .andExpect(status().isForbidden());
+
+        verify(noticeAdminService, never()).deleteNotice(any(), any(), any(), any());
+    }
+
+    @Test
+    void allowsNoticeDeleteWithSuperAdminEmail() throws Exception {
+        mockMvc
+            .perform(
+                delete("/api/groups/1/notices/5")
+                    .header("X-USER-EMAIL", "superadmin@hei.gg")
+            )
+            .andExpect(status().isOk());
+
+        verify(noticeAdminService).deleteNotice(eq(1L), eq(5L), eq("superadmin@hei.gg"), eq("superadmin"));
     }
 
     @Test

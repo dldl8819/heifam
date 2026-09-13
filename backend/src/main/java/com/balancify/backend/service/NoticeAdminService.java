@@ -93,7 +93,8 @@ public class NoticeAdminService {
 
     @Transactional
     public void deleteNotice(Long groupId, Long noticeId, String actorEmail, String actorNickname) {
-        requireAdmin(actorEmail);
+        // Admins can post and edit notices, but removing one is reserved for super admins.
+        requireSuperAdmin(actorEmail);
 
         Notice notice = noticeRepository.findByIdAndGroupId(noticeId, groupId)
             .orElseThrow(() -> new NoSuchElementException("Notice not found"));
@@ -105,6 +106,12 @@ public class NoticeAdminService {
     private void requireAdmin(String actorEmail) {
         if (!accessControlService.isAdminEmail(actorEmail)) {
             throw new IllegalArgumentException("Only admins can manage notices");
+        }
+    }
+
+    private void requireSuperAdmin(String actorEmail) {
+        if (!accessControlService.isSuperAdminEmail(actorEmail)) {
+            throw new IllegalArgumentException("Only super admins can delete notices");
         }
     }
 

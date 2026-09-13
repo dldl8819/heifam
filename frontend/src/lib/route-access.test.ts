@@ -62,17 +62,22 @@ describe('route access', () => {
     })
   })
 
-  it('blocks a regular admin from viewing notices', () => {
-    const decision = getRouteAccessDecision('/notices', {
+  it('allows a regular admin to view notices', () => {
+    const context = {
       isLoggedIn: true,
       canAccess: true,
       isAdmin: true,
       isSuperAdmin: false,
-    })
+    }
 
-    expect(decision).toEqual({
-      allowed: false,
-      redirectTo: '/players',
+    expect(getRouteAccessDecision('/notices', context)).toEqual({
+      allowed: true,
+      redirectTo: null,
+      blocked: false,
+    })
+    expect(getRouteAccessDecision('/notices/5', context)).toEqual({
+      allowed: true,
+      redirectTo: null,
       blocked: false,
     })
   })

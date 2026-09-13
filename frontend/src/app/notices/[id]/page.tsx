@@ -25,7 +25,7 @@ export default function NoticeDetailPage() {
   const router = useRouter()
   const params = useParams<{ id: string }>()
   const noticeId = Number(params.id)
-  const { isAdmin } = useAdminAuth()
+  const { isAdmin, isSuperAdmin } = useAdminAuth()
 
   const [notice, setNotice] = useState<NoticeItem | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
@@ -151,13 +151,15 @@ export default function NoticeDetailPage() {
               >
                 {t('notices.posts.editButton')}
               </button>
-              <button
-                type="button"
-                onClick={handleDelete}
-                className="rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-400 dark:hover:bg-rose-950/40"
-              >
-                {t('notices.posts.deleteButton')}
-              </button>
+              {isSuperAdmin && (
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  className="rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-400 dark:hover:bg-rose-950/40"
+                >
+                  {t('notices.posts.deleteButton')}
+                </button>
+              )}
             </div>
           )}
         </article>

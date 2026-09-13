@@ -42,6 +42,8 @@ class NoticeAdminServiceTest {
         noticeAdminService = new NoticeAdminService(noticeRepository, accessControlService, operationAuditLogService);
         when(accessControlService.isAdminEmail("ops@hei.gg")).thenReturn(true);
         when(accessControlService.isAdminEmail("member@hei.gg")).thenReturn(false);
+        when(accessControlService.isAdminEmail("superadmin@hei.gg")).thenReturn(true);
+        when(accessControlService.isSuperAdminEmail("superadmin@hei.gg")).thenReturn(true);
         when(noticeRepository.save(any(Notice.class))).thenAnswer(invocation -> {
             Notice notice = invocation.getArgument(0);
             if (notice.getId() == null) {
@@ -133,10 +135,25 @@ class NoticeAdminServiceTest {
         notice.setTitle("to delete");
         when(noticeRepository.findByIdAndGroupId(7L, 1L)).thenReturn(Optional.of(notice));
 
-        noticeAdminService.deleteNotice(1L, 7L, "ops@hei.gg", "OpsUser");
+        noticeAdminService.deleteNotice(1L, 7L, "superadmin@hei.gg", "SuperAdmin");
 
         verify(noticeRepository).delete(notice);
         verify(operationAuditLogService)
-            .recordNoticeDeleted(eq("ops@hei.gg"), eq("OpsUser"), eq(1L), eq(7L), eq("to delete"));
+            .recordNoticeDeleted(eq("superadmin@hei.gg"), eq("SuperAdmin"), eq(1L), eq(7L), eq("to delete"));
+    }
+
+    @Test
+    void rejectsDeleteWhenActorIsAdminButNotSuperAdmin() {
+        Notice notice = new Notice();
+        notice.setId(8L);
+        notice.setGroupId(1L);
+        notice.setTitle("keep");
+        when(noticeRepository.findByIdAndGroupId(8L, 1L)).thenReturn(Optional.of(notice));
+
+        assertThatThrownBy(() -> noticeAdminService.deleteNotice(1L, 8L, "ops@hei.gg", "OpsUser"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Only super admins can delete notices");
+
+        verify(noticeRepository, never()).delete(any(Notice.class));
     }
 }

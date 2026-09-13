@@ -157,7 +157,7 @@ public class AdminKeyFilter extends OncePerRequestFilter {
         new ProtectedRoute(
             "DELETE",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/notices/{noticeId}"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SUPER_ADMIN_EMAIL
         ),
         new ProtectedRoute(
             "GET",

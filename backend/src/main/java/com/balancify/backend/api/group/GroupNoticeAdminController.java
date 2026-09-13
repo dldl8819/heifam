@@ -101,10 +101,16 @@ public class GroupNoticeAdminController {
         HttpServletRequest httpRequest
     ) {
         String requestEmail = requireRequestEmail(httpRequest);
-        requireAdmin(requestEmail);
+        requireSuperAdmin(requestEmail);
 
         try {
             noticeAdminService.deleteNotice(groupId, noticeId, requestEmail, resolveActorNickname(requestEmail));
+        } catch (IllegalArgumentException illegalArgumentException) {
+            throw new ResponseStatusException(
+                HttpStatus.FORBIDDEN,
+                illegalArgumentException.getMessage(),
+                illegalArgumentException
+            );
         } catch (NoSuchElementException noSuchElementException) {
             throw new ResponseStatusException(
                 HttpStatus.NOT_FOUND,
@@ -117,6 +123,12 @@ public class GroupNoticeAdminController {
     private void requireAdmin(String email) {
         if (!accessControlService.isAdminEmail(email)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin role required");
+        }
+    }
+
+    private void requireSuperAdmin(String email) {
+        if (!accessControlService.isSuperAdminEmail(email)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Super admin role required");
         }
     }
 

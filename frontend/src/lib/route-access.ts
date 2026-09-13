@@ -17,8 +17,8 @@ const AUTH_PATH_PREFIX = '/auth'
 const DISABLED_PATHS = ['/dashboard']
 const PUBLIC_PATHS = ['/', '/events', '/ads', '/results', '/privacy', '/terms']
 const MEMBER_PATHS = ['/balance', '/players', '/ranking']
-const ADMIN_PATHS = ['/balance/multi', '/captain-draft', '/import', '/players/import']
-const SUPER_ADMIN_PATHS = ['/admin/access', '/admin/audit', '/notices']
+const ADMIN_PATHS = ['/balance/multi', '/captain-draft', '/import', '/players/import', '/notices']
+const SUPER_ADMIN_PATHS = ['/admin/access', '/admin/audit']
 
 function getAuthenticatedDefaultPath(_context: RouteAccessContext): string {
   return '/players'
