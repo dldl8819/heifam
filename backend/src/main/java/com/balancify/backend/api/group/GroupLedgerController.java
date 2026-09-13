@@ -1,6 +1,7 @@
 package com.balancify.backend.api.group;
 
 import com.balancify.backend.api.group.dto.LedgerCategoriesResponse;
+import com.balancify.backend.api.group.dto.LedgerDashboardResponse;
 import com.balancify.backend.api.group.dto.LedgerExpenseEntryResponse;
 import com.balancify.backend.api.group.dto.LedgerIncomeEntryResponse;
 import com.balancify.backend.api.group.dto.LedgerMonthlySummaryResponse;
@@ -66,5 +67,10 @@ public class GroupLedgerController {
     ) {
         int resolvedYear = year == null ? Year.now().getValue() : year;
         return ledgerSummaryService.getMonthlySummary(groupId, resolvedYear);
+    }
+
+    @GetMapping("/{groupId}/ledger/dashboard")
+    public LedgerDashboardResponse getDashboard(@PathVariable Long groupId) {
+        return ledgerSummaryService.getDashboard(groupId);
     }
 }

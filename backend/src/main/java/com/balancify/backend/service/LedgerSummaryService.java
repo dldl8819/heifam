@@ -1,5 +1,9 @@
 package com.balancify.backend.service;
 
+import com.balancify.backend.api.group.dto.LedgerDashboardBalancePoint;
+import com.balancify.backend.api.group.dto.LedgerDashboardCategoryItem;
+import com.balancify.backend.api.group.dto.LedgerDashboardMonthItem;
+import com.balancify.backend.api.group.dto.LedgerDashboardResponse;
 import com.balancify.backend.api.group.dto.LedgerMonthlySummaryItem;
 import com.balancify.backend.api.group.dto.LedgerMonthlySummaryResponse;
 import com.balancify.backend.domain.LedgerExpenseEntry;
@@ -7,9 +11,13 @@ import com.balancify.backend.domain.LedgerIncomeEntry;
 import com.balancify.backend.repository.LedgerExpenseEntryRepository;
 import com.balancify.backend.repository.LedgerIncomeEntryRepository;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -97,6 +105,142 @@ public class LedgerSummaryService {
         return new LedgerMonthlySummaryResponse(year, months);
     }
 
+    /**
+     * Builds the all-time ledger dashboard: the current balance, the balance after each day with
+     * entries, per-month totals and spending by category.
+     *
+     * <p>Counting starts at the earliest "기초 잔액" entry - the same starting point the monthly
+     * summary's cumulative balance uses - and entries dated before it are left out, so
+     * {@code startingBalance + totalIncome - totalExpense} always equals {@code currentBalance}.
+     * Starting balance entries are reported on their own rather than as income: they are the money
+     * already in the account when record keeping began, not money that came in.
+     */
+    @Transactional(readOnly = true)
+    public LedgerDashboardResponse getDashboard(Long groupId) {
+        List<LedgerIncomeEntry> incomeEntries = ledgerIncomeEntryRepository
+            .findByGroupIdOrderByEntryDateAscIdAsc(groupId);
+        List<LedgerExpenseEntry> expenseEntries = ledgerExpenseEntryRepository
+            .findByGroupIdOrderByEntryDateAscIdAsc(groupId);
+        LocalDate startingBalanceDate = findEarliestStartingBalanceDate(incomeEntries);
+
+        long startingBalance = 0L;
+        long totalIncome = 0L;
+        int incomeCount = 0;
+        long totalFixedExpense = 0L;
+        long totalVariableExpense = 0L;
+        int expenseCount = 0;
+        TreeMap<LocalDate, Long> changeByDate = new TreeMap<>();
+        Map<YearMonth, MonthTotals> totalsByMonth = new LinkedHashMap<>();
+        Map<String, CategoryTotals> totalsByCategory = new LinkedHashMap<>();
+
+        for (LedgerIncomeEntry entry : incomeEntries) {
+            LocalDate date = entry.getEntryDate();
+            if (date == null || !isOnOrAfterStartingBalance(date, startingBalanceDate)) {
+                continue;
+            }
+            long amount = safeAmount(entry.getAmount());
+            changeByDate.merge(date, amount, Long::sum);
+            if (isStartingBalanceCategory(entry.getCategory())) {
+                startingBalance += amount;
+                continue;
+            }
+            totalIncome += amount;
+            incomeCount++;
+            MonthTotals month = totalsByMonth.computeIfAbsent(YearMonth.from(date), ignored -> new MonthTotals());
+            month.income += amount;
+            month.incomeCount++;
+        }
+
+        for (LedgerExpenseEntry entry : expenseEntries) {
+            LocalDate date = entry.getEntryDate();
+            if (date == null || !isOnOrAfterStartingBalance(date, startingBalanceDate)) {
+                continue;
+            }
+            boolean fixed = "FIXED".equals(entry.getExpenseType());
+            if (!fixed && !"VARIABLE".equals(entry.getExpenseType())) {
+                continue;
+            }
+            long amount = safeAmount(entry.getAmount());
+            changeByDate.merge(date, -amount, Long::sum);
+            expenseCount++;
+            MonthTotals month = totalsByMonth.computeIfAbsent(YearMonth.from(date), ignored -> new MonthTotals());
+            month.expenseCount++;
+            if (fixed) {
+                totalFixedExpense += amount;
+                month.fixedExpense += amount;
+            } else {
+                totalVariableExpense += amount;
+                month.variableExpense += amount;
+            }
+            String category = entry.getCategory() == null ? "" : entry.getCategory().trim();
+            CategoryTotals categoryTotals = totalsByCategory.computeIfAbsent(category, ignored -> new CategoryTotals());
+            categoryTotals.amount += amount;
+            categoryTotals.count++;
+        }
+
+        List<LedgerDashboardBalancePoint> balanceTimeline = new ArrayList<>();
+        long balance = 0L;
+        for (Map.Entry<LocalDate, Long> day : changeByDate.entrySet()) {
+            balance += day.getValue();
+            balanceTimeline.add(new LedgerDashboardBalancePoint(day.getKey(), day.getValue(), balance));
+        }
+
+        List<LedgerDashboardMonthItem> months = new ArrayList<>();
+        if (!changeByDate.isEmpty()) {
+            YearMonth lastMonth = YearMonth.from(changeByDate.lastKey());
+            int pointIndex = 0;
+            long endBalance = 0L;
+            for (YearMonth month = YearMonth.from(changeByDate.firstKey()); !month.isAfter(lastMonth); month = month.plusMonths(1)) {
+                LocalDate monthEnd = month.atEndOfMonth();
+                while (pointIndex < balanceTimeline.size() && !balanceTimeline.get(pointIndex).date().isAfter(monthEnd)) {
+                    endBalance = balanceTimeline.get(pointIndex).balance();
+                    pointIndex++;
+                }
+                MonthTotals totals = totalsByMonth.getOrDefault(month, new MonthTotals());
+                long monthExpense = totals.fixedExpense + totals.variableExpense;
+                months.add(new LedgerDashboardMonthItem(
+                    month.toString(),
+                    totals.income,
+                    totals.incomeCount,
+                    totals.fixedExpense,
+                    totals.variableExpense,
+                    monthExpense,
+                    totals.expenseCount,
+                    totals.income - monthExpense,
+                    endBalance
+                ));
+            }
+        }
+
+        List<LedgerDashboardCategoryItem> expenseCategories = totalsByCategory.entrySet()
+            .stream()
+            .map(entry -> new LedgerDashboardCategoryItem(entry.getKey(), entry.getValue().amount, entry.getValue().count))
+            .sorted(Comparator.comparingLong(LedgerDashboardCategoryItem::amount)
+                .reversed()
+                .thenComparing(LedgerDashboardCategoryItem::category))
+            .toList();
+
+        return new LedgerDashboardResponse(
+            changeByDate.isEmpty() ? null : changeByDate.lastKey(),
+            startingBalanceDate,
+            startingBalance,
+            totalIncome,
+            incomeCount,
+            totalFixedExpense,
+            totalVariableExpense,
+            totalFixedExpense + totalVariableExpense,
+            expenseCount,
+            balance,
+            balanceTimeline,
+            months,
+            expenseCategories
+        );
+    }
+
+    private boolean isStartingBalanceCategory(String category) {
+        return category != null && STARTING_BALANCE_CATEGORY.equals(category.trim());
+    }
+
     private LocalDate findEarliestStartingBalanceDate(List<LedgerIncomeEntry> incomeEntries) {
         LocalDate earliest = null;
         for (LedgerIncomeEntry entry : incomeEntries) {
@@ -127,5 +271,18 @@ public class LedgerSummaryService {
     }
 
     private record LedgerEvent(LocalDate date, long amount) {
+    }
+
+    private static final class MonthTotals {
+        private long income;
+        private int incomeCount;
+        private long fixedExpense;
+        private long variableExpense;
+        private int expenseCount;
+    }
+
+    private static final class CategoryTotals {
+        private long amount;
+        private int count;
     }
 }

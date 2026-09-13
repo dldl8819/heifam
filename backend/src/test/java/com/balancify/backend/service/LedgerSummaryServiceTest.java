@@ -1,8 +1,13 @@
 package com.balancify.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.Mockito.when;
 
+import com.balancify.backend.api.group.dto.LedgerDashboardBalancePoint;
+import com.balancify.backend.api.group.dto.LedgerDashboardCategoryItem;
+import com.balancify.backend.api.group.dto.LedgerDashboardMonthItem;
+import com.balancify.backend.api.group.dto.LedgerDashboardResponse;
 import com.balancify.backend.api.group.dto.LedgerMonthlySummaryItem;
 import com.balancify.backend.api.group.dto.LedgerMonthlySummaryResponse;
 import com.balancify.backend.domain.LedgerExpenseEntry;
@@ -55,6 +60,124 @@ class LedgerSummaryServiceTest {
         entry.setAmount(amount);
         entry.setAuthorEmail("ops@hei.gg");
         return entry;
+    }
+
+    private LedgerExpenseEntry expense(LocalDate date, String expenseType, String category, long amount) {
+        LedgerExpenseEntry entry = expense(date, expenseType, amount);
+        entry.setCategory(category);
+        return entry;
+    }
+
+    @Test
+    void dashboardReportsStartingBalanceSeparatelyAndReconcilesCurrentBalance() {
+        when(ledgerIncomeEntryRepository.findByGroupIdOrderByEntryDateAscIdAsc(1L)).thenReturn(List.of(
+            income(LocalDate.of(2026, 2, 1), "후원", 50_000L),
+            income(LocalDate.of(2026, 3, 3), "기초 잔액", 1_057_801L),
+            income(LocalDate.of(2026, 4, 1), "후원", 10_000L),
+            income(LocalDate.of(2026, 4, 1), "후원", 100_000L)
+        ));
+        when(ledgerExpenseEntryRepository.findByGroupIdOrderByEntryDateAscIdAsc(1L)).thenReturn(List.of(
+            expense(LocalDate.of(2026, 3, 6), "VARIABLE", "리그전", 150_000L),
+            expense(LocalDate.of(2026, 4, 6), "VARIABLE", "정기감전", 30_000L),
+            expense(LocalDate.of(2026, 4, 10), "FIXED", "서버비", 9_000L)
+        ));
+
+        LedgerDashboardResponse dashboard = ledgerSummaryService.getDashboard(1L);
+
+        assertThat(dashboard.startingBalanceDate()).isEqualTo(LocalDate.of(2026, 3, 3));
+        assertThat(dashboard.asOfDate()).isEqualTo(LocalDate.of(2026, 4, 10));
+        assertThat(dashboard.startingBalance()).isEqualTo(1_057_801L);
+        assertThat(dashboard.totalIncome()).isEqualTo(110_000L);
+        assertThat(dashboard.incomeCount()).isEqualTo(2);
+        assertThat(dashboard.totalFixedExpense()).isEqualTo(9_000L);
+        assertThat(dashboard.totalVariableExpense()).isEqualTo(180_000L);
+        assertThat(dashboard.totalExpense()).isEqualTo(189_000L);
+        assertThat(dashboard.expenseCount()).isEqualTo(3);
+        assertThat(dashboard.currentBalance())
+            .isEqualTo(dashboard.startingBalance() + dashboard.totalIncome() - dashboard.totalExpense())
+            .isEqualTo(978_801L);
+
+        assertThat(dashboard.balanceTimeline())
+            .extracting(
+                LedgerDashboardBalancePoint::date,
+                LedgerDashboardBalancePoint::change,
+                LedgerDashboardBalancePoint::balance
+            )
+            .containsExactly(
+                tuple(LocalDate.of(2026, 3, 3), 1_057_801L, 1_057_801L),
+                tuple(LocalDate.of(2026, 3, 6), -150_000L, 907_801L),
+                tuple(LocalDate.of(2026, 4, 1), 110_000L, 1_017_801L),
+                tuple(LocalDate.of(2026, 4, 6), -30_000L, 987_801L),
+                tuple(LocalDate.of(2026, 4, 10), -9_000L, 978_801L)
+            );
+
+        assertThat(dashboard.months()).hasSize(2);
+        LedgerDashboardMonthItem march = dashboard.months().get(0);
+        assertThat(march.month()).isEqualTo("2026-03");
+        assertThat(march.income()).isZero();
+        assertThat(march.totalExpense()).isEqualTo(150_000L);
+        assertThat(march.net()).isEqualTo(-150_000L);
+        assertThat(march.endBalance()).isEqualTo(907_801L);
+        LedgerDashboardMonthItem april = dashboard.months().get(1);
+        assertThat(april.month()).isEqualTo("2026-04");
+        assertThat(april.income()).isEqualTo(110_000L);
+        assertThat(april.incomeCount()).isEqualTo(2);
+        assertThat(april.fixedExpense()).isEqualTo(9_000L);
+        assertThat(april.variableExpense()).isEqualTo(30_000L);
+        assertThat(april.expenseCount()).isEqualTo(2);
+        assertThat(april.net()).isEqualTo(71_000L);
+        assertThat(april.endBalance()).isEqualTo(978_801L);
+
+        assertThat(dashboard.expenseCategories())
+            .extracting(
+                LedgerDashboardCategoryItem::category,
+                LedgerDashboardCategoryItem::amount,
+                LedgerDashboardCategoryItem::count
+            )
+            .containsExactly(
+                tuple("리그전", 150_000L, 1),
+                tuple("정기감전", 30_000L, 1),
+                tuple("서버비", 9_000L, 1)
+            );
+    }
+
+    @Test
+    void dashboardFillsMonthsWithoutEntriesAndCarriesTheBalanceForward() {
+        when(ledgerIncomeEntryRepository.findByGroupIdOrderByEntryDateAscIdAsc(1L)).thenReturn(List.of(
+            income(LocalDate.of(2026, 1, 15), "기초 잔액", 100_000L)
+        ));
+        when(ledgerExpenseEntryRepository.findByGroupIdOrderByEntryDateAscIdAsc(1L)).thenReturn(List.of(
+            expense(LocalDate.of(2026, 3, 2), "VARIABLE", 1_000L)
+        ));
+
+        LedgerDashboardResponse dashboard = ledgerSummaryService.getDashboard(1L);
+
+        assertThat(dashboard.months())
+            .extracting(
+                LedgerDashboardMonthItem::month,
+                LedgerDashboardMonthItem::totalExpense,
+                LedgerDashboardMonthItem::endBalance
+            )
+            .containsExactly(
+                tuple("2026-01", 0L, 100_000L),
+                tuple("2026-02", 0L, 100_000L),
+                tuple("2026-03", 1_000L, 99_000L)
+            );
+    }
+
+    @Test
+    void dashboardIsEmptyWhenTheLedgerHasNoEntries() {
+        when(ledgerIncomeEntryRepository.findByGroupIdOrderByEntryDateAscIdAsc(1L)).thenReturn(List.of());
+        when(ledgerExpenseEntryRepository.findByGroupIdOrderByEntryDateAscIdAsc(1L)).thenReturn(List.of());
+
+        LedgerDashboardResponse dashboard = ledgerSummaryService.getDashboard(1L);
+
+        assertThat(dashboard.asOfDate()).isNull();
+        assertThat(dashboard.startingBalanceDate()).isNull();
+        assertThat(dashboard.currentBalance()).isZero();
+        assertThat(dashboard.balanceTimeline()).isEmpty();
+        assertThat(dashboard.months()).isEmpty();
+        assertThat(dashboard.expenseCategories()).isEmpty();
     }
 
     @Test

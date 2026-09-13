@@ -18,6 +18,7 @@ import type {
   GroupPlayerTierBoardItem,
   HealthResponse,
   LedgerCategoriesResponse,
+  LedgerDashboardResponse,
   LedgerExpenseEntry,
   LedgerExpenseEntryCreateRequest,
   LedgerExpenseEntryUpdateRequest,
@@ -25,7 +26,6 @@ import type {
   LedgerIncomeEntry,
   LedgerIncomeEntryCreateRequest,
   LedgerIncomeEntryUpdateRequest,
-  LedgerMonthlySummaryResponse,
   MatchHistoryFilters,
   MatchHistoryPage,
   MatchTeamSide,
@@ -1415,9 +1415,9 @@ export const apiClient = {
       },
       { adminOnly: true }
     ),
-  getLedgerSummary: (groupId: number, year: number) =>
-    apiRequest<LedgerMonthlySummaryResponse>(
-      `/api/groups/${groupId}/ledger/summary?year=${year}`,
+  getLedgerDashboard: (groupId: number) =>
+    apiRequest<LedgerDashboardResponse>(
+      `/api/groups/${groupId}/ledger/dashboard`,
       undefined,
       { includeUserEmail: true }
     ),

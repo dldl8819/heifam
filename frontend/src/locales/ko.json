@@ -338,9 +338,9 @@
     },
     "donations": {
       "subTabs": {
+        "dashboard": "대시보드",
         "income": "수입",
-        "expense": "지출",
-        "summary": "월별 요약"
+        "expense": "지출"
       },
       "memoHint": "팸 내부 공개 정보이니 참고해서 작성해주세요.",
       "addButton": "내역 추가",
@@ -401,18 +401,50 @@
         "memoPlaceholder": "내용",
         "uploadTypeLabel": "업로드할 지출 구분"
       },
-      "summary": {
-        "yearLabel": "연도",
+      "dashboard": {
+        "balanceLabel": "현재 후원금 잔액",
+        "asOf": "{date} 기준",
+        "startingBalance": "기초 잔액 ({date})",
+        "startingBalanceNoDate": "기초 잔액",
+        "plusIncome": "+ 들어온 돈",
+        "minusExpense": "− 사용한 돈",
+        "equalsBalance": "= 현재 잔액",
+        "overviewTitle": "한눈에 보기",
+        "overviewHint": "기초 잔액은 기록을 시작할 때 통장에 있던 돈이라 들어온 돈에 넣지 않았습니다.",
+        "totalIncome": "누적 들어온 돈",
+        "totalExpense": "누적 사용",
+        "monthIncome": "{month} 들어온 돈",
+        "monthExpense": "{month} 사용",
+        "count": "{count}건",
+        "expenseSplit": "{count}건 · 고정 {fixed} · 소비 {variable}",
+        "balanceTitle": "잔액 추이",
+        "balanceHint": "거래가 있던 날마다 통장 잔액이 어떻게 바뀌었는지 보여줍니다.",
+        "balanceAria": "잔액 추이 그래프. 현재 잔액 {balance}. 좌우 방향키로 날짜별 잔액을 확인할 수 있습니다.",
+        "balanceTooltipBalance": "잔액",
+        "balanceTooltipChange": "그날 변동",
+        "categoryTitle": "어디에 썼나",
+        "categoryHint": "사용 분류별 누적 금액입니다.",
+        "noExpense": "아직 사용 내역이 없습니다.",
+        "monthlyTitle": "월별 들어온 돈 · 사용",
+        "monthlyHint": "기초 잔액을 빼고 매달 들어온 돈과 사용한 돈을 비교합니다.",
+        "monthlyAria": "월별 들어온 돈과 사용 금액 막대그래프",
+        "monthlyBarAria": "{month} 들어온 돈 {income}, 사용 {expense}, 월말 잔액 {balance}",
+        "legendIncome": "들어온 돈",
+        "legendExpense": "사용",
+        "tooltipIncome": "들어온 돈 {count}건",
+        "tooltipExpense": "사용 {count}건",
         "table": {
           "month": "월",
-          "income": "수입",
+          "income": "들어온 돈",
           "fixedExpense": "고정비용",
           "variableExpense": "소비지출",
-          "totalExpense": "지출 합계",
+          "totalExpense": "사용 합계",
           "net": "수지",
-          "cumulativeBalance": "누적 잔액"
+          "endBalance": "월말 잔액",
+          "total": "합계"
         },
-        "cumulativeHint": "누적 잔액은 \"기초 잔액\" 수입 항목부터 시간순으로 누적됩니다."
+        "endBalanceCaption": "월말 잔액에는 {date} 기초 잔액 {amount}이 포함되어 있습니다.",
+        "empty": "아직 등록된 후원금 내역이 없습니다. 최고 관리자가 수입·지출 탭에서 내역을 추가하거나 CSV로 일괄 업로드하면 여기에 표시됩니다."
       }
     }
   },

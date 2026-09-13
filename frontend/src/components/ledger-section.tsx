@@ -5,6 +5,7 @@ import { useAdminAuth } from '@/lib/admin-auth'
 import { apiClient } from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
+import { LedgerDashboard } from '@/components/ledger-dashboard'
 import { t } from '@/lib/i18n'
 import { escapeCsvCell, triggerBlobDownload } from '@/lib/csv-download'
 import { normalizeLedgerTargetInput } from '@/lib/ledger-target'
@@ -12,14 +13,13 @@ import type {
   LedgerExpenseEntry,
   LedgerExpenseType,
   LedgerIncomeEntry,
-  LedgerMonthlySummaryItem,
   PlayerRosterItem,
 } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
 const CUSTOM_CATEGORY_OPTION = '__custom__'
 
-type LedgerSubTab = 'income' | 'expense' | 'summary'
+type LedgerSubTab = 'dashboard' | 'income' | 'expense'
 
 function todayIsoDate(): string {
   const now = new Date()
@@ -64,7 +64,7 @@ function emptyExpenseForm(expenseType: LedgerExpenseType): ExpenseFormState {
 export function LedgerSection() {
   // Admins can read the ledger; adding, editing, importing and deleting entries is for super admins.
   const { isSuperAdmin: canManage } = useAdminAuth()
-  const [subTab, setSubTab] = useState<LedgerSubTab>('income')
+  const [subTab, setSubTab] = useState<LedgerSubTab>('dashboard')
 
   const [roster, setRoster] = useState<PlayerRosterItem[]>([])
 
@@ -90,11 +90,6 @@ export function LedgerSection() {
   const [expenseUploadType, setExpenseUploadType] = useState<LedgerExpenseType>('FIXED')
   const [expenseUploading, setExpenseUploading] = useState<boolean>(false)
   const expenseFileInputRef = useRef<HTMLInputElement | null>(null)
-
-  const [summaryYear, setSummaryYear] = useState<number>(new Date().getFullYear())
-  const [summaryMonths, setSummaryMonths] = useState<LedgerMonthlySummaryItem[]>([])
-  const [summaryLoading, setSummaryLoading] = useState<boolean>(true)
-  const [summaryError, setSummaryError] = useState<string | null>(null)
 
   const loadIncome = useCallback(async () => {
     setIncomeLoading(true)
@@ -132,19 +127,6 @@ export function LedgerSection() {
     }
   }, [])
 
-  const loadSummary = useCallback(async (year: number) => {
-    setSummaryLoading(true)
-    setSummaryError(null)
-    try {
-      const response = await apiClient.getLedgerSummary(TEMP_GROUP_ID, year)
-      setSummaryMonths(response.months)
-    } catch {
-      setSummaryError(t('notices.loadError'))
-    } finally {
-      setSummaryLoading(false)
-    }
-  }, [])
-
   useEffect(() => {
     void loadIncome()
   }, [loadIncome])
@@ -152,10 +134,6 @@ export function LedgerSection() {
   useEffect(() => {
     void loadExpense(expenseTypeFilter)
   }, [loadExpense, expenseTypeFilter])
-
-  useEffect(() => {
-    void loadSummary(summaryYear)
-  }, [loadSummary, summaryYear])
 
   useEffect(() => {
     if (!canManage) {
@@ -410,15 +388,11 @@ export function LedgerSection() {
   }, [expenseEntries])
 
   const rosterNicknames = useMemo(() => roster.map((player) => player.nickname), [roster])
-  const yearOptions = useMemo(() => {
-    const currentYear = new Date().getFullYear()
-    return Array.from({ length: 6 }, (_, index) => currentYear - index)
-  }, [])
 
   return (
     <div className="space-y-6">
       <div className="flex gap-2 border-b border-slate-200 dark:border-slate-700">
-        {(['income', 'expense', 'summary'] as LedgerSubTab[]).map((tab) => (
+        {(['dashboard', 'income', 'expense'] as LedgerSubTab[]).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -971,78 +945,7 @@ export function LedgerSection() {
         </div>
       )}
 
-      {subTab === 'summary' && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-              {t('notices.donations.summary.yearLabel')}
-              <select
-                value={summaryYear}
-                onChange={(event) => setSummaryYear(Number(event.target.value))}
-                className="rounded-md border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-900"
-              >
-                {yearOptions.map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <p className="text-xs text-slate-500 dark:text-slate-400">{t('notices.donations.summary.cumulativeHint')}</p>
-
-          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-            <table className="min-w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs tracking-wide text-slate-500 dark:bg-slate-800/80 dark:text-slate-300">
-                <tr>
-                  <th className="px-4 py-3">{t('notices.donations.summary.table.month')}</th>
-                  <th className="px-4 py-3">{t('notices.donations.summary.table.income')}</th>
-                  <th className="px-4 py-3">{t('notices.donations.summary.table.fixedExpense')}</th>
-                  <th className="px-4 py-3">{t('notices.donations.summary.table.variableExpense')}</th>
-                  <th className="px-4 py-3">{t('notices.donations.summary.table.totalExpense')}</th>
-                  <th className="px-4 py-3">{t('notices.donations.summary.table.net')}</th>
-                  <th className="px-4 py-3">{t('notices.donations.summary.table.cumulativeBalance')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {summaryLoading && (
-                  <tr>
-                    <td className="px-4 py-3" colSpan={7}>
-                      <LoadingIndicator label={t('common.loading')} />
-                    </td>
-                  </tr>
-                )}
-                {!summaryLoading && summaryError && (
-                  <tr>
-                    <td className="px-4 py-8 text-center" colSpan={7}>
-                      <Alert variant="destructive" appearance="light">
-                        <AlertIcon icon="destructive">!</AlertIcon>
-                        <AlertContent>
-                          <AlertDescription>{summaryError}</AlertDescription>
-                        </AlertContent>
-                      </Alert>
-                    </td>
-                  </tr>
-                )}
-                {!summaryLoading &&
-                  !summaryError &&
-                  summaryMonths.map((month) => (
-                    <tr key={month.month} className="border-t border-slate-100 dark:border-slate-800">
-                      <td className="px-4 py-3">{month.month}</td>
-                      <td className="px-4 py-3">{formatAmount(month.totalIncome)}</td>
-                      <td className="px-4 py-3">{formatAmount(month.totalFixedExpense)}</td>
-                      <td className="px-4 py-3">{formatAmount(month.totalVariableExpense)}</td>
-                      <td className="px-4 py-3">{formatAmount(month.totalExpense)}</td>
-                      <td className="px-4 py-3">{formatAmount(month.net)}</td>
-                      <td className="px-4 py-3">{formatAmount(month.cumulativeBalance)}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      {subTab === 'dashboard' && <LedgerDashboard groupId={TEMP_GROUP_ID} />}
     </div>
   )
 }

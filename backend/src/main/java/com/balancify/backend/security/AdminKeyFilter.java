@@ -223,6 +223,12 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             "GET",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/ledger/summary"),
             AuthType.ADMIN_EMAIL
+        ),
+        // Amounts and categories only, no names: this can move to SERVICE_ACCESS once members get the dashboard.
+        new ProtectedRoute(
+            "GET",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/ledger/dashboard"),
+            AuthType.ADMIN_EMAIL
         )
     );
 

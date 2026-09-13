@@ -2010,6 +2010,26 @@ class AdminKeyFilterTest {
     }
 
     @Test
+    void returnsForbiddenForLedgerDashboardWithMemberEmail() throws Exception {
+        mockMvc
+            .perform(
+                get("/api/groups/1/ledger/dashboard")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void allowsLedgerDashboardWithAdminEmail() throws Exception {
+        mockMvc
+            .perform(
+                get("/api/groups/1/ledger/dashboard")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+            )
+            .andExpect(status().isOk());
+    }
+
+    @Test
     void returnsForbiddenForLedgerSummaryWithMemberEmail() throws Exception {
         mockMvc
             .perform(

@@ -610,19 +610,44 @@ export type LedgerCategoriesResponse = {
   categories: string[]
 }
 
-export type LedgerMonthlySummaryItem = {
-  month: number
+export type LedgerDashboardBalancePoint = {
+  date: string
+  change: number
+  balance: number
+}
+
+export type LedgerDashboardMonthItem = {
+  month: string
+  income: number
+  incomeCount: number
+  fixedExpense: number
+  variableExpense: number
+  totalExpense: number
+  expenseCount: number
+  net: number
+  endBalance: number
+}
+
+export type LedgerDashboardCategoryItem = {
+  category: string
+  amount: number
+  count: number
+}
+
+export type LedgerDashboardResponse = {
+  asOfDate: string | null
+  startingBalanceDate: string | null
+  startingBalance: number
   totalIncome: number
+  incomeCount: number
   totalFixedExpense: number
   totalVariableExpense: number
   totalExpense: number
-  net: number
-  cumulativeBalance: number
-}
-
-export type LedgerMonthlySummaryResponse = {
-  year: number
-  months: LedgerMonthlySummaryItem[]
+  expenseCount: number
+  currentBalance: number
+  balanceTimeline: LedgerDashboardBalancePoint[]
+  months: LedgerDashboardMonthItem[]
+  expenseCategories: LedgerDashboardCategoryItem[]
 }
 
 export type LedgerImportRowError = {
