@@ -99,7 +99,10 @@ public class DashboardQueryService {
         }
 
         List<MatchParticipant> matchParticipants =
-            matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(groupId);
+            matchParticipantRepository.findByGroupIdAndPlayerMatchesOrderByPlayedAtDesc(
+                groupId,
+                targetPlayer.getId()
+            );
         Map<Long, Map<String, String>> teamCompositionByMatchTeam =
             buildTeamCompositionByMatchTeam(matchParticipants);
 

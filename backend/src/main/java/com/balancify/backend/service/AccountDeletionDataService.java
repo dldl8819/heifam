@@ -65,9 +65,24 @@ public class AccountDeletionDataService {
         this.clock = clock == null ? Clock.systemUTC() : clock;
     }
 
+    /**
+     * Links the signed-in account to its roster player, matching on the nickname registered for
+     * the account's email.
+     *
+     * <p>This runs on every {@code GET /api/access/me}, so that a member who signs in before their
+     * roster row exists still gets linked on a later page load. Once the link exists it never needs
+     * to be made again — the roster row keeps its {@code auth_user_id} even when an admin renames
+     * it — so an account that already owns a player returns immediately rather than re-running the
+     * nickname lookup on every request.
+     */
     @Transactional
     public void linkPlayers(UUID authUserId, String email) {
         if (authUserId == null) {
+            return;
+        }
+        // An existence check, not findByAuthUserIdAndAnonymizedAtIsNull: that finder takes a
+        // PESSIMISTIC_WRITE lock, which would make every page load queue behind player-row writers.
+        if (playerRepository.existsByAuthUserIdAndAnonymizedAtIsNull(authUserId)) {
             return;
         }
         String normalizedEmail = normalizeEmail(email);

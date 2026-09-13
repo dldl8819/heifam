@@ -17,13 +17,15 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AccessControlService {
 
-    private static final long DEFAULT_ACCESS_STATE_CACHE_TTL_MS = 0L;
+    private static final String ACCESS_STATE_CACHE_TTL_PROPERTY =
+        "${balancify.access.state-cache-ttl-ms:30000}";
 
     private final AdminKeyProperties adminKeyProperties;
     private final ManagedAdminEmailRepository managedAdminEmailRepository;
@@ -31,6 +33,19 @@ public class AccessControlService {
     private final AllowedUserEmailRepository allowedUserEmailRepository;
     private final UserRacePreferenceRepository userRacePreferenceRepository;
     private final ConcurrentMap<String, CachedAccessState> accessStateCache = new ConcurrentHashMap<>();
+
+    /**
+     * How long a resolved access state stays cached in-process.
+     *
+     * <p>Every authenticated request resolves the caller's access state, and each resolution costs
+     * four single-row lookups (managed admins, MMR access, allowed users, race preference). Those
+     * tables hold a handful of rows and only change when an admin edits access, so re-reading them
+     * on each request was the largest source of query volume on the database.
+     *
+     * <p>Grants and revocations evict the entry immediately on the instance that applied them, so
+     * this TTL only bounds how long another instance can keep serving a stale decision. Set
+     * {@code balancify.access.state-cache-ttl-ms} to 0 to disable caching entirely.
+     */
     private final long accessStateCacheTtlMs;
 
     private static final int MAX_NICKNAME_LENGTH = 100;
@@ -41,25 +56,8 @@ public class AccessControlService {
         ManagedAdminEmailRepository managedAdminEmailRepository,
         AdminMmrAccessEmailRepository adminMmrAccessEmailRepository,
         AllowedUserEmailRepository allowedUserEmailRepository,
-        UserRacePreferenceRepository userRacePreferenceRepository
-    ) {
-        this(
-            adminKeyProperties,
-            managedAdminEmailRepository,
-            adminMmrAccessEmailRepository,
-            allowedUserEmailRepository,
-            userRacePreferenceRepository,
-            DEFAULT_ACCESS_STATE_CACHE_TTL_MS
-        );
-    }
-
-    AccessControlService(
-        AdminKeyProperties adminKeyProperties,
-        ManagedAdminEmailRepository managedAdminEmailRepository,
-        AdminMmrAccessEmailRepository adminMmrAccessEmailRepository,
-        AllowedUserEmailRepository allowedUserEmailRepository,
         UserRacePreferenceRepository userRacePreferenceRepository,
-        long accessStateCacheTtlMs
+        @Value(ACCESS_STATE_CACHE_TTL_PROPERTY) long accessStateCacheTtlMs
     ) {
         this.adminKeyProperties = adminKeyProperties;
         this.managedAdminEmailRepository = managedAdminEmailRepository;

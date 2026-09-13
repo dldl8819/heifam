@@ -12,15 +12,32 @@ import org.springframework.data.repository.query.Param;
 
 public interface MatchParticipantRepository extends JpaRepository<MatchParticipant, Long> {
 
+    /**
+     * Loads only the participants of matches the given player took part in.
+     *
+     * <p>The dashboard summaries are all scoped to a single player: their own per-race and
+     * per-game-type records plus the team compositions and teammates of the matches they played.
+     * Fetching every participant row in the group pulls the whole history on each request, so this
+     * narrows the scan to the target player's matches while still returning the full roster of
+     * those matches (needed to resolve team compositions and teammates).
+     */
     @Query("""
         select mp
         from MatchParticipant mp
         join fetch mp.match m
         join fetch mp.player p
         where p.group.id = :groupId
+          and m.id in (
+            select mp2.match.id
+            from MatchParticipant mp2
+            where mp2.player.id = :playerId
+          )
         order by m.playedAt desc, m.id desc, mp.id desc
         """)
-    List<MatchParticipant> findByGroupIdOrderByPlayedAtDesc(@Param("groupId") Long groupId);
+    List<MatchParticipant> findByGroupIdAndPlayerMatchesOrderByPlayedAtDesc(
+        @Param("groupId") Long groupId,
+        @Param("playerId") Long playerId
+    );
 
     @Query(value = """
         select
@@ -81,7 +98,6 @@ public interface MatchParticipantRepository extends JpaRepository<MatchParticipa
         """)
     void resetAllDerivedRatings();
 
-    long countByPlayer_IdAndMatch_WinningTeamIsNotNull(Long playerId);
 
     void deleteByMatch_Id(Long matchId);
 
@@ -89,4 +105,5 @@ public interface MatchParticipantRepository extends JpaRepository<MatchParticipa
         Long getPlayerId();
         Instant getLastPlayedAt();
     }
+
 }

@@ -373,6 +373,7 @@ class MatchQueryServiceTest {
         when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of(match));
         when(matchParticipantRepository.findByMatchIdInWithPlayerAndMatch(List.of(210L))).thenReturn(List.of());
         when(accessControlService.isAdminEmail("admin@hei.gg")).thenReturn(true);
+        when(accessControlService.resolveAccessProfile("recorder@hei.gg")).thenReturn(recorderProfile());
 
         List<GroupRecentMatchResponse> responses =
             matchQueryService.getRecentMatches(1L, 10, 0, "admin@hei.gg");
@@ -395,6 +396,7 @@ class MatchQueryServiceTest {
         when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of(match));
         when(matchParticipantRepository.findByMatchIdInWithPlayerAndMatch(List.of(211L))).thenReturn(List.of());
         when(accessControlService.isAdminEmail("recorder@hei.gg")).thenReturn(false);
+        when(accessControlService.resolveAccessProfile("recorder@hei.gg")).thenReturn(recorderProfile());
 
         List<GroupRecentMatchResponse> responses =
             matchQueryService.getRecentMatches(1L, 10, 0, "recorder@hei.gg");
@@ -417,6 +419,7 @@ class MatchQueryServiceTest {
         when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of(match));
         when(matchParticipantRepository.findByMatchIdInWithPlayerAndMatch(List.of(212L))).thenReturn(List.of());
         when(accessControlService.isAdminEmail("member@hei.gg")).thenReturn(false);
+        when(accessControlService.resolveAccessProfile("recorder@hei.gg")).thenReturn(recorderProfile());
 
         List<GroupRecentMatchResponse> responses =
             matchQueryService.getRecentMatches(1L, 10, 0, "member@hei.gg");
@@ -492,5 +495,18 @@ class MatchQueryServiceTest {
         participant.setTeam(team);
         participant.setMmrBefore(mmrBefore);
         return participant;
+    }
+
+    private AccessControlService.AccessProfile recorderProfile() {
+        return new AccessControlService.AccessProfile(
+            "recorder@hei.gg",
+            "기록자",
+            "MEMBER",
+            false,
+            false,
+            true,
+            false,
+            null
+        );
     }
 }

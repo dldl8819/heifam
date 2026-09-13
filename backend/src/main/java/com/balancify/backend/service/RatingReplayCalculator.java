@@ -5,6 +5,7 @@ import com.balancify.backend.domain.Match;
 import com.balancify.backend.domain.MatchParticipant;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.domain.PlayerTierPolicy;
+import com.balancify.backend.domain.RankedMatchPolicy;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -80,6 +81,7 @@ class RatingReplayCalculator {
             }
 
             int teamSize = resolveRequiredTeamSize(match, participants);
+            boolean ratingAffecting = RankedMatchPolicy.affectsRating(teamSize);
             List<MatchParticipant> homeParticipants = participants.stream()
                 .filter(participant -> TEAM_HOME.equals(normalizeTeam(participant.getTeam())))
                 .toList();
@@ -117,19 +119,19 @@ class RatingReplayCalculator {
                 double actual = winnerTeam.equals(normalizeTeam(participant.getTeam())) ? 1.0 : 0.0;
 
                 int beforeMmr = state.currentMmr();
-                int rawDelta = (int) Math.round(effectiveKFactor * (actual - expected));
+                int rawDelta = ratingAffecting
+                    ? (int) Math.round(effectiveKFactor * (actual - expected))
+                    : 0;
                 int afterMmr = floorMmr(beforeMmr + rawDelta);
                 int delta = afterMmr - beforeMmr;
-                int completedGames = state.completedGames() + 1;
                 String nextTier = PlayerTierPolicy.resolveTierForRankedMatch(
                     state.currentTier(),
-                    afterMmr,
-                    completedGames
+                    afterMmr
                 );
 
                 state.currentMmr(afterMmr);
                 state.currentTier(nextTier);
-                state.completedGames(completedGames);
+                state.completedGames(state.completedGames() + 1);
 
                 totalAbsoluteDeltaDifference += Math.abs(delta - safeInt(participant.getMmrDelta()));
                 totalDeltaSamples++;

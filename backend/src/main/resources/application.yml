@@ -57,6 +57,10 @@ balancify:
       base-url: ${UPBIT_BASE_URL:https://api.upbit.com}
       access-key: ${UPBIT_ACCESS_KEY:}
       secret-key: ${UPBIT_SECRET_KEY:}
+  access:
+    # In-process TTL for a resolved access state. Grants/revocations evict immediately on the
+    # instance that applied them; this only bounds cross-instance staleness. 0 disables caching.
+    state-cache-ttl-ms: ${ACCESS_STATE_CACHE_TTL_MS:30000}
   security:
     jwt:
       enabled: ${JWT_ENABLED:false}

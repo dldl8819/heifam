@@ -157,6 +157,18 @@ class AccountDeletionDataServiceTest {
     }
 
     @Test
+    void skipsNicknameLookupWhenAccountAlreadyOwnsPlayer() {
+        when(playerRepository.existsByAuthUserIdAndAnonymizedAtIsNull(PLACEHOLDER_AUTH_USER_ID))
+            .thenReturn(true);
+
+        accountDeletionDataService.linkPlayers(PLACEHOLDER_AUTH_USER_ID, PLACEHOLDER_EMAIL);
+
+        verify(accountPersonalDataRepository, never()).findLinkedNickname(org.mockito.ArgumentMatchers.any());
+        verify(playerRepository, never()).findByAuthUserIdAndAnonymizedAtIsNull(org.mockito.ArgumentMatchers.any());
+        verify(playerRepository, never()).saveAll(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void linksSingleActivePlayerAndClearsStaleRetentionSubject() {
         Player candidate = new Player();
         candidate.setId(105L);

@@ -130,7 +130,7 @@ class DashboardQueryServiceTest {
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
             .thenReturn(List.of(alpha, bravo, charlie, delta, echo));
         when(matchRepository.countByGroup_IdAndWinningTeamIsNotNull(1L)).thenReturn(3L);
-        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L))
+        when(matchParticipantRepository.findByGroupIdAndPlayerMatchesOrderByPlayedAtDesc(1L, 1L))
             .thenReturn(groupParticipants);
         GroupDashboardResponse response = dashboardQueryService.getGroupDashboard(1L, "Alpha");
 
@@ -184,7 +184,7 @@ class DashboardQueryServiceTest {
             .thenReturn(List.of(alpha, bravo, charlie, delta, echo));
         when(matchRepository.countByGroup_IdAndWinningTeamIsNotNull(1L))
             .thenReturn((long) groupParticipants.size() / 2);
-        when(matchParticipantRepository.findByGroupIdOrderByPlayedAtDesc(1L))
+        when(matchParticipantRepository.findByGroupIdAndPlayerMatchesOrderByPlayedAtDesc(1L, 1L))
             .thenReturn(groupParticipants);
 
         GroupDashboardResponse response = dashboardQueryService.getGroupDashboard(1L, "Alpha");

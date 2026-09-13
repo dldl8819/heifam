@@ -42,7 +42,6 @@ public final class PlayerTierPolicy {
         Map.entry("S", 2200),
         Map.entry("S+", 2400)
     );
-    private static final int PLACEMENT_GAME_COUNT = 5;
     private static final int PROMOTION_MMR_BUFFER = 30;
     private static final int DEMOTION_MMR_BUFFER = 50;
 
@@ -94,11 +93,7 @@ public final class PlayerTierPolicy {
         return "S+";
     }
 
-    public static String resolveTierForRankedMatch(
-        String currentTier,
-        Integer mmr,
-        int completedRankedGames
-    ) {
+    public static String resolveTierForRankedMatch(String currentTier, Integer mmr) {
         int normalizedMmr = mmr == null ? 0 : mmr;
         String targetTier = resolveTier(normalizedMmr);
         if (normalizedMmr <= 0) {
@@ -111,10 +106,6 @@ public final class PlayerTierPolicy {
 
         if (targetTierIndex > currentTierIndex && canPromote(normalizedCurrentTier, normalizedMmr)) {
             return stepTier(normalizedCurrentTier, 1);
-        }
-
-        if (Math.max(0, completedRankedGames) < PLACEMENT_GAME_COUNT) {
-            return normalizedCurrentTier;
         }
 
         if (targetTierIndex < currentTierIndex && canDemote(normalizedCurrentTier, normalizedMmr)) {

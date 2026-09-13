@@ -172,7 +172,7 @@ public class Player {
         this.mmr = normalizeMmr(mmr);
     }
 
-    public void applyRankedMmr(Integer mmr, int completedRankedGames) {
+    public void applyRankedMmr(Integer mmr) {
         this.mmr = normalizeMmr(mmr);
     }
 

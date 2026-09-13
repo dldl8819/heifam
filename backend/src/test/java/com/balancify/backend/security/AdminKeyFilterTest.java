@@ -1090,7 +1090,8 @@ class AdminKeyFilterTest {
             eq(10L),
             argThat(request -> request != null && "B+".equals(request.tier())),
             eq("admin@hei.gg"),
-            eq("admin")
+            eq("admin"),
+            isNull()
         );
     }
 
@@ -1105,7 +1106,7 @@ class AdminKeyFilterTest {
             )
             .andExpect(status().isForbidden());
 
-        verify(playerAdminService, never()).updatePlayer(any(), any(), any(), any(), any());
+        verify(playerAdminService, never()).updatePlayer(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -1119,7 +1120,7 @@ class AdminKeyFilterTest {
             )
             .andExpect(status().isOk());
 
-        verify(playerAdminService).updatePlayer(any(), any(), any(), any(), any());
+        verify(playerAdminService).updatePlayer(any(), any(), any(), any(), any(), any());
     }
 
     @Test

@@ -189,14 +189,18 @@ class MatchResultServiceTest {
         match.setId(2L);
         match.setGroup(group);
         match.setStatus(MatchStatus.CONFIRMED);
-        match.setTeamSize(1);
+        match.setTeamSize(3);
 
         Player inactivePlayer = player(7L, group, "LEGACY_NICKNAME", 1000);
         inactivePlayer.setActive(false);
         Player activePlayer = player(8L, group, "ACTIVE_NICKNAME", 1000);
         List<MatchParticipant> participants = List.of(
             participant(17L, match, inactivePlayer, "HOME"),
-            participant(18L, match, activePlayer, "AWAY")
+            participant(18L, match, activePlayer, "AWAY"),
+            participant(19L, match, player(9L, group, "H2", 1000), "HOME"),
+            participant(20L, match, player(10L, group, "H3", 1000), "HOME"),
+            participant(21L, match, player(11L, group, "A2", 1000), "AWAY"),
+            participant(22L, match, player(12L, group, "A3", 1000), "AWAY")
         );
 
         when(matchRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(match));
@@ -212,7 +216,7 @@ class MatchResultServiceTest {
         );
 
         assertThat(inactivePlayer.getAnonymizedAt()).isNull();
-        assertThat(response.participants()).hasSize(2);
+        assertThat(response.participants()).hasSize(6);
         assertThat(response.participants().get(0).playerId()).isNull();
         assertThat(response.participants().get(0).nickname())
             .isEqualTo(PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL);
@@ -226,10 +230,10 @@ class MatchResultServiceTest {
 
         ArgumentCaptor<List<MmrHistory>> historyCaptor = ArgumentCaptor.forClass(List.class);
         verify(mmrHistoryRepository).saveAll(historyCaptor.capture());
-        assertThat(historyCaptor.getValue()).hasSize(2);
+        assertThat(historyCaptor.getValue()).hasSize(6);
         assertThat(historyCaptor.getValue())
             .extracting(history -> history.getPlayer().getId())
-            .containsExactlyInAnyOrder(7L, 8L);
+            .containsExactlyInAnyOrder(7L, 8L, 9L, 10L, 11L, 12L);
         verify(playerStatsRefreshService, timeout(ASYNC_STATS_REBUILD_TIMEOUT_MS)).rebuildGroupStats(8L);
     }
 
@@ -781,7 +785,7 @@ class MatchResultServiceTest {
         Match match = new Match();
         match.setId(24L);
         match.setStatus(MatchStatus.CONFIRMED);
-        match.setTeamSize(2);
+        match.setTeamSize(3);
 
         Group group = new Group();
         group.setId(1L);
@@ -789,8 +793,10 @@ class MatchResultServiceTest {
         List<MatchParticipant> participants = List.of(
             participant(61L, match, player(41L, group, "H1", 10), "HOME"),
             participant(62L, match, player(42L, group, "H2", 10), "HOME"),
-            participant(63L, match, player(43L, group, "A1", 5), "AWAY"),
-            participant(64L, match, player(44L, group, "A2", 5), "AWAY")
+            participant(63L, match, player(43L, group, "H3", 10), "HOME"),
+            participant(64L, match, player(44L, group, "A1", 5), "AWAY"),
+            participant(65L, match, player(45L, group, "A2", 5), "AWAY"),
+            participant(66L, match, player(46L, group, "A3", 5), "AWAY")
         );
 
         when(matchRepository.findByIdForUpdate(24L)).thenReturn(Optional.of(match));
@@ -824,12 +830,59 @@ class MatchResultServiceTest {
         ArgumentCaptor<List<MmrHistory>> historyCaptor = ArgumentCaptor.forClass(List.class);
         verify(mmrHistoryRepository).saveAll(historyCaptor.capture());
         historyCaptor.getValue().stream()
-            .filter(history -> history.getPlayer().getId().equals(43L) || history.getPlayer().getId().equals(44L))
+            .filter(history -> List.of(44L, 45L, 46L).contains(history.getPlayer().getId()))
             .forEach(history -> {
                 assertThat(history.getBeforeMmr()).isEqualTo(5);
                 assertThat(history.getAfterMmr()).isZero();
                 assertThat(history.getDelta()).isEqualTo(-5);
             });
+    }
+
+    @Test
+    void recordsTwoVsTwoResultWithoutChangingMmr() {
+        Match match = new Match();
+        match.setId(25L);
+        match.setStatus(MatchStatus.CONFIRMED);
+        match.setTeamSize(2);
+
+        Group group = new Group();
+        group.setId(1L);
+
+        // An upset: the lower-rated side wins, which would move ratings a lot in a rated match.
+        List<MatchParticipant> participants = List.of(
+            participant(71L, match, player(51L, group, "H1", 1200), "HOME"),
+            participant(72L, match, player(52L, group, "H2", 1100), "HOME"),
+            participant(73L, match, player(53L, group, "A1", 1000), "AWAY"),
+            participant(74L, match, player(54L, group, "A2", 900), "AWAY")
+        );
+
+        when(matchRepository.findByIdForUpdate(25L)).thenReturn(Optional.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(25L)).thenReturn(participants);
+        when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(playerRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(mmrHistoryRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MatchResultResponse response = matchResultService.processMatchResult(
+            25L,
+            new MatchResultRequest("AWAY")
+        );
+
+        assertThat(match.getWinningTeam()).isEqualTo("AWAY");
+        participants.forEach(participant -> {
+            assertThat(participant.getMmrAfter()).isEqualTo(participant.getMmrBefore());
+            assertThat(participant.getMmrDelta()).isZero();
+            assertThat(participant.getPlayer().getMmr()).isEqualTo(participant.getMmrBefore());
+        });
+        assertThat(response.participants())
+            .hasSize(4)
+            .allSatisfy(participant -> assertThat(participant.mmrDelta()).isZero());
+
+        ArgumentCaptor<List<MmrHistory>> historyCaptor = ArgumentCaptor.forClass(List.class);
+        verify(mmrHistoryRepository).saveAll(historyCaptor.capture());
+        assertThat(historyCaptor.getValue())
+            .hasSize(4)
+            .allSatisfy(history -> assertThat(history.getDelta()).isZero());
     }
 
     @Test

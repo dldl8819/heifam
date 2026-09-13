@@ -99,17 +99,60 @@ class RatingReplayCalculatorTest {
 
         Player h1 = player(1L, group, "H1", 10);
         Player h2 = player(2L, group, "H2", 10);
-        Player a1 = player(3L, group, "A1", 5);
-        Player a2 = player(4L, group, "A2", 5);
+        Player h3 = player(3L, group, "H3", 10);
+        Player a1 = player(4L, group, "A1", 5);
+        Player a2 = player(5L, group, "A2", 5);
+        Player a3 = player(6L, group, "A3", 5);
         Match match = match(201L, "HOME", OffsetDateTime.parse("2026-05-01T10:00:00Z"));
-        match.setTeamSize(2);
 
         Map<Long, List<MatchParticipant>> participantsByMatchId = new LinkedHashMap<>();
         participantsByMatchId.put(match.getId(), List.of(
             participant(2001L, match, h1, "HOME"),
             participant(2002L, match, h2, "HOME"),
-            participant(2003L, match, a1, "AWAY"),
-            participant(2004L, match, a2, "AWAY")
+            participant(2003L, match, h3, "HOME"),
+            participant(2004L, match, a1, "AWAY"),
+            participant(2005L, match, a2, "AWAY"),
+            participant(2006L, match, a3, "AWAY")
+        ));
+
+        RatingReplayPlan plan = calculator.calculate(
+            List.of(h1, h2, h3, a1, a2, a3),
+            List.of(match),
+            participantsByMatchId
+        );
+
+        assertThat(finalMmrByPlayerId(plan).get(4L)).isZero();
+        assertThat(finalMmrByPlayerId(plan).get(5L)).isZero();
+        assertThat(finalMmrByPlayerId(plan).get(6L)).isZero();
+        plan.participants().stream()
+            .filter(result -> List.of(4L, 5L, 6L).contains(result.playerId()))
+            .forEach(result -> {
+                assertThat(result.beforeMmr()).isEqualTo(5);
+                assertThat(result.afterMmr()).isZero();
+                assertThat(result.delta()).isEqualTo(-5);
+            });
+    }
+
+    @Test
+    void replayLeavesMmrUnchangedForTwoVsTwoMatch() {
+        RatingReplayCalculator calculator = new RatingReplayCalculator(36, 800, 300, 900, 0.6, 0.7);
+        Group group = new Group();
+        group.setId(1L);
+
+        // An upset: the lower-rated side wins, which would move ratings a lot in a rated match.
+        Player h1 = player(1L, group, "H1", 1200);
+        Player h2 = player(2L, group, "H2", 1100);
+        Player a1 = player(3L, group, "A1", 1000);
+        Player a2 = player(4L, group, "A2", 900);
+        Match match = match(202L, "AWAY", OffsetDateTime.parse("2026-05-02T10:00:00Z"));
+        match.setTeamSize(2);
+
+        Map<Long, List<MatchParticipant>> participantsByMatchId = new LinkedHashMap<>();
+        participantsByMatchId.put(match.getId(), List.of(
+            participant(2101L, match, h1, "HOME"),
+            participant(2102L, match, h2, "HOME"),
+            participant(2103L, match, a1, "AWAY"),
+            participant(2104L, match, a2, "AWAY")
         ));
 
         RatingReplayPlan plan = calculator.calculate(
@@ -118,14 +161,16 @@ class RatingReplayCalculatorTest {
             participantsByMatchId
         );
 
-        assertThat(finalMmrByPlayerId(plan).get(3L)).isZero();
-        assertThat(finalMmrByPlayerId(plan).get(4L)).isZero();
-        plan.participants().stream()
-            .filter(result -> result.playerId().equals(3L) || result.playerId().equals(4L))
-            .forEach(result -> {
-                assertThat(result.beforeMmr()).isEqualTo(5);
-                assertThat(result.afterMmr()).isZero();
-                assertThat(result.delta()).isEqualTo(-5);
+        assertThat(finalMmrByPlayerId(plan))
+            .containsEntry(1L, 1200)
+            .containsEntry(2L, 1100)
+            .containsEntry(3L, 1000)
+            .containsEntry(4L, 900);
+        assertThat(plan.participants())
+            .hasSize(4)
+            .allSatisfy(result -> {
+                assertThat(result.afterMmr()).isEqualTo(result.beforeMmr());
+                assertThat(result.delta()).isZero();
             });
     }
 

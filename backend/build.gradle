@@ -7,6 +7,15 @@ plugins {
 group = 'com.heifam'
 version = '0.0.1-SNAPSHOT'
 
+// Windows에서 프로젝트 경로에 한글이 섞이면 포크된 테스트 워커 JVM이 클래스패스를 해석하지
+// 못해 모든 테스트가 ClassNotFoundException으로 죽는다. 빌드 산출물만 ASCII 경로로 빼면
+// 테스트 클래스패스에서 한글이 사라져 우회된다. 값이 주어진 환경에서만 적용하므로
+// 저장소 자체는 어디서든 그대로 빌드된다.
+def overriddenBuildDir = providers.gradleProperty('heifam.buildDir').orNull
+if (overriddenBuildDir) {
+    layout.buildDirectory.set(file(overriddenBuildDir))
+}
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)

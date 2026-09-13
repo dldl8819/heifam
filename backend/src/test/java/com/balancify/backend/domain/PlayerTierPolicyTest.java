@@ -40,29 +40,29 @@ class PlayerTierPolicyTest {
 
     @Test
     void promotesThroughEachSSubTierWithBuffer() {
-        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("A+", 2000, 10))
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("A+", 2000))
             .isEqualTo("A+");
-        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("A+", 2030, 10))
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("A+", 2030))
             .isEqualTo("S-");
-        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("S-", 2230, 10))
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("S-", 2230))
             .isEqualTo("S");
-        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("S", 2430, 10))
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("S", 2430))
             .isEqualTo("S+");
     }
 
     @Test
     void doesNotPromoteBeyondSPlus() {
-        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("S+", 9999, 10))
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("S+", 9999))
             .isEqualTo("S+");
     }
 
     @Test
     void demotesThroughEachSSubTierWithBuffer() {
-        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("S+", 2349, 10))
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("S+", 2349))
             .isEqualTo("S");
-        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("S", 2149, 10))
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("S", 2149))
             .isEqualTo("S-");
-        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("S-", 1949, 10))
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("S-", 1949))
             .isEqualTo("A+");
     }
 
@@ -82,35 +82,30 @@ class PlayerTierPolicyTest {
         assertThat(PlayerTierPolicy.isLowTier(1000)).isFalse();
     }
 
-    @Test
-    void protectsDemotionDuringPlacement() {
-        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("A", 730, 2))
-            .isEqualTo("A");
-    }
 
     @Test
     void demotesAfterPlacementWhenMmrFallsBelowShield() {
-        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("A", 1540, 6))
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("A", 1540))
             .isEqualTo("A-");
     }
 
     @Test
     void doesNotDemoteInsideDemotionShieldRange() {
-        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("A", 1560, 6))
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("A", 1560))
             .isEqualTo("A");
     }
 
     @Test
     void requiresPromotionBufferBeforeTierUp() {
-        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("B", 1220, 6))
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("B", 1220))
             .isEqualTo("B");
-        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("B", 1230, 6))
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("B", 1230))
             .isEqualTo("B+");
     }
 
     @Test
     void promotesOnlyOneStepPerMatchResult() {
-        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("B", 1980, 10))
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("B", 1980))
             .isEqualTo("B+");
     }
 

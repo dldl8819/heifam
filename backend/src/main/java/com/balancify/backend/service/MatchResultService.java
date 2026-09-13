@@ -10,6 +10,7 @@ import com.balancify.backend.domain.MatchStatus;
 import com.balancify.backend.domain.MmrHistory;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.domain.PlayerTierPolicy;
+import com.balancify.backend.domain.RankedMatchPolicy;
 import com.balancify.backend.repository.GroupRepository;
 import com.balancify.backend.repository.MatchParticipantRepository;
 import com.balancify.backend.repository.MatchRepository;
@@ -178,7 +179,7 @@ public class MatchResultService {
 
             matchParticipantRepository.saveAll(validatedParticipants.all());
             matchRepository.save(match);
-            TransactionAfterCommit.runAfterCommitAsync(() -> {
+            TransactionAfterCommit.runAfterCommitAsync(groupStatsKey(groupId), () -> {
                 playerStatsRefreshService.rebuildGroupStats(groupId);
                 evictGroupReadCache(groupId);
             });
@@ -254,6 +255,7 @@ public class MatchResultService {
         ValidatedParticipants validatedParticipants = loadValidatedParticipants(matchId, match);
         List<MatchParticipant> participants = validatedParticipants.all();
         int teamSize = validatedParticipants.teamSize();
+        boolean ratingAffecting = RankedMatchPolicy.affectsRating(teamSize);
         List<MatchParticipant> homeParticipants = validatedParticipants.home();
         List<MatchParticipant> awayParticipants = validatedParticipants.away();
 
@@ -269,7 +271,6 @@ public class MatchResultService {
         List<MmrHistory> mmrHistories = new ArrayList<>();
         Map<Long, Player> updatedPlayers = new LinkedHashMap<>();
         List<MatchResultParticipantResponse> responseParticipants = new ArrayList<>();
-        Map<Long, Integer> completedRankedGamesByPlayerId = new HashMap<>();
 
         for (MatchParticipant participant : participants) {
             Player player = participant.getPlayer();
@@ -280,9 +281,11 @@ public class MatchResultService {
             double expected = homeSide ? homeExpectedWinRate : awayExpectedWinRate;
             double actual = winnerTeam.equals(normalizeTeam(participant.getTeam())) ? 1.0 : 0.0;
 
-            int rawMmrDelta = (int) Math.round(
-                effectiveKFactor * outcomeMultiplier * (actual - expected)
-            );
+            // An unrated match (2v2) is still recorded in full, but leaves ratings where they are.
+            // Reprocessing one that was rated before still rolls its old delta back, below.
+            int rawMmrDelta = ratingAffecting
+                ? (int) Math.round(effectiveKFactor * outcomeMultiplier * (actual - expected))
+                : 0;
             int mmrAfter = floorMmr(baseMmrBefore + rawMmrDelta);
             int mmrDelta = mmrAfter - baseMmrBefore;
             int previousDelta = safeMmr(participant.getMmrDelta());
@@ -298,12 +301,7 @@ public class MatchResultService {
             participant.setMmrAfter(mmrAfter);
             participant.setMmrDelta(mmrDelta);
 
-            int completedRankedGames = resolveCompletedRankedGamesAfterResult(
-                player.getId(),
-                alreadyProcessed,
-                completedRankedGamesByPlayerId
-            );
-            player.applyRankedMmr(updatedPlayerMmr, completedRankedGames);
+            player.applyRankedMmr(updatedPlayerMmr);
             updatedPlayers.put(player.getId(), player);
 
             MmrHistory mmrHistory = existingHistoriesByPlayerId.get(player.getId());
@@ -342,7 +340,7 @@ public class MatchResultService {
         mmrHistoryRepository.saveAll(mmrHistories);
         matchRepository.save(match);
         Long groupId = resolveGroupId(match, participants);
-        TransactionAfterCommit.runAfterCommitAsync(() -> {
+        TransactionAfterCommit.runAfterCommitAsync(groupStatsKey(groupId), () -> {
             playerStatsRefreshService.rebuildGroupStats(groupId);
             evictGroupReadCache(groupId);
         });
@@ -679,21 +677,18 @@ public class MatchResultService {
         return participants.size() / 2;
     }
 
-    private int resolveCompletedRankedGamesAfterResult(
-        Long playerId,
-        boolean alreadyProcessed,
-        Map<Long, Integer> cache
-    ) {
-        if (playerId == null) {
-            return 0;
-        }
-
-        return cache.computeIfAbsent(playerId, id -> {
-            long completedGames = matchParticipantRepository.countByPlayer_IdAndMatch_WinningTeamIsNotNull(id);
-            long adjustedCompletedGames = alreadyProcessed ? completedGames : completedGames + 1;
-            return (int) Math.max(0, Math.min(Integer.MAX_VALUE, adjustedCompletedGames));
-        });
+    /**
+     * Coalescing key for a group's post-commit stats rebuild.
+     *
+     * <p>A rebuild recomputes the group's entire stats tables rather than applying a delta, so
+     * queuing one per match result is redundant — importing a batch of matches queued one per row.
+     * Keying them per group lets the executor collapse a burst into a single trailing rebuild that
+     * still observes every committed result.
+     */
+    private static Object groupStatsKey(Long groupId) {
+        return groupId == null ? null : "group-stats-rebuild:" + groupId;
     }
+
 
     private boolean hasProcessedResult(String winningTeam) {
         return winningTeam != null && !winningTeam.isBlank();
@@ -853,7 +848,6 @@ public class MatchResultService {
 
         Map<Long, Player> playersToUpdate = new LinkedHashMap<>();
         boolean matchHadResult = hasProcessedResult(match.getWinningTeam());
-        Map<Long, Integer> completedRankedGamesByPlayerId = new HashMap<>();
         for (MatchParticipant participant : participants) {
             Player player = participant.getPlayer();
             if (player == null || player.getId() == null) {
@@ -862,12 +856,7 @@ public class MatchResultService {
 
             int currentMmr = safeMmr(player.getMmr());
             int rollbackDelta = safeMmr(participant.getMmrDelta());
-            int completedRankedGames = resolveCompletedRankedGamesAfterDelete(
-                player.getId(),
-                matchHadResult,
-                completedRankedGamesByPlayerId
-            );
-            player.applyRankedMmr(currentMmr - rollbackDelta, completedRankedGames);
+            player.applyRankedMmr(currentMmr - rollbackDelta);
             playersToUpdate.put(player.getId(), player);
         }
 
@@ -878,7 +867,7 @@ public class MatchResultService {
         mmrHistoryRepository.deleteByMatch_Id(matchId);
         matchParticipantRepository.deleteByMatch_Id(matchId);
         matchRepository.delete(match);
-        TransactionAfterCommit.runAfterCommitAsync(() -> {
+        TransactionAfterCommit.runAfterCommitAsync(groupStatsKey(groupId), () -> {
             playerStatsRefreshService.rebuildGroupStats(groupId);
             evictGroupReadCache(groupId);
         });
@@ -961,21 +950,4 @@ public class MatchResultService {
     ) {
     }
 
-    private int resolveCompletedRankedGamesAfterDelete(
-        Long playerId,
-        boolean matchHadResult,
-        Map<Long, Integer> cache
-    ) {
-        if (playerId == null) {
-            return 0;
-        }
-
-        return cache.computeIfAbsent(playerId, id -> {
-            long completedGames = matchParticipantRepository.countByPlayer_IdAndMatch_WinningTeamIsNotNull(id);
-            long adjustedCompletedGames = matchHadResult
-                ? Math.max(0, completedGames - 1)
-                : completedGames;
-            return (int) Math.max(0, Math.min(Integer.MAX_VALUE, adjustedCompletedGames));
-        });
-    }
 }

@@ -212,6 +212,8 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
         """)
     int clearRetentionSubjectHash(@Param("retentionSubjectHash") String retentionSubjectHash);
 
+    boolean existsByAuthUserIdAndAnonymizedAtIsNull(UUID authUserId);
+
     boolean existsByAuthUserIdAndActiveTrueAndAnonymizedAtIsNullAndLifecycleStatusAndIdNot(
         UUID authUserId,
         PlayerLifecycleStatus lifecycleStatus,
