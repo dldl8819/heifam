@@ -6,6 +6,7 @@ import { apiClient } from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { LedgerDashboard } from '@/components/ledger-dashboard'
+import { LedgerServerCosts } from '@/components/ledger-server-costs'
 import { t } from '@/lib/i18n'
 import { escapeCsvCell, triggerBlobDownload } from '@/lib/csv-download'
 import { normalizeLedgerTargetInput } from '@/lib/ledger-target'
@@ -19,7 +20,7 @@ import type {
 const TEMP_GROUP_ID = 1
 const CUSTOM_CATEGORY_OPTION = '__custom__'
 
-type LedgerSubTab = 'dashboard' | 'income' | 'expense'
+type LedgerSubTab = 'dashboard' | 'income' | 'expense' | 'serverCosts'
 
 function todayIsoDate(): string {
   const now = new Date()
@@ -392,7 +393,7 @@ export function LedgerSection() {
   return (
     <div className="space-y-6">
       <div className="flex gap-2 border-b border-slate-200 dark:border-slate-700">
-        {(['dashboard', 'income', 'expense'] as LedgerSubTab[]).map((tab) => (
+        {(['dashboard', 'income', 'expense', 'serverCosts'] as LedgerSubTab[]).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -946,6 +947,7 @@ export function LedgerSection() {
       )}
 
       {subTab === 'dashboard' && <LedgerDashboard groupId={TEMP_GROUP_ID} />}
+      {subTab === 'serverCosts' && <LedgerServerCosts groupId={TEMP_GROUP_ID} canManage={canManage} />}
     </div>
   )
 }

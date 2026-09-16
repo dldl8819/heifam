@@ -624,6 +624,7 @@ export type LedgerDashboardMonthItem = {
   variableExpense: number
   totalExpense: number
   expenseCount: number
+  serverCostReimbursed: number
   net: number
   endBalance: number
 }
@@ -645,9 +646,37 @@ export type LedgerDashboardResponse = {
   totalExpense: number
   expenseCount: number
   currentBalance: number
+  serverCostReimbursed: number
+  serverCostPending: number
+  serverCostMissingKrwCount: number
   balanceTimeline: LedgerDashboardBalancePoint[]
   months: LedgerDashboardMonthItem[]
   expenseCategories: LedgerDashboardCategoryItem[]
+}
+
+export type LedgerServerCost = {
+  id: number
+  serviceName: string
+  billingMonth: string
+  chargedDate: string
+  usdAmount: number | null
+  krwAmount: number | null
+  paidBy: string | null
+  reimbursedDate: string | null
+  memo: string | null
+  authorNickname: string | null
+  createdAt: string
+}
+
+export type LedgerServerCostRequest = {
+  serviceName: string
+  billingMonth: string
+  chargedDate: string
+  usdAmount: number | null
+  krwAmount: number | null
+  paidBy: string | null
+  reimbursedDate: string | null
+  memo: string | null
 }
 
 export type LedgerImportRowError = {

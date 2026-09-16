@@ -5,8 +5,10 @@ import com.balancify.backend.api.group.dto.LedgerDashboardResponse;
 import com.balancify.backend.api.group.dto.LedgerExpenseEntryResponse;
 import com.balancify.backend.api.group.dto.LedgerIncomeEntryResponse;
 import com.balancify.backend.api.group.dto.LedgerMonthlySummaryResponse;
+import com.balancify.backend.api.group.dto.LedgerServerCostResponse;
 import com.balancify.backend.service.LedgerExpenseService;
 import com.balancify.backend.service.LedgerIncomeService;
+import com.balancify.backend.service.LedgerServerCostService;
 import com.balancify.backend.service.LedgerSummaryService;
 import java.time.Year;
 import java.util.List;
@@ -23,15 +25,18 @@ public class GroupLedgerController {
     private final LedgerIncomeService ledgerIncomeService;
     private final LedgerExpenseService ledgerExpenseService;
     private final LedgerSummaryService ledgerSummaryService;
+    private final LedgerServerCostService ledgerServerCostService;
 
     public GroupLedgerController(
         LedgerIncomeService ledgerIncomeService,
         LedgerExpenseService ledgerExpenseService,
-        LedgerSummaryService ledgerSummaryService
+        LedgerSummaryService ledgerSummaryService,
+        LedgerServerCostService ledgerServerCostService
     ) {
         this.ledgerIncomeService = ledgerIncomeService;
         this.ledgerExpenseService = ledgerExpenseService;
         this.ledgerSummaryService = ledgerSummaryService;
+        this.ledgerServerCostService = ledgerServerCostService;
     }
 
     @GetMapping("/{groupId}/ledger/income")
@@ -72,5 +77,10 @@ public class GroupLedgerController {
     @GetMapping("/{groupId}/ledger/dashboard")
     public LedgerDashboardResponse getDashboard(@PathVariable Long groupId) {
         return ledgerSummaryService.getDashboard(groupId);
+    }
+
+    @GetMapping("/{groupId}/ledger/server-costs")
+    public List<LedgerServerCostResponse> getServerCosts(@PathVariable Long groupId) {
+        return ledgerServerCostService.getEntries(groupId);
     }
 }

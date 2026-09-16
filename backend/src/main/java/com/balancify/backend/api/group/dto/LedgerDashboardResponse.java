@@ -12,7 +12,10 @@ import java.util.List;
  * @param asOfDate date of the latest counted entry, or null when the ledger is empty
  * @param startingBalanceDate date of the earliest "기초 잔액" entry, or null when there is none
  * @param totalIncome income counted from the starting balance date, excluding the starting balance
- * @param currentBalance {@code startingBalance + totalIncome - totalExpense}
+ * @param currentBalance {@code startingBalance + totalIncome - totalExpense - serverCostReimbursed}
+ * @param serverCostReimbursed server costs the account has paid back (they are not expenses)
+ * @param serverCostPending server costs with a known won amount that are still to be paid back
+ * @param serverCostMissingKrwCount server costs whose won amount has not been entered yet
  */
 public record LedgerDashboardResponse(
     LocalDate asOfDate,
@@ -25,6 +28,9 @@ public record LedgerDashboardResponse(
     long totalExpense,
     int expenseCount,
     long currentBalance,
+    long serverCostReimbursed,
+    long serverCostPending,
+    int serverCostMissingKrwCount,
     List<LedgerDashboardBalancePoint> balanceTimeline,
     List<LedgerDashboardMonthItem> months,
     List<LedgerDashboardCategoryItem> expenseCategories

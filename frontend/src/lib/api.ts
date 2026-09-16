@@ -26,6 +26,8 @@ import type {
   LedgerIncomeEntry,
   LedgerIncomeEntryCreateRequest,
   LedgerIncomeEntryUpdateRequest,
+  LedgerServerCost,
+  LedgerServerCostRequest,
   MatchHistoryFilters,
   MatchHistoryPage,
   MatchTeamSide,
@@ -1413,6 +1415,36 @@ export const apiClient = {
         method: 'POST',
         body: JSON.stringify({ csvContent, expenseType }),
       },
+      { adminOnly: true }
+    ),
+  getLedgerServerCosts: (groupId: number) =>
+    apiRequest<LedgerServerCost[]>(
+      `/api/groups/${groupId}/ledger/server-costs`,
+      undefined,
+      { includeUserEmail: true }
+    ),
+  createLedgerServerCost: (groupId: number, payload: LedgerServerCostRequest) =>
+    apiRequest<LedgerServerCost>(
+      `/api/groups/${groupId}/ledger/server-costs`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      { adminOnly: true }
+    ),
+  updateLedgerServerCost: (groupId: number, costId: number, payload: LedgerServerCostRequest) =>
+    apiRequest<LedgerServerCost>(
+      `/api/groups/${groupId}/ledger/server-costs/${costId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      },
+      { adminOnly: true }
+    ),
+  deleteLedgerServerCost: (groupId: number, costId: number) =>
+    apiRequest<void>(
+      `/api/groups/${groupId}/ledger/server-costs/${costId}`,
+      { method: 'DELETE' },
       { adminOnly: true }
     ),
   getLedgerDashboard: (groupId: number) =>

@@ -72,6 +72,8 @@ import com.balancify.backend.service.LedgerExpenseAdminService;
 import com.balancify.backend.service.LedgerExpenseService;
 import com.balancify.backend.service.LedgerIncomeAdminService;
 import com.balancify.backend.service.LedgerIncomeService;
+import com.balancify.backend.service.LedgerServerCostAdminService;
+import com.balancify.backend.service.LedgerServerCostService;
 import com.balancify.backend.service.LedgerSummaryService;
 import com.balancify.backend.service.MatchQueryService;
 import com.balancify.backend.service.MatchImportService;
@@ -203,6 +205,12 @@ class AdminKeyFilterTest {
 
     @MockBean
     private LedgerExpenseAdminService ledgerExpenseAdminService;
+
+    @MockBean
+    private LedgerServerCostService ledgerServerCostService;
+
+    @MockBean
+    private LedgerServerCostAdminService ledgerServerCostAdminService;
 
     @MockBean
     private AdminRequestResolver adminRequestResolver;
@@ -2007,6 +2015,72 @@ class AdminKeyFilterTest {
                     .content("{\"mmr\":1200}")
             )
             .andExpect(status().isOk());
+    }
+
+    @Test
+    void returnsForbiddenForServerCostsWithMemberEmail() throws Exception {
+        mockMvc
+            .perform(
+                get("/api/groups/1/ledger/server-costs")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void allowsServerCostsWithAdminEmail() throws Exception {
+        mockMvc
+            .perform(
+                get("/api/groups/1/ledger/server-costs")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+            )
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void returnsForbiddenForServerCostCreateWithAdminEmail() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/groups/1/ledger/server-costs")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"serviceName\":\"Render\",\"billingMonth\":\"2026-08\",\"chargedDate\":\"2026-09-01\",\"usdAmount\":7.41}")
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void allowsServerCostCreateWithSuperAdminEmail() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/groups/1/ledger/server-costs")
+                    .header("X-USER-EMAIL", "superadmin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"serviceName\":\"Render\",\"billingMonth\":\"2026-08\",\"chargedDate\":\"2026-09-01\",\"usdAmount\":7.41}")
+            )
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void allowsServerCostUpdateWithSuperAdminEmail() throws Exception {
+        mockMvc
+            .perform(
+                put("/api/groups/1/ledger/server-costs/5")
+                    .header("X-USER-EMAIL", "superadmin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"serviceName\":\"Render\",\"billingMonth\":\"2026-08\",\"chargedDate\":\"2026-09-01\",\"usdAmount\":7.41}")
+            )
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void returnsForbiddenForServerCostDeleteWithAdminEmail() throws Exception {
+        mockMvc
+            .perform(
+                delete("/api/groups/1/ledger/server-costs/5")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+            )
+            .andExpect(status().isForbidden());
     }
 
     @Test

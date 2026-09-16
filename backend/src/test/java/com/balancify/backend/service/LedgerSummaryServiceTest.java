@@ -12,8 +12,10 @@ import com.balancify.backend.api.group.dto.LedgerMonthlySummaryItem;
 import com.balancify.backend.api.group.dto.LedgerMonthlySummaryResponse;
 import com.balancify.backend.domain.LedgerExpenseEntry;
 import com.balancify.backend.domain.LedgerIncomeEntry;
+import com.balancify.backend.domain.LedgerServerCost;
 import com.balancify.backend.repository.LedgerExpenseEntryRepository;
 import com.balancify.backend.repository.LedgerIncomeEntryRepository;
+import com.balancify.backend.repository.LedgerServerCostRepository;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,11 +36,18 @@ class LedgerSummaryServiceTest {
     @Mock
     private LedgerExpenseEntryRepository ledgerExpenseEntryRepository;
 
+    @Mock
+    private LedgerServerCostRepository ledgerServerCostRepository;
+
     private LedgerSummaryService ledgerSummaryService;
 
     @BeforeEach
     void setUp() {
-        ledgerSummaryService = new LedgerSummaryService(ledgerIncomeEntryRepository, ledgerExpenseEntryRepository);
+        ledgerSummaryService = new LedgerSummaryService(
+            ledgerIncomeEntryRepository,
+            ledgerExpenseEntryRepository,
+            ledgerServerCostRepository
+        );
     }
 
     private LedgerIncomeEntry income(LocalDate date, String category, long amount) {
@@ -139,6 +148,62 @@ class LedgerSummaryServiceTest {
                 tuple("정기감전", 30_000L, 1),
                 tuple("서버비", 9_000L, 1)
             );
+    }
+
+    private LedgerServerCost serverCost(String billingMonth, Long krwAmount, LocalDate reimbursedDate) {
+        LedgerServerCost cost = new LedgerServerCost();
+        cost.setGroupId(1L);
+        cost.setServiceName("Render");
+        cost.setBillingMonth(billingMonth);
+        cost.setChargedDate(LocalDate.parse(billingMonth + "-01").plusMonths(1));
+        cost.setKrwAmount(krwAmount);
+        cost.setReimbursedDate(reimbursedDate);
+        cost.setAuthorEmail("ops@hei.gg");
+        return cost;
+    }
+
+    @Test
+    void dashboardSubtractsOnlyReimbursedServerCostsAndKeepsThemOutOfExpenses() {
+        when(ledgerIncomeEntryRepository.findByGroupIdOrderByEntryDateAscIdAsc(1L)).thenReturn(List.of(
+            income(LocalDate.of(2026, 3, 3), "기초 잔액", 100_000L)
+        ));
+        when(ledgerExpenseEntryRepository.findByGroupIdOrderByEntryDateAscIdAsc(1L)).thenReturn(List.of(
+            expense(LocalDate.of(2026, 4, 6), "VARIABLE", "정기감전", 30_000L)
+        ));
+        when(ledgerServerCostRepository.findByGroupIdOrderByBillingMonthDescIdDesc(1L)).thenReturn(List.of(
+            serverCost("2026-04", 10_000L, LocalDate.of(2026, 5, 20)),
+            serverCost("2026-05", 9_500L, null),
+            serverCost("2026-06", null, null)
+        ));
+
+        LedgerDashboardResponse dashboard = ledgerSummaryService.getDashboard(1L);
+
+        assertThat(dashboard.totalExpense()).isEqualTo(30_000L);
+        assertThat(dashboard.expenseCategories())
+            .extracting(LedgerDashboardCategoryItem::category)
+            .containsExactly("정기감전");
+        assertThat(dashboard.serverCostReimbursed()).isEqualTo(10_000L);
+        assertThat(dashboard.serverCostPending()).isEqualTo(9_500L);
+        assertThat(dashboard.serverCostMissingKrwCount()).isEqualTo(1);
+        assertThat(dashboard.currentBalance())
+            .isEqualTo(dashboard.startingBalance() + dashboard.totalIncome() - dashboard.totalExpense()
+                - dashboard.serverCostReimbursed())
+            .isEqualTo(60_000L);
+        assertThat(dashboard.asOfDate()).isEqualTo(LocalDate.of(2026, 5, 20));
+        assertThat(dashboard.balanceTimeline())
+            .extracting(LedgerDashboardBalancePoint::date, LedgerDashboardBalancePoint::balance)
+            .containsExactly(
+                tuple(LocalDate.of(2026, 3, 3), 100_000L),
+                tuple(LocalDate.of(2026, 4, 6), 70_000L),
+                tuple(LocalDate.of(2026, 5, 20), 60_000L)
+            );
+
+        LedgerDashboardMonthItem may = dashboard.months().get(2);
+        assertThat(may.month()).isEqualTo("2026-05");
+        assertThat(may.totalExpense()).isZero();
+        assertThat(may.serverCostReimbursed()).isEqualTo(10_000L);
+        assertThat(may.net()).isEqualTo(-10_000L);
+        assertThat(may.endBalance()).isEqualTo(60_000L);
     }
 
     @Test

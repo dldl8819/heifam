@@ -8,8 +8,10 @@ import com.balancify.backend.api.group.dto.LedgerMonthlySummaryItem;
 import com.balancify.backend.api.group.dto.LedgerMonthlySummaryResponse;
 import com.balancify.backend.domain.LedgerExpenseEntry;
 import com.balancify.backend.domain.LedgerIncomeEntry;
+import com.balancify.backend.domain.LedgerServerCost;
 import com.balancify.backend.repository.LedgerExpenseEntryRepository;
 import com.balancify.backend.repository.LedgerIncomeEntryRepository;
+import com.balancify.backend.repository.LedgerServerCostRepository;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -28,13 +30,16 @@ public class LedgerSummaryService {
 
     private final LedgerIncomeEntryRepository ledgerIncomeEntryRepository;
     private final LedgerExpenseEntryRepository ledgerExpenseEntryRepository;
+    private final LedgerServerCostRepository ledgerServerCostRepository;
 
     public LedgerSummaryService(
         LedgerIncomeEntryRepository ledgerIncomeEntryRepository,
-        LedgerExpenseEntryRepository ledgerExpenseEntryRepository
+        LedgerExpenseEntryRepository ledgerExpenseEntryRepository,
+        LedgerServerCostRepository ledgerServerCostRepository
     ) {
         this.ledgerIncomeEntryRepository = ledgerIncomeEntryRepository;
         this.ledgerExpenseEntryRepository = ledgerExpenseEntryRepository;
+        this.ledgerServerCostRepository = ledgerServerCostRepository;
     }
 
     @Transactional(readOnly = true)
@@ -111,9 +116,14 @@ public class LedgerSummaryService {
      *
      * <p>Counting starts at the earliest "기초 잔액" entry - the same starting point the monthly
      * summary's cumulative balance uses - and entries dated before it are left out, so
-     * {@code startingBalance + totalIncome - totalExpense} always equals {@code currentBalance}.
+     * {@code startingBalance + totalIncome - totalExpense - serverCostReimbursed} always equals
+     * {@code currentBalance}.
      * Starting balance entries are reported on their own rather than as income: they are the money
      * already in the account when record keeping began, not money that came in.
+     *
+     * <p>Server costs are tracked apart from expenses. A member pays them first, so only the ones
+     * the account has paid back (a reimbursed date) reduce the balance, on that date; costs still
+     * to be paid back are reported as pending, and costs without a won amount are only counted.
      */
     @Transactional(readOnly = true)
     public LedgerDashboardResponse getDashboard(Long groupId) {
@@ -121,6 +131,8 @@ public class LedgerSummaryService {
             .findByGroupIdOrderByEntryDateAscIdAsc(groupId);
         List<LedgerExpenseEntry> expenseEntries = ledgerExpenseEntryRepository
             .findByGroupIdOrderByEntryDateAscIdAsc(groupId);
+        List<LedgerServerCost> serverCosts = ledgerServerCostRepository
+            .findByGroupIdOrderByBillingMonthDescIdDesc(groupId);
         LocalDate startingBalanceDate = findEarliestStartingBalanceDate(incomeEntries);
 
         long startingBalance = 0L;
@@ -178,6 +190,29 @@ public class LedgerSummaryService {
             categoryTotals.count++;
         }
 
+        long serverCostReimbursed = 0L;
+        long serverCostPending = 0L;
+        int serverCostMissingKrwCount = 0;
+        for (LedgerServerCost serverCost : serverCosts) {
+            Long krwAmount = serverCost.getKrwAmount();
+            if (krwAmount == null) {
+                serverCostMissingKrwCount++;
+                continue;
+            }
+            LocalDate reimbursedDate = serverCost.getReimbursedDate();
+            if (reimbursedDate == null) {
+                serverCostPending += krwAmount;
+                continue;
+            }
+            if (!isOnOrAfterStartingBalance(reimbursedDate, startingBalanceDate)) {
+                continue;
+            }
+            serverCostReimbursed += krwAmount;
+            changeByDate.merge(reimbursedDate, -krwAmount, Long::sum);
+            MonthTotals month = totalsByMonth.computeIfAbsent(YearMonth.from(reimbursedDate), ignored -> new MonthTotals());
+            month.serverCostReimbursed += krwAmount;
+        }
+
         List<LedgerDashboardBalancePoint> balanceTimeline = new ArrayList<>();
         long balance = 0L;
         for (Map.Entry<LocalDate, Long> day : changeByDate.entrySet()) {
@@ -206,7 +241,8 @@ public class LedgerSummaryService {
                     totals.variableExpense,
                     monthExpense,
                     totals.expenseCount,
-                    totals.income - monthExpense,
+                    totals.serverCostReimbursed,
+                    totals.income - monthExpense - totals.serverCostReimbursed,
                     endBalance
                 ));
             }
@@ -231,6 +267,9 @@ public class LedgerSummaryService {
             totalFixedExpense + totalVariableExpense,
             expenseCount,
             balance,
+            serverCostReimbursed,
+            serverCostPending,
+            serverCostMissingKrwCount,
             balanceTimeline,
             months,
             expenseCategories
@@ -279,6 +318,7 @@ public class LedgerSummaryService {
         private long fixedExpense;
         private long variableExpense;
         private int expenseCount;
+        private long serverCostReimbursed;
     }
 
     private static final class CategoryTotals {

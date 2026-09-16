@@ -3,6 +3,7 @@ package com.balancify.backend.service;
 import com.balancify.backend.api.admin.dto.OperationAuditLogPageResponse;
 import com.balancify.backend.api.admin.dto.OperationAuditLogResponse;
 import com.balancify.backend.domain.LedgerExpenseEntry;
+import com.balancify.backend.domain.LedgerServerCost;
 import com.balancify.backend.domain.LedgerIncomeEntry;
 import com.balancify.backend.domain.Notice;
 import com.balancify.backend.domain.OperationAuditLog;
@@ -50,6 +51,9 @@ public class OperationAuditLogService {
     public static final String ACTION_LEDGER_EXPENSE_UPDATED = "LEDGER_EXPENSE_UPDATED";
     public static final String ACTION_LEDGER_EXPENSE_DELETED = "LEDGER_EXPENSE_DELETED";
     public static final String ACTION_LEDGER_EXPENSE_IMPORTED = "LEDGER_EXPENSE_IMPORTED";
+    public static final String ACTION_LEDGER_SERVER_COST_ADDED = "LEDGER_SERVER_COST_ADDED";
+    public static final String ACTION_LEDGER_SERVER_COST_UPDATED = "LEDGER_SERVER_COST_UPDATED";
+    public static final String ACTION_LEDGER_SERVER_COST_DELETED = "LEDGER_SERVER_COST_DELETED";
 
     private static final int MAX_PAGE_SIZE = 200;
 
@@ -524,6 +528,53 @@ public class OperationAuditLogService {
         log.setSummary("지출 내역 일괄 업로드");
         log.setDetails("importedCount=" + importedCount);
         operationAuditLogRepository.save(log);
+    }
+
+    @Transactional
+    public void recordLedgerServerCostAdded(String actorEmail, String actorNickname, Long groupId, LedgerServerCost entry) {
+        if (entry == null) {
+            return;
+        }
+
+        OperationAuditLog log = baseLog(
+            actorEmail, actorNickname, ACTION_LEDGER_SERVER_COST_ADDED, "LEDGER_SERVER_COST", entry.getId(),
+            formatLedgerServerCostLabel(entry), groupId
+        );
+        log.setSummary("서버비 내역 추가");
+        operationAuditLogRepository.save(log);
+    }
+
+    @Transactional
+    public void recordLedgerServerCostUpdated(String actorEmail, String actorNickname, Long groupId, LedgerServerCost entry) {
+        if (entry == null) {
+            return;
+        }
+
+        OperationAuditLog log = baseLog(
+            actorEmail, actorNickname, ACTION_LEDGER_SERVER_COST_UPDATED, "LEDGER_SERVER_COST", entry.getId(),
+            formatLedgerServerCostLabel(entry), groupId
+        );
+        log.setSummary("서버비 내역 수정");
+        operationAuditLogRepository.save(log);
+    }
+
+    @Transactional
+    public void recordLedgerServerCostDeleted(
+        String actorEmail,
+        String actorNickname,
+        Long groupId,
+        Long entryId,
+        String entryLabel
+    ) {
+        OperationAuditLog log = baseLog(
+            actorEmail, actorNickname, ACTION_LEDGER_SERVER_COST_DELETED, "LEDGER_SERVER_COST", entryId, entryLabel, groupId
+        );
+        log.setSummary("서버비 내역 삭제");
+        operationAuditLogRepository.save(log);
+    }
+
+    private String formatLedgerServerCostLabel(LedgerServerCost entry) {
+        return entry.getBillingMonth() + " " + entry.getServiceName();
     }
 
     private String formatLedgerIncomeLabel(LedgerIncomeEntry entry) {

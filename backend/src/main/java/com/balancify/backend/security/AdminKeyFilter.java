@@ -229,6 +229,26 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             "GET",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/ledger/dashboard"),
             AuthType.ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "GET",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/ledger/server-costs"),
+            AuthType.ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "POST",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/ledger/server-costs"),
+            AuthType.SUPER_ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "PUT",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/ledger/server-costs/{costId}"),
+            AuthType.SUPER_ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "DELETE",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/ledger/server-costs/{costId}"),
+            AuthType.SUPER_ADMIN_EMAIL
         )
     );
 

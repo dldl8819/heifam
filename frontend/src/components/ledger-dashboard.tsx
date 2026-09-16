@@ -379,6 +379,9 @@ function MonthlyChart({ months, spansYears }: { months: LedgerDashboardMonthItem
               value: formatWon(active.totalExpense),
               label: t(key('tooltipExpense'), { count: String(active.expenseCount) }),
             },
+            ...(active.serverCostReimbursed > 0
+              ? [{ value: formatWon(active.serverCostReimbursed), label: t(key('tooltipServerCost')) }]
+              : []),
             { value: formatWon(active.endBalance), label: t(key('table.endBalance')) },
           ],
         }
@@ -508,7 +511,18 @@ function amountCell(value: number): string {
 }
 
 function MonthlyTable({ dashboard, spansYears }: { dashboard: LedgerDashboardResponse; spansYears: boolean }) {
-  const headers = ['month', 'income', 'fixedExpense', 'variableExpense', 'totalExpense', 'net', 'endBalance']
+  // The server cost column only appears once something has been paid back, so the table stays narrow until then.
+  const showServerCost = dashboard.serverCostReimbursed > 0
+  const headers = [
+    'month',
+    'income',
+    'fixedExpense',
+    'variableExpense',
+    'totalExpense',
+    ...(showServerCost ? ['serverCost'] : []),
+    'net',
+    'endBalance',
+  ]
   const numberCell = 'whitespace-nowrap px-3 py-2 text-right tabular-nums'
   return (
     <div className="overflow-x-auto">
@@ -530,6 +544,7 @@ function MonthlyTable({ dashboard, spansYears }: { dashboard: LedgerDashboardRes
               <td className={numberCell}>{amountCell(month.fixedExpense)}</td>
               <td className={numberCell}>{amountCell(month.variableExpense)}</td>
               <td className={numberCell}>{amountCell(month.totalExpense)}</td>
+              {showServerCost && <td className={numberCell}>{amountCell(month.serverCostReimbursed)}</td>}
               <td className={numberCell}>{formatSignedWon(month.net)}</td>
               <td className={numberCell}>{formatWon(month.endBalance)}</td>
             </tr>
@@ -542,7 +557,10 @@ function MonthlyTable({ dashboard, spansYears }: { dashboard: LedgerDashboardRes
             <td className={numberCell}>{amountCell(dashboard.totalFixedExpense)}</td>
             <td className={numberCell}>{amountCell(dashboard.totalVariableExpense)}</td>
             <td className={numberCell}>{amountCell(dashboard.totalExpense)}</td>
-            <td className={numberCell}>{formatSignedWon(dashboard.totalIncome - dashboard.totalExpense)}</td>
+            {showServerCost && <td className={numberCell}>{amountCell(dashboard.serverCostReimbursed)}</td>}
+            <td className={numberCell}>
+              {formatSignedWon(dashboard.totalIncome - dashboard.totalExpense - dashboard.serverCostReimbursed)}
+            </td>
             <td className={numberCell}>{formatWon(dashboard.currentBalance)}</td>
           </tr>
         </tfoot>
@@ -630,8 +648,18 @@ export function LedgerDashboardContent({ dashboard }: { dashboard: LedgerDashboa
             />
             <EquationRow label={t(key('plusIncome'))} value={formatWon(dashboard.totalIncome)} />
             <EquationRow label={t(key('minusExpense'))} value={formatWon(dashboard.totalExpense)} />
+            {dashboard.serverCostReimbursed > 0 && (
+              <EquationRow label={t(key('minusServerCost'))} value={formatWon(dashboard.serverCostReimbursed)} />
+            )}
             <EquationRow label={t(key('equalsBalance'))} value={formatWon(dashboard.currentBalance)} emphasized />
           </dl>
+          {(dashboard.serverCostPending > 0 || dashboard.serverCostMissingKrwCount > 0) && (
+            <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
+              {t(key('serverCostPending'), { amount: formatWon(dashboard.serverCostPending) })}
+              {dashboard.serverCostMissingKrwCount > 0 &&
+                ` ${t(key('serverCostMissingKrw'), { count: String(dashboard.serverCostMissingKrwCount) })}`}
+            </p>
+          )}
         </section>
 
         <section className={CARD}>

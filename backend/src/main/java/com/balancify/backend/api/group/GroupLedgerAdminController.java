@@ -8,10 +8,13 @@ import com.balancify.backend.api.group.dto.LedgerImportResponse;
 import com.balancify.backend.api.group.dto.LedgerIncomeEntryCreateRequest;
 import com.balancify.backend.api.group.dto.LedgerIncomeEntryResponse;
 import com.balancify.backend.api.group.dto.LedgerIncomeEntryUpdateRequest;
+import com.balancify.backend.api.group.dto.LedgerServerCostRequest;
+import com.balancify.backend.api.group.dto.LedgerServerCostResponse;
 import com.balancify.backend.security.AuthenticatedRequestResolver;
 import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.LedgerExpenseAdminService;
 import com.balancify.backend.service.LedgerIncomeAdminService;
+import com.balancify.backend.service.LedgerServerCostAdminService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.NoSuchElementException;
 import org.springframework.http.HttpStatus;
@@ -30,17 +33,20 @@ public class GroupLedgerAdminController {
 
     private final LedgerIncomeAdminService ledgerIncomeAdminService;
     private final LedgerExpenseAdminService ledgerExpenseAdminService;
+    private final LedgerServerCostAdminService ledgerServerCostAdminService;
     private final AccessControlService accessControlService;
     private final AuthenticatedRequestResolver authenticatedRequestResolver;
 
     public GroupLedgerAdminController(
         LedgerIncomeAdminService ledgerIncomeAdminService,
         LedgerExpenseAdminService ledgerExpenseAdminService,
+        LedgerServerCostAdminService ledgerServerCostAdminService,
         AccessControlService accessControlService,
         AuthenticatedRequestResolver authenticatedRequestResolver
     ) {
         this.ledgerIncomeAdminService = ledgerIncomeAdminService;
         this.ledgerExpenseAdminService = ledgerExpenseAdminService;
+        this.ledgerServerCostAdminService = ledgerServerCostAdminService;
         this.accessControlService = accessControlService;
         this.authenticatedRequestResolver = authenticatedRequestResolver;
     }
@@ -164,6 +170,52 @@ public class GroupLedgerAdminController {
             return ledgerExpenseAdminService.importEntries(groupId, request, requestEmail, resolveActorNickname(requestEmail));
         } catch (IllegalArgumentException illegalArgumentException) {
             throw badRequest(illegalArgumentException);
+        }
+    }
+
+    @PostMapping("/{groupId}/ledger/server-costs")
+    public LedgerServerCostResponse createServerCost(
+        @PathVariable Long groupId,
+        @RequestBody LedgerServerCostRequest request,
+        HttpServletRequest httpRequest
+    ) {
+        String requestEmail = requireRequestEmail(httpRequest);
+        requireSuperAdmin(requestEmail);
+        try {
+            return ledgerServerCostAdminService.createEntry(groupId, request, requestEmail, resolveActorNickname(requestEmail));
+        } catch (IllegalArgumentException illegalArgumentException) {
+            throw badRequest(illegalArgumentException);
+        }
+    }
+
+    @PutMapping("/{groupId}/ledger/server-costs/{costId}")
+    public LedgerServerCostResponse updateServerCost(
+        @PathVariable Long groupId,
+        @PathVariable Long costId,
+        @RequestBody LedgerServerCostRequest request,
+        HttpServletRequest httpRequest
+    ) {
+        String requestEmail = requireRequestEmail(httpRequest);
+        requireSuperAdmin(requestEmail);
+        try {
+            return ledgerServerCostAdminService.updateEntry(
+                groupId, costId, request, requestEmail, resolveActorNickname(requestEmail)
+            );
+        } catch (IllegalArgumentException illegalArgumentException) {
+            throw badRequest(illegalArgumentException);
+        } catch (NoSuchElementException noSuchElementException) {
+            throw notFound(noSuchElementException);
+        }
+    }
+
+    @DeleteMapping("/{groupId}/ledger/server-costs/{costId}")
+    public void deleteServerCost(@PathVariable Long groupId, @PathVariable Long costId, HttpServletRequest httpRequest) {
+        String requestEmail = requireRequestEmail(httpRequest);
+        requireSuperAdmin(requestEmail);
+        try {
+            ledgerServerCostAdminService.deleteEntry(groupId, costId, requestEmail, resolveActorNickname(requestEmail));
+        } catch (NoSuchElementException noSuchElementException) {
+            throw notFound(noSuchElementException);
         }
     }
 

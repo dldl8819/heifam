@@ -340,7 +340,8 @@
       "subTabs": {
         "dashboard": "대시보드",
         "income": "수입",
-        "expense": "지출"
+        "expense": "지출",
+        "serverCosts": "서버비"
       },
       "memoHint": "팸 내부 공개 정보이니 참고해서 작성해주세요.",
       "addButton": "내역 추가",
@@ -441,10 +442,50 @@
           "totalExpense": "사용 합계",
           "net": "수지",
           "endBalance": "월말 잔액",
-          "total": "합계"
+          "total": "합계",
+          "serverCost": "서버비 환급"
         },
         "endBalanceCaption": "월말 잔액에는 {date} 기초 잔액 {amount}이 포함되어 있습니다.",
-        "empty": "아직 등록된 후원금 내역이 없습니다. 최고 관리자가 수입·지출 탭에서 내역을 추가하거나 CSV로 일괄 업로드하면 여기에 표시됩니다."
+        "empty": "아직 등록된 후원금 내역이 없습니다. 최고 관리자가 수입·지출 탭에서 내역을 추가하거나 CSV로 일괄 업로드하면 여기에 표시됩니다.",
+        "minusServerCost": "− 서버비 환급",
+        "serverCostPending": "아직 돌려받지 않은 서버비 {amount}은 잔액에서 빠지지 않았습니다.",
+        "serverCostMissingKrw": "원화 금액을 입력하지 않은 서버비 {count}건은 제외했습니다.",
+        "tooltipServerCost": "서버비 환급"
+      },
+      "serverCosts": {
+        "hint": "서버·호스팅 비용은 후원금 지출과 따로 관리합니다. 환급일을 넣은 금액만 후원금 잔액에서 빠지고, 아직 돌려받지 않은 금액은 대시보드에 따로 표시됩니다.",
+        "totalKrw": "원화 결제 합계",
+        "totalUsd": "청구액 합계 {amount}",
+        "reimbursed": "환급 완료",
+        "pending": "돌려받을 금액",
+        "missingKrw": "원화 미입력",
+        "count": "{count}건",
+        "missingKrwHint": "카드 명세서의 원화 금액을 입력해 주세요.",
+        "addButton": "서버비 추가",
+        "empty": "등록된 서버비 내역이 없습니다.",
+        "serviceRequired": "서비스 이름을 입력해 주세요.",
+        "billingMonthRequired": "청구 월을 입력해 주세요.",
+        "reimbursedNeedsKrw": "환급일을 넣으려면 원화 결제액이 필요합니다.",
+        "statusReimbursed": "환급 완료 ({date})",
+        "statusPending": "환급 대기",
+        "statusMissingKrw": "원화 미입력",
+        "reimbursedDate": "환급일 (후원금에서 돌려받은 날)",
+        "table": {
+          "billingMonth": "청구 월",
+          "service": "서비스",
+          "chargedDate": "결제일",
+          "usdAmount": "청구액 (USD)",
+          "krwAmount": "원화 결제액",
+          "paidBy": "결제자",
+          "status": "환급",
+          "memo": "메모",
+          "author": "작성자"
+        },
+        "placeholders": {
+          "service": "예: Render",
+          "paidBy": "예: 민식 개인 카드",
+          "memo": "메모"
+        }
       }
     }
   },
