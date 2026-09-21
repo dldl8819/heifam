@@ -6,6 +6,8 @@ import { apiClient, isApiConflictError, isApiForbiddenError, isApiNotFoundError,
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { PlayerGameTypeStatsModal } from '@/components/player-game-type-stats-modal'
+import { PlayerTeammateStatsModal } from '@/components/player-teammate-stats-modal'
+import { hasEnoughGamesForTeammateStats } from '@/lib/teammate-stats'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
 import { toTierOrder } from '@/lib/player-tier'
@@ -25,7 +27,13 @@ import {
   createMonthlyTierBoardPng,
   selectMonthlyTierBoardPlayers,
 } from '@/lib/monthly-tier-board-image'
-import type { GroupPlayerRaceStatsItem, PlayerRace, PlayerRosterItem, PlayerTierStatus } from '@/types/api'
+import type {
+  GroupPlayerRaceStatsItem,
+  GroupPlayerTeammateStats,
+  PlayerRace,
+  PlayerRosterItem,
+  PlayerTierStatus,
+} from '@/types/api'
 
 const TEMP_GROUP_ID = 1
 
@@ -322,6 +330,11 @@ export default function PlayersPage() {
   const [gameTypeStats, setGameTypeStats] = useState<GroupPlayerRaceStatsItem | null>(null)
   const [gameTypeStatsLoading, setGameTypeStatsLoading] = useState<boolean>(false)
   const [gameTypeStatsError, setGameTypeStatsError] = useState<string | null>(null)
+  const [teammateStatsPlayer, setTeammateStatsPlayer] =
+    useState<{ id: number; nickname: string } | null>(null)
+  const [teammateStats, setTeammateStats] = useState<GroupPlayerTeammateStats | null>(null)
+  const [teammateStatsLoading, setTeammateStatsLoading] = useState<boolean>(false)
+  const [teammateStatsError, setTeammateStatsError] = useState<string | null>(null)
   const [lastParticipation, setLastParticipation] = useState<LastParticipationState | null>(null)
   const [ownRaceEditingPlayerId, setOwnRaceEditingPlayerId] = useState<number | null>(null)
   const [ownRaceEditingValue, setOwnRaceEditingValue] = useState<PlayerRace>('P')
@@ -617,6 +630,7 @@ export default function PlayersPage() {
     setDeletingPlayerId(player.id)
     setPlayerActionError(null)
     setPlayerActionSuccess(null)
+    setDeleteConflictPlayer(null)
     try {
       await apiClient.deleteGroupPlayer(TEMP_GROUP_ID, player.id)
       if (editingPlayerId === player.id) {
@@ -651,6 +665,7 @@ export default function PlayersPage() {
   }
 
   const handleTogglePlayerActive = (player: PlayerRosterItem) => {
+    setDeleteConflictPlayer(null)
     if (!isAdmin) {
       setPlayerActionError(t('common.adminOnlyAction'))
       return
@@ -759,6 +774,28 @@ export default function PlayersPage() {
       setTogglingPlayerId(null)
     }
   }
+
+  const handleOpenTeammateStats = useCallback(async (player: PlayerRosterItem) => {
+    setTeammateStatsPlayer({ id: player.id, nickname: player.nickname })
+    setTeammateStats(null)
+    setTeammateStatsError(null)
+    setTeammateStatsLoading(true)
+
+    try {
+      setTeammateStats(await apiClient.getGroupPlayerTeammateStats(TEMP_GROUP_ID, player.id))
+    } catch {
+      setTeammateStatsError(t('teammateStatsModal.loadError'))
+    } finally {
+      setTeammateStatsLoading(false)
+    }
+  }, [])
+
+  const handleCloseTeammateStats = useCallback(() => {
+    setTeammateStatsPlayer(null)
+    setTeammateStats(null)
+    setTeammateStatsError(null)
+    setTeammateStatsLoading(false)
+  }, [])
 
   const handleOpenGameTypeStats = useCallback(async (player: PlayerRosterItem) => {
     setGameTypeStatsPlayer({ id: player.id, nickname: player.nickname })
@@ -1199,6 +1236,14 @@ export default function PlayersPage() {
         </div>
       )}
 
+      <PlayerTeammateStatsModal
+        open={teammateStatsPlayer !== null}
+        playerName={teammateStatsPlayer?.nickname ?? ''}
+        stats={teammateStats}
+        loading={teammateStatsLoading}
+        error={teammateStatsError}
+        onClose={handleCloseTeammateStats}
+      />
       <PlayerGameTypeStatsModal
         open={gameTypeStatsPlayer !== null}
         playerName={gameTypeStatsPlayer?.nickname ?? ''}
@@ -1641,6 +1686,18 @@ export default function PlayersPage() {
                             {gameTypeStatsLoading && gameTypeStatsPlayer?.id === row.id
                               ? t('statsModal.buttonLoading')
                               : t('statsModal.button')}
+                          </button>
+                        )}
+                        {!identityHidden && isSuperAdmin && hasEnoughGamesForTeammateStats(row.games) && (
+                          <button
+                            type="button"
+                            disabled={teammateStatsLoading && teammateStatsPlayer?.id === row.id}
+                            onClick={() => handleOpenTeammateStats(row)}
+                            className="ml-1.5 rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-sky-600 hover:bg-sky-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:border-sky-400 dark:hover:bg-sky-700"
+                          >
+                            {teammateStatsLoading && teammateStatsPlayer?.id === row.id
+                              ? t('teammateStatsModal.buttonLoading')
+                              : t('teammateStatsModal.button')}
                           </button>
                         )}
                       </td>

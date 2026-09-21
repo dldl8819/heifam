@@ -14,6 +14,7 @@ import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.PlayerActivityQueryService;
 import com.balancify.backend.service.PlayerQueryService;
 import com.balancify.backend.service.PlayerRaceStatsQueryService;
+import com.balancify.backend.service.PlayerTeammateStatsQueryService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -33,6 +34,8 @@ class GroupPlayerControllerDormancyTest {
     private final PlayerQueryService playerQueryService = mock(PlayerQueryService.class);
     private final PlayerActivityQueryService playerActivityQueryService = mock(PlayerActivityQueryService.class);
     private final PlayerRaceStatsQueryService playerRaceStatsQueryService = mock(PlayerRaceStatsQueryService.class);
+    private final PlayerTeammateStatsQueryService playerTeammateStatsQueryService =
+        mock(PlayerTeammateStatsQueryService.class);
     private final AccessControlService accessControlService = mock(AccessControlService.class);
     private final AuthenticatedRequestResolver authenticatedRequestResolver =
         mock(AuthenticatedRequestResolver.class);
@@ -47,6 +50,7 @@ class GroupPlayerControllerDormancyTest {
             playerQueryService,
             playerActivityQueryService,
             playerRaceStatsQueryService,
+            playerTeammateStatsQueryService,
             accessControlService,
             authenticatedRequestResolver
         );

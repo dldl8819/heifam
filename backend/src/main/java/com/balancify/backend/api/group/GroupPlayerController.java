@@ -5,12 +5,14 @@ import com.balancify.backend.api.group.dto.GroupDormantPlayerResponse;
 import com.balancify.backend.api.group.dto.GroupPlayerLastParticipationResponse;
 import com.balancify.backend.api.group.dto.GroupPlayerResponse;
 import com.balancify.backend.api.group.dto.GroupPlayerRaceStatsResponse;
+import com.balancify.backend.api.group.dto.GroupPlayerTeammateStatsResponse;
 import com.balancify.backend.api.group.dto.GroupPlayerTierBoardResponse;
 import com.balancify.backend.security.AuthenticatedRequestResolver;
 import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.PlayerActivityQueryService;
 import com.balancify.backend.service.PlayerQueryService;
 import com.balancify.backend.service.PlayerRaceStatsQueryService;
+import com.balancify.backend.service.PlayerTeammateStatsQueryService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
@@ -31,6 +33,7 @@ public class GroupPlayerController {
     private final PlayerQueryService playerQueryService;
     private final PlayerActivityQueryService playerActivityQueryService;
     private final PlayerRaceStatsQueryService playerRaceStatsQueryService;
+    private final PlayerTeammateStatsQueryService playerTeammateStatsQueryService;
     private final AccessControlService accessControlService;
     private final AuthenticatedRequestResolver authenticatedRequestResolver;
 
@@ -38,12 +41,14 @@ public class GroupPlayerController {
         PlayerQueryService playerQueryService,
         PlayerActivityQueryService playerActivityQueryService,
         PlayerRaceStatsQueryService playerRaceStatsQueryService,
+        PlayerTeammateStatsQueryService playerTeammateStatsQueryService,
         AccessControlService accessControlService,
         AuthenticatedRequestResolver authenticatedRequestResolver
     ) {
         this.playerQueryService = playerQueryService;
         this.playerActivityQueryService = playerActivityQueryService;
         this.playerRaceStatsQueryService = playerRaceStatsQueryService;
+        this.playerTeammateStatsQueryService = playerTeammateStatsQueryService;
         this.accessControlService = accessControlService;
         this.authenticatedRequestResolver = authenticatedRequestResolver;
     }
@@ -158,6 +163,27 @@ public class GroupPlayerController {
 
         try {
             return playerRaceStatsQueryService.getGroupPlayerMonthlyRaceStats(groupId, playerId);
+        } catch (NoSuchElementException exception) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, exception.getMessage(), exception);
+        }
+    }
+
+    /** Who this player wins with. Super admins only for now (see AdminKeyFilter). */
+    @GetMapping("/{groupId}/players/{playerId}/teammate-stats")
+    public GroupPlayerTeammateStatsResponse getGroupPlayerTeammateStats(
+        @PathVariable Long groupId,
+        @PathVariable Long playerId,
+        HttpServletRequest request
+    ) {
+        AccessControlService.AccessProfile accessProfile = accessControlService.resolveAccessProfile(
+            authenticatedRequestResolver.resolve(request).email()
+        );
+        if (!accessProfile.superAdmin()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only super admins can view teammate stats");
+        }
+
+        try {
+            return playerTeammateStatsQueryService.getTeammateStats(groupId, playerId);
         } catch (NoSuchElementException exception) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, exception.getMessage(), exception);
         }

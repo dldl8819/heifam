@@ -16,6 +16,7 @@ import type {
   GroupPlayerMmrUpdateRequest,
   GroupPlayerUpdateRequest,
   GroupPlayerTierBoardItem,
+  GroupPlayerTeammateStats,
   HealthResponse,
   LedgerCategoriesResponse,
   LedgerDashboardResponse,
@@ -1416,6 +1417,12 @@ export const apiClient = {
         body: JSON.stringify({ csvContent, expenseType }),
       },
       { adminOnly: true }
+    ),
+  getGroupPlayerTeammateStats: (groupId: number, playerId: number) =>
+    apiRequest<GroupPlayerTeammateStats>(
+      `/api/groups/${groupId}/players/${playerId}/teammate-stats`,
+      undefined,
+      { includeUserEmail: true }
     ),
   getLedgerServerCosts: (groupId: number) =>
     apiRequest<LedgerServerCost[]>(

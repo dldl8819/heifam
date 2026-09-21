@@ -1351,5 +1351,25 @@
       "win": "승",
       "loss": "패"
     }
+  },
+  "teammateStatsModal": {
+    "title": "{nickname} 팀메이트 승률",
+    "button": "팀메이트",
+    "buttonLoading": "불러오는 중",
+    "close": "닫기",
+    "loading": "팀메이트 승률을 불러오는 중...",
+    "loadError": "팀메이트 승률을 불러오지 못했습니다.",
+    "summary": "결과가 기록된 {games}경기 {wins}승 {losses}패 · 승률 {winRate}",
+    "empty": "같은 팀으로 {count}경기 이상 함께한 선수가 아직 없습니다.",
+    "streakValue": "{count}연승",
+    "table": {
+      "teammate": "팀메이트",
+      "games": "함께",
+      "wins": "승",
+      "losses": "패",
+      "winRate": "승률",
+      "streak": "현재 연승"
+    },
+    "hint": "같은 팀으로 {count}경기 이상 함께한 선수만 보여줍니다."
   }
 }

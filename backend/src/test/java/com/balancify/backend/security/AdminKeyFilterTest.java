@@ -86,6 +86,7 @@ import com.balancify.backend.service.PlayerActivityQueryService;
 import com.balancify.backend.service.PlayerAdminService;
 import com.balancify.backend.service.PlayerQueryService;
 import com.balancify.backend.service.PlayerRaceStatsQueryService;
+import com.balancify.backend.service.PlayerTeammateStatsQueryService;
 import com.balancify.backend.service.PlayerImportService;
 import com.balancify.backend.service.RankingService;
 import com.balancify.backend.service.RatingRecalculationService;
@@ -172,6 +173,9 @@ class AdminKeyFilterTest {
 
     @MockBean
     private PlayerRaceStatsQueryService playerRaceStatsQueryService;
+
+    @MockBean
+    private PlayerTeammateStatsQueryService playerTeammateStatsQueryService;
 
     @MockBean
     private RankingService rankingService;
@@ -2013,6 +2017,36 @@ class AdminKeyFilterTest {
                     .header("X-USER-EMAIL", "superadmin@hei.gg")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"mmr\":1200}")
+            )
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void returnsForbiddenForTeammateStatsWithMemberEmail() throws Exception {
+        mockMvc
+            .perform(
+                get("/api/groups/1/players/10/teammate-stats")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void returnsForbiddenForTeammateStatsWithAdminEmail() throws Exception {
+        mockMvc
+            .perform(
+                get("/api/groups/1/players/10/teammate-stats")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void allowsTeammateStatsWithSuperAdminEmail() throws Exception {
+        mockMvc
+            .perform(
+                get("/api/groups/1/players/10/teammate-stats")
+                    .header("X-USER-EMAIL", "superadmin@hei.gg")
             )
             .andExpect(status().isOk());
     }

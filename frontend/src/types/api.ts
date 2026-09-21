@@ -654,6 +654,26 @@ export type LedgerDashboardResponse = {
   expenseCategories: LedgerDashboardCategoryItem[]
 }
 
+export type GroupPlayerTeammateStat = {
+  playerId: number
+  nickname: string
+  wins: number
+  losses: number
+  games: number
+  winRate: number
+  currentWinStreak: number
+}
+
+export type GroupPlayerTeammateStats = {
+  playerId: number
+  nickname: string
+  wins: number
+  losses: number
+  games: number
+  winRate: number
+  teammates: GroupPlayerTeammateStat[]
+}
+
 export type LedgerServerCost = {
   id: number
   serviceName: string
