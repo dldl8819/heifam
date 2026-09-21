@@ -168,7 +168,7 @@ public class GroupPlayerController {
         }
     }
 
-    /** Who this player wins with. Super admins only for now (see AdminKeyFilter). */
+    /** Who this player wins with. Admins and above (see AdminKeyFilter). */
     @GetMapping("/{groupId}/players/{playerId}/teammate-stats")
     public GroupPlayerTeammateStatsResponse getGroupPlayerTeammateStats(
         @PathVariable Long groupId,
@@ -178,8 +178,8 @@ public class GroupPlayerController {
         AccessControlService.AccessProfile accessProfile = accessControlService.resolveAccessProfile(
             authenticatedRequestResolver.resolve(request).email()
         );
-        if (!accessProfile.superAdmin()) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only super admins can view teammate stats");
+        if (!accessProfile.admin()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only admins can view teammate stats");
         }
 
         try {

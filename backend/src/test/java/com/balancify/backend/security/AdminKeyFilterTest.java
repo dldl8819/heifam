@@ -2032,13 +2032,13 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void returnsForbiddenForTeammateStatsWithAdminEmail() throws Exception {
+    void allowsTeammateStatsWithAdminEmail() throws Exception {
         mockMvc
             .perform(
                 get("/api/groups/1/players/10/teammate-stats")
                     .header("X-USER-EMAIL", "admin@hei.gg")
             )
-            .andExpect(status().isForbidden());
+            .andExpect(status().isOk());
     }
 
     @Test

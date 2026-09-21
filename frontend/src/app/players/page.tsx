@@ -1701,7 +1701,7 @@ export default function PlayersPage() {
                               : t('statsModal.button')}
                           </button>
                         )}
-                        {!identityHidden && isSuperAdmin && hasEnoughGamesForTeammateStats(row.games) && (
+                        {!identityHidden && isAdmin && hasEnoughGamesForTeammateStats(row.games) && (
                           <button
                             type="button"
                             disabled={teammateStatsLoading && teammateStatsPlayer?.id === row.id}
