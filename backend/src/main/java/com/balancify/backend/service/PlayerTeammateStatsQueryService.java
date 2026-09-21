@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>It reads the participants of that player's matches once and aggregates them in memory, so a
  * lookup costs a single query rather than one per teammate. Results are cached per group and player
  * for the same short window as the other group reads, and a match result change drops the cache.
+ * Withdrawn members are left out, since their nickname is masked everywhere else anyway.
  */
 @Service
 public class PlayerTeammateStatsQueryService {
@@ -91,6 +92,11 @@ public class PlayerTeammateStatsQueryService {
                     continue;
                 }
                 if (playerId.equals(other.getPlayer().getId()) || !ownTeam.equals(normalizeTeam(other.getTeam()))) {
+                    continue;
+                }
+                // Withdrawn members are masked everywhere else, so a row for them would only ever
+                // read as the hidden member label.
+                if (PlayerIdentityPolicy.isIdentityHidden(other.getPlayer())) {
                     continue;
                 }
 

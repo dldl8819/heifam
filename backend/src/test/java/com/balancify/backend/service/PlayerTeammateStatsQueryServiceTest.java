@@ -159,6 +159,32 @@ class PlayerTeammateStatsQueryServiceTest {
     }
 
     @Test
+    void leavesOutTeammatesWhoseIdentityIsHidden() {
+        Player target = player(1L, "민식");
+        Player partner = player(2L, "보이");
+        Player withdrawn = player(3L, "떠난 사람");
+        withdrawn.setActive(false);
+        Player rival = player(4L, "리드");
+
+        List<MatchParticipant> participants = new ArrayList<>();
+        participants.addAll(match(3L, "HOME", target, withdrawn, rival));
+        participants.addAll(match(2L, "HOME", target, partner, rival));
+        when(playerRepository.findByIdAndGroup_Id(1L, 1L)).thenReturn(Optional.of(target));
+        when(matchParticipantRepository.findByGroupIdAndPlayerMatchesOrderByPlayedAtDesc(1L, 1L))
+            .thenReturn(participants);
+
+        GroupPlayerTeammateStatsResponse response = playerTeammateStatsQueryService.getTeammateStats(1L, 1L);
+
+        // The withdrawn teammate drops out of the list, but the matches still count as the
+        // player's own wins.
+        assertThat(response.games()).isEqualTo(2);
+        assertThat(response.wins()).isEqualTo(2);
+        assertThat(response.teammates())
+            .extracting(GroupPlayerTeammateStatResponse::nickname)
+            .containsExactly("보이");
+    }
+
+    @Test
     void throwsWhenThePlayerIsNotInTheGroup() {
         when(playerRepository.findByIdAndGroup_Id(99L, 1L)).thenReturn(Optional.empty());
 
