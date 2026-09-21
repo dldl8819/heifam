@@ -630,7 +630,6 @@ export default function PlayersPage() {
     setDeletingPlayerId(player.id)
     setPlayerActionError(null)
     setPlayerActionSuccess(null)
-    setDeleteConflictPlayer(null)
     try {
       await apiClient.deleteGroupPlayer(TEMP_GROUP_ID, player.id)
       if (editingPlayerId === player.id) {
@@ -665,7 +664,6 @@ export default function PlayersPage() {
   }
 
   const handleTogglePlayerActive = (player: PlayerRosterItem) => {
-    setDeleteConflictPlayer(null)
     if (!isAdmin) {
       setPlayerActionError(t('common.adminOnlyAction'))
       return
