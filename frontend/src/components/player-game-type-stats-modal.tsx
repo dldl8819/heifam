@@ -4,7 +4,10 @@ import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
 import type { GroupPlayerGameTypeStat, GroupPlayerRaceStatsItem } from '@/types/api'
 
-const DISPLAY_GAME_TYPES = ['PPP', 'PPT', 'PPZ', 'PTZ', 'PP', 'PT', 'PZ'] as const
+// Games are 3v3 now, so the 2v2 compositions (PP/PT/PZ) are left out - they would only ever
+// show an empty row, or a win rate from a format nobody plays any more. The backend still
+// aggregates them, so listing them again is a one line change.
+const DISPLAY_GAME_TYPES = ['PPP', 'PPT', 'PPZ', 'PTZ'] as const
 
 type PlayerGameTypeStatsModalProps = {
   open: boolean
