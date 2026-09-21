@@ -369,7 +369,7 @@ public class PlayerAdminService {
             groupReadCacheService.evictGroup(groupId);
         } catch (DataIntegrityViolationException exception) {
             throw new IllegalStateException(
-                "매치 또는 드래프트 기록이 남아 있는 선수는 삭제할 수 없습니다.",
+                "경기 또는 정기 감전 기록이 있는 선수는 삭제할 수 없습니다. 명단에서 빼려면 비활성 처리를 사용해 주세요.",
                 exception
             );
         }

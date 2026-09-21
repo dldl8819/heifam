@@ -323,6 +323,8 @@ export default function PlayersPage() {
     () => new Set<number>()
   )
   const [playerActionError, setPlayerActionError] = useState<string | null>(null)
+  /** Set when a delete was refused because the player still has match/draft history. */
+  const [deleteConflictPlayer, setDeleteConflictPlayer] = useState<PlayerRosterItem | null>(null)
   const [playerActionSuccess, setPlayerActionSuccess] = useState<string | null>(null)
   const [tierBoardDownloading, setTierBoardDownloading] = useState<boolean>(false)
   const [gameTypeStatsPlayer, setGameTypeStatsPlayer] =
@@ -630,6 +632,7 @@ export default function PlayersPage() {
     setDeletingPlayerId(player.id)
     setPlayerActionError(null)
     setPlayerActionSuccess(null)
+    setDeleteConflictPlayer(null)
     try {
       await apiClient.deleteGroupPlayer(TEMP_GROUP_ID, player.id)
       if (editingPlayerId === player.id) {
@@ -653,6 +656,8 @@ export default function PlayersPage() {
         } else {
           setPlayerActionError(t('players.actions.deleteConflict'))
         }
+        // History is what blocks the delete, so offer the action that actually applies.
+        setDeleteConflictPlayer(player)
       } else if (isApiNotFoundError(actionError)) {
         setPlayerActionError(t('players.actions.deleteNotFound'))
       } else {
@@ -664,6 +669,7 @@ export default function PlayersPage() {
   }
 
   const handleTogglePlayerActive = (player: PlayerRosterItem) => {
+    setDeleteConflictPlayer(null)
     if (!isAdmin) {
       setPlayerActionError(t('common.adminOnlyAction'))
       return
@@ -1110,6 +1116,15 @@ export default function PlayersPage() {
               <AlertIcon icon="destructive">!</AlertIcon>
               <AlertContent>
                 <AlertDescription>{playerActionError ?? ownRaceActionError}</AlertDescription>
+                {deleteConflictPlayer && deleteConflictPlayer.active !== false && (
+                  <button
+                    type="button"
+                    className="mt-2 inline-flex items-center rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-medium text-rose-800 transition-colors hover:bg-rose-100 dark:border-rose-700 dark:text-rose-200 dark:hover:bg-rose-900/40"
+                    onClick={() => handleTogglePlayerActive(deleteConflictPlayer)}
+                  >
+                    {t('players.actions.deleteConflictDeactivate')}
+                  </button>
+                )}
               </AlertContent>
             </Alert>
           )}

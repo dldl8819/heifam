@@ -814,7 +814,8 @@
       "reactivateSuccess": "선수가 다시 활성화되었습니다.",
       "reactivateFailure": "선수 복구에 실패했습니다. 서버 상태를 확인해 주세요.",
       "deleteSuccess": "선수가 삭제되었습니다.",
-      "deleteConflict": "매치 또는 드래프트 기록이 남아 있는 선수는 삭제할 수 없습니다.",
+      "deleteConflict": "경기 또는 정기 감전 기록이 있는 선수는 삭제할 수 없습니다. 명단에서 빼려면 비활성 처리를 사용해 주세요.",
+      "deleteConflictDeactivate": "비활성 처리하기",
       "deleteFailure": "선수 삭제에 실패했습니다. 서버 상태를 확인해 주세요.",
       "deleteNotFound": "선수 삭제 API를 찾지 못했습니다. 백엔드를 재시작하고 최신 코드인지 확인해 주세요.",
       "deleteConfirm": "{nickname} 선수를 삭제하시겠습니까?"

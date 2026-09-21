@@ -890,7 +890,7 @@ class PlayerAdminServiceTest {
 
         assertThatThrownBy(() -> playerAdminService.deletePlayer(1L, 10L))
             .isInstanceOf(IllegalStateException.class)
-            .hasMessage("매치 또는 드래프트 기록이 남아 있는 선수는 삭제할 수 없습니다.");
+            .hasMessage("경기 또는 정기 감전 기록이 있는 선수는 삭제할 수 없습니다. 명단에서 빼려면 비활성 처리를 사용해 주세요.");
     }
 
     private Player player(Long playerId, Long groupId, String nickname) {
