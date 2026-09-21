@@ -12,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,6 +40,42 @@ public class PlayerTeammateStatsQueryService {
         this.playerRepository = playerRepository;
         this.matchParticipantRepository = matchParticipantRepository;
         this.groupReadCacheService = groupReadCacheService;
+    }
+
+    /**
+     * The cut a member sees of their own record. Their own totals stay whole; the list keeps the
+     * teammates they win at least half their shared matches with. Admins see every teammate.
+     */
+    public static final double MEMBER_MIN_WIN_RATE = 50.0;
+
+    /** Whether the signed-in account owns this roster row, which is what lets a member read it. */
+    @Transactional(readOnly = true)
+    public boolean isOwnPlayer(Long groupId, Long playerId, UUID requesterAuthUserId) {
+        if (requesterAuthUserId == null) {
+            return false;
+        }
+        return playerRepository.findByIdAndGroup_Id(playerId, groupId)
+            .filter(player -> !PlayerIdentityPolicy.isIdentityHidden(player))
+            .map(player -> requesterAuthUserId.equals(player.getAuthUserId()))
+            .orElse(false);
+    }
+
+    /** A member's own view of their record: the losing teammates are left out. */
+    @Transactional(readOnly = true)
+    public GroupPlayerTeammateStatsResponse getOwnTeammateStats(Long groupId, Long playerId) {
+        GroupPlayerTeammateStatsResponse stats = getTeammateStats(groupId, playerId);
+        return new GroupPlayerTeammateStatsResponse(
+            stats.playerId(),
+            stats.nickname(),
+            stats.wins(),
+            stats.losses(),
+            stats.games(),
+            stats.winRate(),
+            stats.teammates()
+                .stream()
+                .filter(teammate -> teammate.winRate() >= MEMBER_MIN_WIN_RATE)
+                .toList()
+        );
     }
 
     @Transactional(readOnly = true)

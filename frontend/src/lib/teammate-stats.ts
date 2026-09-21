@@ -9,6 +9,24 @@ export const TEAMMATE_MIN_GAMES = 10
 /** Players with fewer matches than this are not offered the teammate view at all. */
 export const PLAYER_MIN_GAMES_FOR_TEAMMATE_STATS = 30
 
+/**
+ * A member sees their own record only, and only the teammates they win with. The server applies
+ * this cut; the number lives here so the modal can say what was left out.
+ */
+export const MEMBER_MIN_WIN_RATE = 50
+
+/** Admins open any roster row; everyone else opens their own. */
+export function canOpenTeammateStats(options: {
+  isAdmin: boolean
+  isOwnPlayer: boolean
+  games: number | undefined
+}): boolean {
+  if (!hasEnoughGamesForTeammateStats(options.games)) {
+    return false
+  }
+  return options.isAdmin || options.isOwnPlayer
+}
+
 export function filterTeammateStats(
   teammates: GroupPlayerTeammateStat[],
   minGames: number = TEAMMATE_MIN_GAMES

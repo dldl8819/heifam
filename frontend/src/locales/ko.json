@@ -1371,6 +1371,8 @@
       "winRate": "승률",
       "streak": "현재 연승"
     },
-    "hint": "같은 팀으로 {count}경기 이상 함께한 선수만 보여줍니다."
+    "hint": "같은 팀으로 {count}경기 이상 함께한 선수만 보여줍니다.",
+    "hintWinningOnly": "같은 팀으로 {count}경기 이상 함께하고 승률 {winRate}% 이상인 팀메이트만 보여줍니다.",
+    "emptyWinningOnly": "같은 팀으로 {count}경기 이상 함께하고 승률 {winRate}% 이상인 팀메이트가 아직 없습니다."
   }
 }

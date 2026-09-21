@@ -168,22 +168,39 @@ public class GroupPlayerController {
         }
     }
 
-    /** Who this player wins with. Admins and above (see AdminKeyFilter). */
+    /**
+     * Who this player wins with. Admins read any roster row in full; a member reads only the row
+     * their own account is linked to, and only the teammates they win with.
+     */
     @GetMapping("/{groupId}/players/{playerId}/teammate-stats")
     public GroupPlayerTeammateStatsResponse getGroupPlayerTeammateStats(
         @PathVariable Long groupId,
         @PathVariable Long playerId,
         HttpServletRequest request
     ) {
+        AuthenticatedRequestResolver.ResolvedRequestIdentity identity =
+            authenticatedRequestResolver.resolve(request);
         AccessControlService.AccessProfile accessProfile = accessControlService.resolveAccessProfile(
-            authenticatedRequestResolver.resolve(request).email()
+            identity.email()
         );
-        if (!accessProfile.admin()) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only admins can view teammate stats");
+        boolean admin = accessProfile.admin();
+        // A missing roster row reads as someone else's row, so a member never learns it is missing.
+        if (!admin
+            && !playerTeammateStatsQueryService.isOwnPlayer(
+                groupId,
+                playerId,
+                resolveVerifiedAuthUserId(identity)
+            )) {
+            throw new ResponseStatusException(
+                HttpStatus.FORBIDDEN,
+                "Members can only view their own teammate stats"
+            );
         }
 
         try {
-            return playerTeammateStatsQueryService.getTeammateStats(groupId, playerId);
+            return admin
+                ? playerTeammateStatsQueryService.getTeammateStats(groupId, playerId)
+                : playerTeammateStatsQueryService.getOwnTeammateStats(groupId, playerId);
         } catch (NoSuchElementException exception) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, exception.getMessage(), exception);
         }

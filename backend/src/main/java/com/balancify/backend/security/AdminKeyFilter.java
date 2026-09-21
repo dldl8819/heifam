@@ -44,10 +44,11 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/matches/history"),
             AuthType.SUPER_ADMIN_EMAIL
         ),
+        // A member may read their own row here; the controller is what checks that it is theirs.
         new ProtectedRoute(
             "GET",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/players/{playerId}/teammate-stats"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SERVICE_ACCESS
         ),
         new ProtectedRoute(
             "PATCH",

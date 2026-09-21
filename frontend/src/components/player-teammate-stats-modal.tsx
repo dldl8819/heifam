@@ -2,7 +2,12 @@
 
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
-import { TEAMMATE_MIN_GAMES, filterTeammateStats, formatWinRate } from '@/lib/teammate-stats'
+import {
+  MEMBER_MIN_WIN_RATE,
+  TEAMMATE_MIN_GAMES,
+  filterTeammateStats,
+  formatWinRate,
+} from '@/lib/teammate-stats'
 import type { GroupPlayerTeammateStats } from '@/types/api'
 
 type PlayerTeammateStatsModalProps = {
@@ -12,6 +17,8 @@ type PlayerTeammateStatsModalProps = {
   loading: boolean
   error: string | null
   onClose: () => void
+  /** A member's own view, where the server already dropped the teammates they lose with. */
+  winningOnly?: boolean
 }
 
 const key = (name: string) => `teammateStatsModal.${name}`
@@ -23,12 +30,17 @@ export function PlayerTeammateStatsModal({
   loading,
   error,
   onClose,
+  winningOnly = false,
 }: PlayerTeammateStatsModalProps) {
   if (!open) {
     return null
   }
 
   const teammates = stats ? filterTeammateStats(stats.teammates) : []
+  const noticeParams = {
+    count: String(TEAMMATE_MIN_GAMES),
+    winRate: String(MEMBER_MIN_WIN_RATE),
+  }
 
   return (
     <div
@@ -73,12 +85,12 @@ export function PlayerTeammateStatsModal({
           ) : (
             <div className="space-y-3">
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                {t(key('hint'), { count: String(TEAMMATE_MIN_GAMES) })}
+                {t(key(winningOnly ? 'hintWinningOnly' : 'hint'), noticeParams)}
               </p>
 
               {teammates.length === 0 ? (
                 <p className="rounded-md border border-dashed border-slate-300 px-3 py-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                  {t(key('empty'), { count: String(TEAMMATE_MIN_GAMES) })}
+                  {t(key(winningOnly ? 'emptyWinningOnly' : 'empty'), noticeParams)}
                 </p>
               ) : (
                 <div className="overflow-x-auto">

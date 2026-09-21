@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  MEMBER_MIN_WIN_RATE,
   PLAYER_MIN_GAMES_FOR_TEAMMATE_STATS,
   TEAMMATE_MIN_GAMES,
+  canOpenTeammateStats,
   filterTeammateStats,
   formatWinRate,
   hasEnoughGamesForTeammateStats,
@@ -40,6 +42,19 @@ describe('teammate stats helpers', () => {
     expect(hasEnoughGamesForTeammateStats(31)).toBe(true)
     expect(hasEnoughGamesForTeammateStats(29)).toBe(false)
     expect(hasEnoughGamesForTeammateStats(undefined)).toBe(false)
+  })
+
+  it('opens any row for an admin and only their own row for a member', () => {
+    expect(MEMBER_MIN_WIN_RATE).toBe(50)
+    expect(canOpenTeammateStats({ isAdmin: true, isOwnPlayer: false, games: 30 })).toBe(true)
+    expect(canOpenTeammateStats({ isAdmin: false, isOwnPlayer: true, games: 30 })).toBe(true)
+    expect(canOpenTeammateStats({ isAdmin: false, isOwnPlayer: false, games: 120 })).toBe(false)
+  })
+
+  it('keeps the thirty match floor for everyone', () => {
+    expect(canOpenTeammateStats({ isAdmin: true, isOwnPlayer: false, games: 29 })).toBe(false)
+    expect(canOpenTeammateStats({ isAdmin: false, isOwnPlayer: true, games: 29 })).toBe(false)
+    expect(canOpenTeammateStats({ isAdmin: true, isOwnPlayer: true, games: undefined })).toBe(false)
   })
 
   it('formats win rates sent as a percentage or a ratio', () => {

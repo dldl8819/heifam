@@ -2021,8 +2021,10 @@ class AdminKeyFilterTest {
             .andExpect(status().isOk());
     }
 
+    // The route itself is open to members now, so this is the controller turning down a row that
+    // belongs to someone else.
     @Test
-    void returnsForbiddenForTeammateStatsWithMemberEmail() throws Exception {
+    void returnsForbiddenForAnotherPlayersTeammateStatsWithMemberEmail() throws Exception {
         mockMvc
             .perform(
                 get("/api/groups/1/players/10/teammate-stats")

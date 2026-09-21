@@ -7,7 +7,7 @@ import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { PlayerGameTypeStatsModal } from '@/components/player-game-type-stats-modal'
 import { PlayerTeammateStatsModal } from '@/components/player-teammate-stats-modal'
-import { hasEnoughGamesForTeammateStats } from '@/lib/teammate-stats'
+import { canOpenTeammateStats } from '@/lib/teammate-stats'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
 import { toTierOrder } from '@/lib/player-tier'
@@ -1255,6 +1255,7 @@ export default function PlayersPage() {
         stats={teammateStats}
         loading={teammateStatsLoading}
         error={teammateStatsError}
+        winningOnly={!isAdmin}
         onClose={handleCloseTeammateStats}
       />
       <PlayerGameTypeStatsModal
@@ -1701,7 +1702,12 @@ export default function PlayersPage() {
                               : t('statsModal.button')}
                           </button>
                         )}
-                        {!identityHidden && isAdmin && hasEnoughGamesForTeammateStats(row.games) && (
+                        {!identityHidden &&
+                          canOpenTeammateStats({
+                            isAdmin,
+                            isOwnPlayer: row.isOwnPlayer === true,
+                            games: row.games,
+                          }) && (
                           <button
                             type="button"
                             disabled={teammateStatsLoading && teammateStatsPlayer?.id === row.id}

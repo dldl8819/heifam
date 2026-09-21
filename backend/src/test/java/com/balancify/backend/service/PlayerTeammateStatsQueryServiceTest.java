@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -182,6 +183,65 @@ class PlayerTeammateStatsQueryServiceTest {
         assertThat(response.teammates())
             .extracting(GroupPlayerTeammateStatResponse::nickname)
             .containsExactly("보이");
+    }
+
+    @Test
+    void keepsOnlyTheTeammatesAMemberWinsWithInTheirOwnView() {
+        Player target = player(1L, "민식");
+        Player alwaysWins = player(2L, "보이");
+        Player evenRecord = player(3L, "스톰");
+        Player mostlyLoses = player(4L, "리드");
+        Player rival = player(5L, "제이");
+
+        List<MatchParticipant> participants = new ArrayList<>();
+        participants.addAll(match(7L, "HOME", target, alwaysWins, rival));
+        participants.addAll(match(6L, "HOME", target, alwaysWins, rival));
+        participants.addAll(match(5L, "HOME", target, evenRecord, rival));
+        participants.addAll(match(4L, "AWAY", target, evenRecord, rival));
+        participants.addAll(match(3L, "HOME", target, mostlyLoses, rival));
+        participants.addAll(match(2L, "AWAY", target, mostlyLoses, rival));
+        participants.addAll(match(1L, "AWAY", target, mostlyLoses, rival));
+        when(playerRepository.findByIdAndGroup_Id(1L, 1L)).thenReturn(Optional.of(target));
+        when(matchParticipantRepository.findByGroupIdAndPlayerMatchesOrderByPlayedAtDesc(1L, 1L))
+            .thenReturn(participants);
+
+        GroupPlayerTeammateStatsResponse response = playerTeammateStatsQueryService.getOwnTeammateStats(1L, 1L);
+
+        // Their own record stays whole - only the teammate list is cut.
+        assertThat(response.games()).isEqualTo(7);
+        assertThat(response.wins()).isEqualTo(4);
+        assertThat(response.losses()).isEqualTo(3);
+        // An even record still counts as 50% or better, so it stays; the losing one goes.
+        assertThat(response.teammates())
+            .extracting(
+                GroupPlayerTeammateStatResponse::nickname,
+                GroupPlayerTeammateStatResponse::winRate
+            )
+            .containsExactly(
+                tuple("보이", 100.0),
+                tuple("스톰", 50.0)
+            );
+    }
+
+    @Test
+    void recognizesOnlyTheRosterRowTheAccountIsLinkedTo() {
+        UUID account = UUID.fromString("00000000-0000-0000-0000-0000000000aa");
+        UUID otherAccount = UUID.fromString("00000000-0000-0000-0000-0000000000bb");
+        Player target = player(1L, "민식");
+        target.setAuthUserId(account);
+        Player withdrawn = player(2L, "떠난 사람");
+        withdrawn.setAuthUserId(account);
+        withdrawn.setActive(false);
+        when(playerRepository.findByIdAndGroup_Id(1L, 1L)).thenReturn(Optional.of(target));
+        when(playerRepository.findByIdAndGroup_Id(2L, 1L)).thenReturn(Optional.of(withdrawn));
+        when(playerRepository.findByIdAndGroup_Id(99L, 1L)).thenReturn(Optional.empty());
+
+        assertThat(playerTeammateStatsQueryService.isOwnPlayer(1L, 1L, account)).isTrue();
+        assertThat(playerTeammateStatsQueryService.isOwnPlayer(1L, 1L, otherAccount)).isFalse();
+        // Signed out, or signed in without a verified account id.
+        assertThat(playerTeammateStatsQueryService.isOwnPlayer(1L, 1L, null)).isFalse();
+        assertThat(playerTeammateStatsQueryService.isOwnPlayer(1L, 2L, account)).isFalse();
+        assertThat(playerTeammateStatsQueryService.isOwnPlayer(1L, 99L, account)).isFalse();
     }
 
     @Test
