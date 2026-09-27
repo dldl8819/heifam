@@ -1434,7 +1434,7 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void returnsMaskedRankingForAdminWithMmrAccess() throws Exception {
+    void returnsRankingMmrForAdminWithMmrAccess() throws Exception {
         when(rankingService.getGroupRanking(eq(1L)))
             .thenReturn(
                 List.of(
@@ -1463,8 +1463,8 @@ class AdminKeyFilterTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].rank").value(1))
             .andExpect(jsonPath("$[0].nickname").value("alpha"))
-            .andExpect(jsonPath("$[0].currentMmr").doesNotExist())
-            .andExpect(jsonPath("$[0].mmrDelta").doesNotExist());
+            .andExpect(jsonPath("$[0].currentMmr").value(1216))
+            .andExpect(jsonPath("$[0].mmrDelta").value(16));
     }
 
     @Test
