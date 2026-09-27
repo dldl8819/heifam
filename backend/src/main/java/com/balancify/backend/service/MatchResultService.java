@@ -4,6 +4,7 @@ import com.balancify.backend.api.match.dto.MatchResultParticipantResponse;
 import com.balancify.backend.api.match.dto.MatchResultRequest;
 import com.balancify.backend.api.match.dto.MatchResultResponse;
 import com.balancify.backend.api.match.dto.MatchResultUpdateRequest;
+import com.balancify.backend.api.match.dto.ParticipantRaceRequest;
 import com.balancify.backend.domain.Match;
 import com.balancify.backend.domain.MatchParticipant;
 import com.balancify.backend.domain.MatchStatus;
@@ -20,12 +21,14 @@ import com.balancify.backend.service.exception.MatchConflictException;
 import com.balancify.backend.service.exception.MatchEditForbiddenException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Set;
 import java.time.OffsetDateTime;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -162,7 +165,8 @@ public class MatchResultService {
         RaceCompositionUpdate raceCompositionUpdate = applyRaceCompositionUpdate(
             match,
             validatedParticipants,
-            request == null ? null : request.raceComposition()
+            request == null ? null : request.raceComposition(),
+            request == null ? null : request.participantRaces()
         );
 
         boolean sameCompletedWinner = currentStatus == MatchStatus.COMPLETED
@@ -197,7 +201,8 @@ public class MatchResultService {
                     previousWinnerTeam,
                     winnerTeam,
                     raceCompositionUpdate.previousRaceComposition(),
-                    raceCompositionUpdate.nextRaceComposition()
+                    raceCompositionUpdate.nextRaceComposition(),
+                    raceCompositionUpdate.participantRacesChanged()
                 )
             );
         }
@@ -218,7 +223,8 @@ public class MatchResultService {
                 winnerAudit.previousWinnerTeam(),
                 winnerAudit.nextWinnerTeam(),
                 raceCompositionUpdate.previousRaceComposition(),
-                raceCompositionUpdate.nextRaceComposition()
+                raceCompositionUpdate.nextRaceComposition(),
+                raceCompositionUpdate.participantRacesChanged()
             )
         );
     }
@@ -253,6 +259,11 @@ public class MatchResultService {
         }
 
         ValidatedParticipants validatedParticipants = loadValidatedParticipants(matchId, match);
+        applyParticipantRaces(
+            validatedParticipants,
+            normalizeRaceCompositionForAudit(match.getRaceComposition(), validatedParticipants.teamSize()),
+            request == null ? null : request.participantRaces()
+        );
         List<MatchParticipant> participants = validatedParticipants.all();
         int teamSize = validatedParticipants.teamSize();
         boolean ratingAffecting = RankedMatchPolicy.affectsRating(teamSize);
@@ -402,32 +413,49 @@ public class MatchResultService {
     private RaceCompositionUpdate applyRaceCompositionUpdate(
         Match match,
         ValidatedParticipants participants,
-        String requestedRaceComposition
+        String requestedRaceComposition,
+        List<ParticipantRaceRequest> requestedParticipantRaces
     ) {
         String previousRaceComposition = normalizeRaceCompositionForAudit(
             match == null ? null : match.getRaceComposition(),
             participants.teamSize()
         );
-        if (requestedRaceComposition == null) {
+        boolean hasParticipantRaces = requestedParticipantRaces != null && !requestedParticipantRaces.isEmpty();
+        if (requestedRaceComposition == null && !hasParticipantRaces) {
             return new RaceCompositionUpdate(
                 previousRaceComposition,
                 previousRaceComposition,
+                false,
                 false
             );
         }
-        if (requestedRaceComposition.isBlank()) {
+        if (requestedRaceComposition != null && requestedRaceComposition.isBlank()) {
             throw new IllegalArgumentException("raceComposition is required");
         }
 
-        String nextRaceComposition = RaceCompositionPolicy.normalizeForTeamSize(
-            requestedRaceComposition,
-            participants.teamSize()
-        );
+        String nextRaceComposition = requestedRaceComposition == null
+            ? previousRaceComposition
+            : RaceCompositionPolicy.normalizeForTeamSize(requestedRaceComposition, participants.teamSize());
         if (!Objects.equals(previousRaceComposition, nextRaceComposition)) {
             rejectDuplicateRaceCompositionUpdate(
                 match,
                 participants,
                 nextRaceComposition
+            );
+        }
+        if (hasParticipantRaces) {
+            boolean participantRacesChanged = applyParticipantRaces(
+                participants,
+                nextRaceComposition,
+                requestedParticipantRaces
+            );
+            boolean storedCompositionChanged = !Objects.equals(nextRaceComposition, match.getRaceComposition());
+            match.setRaceComposition(nextRaceComposition);
+            return new RaceCompositionUpdate(
+                previousRaceComposition,
+                nextRaceComposition,
+                storedCompositionChanged || participantRacesChanged,
+                participantRacesChanged
             );
         }
         boolean matchAlreadyCanonical = Objects.equals(
@@ -445,6 +473,7 @@ public class MatchResultService {
             return new RaceCompositionUpdate(
                 previousRaceComposition,
                 nextRaceComposition,
+                false,
                 false
             );
         }
@@ -455,8 +484,61 @@ public class MatchResultService {
         return new RaceCompositionUpdate(
             previousRaceComposition,
             nextRaceComposition,
-            true
+            true,
+            false
         );
+    }
+
+    // The recorder's account of who actually played which race; it replaces the automatic
+    // assignment, so each team must still add up to the match's race composition.
+    private boolean applyParticipantRaces(
+        ValidatedParticipants participants,
+        String raceComposition,
+        List<ParticipantRaceRequest> requestedParticipantRaces
+    ) {
+        if (requestedParticipantRaces == null || requestedParticipantRaces.isEmpty()) {
+            return false;
+        }
+        if (raceComposition == null) {
+            throw new IllegalArgumentException("raceComposition is required");
+        }
+
+        Map<Long, MatchParticipant> participantsByPlayerId = new HashMap<>();
+        for (MatchParticipant participant : participants.all()) {
+            Player player = participant.getPlayer();
+            if (player != null && player.getId() != null && !PlayerIdentityPolicy.isIdentityHidden(player)) {
+                participantsByPlayerId.put(player.getId(), participant);
+            }
+        }
+
+        Set<Long> seenPlayerIds = new HashSet<>();
+        boolean changed = false;
+        for (ParticipantRaceRequest requested : requestedParticipantRaces) {
+            Long playerId = requested == null ? null : requested.playerId();
+            MatchParticipant participant = playerId == null ? null : participantsByPlayerId.get(playerId);
+            if (participant == null || !seenPlayerIds.add(playerId)) {
+                throw new IllegalArgumentException("선수별 종족 정보가 올바르지 않습니다.");
+            }
+            String race = PlayerRacePolicy.normalizeAssignedRace(requested.race());
+            if (race == null) {
+                throw new IllegalArgumentException("선수별 종족 정보가 올바르지 않습니다.");
+            }
+            String currentRace = participant.getAssignedRace() == null
+                ? null
+                : participant.getAssignedRace().trim().toUpperCase(Locale.ROOT);
+            if (!race.equals(currentRace)) {
+                participant.setAssignedRace(race);
+                changed = true;
+            }
+        }
+
+        if (!teamMatchesRaceComposition(participants.home(), raceComposition)
+            || !teamMatchesRaceComposition(participants.away(), raceComposition)) {
+            throw new IllegalArgumentException(
+                "선수별 종족이 종족 조합(" + raceComposition + ")과 맞지 않습니다."
+            );
+        }
+        return changed;
     }
 
     private void assignRaceComposition(
@@ -917,15 +999,35 @@ public class MatchResultService {
         String previousWinnerTeam,
         String nextWinnerTeam,
         String previousRaceComposition,
-        String nextRaceComposition
+        String nextRaceComposition,
+        boolean participantRacesChanged
     ) {
+        public MatchResultUpdateAuditSnapshot(
+            Long matchId,
+            Long groupId,
+            String previousWinnerTeam,
+            String nextWinnerTeam,
+            String previousRaceComposition,
+            String nextRaceComposition
+        ) {
+            this(
+                matchId,
+                groupId,
+                previousWinnerTeam,
+                nextWinnerTeam,
+                previousRaceComposition,
+                nextRaceComposition,
+                false
+            );
+        }
+
         public MatchResultUpdateAuditSnapshot(
             Long matchId,
             Long groupId,
             String previousWinnerTeam,
             String nextWinnerTeam
         ) {
-            this(matchId, groupId, previousWinnerTeam, nextWinnerTeam, null, null);
+            this(matchId, groupId, previousWinnerTeam, nextWinnerTeam, null, null, false);
         }
     }
 
@@ -946,7 +1048,8 @@ public class MatchResultService {
     private record RaceCompositionUpdate(
         String previousRaceComposition,
         String nextRaceComposition,
-        boolean changed
+        boolean changed,
+        boolean participantRacesChanged
     ) {
     }
 

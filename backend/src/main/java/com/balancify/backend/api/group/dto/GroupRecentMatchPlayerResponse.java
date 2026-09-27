@@ -7,6 +7,7 @@ public record GroupRecentMatchPlayerResponse(
     Long playerId,
     String nickname,
     String team,
-    Integer mmr
+    Integer mmr,
+    String assignedRace
 ) {
 }

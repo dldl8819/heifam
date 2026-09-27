@@ -303,7 +303,8 @@ public final class MmrMaskingMapper {
                     player.playerId(),
                     player.nickname(),
                     player.team(),
-                    null
+                    null,
+                    player.assignedRace()
                 )
             )
             .toList();

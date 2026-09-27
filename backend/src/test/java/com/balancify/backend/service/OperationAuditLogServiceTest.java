@@ -149,6 +149,30 @@ class OperationAuditLogServiceTest {
     }
 
     @Test
+    void marksParticipantRaceChangesInMatchResultUpdateAuditLog() {
+        operationAuditLogService.recordMatchResultUpdate(
+            "ops@example.com",
+            "OpsUser",
+            new MatchResultService.MatchResultUpdateAuditSnapshot(
+                99L,
+                1L,
+                "HOME",
+                "HOME",
+                "PPT",
+                "PPT",
+                true
+            )
+        );
+
+        ArgumentCaptor<OperationAuditLog> logCaptor = ArgumentCaptor.forClass(OperationAuditLog.class);
+        verify(operationAuditLogRepository).save(logCaptor.capture());
+
+        assertThat(logCaptor.getValue().getDetails()).isEqualTo(
+            "winner=HOME -> HOME, raceComposition=PPT -> PPT, participantRaces=updated"
+        );
+    }
+
+    @Test
     void recordsPlayerProfileUpdateAuditLogWithChangedFields() {
         Player player = new Player();
         player.setId(10L);

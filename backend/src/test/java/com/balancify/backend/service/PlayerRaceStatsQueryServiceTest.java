@@ -19,6 +19,7 @@ import com.balancify.backend.repository.PlayerRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -183,6 +184,12 @@ class PlayerRaceStatsQueryServiceTest {
                 monthlyGameTypeStats(1L, 1L, JULY_2026, "PT", 1, 1),
                 monthlyGameTypeStats(1L, 1L, JULY_2026, "PTZPTZPTZ", 3, 0)
             ));
+        when(playerRaceStatsRepository.findMonthlyRaceStats(
+            1L,
+            1L,
+            OffsetDateTime.parse("2026-07-01T00:00:00+09:00"),
+            OffsetDateTime.parse("2026-08-01T00:00:00+09:00")
+        )).thenReturn(List.of(new MonthlyRaceRow("T", 1, 0), new MonthlyRaceRow("P", 2, 1)));
 
         GroupPlayerRaceStatsResponse response =
             playerRaceStatsQueryService.getGroupPlayerMonthlyRaceStats(1L, 1L);
@@ -191,7 +198,12 @@ class PlayerRaceStatsQueryServiceTest {
         assertThat(response.wins()).isEqualTo(4);
         assertThat(response.losses()).isEqualTo(2);
         assertThat(response.games()).isEqualTo(6);
-        assertThat(response.byRace()).isEmpty();
+        assertThat(response.byRace())
+            .extracting("race", "wins", "losses", "games", "winRate")
+            .containsExactly(
+                org.assertj.core.groups.Tuple.tuple("P", 2, 1, 3, 66.67),
+                org.assertj.core.groups.Tuple.tuple("T", 1, 0, 1, 100.0)
+            );
         assertThat(response.byGameType())
             .extracting("gameType")
             .containsExactly("PPT", "PT", "PPP");
@@ -230,6 +242,25 @@ class PlayerRaceStatsQueryServiceTest {
         stats.setLosses(losses);
         stats.setGames(wins + losses);
         return stats;
+    }
+
+    private record MonthlyRaceRow(String race, Integer wins, Integer losses)
+        implements PlayerRaceStatsRepository.MonthlyRaceStatRow {
+
+        @Override
+        public String getRace() {
+            return race;
+        }
+
+        @Override
+        public Integer getWins() {
+            return wins;
+        }
+
+        @Override
+        public Integer getLosses() {
+            return losses;
+        }
     }
 
     private PlayerMonthlyGameTypeStats monthlyGameTypeStats(

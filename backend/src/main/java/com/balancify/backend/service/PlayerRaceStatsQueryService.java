@@ -120,6 +120,27 @@ public class PlayerRaceStatsQueryService {
         int wins = byGameType.stream().mapToInt(GroupPlayerGameTypeStatResponse::wins).sum();
         int losses = byGameType.stream().mapToInt(GroupPlayerGameTypeStatResponse::losses).sum();
         int games = wins + losses;
+        List<GroupPlayerRaceStatResponse> byRace = playerRaceStatsRepository
+            .findMonthlyRaceStats(
+                groupId,
+                playerId,
+                statMonth.atStartOfDay(KST).toOffsetDateTime(),
+                statMonth.plusMonths(1).atStartOfDay(KST).toOffsetDateTime()
+            )
+            .stream()
+            .map(row -> {
+                int raceWins = safeInt(row.getWins());
+                int raceGames = raceWins + safeInt(row.getLosses());
+                return new GroupPlayerRaceStatResponse(
+                    row.getRace(),
+                    raceWins,
+                    safeInt(row.getLosses()),
+                    raceGames,
+                    winRate(raceWins, raceGames)
+                );
+            })
+            .sorted(this::compareRaceStat)
+            .toList();
 
         return new GroupPlayerRaceStatsResponse(
             player.getId(),
@@ -129,7 +150,7 @@ public class PlayerRaceStatsQueryService {
             losses,
             games,
             winRate(wins, games),
-            List.of(),
+            byRace,
             byGameType
         );
     }

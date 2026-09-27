@@ -190,7 +190,8 @@ public class MatchQueryService {
                     hiddenPlayer ? null : participant.getPlayer().getId(),
                     hiddenPlayer ? PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL : participant.getPlayer().getNickname(),
                     team,
-                    mmr
+                    mmr,
+                    resolveDisplayedParticipantRace(participant)
                 );
 
                 if ("HOME".equals(team)) {
@@ -383,5 +384,13 @@ public class MatchQueryService {
             return PlayerRacePolicy.normalizeAssignedRace(assignedRace);
         }
         return null;
+    }
+
+    private String resolveDisplayedParticipantRace(MatchParticipant participant) {
+        try {
+            return resolveConcreteParticipantRace(participant);
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
     }
 }

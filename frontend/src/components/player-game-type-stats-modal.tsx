@@ -2,12 +2,13 @@
 
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
-import type { GroupPlayerGameTypeStat, GroupPlayerRaceStatsItem } from '@/types/api'
+import type { GroupPlayerGameTypeStat, GroupPlayerRaceStat, GroupPlayerRaceStatsItem } from '@/types/api'
 
 // Games are 3v3 now, so the 2v2 compositions (PP/PT/PZ) are left out - they would only ever
 // show an empty row, or a win rate from a format nobody plays any more. The backend still
 // aggregates them, so listing them again is a one line change.
 const DISPLAY_GAME_TYPES = ['PPP', 'PPT', 'PPZ', 'PTZ'] as const
+const DISPLAY_RACES = ['P', 'T', 'Z'] as const
 
 type PlayerGameTypeStatsModalProps = {
   open: boolean
@@ -39,6 +40,21 @@ function resolveStat(
     games: 0,
     winRate: 0,
   }
+}
+
+function resolveRaceStat(
+  stats: GroupPlayerRaceStatsItem | null,
+  race: (typeof DISPLAY_RACES)[number]
+): GroupPlayerRaceStat {
+  return (
+    stats?.byRace.find((item) => item.race === race) ?? {
+      race,
+      wins: 0,
+      losses: 0,
+      games: 0,
+      winRate: 0,
+    }
+  )
 }
 
 export function PlayerGameTypeStatsModal({
@@ -84,32 +100,63 @@ export function PlayerGameTypeStatsModal({
               {error}
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead className="bg-slate-50 text-xs text-slate-500 dark:bg-slate-800/80 dark:text-slate-300">
-                  <tr>
-                    <th className="px-3 py-2">{t('statsModal.table.gameType')}</th>
-                    <th className="px-3 py-2">{t('statsModal.table.wins')}</th>
-                    <th className="px-3 py-2">{t('statsModal.table.losses')}</th>
-                    <th className="px-3 py-2">{t('statsModal.table.games')}</th>
-                    <th className="px-3 py-2">{t('statsModal.table.winRate')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {DISPLAY_GAME_TYPES.map((gameType) => {
-                    const stat = resolveStat(stats, gameType)
-                    return (
-                    <tr key={gameType} className="border-t border-slate-100 dark:border-slate-800">
-                      <td className="px-3 py-2 font-semibold text-slate-900 dark:text-slate-100">{gameType}</td>
-                      <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{stat.wins}</td>
-                      <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{stat.losses}</td>
-                      <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{stat.games}</td>
-                      <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{formatWinRate(stat.winRate)}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+            <div className="space-y-4">
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-xs text-slate-500 dark:bg-slate-800/80 dark:text-slate-300">
+                    <tr>
+                      <th className="px-3 py-2">{t('statsModal.table.gameType')}</th>
+                      <th className="px-3 py-2">{t('statsModal.table.wins')}</th>
+                      <th className="px-3 py-2">{t('statsModal.table.losses')}</th>
+                      <th className="px-3 py-2">{t('statsModal.table.games')}</th>
+                      <th className="px-3 py-2">{t('statsModal.table.winRate')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {DISPLAY_GAME_TYPES.map((gameType) => {
+                      const stat = resolveStat(stats, gameType)
+                      return (
+                        <tr key={gameType} className="border-t border-slate-100 dark:border-slate-800">
+                          <td className="px-3 py-2 font-semibold text-slate-900 dark:text-slate-100">{gameType}</td>
+                          <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{stat.wins}</td>
+                          <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{stat.losses}</td>
+                          <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{stat.games}</td>
+                          <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{formatWinRate(stat.winRate)}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-xs text-slate-500 dark:bg-slate-800/80 dark:text-slate-300">
+                    <tr>
+                      <th className="px-3 py-2">{t('statsModal.table.race')}</th>
+                      <th className="px-3 py-2">{t('statsModal.table.wins')}</th>
+                      <th className="px-3 py-2">{t('statsModal.table.losses')}</th>
+                      <th className="px-3 py-2">{t('statsModal.table.games')}</th>
+                      <th className="px-3 py-2">{t('statsModal.table.winRate')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {DISPLAY_RACES.map((race) => {
+                      const stat = resolveRaceStat(stats, race)
+                      return (
+                        <tr key={race} className="border-t border-slate-100 dark:border-slate-800">
+                          <td className="px-3 py-2 font-semibold text-slate-900 dark:text-slate-100">
+                            {t(`statsModal.race.${race}`)}
+                          </td>
+                          <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{stat.wins}</td>
+                          <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{stat.losses}</td>
+                          <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{stat.games}</td>
+                          <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{formatWinRate(stat.winRate)}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>

@@ -2,7 +2,19 @@ import { describe, expect, it } from 'vitest'
 import {
   buildMatchResultUpdateRequest,
   type MatchResultEditSnapshot,
+  type ParticipantRaceEdit,
 } from '@/lib/match-result-edit'
+import type { AssignedRace } from '@/types/api'
+
+const ORIGINAL_RACES: AssignedRace[] = ['P', 'P', 'T', 'P', 'P', 'T']
+
+function raceEdits(races: Array<AssignedRace | null>): ParticipantRaceEdit[] {
+  return races.map((race, index) => ({
+    playerId: index + 1,
+    originalRace: ORIGINAL_RACES[index],
+    race,
+  }))
+}
 
 const completedMatch: MatchResultEditSnapshot = {
   winnerTeam: 'HOME',
@@ -70,6 +82,53 @@ describe('buildMatchResultUpdateRequest', () => {
       winnerTeam: 'HOME',
       raceComposition: 'PPT',
     })
+  })
+
+  it('returns null when no player race changes and the winner stays', () => {
+    expect(
+      buildMatchResultUpdateRequest(completedMatch, 'HOME', 'PPT', raceEdits(ORIGINAL_RACES)),
+    ).toBeNull()
+  })
+
+  it('sends only the winner when player races are untouched', () => {
+    expect(
+      buildMatchResultUpdateRequest(completedMatch, 'AWAY', 'PPT', raceEdits(ORIGINAL_RACES)),
+    ).toEqual({ winnerTeam: 'AWAY' })
+  })
+
+  it('sends every player race with the composition once someone else played terran', () => {
+    expect(
+      buildMatchResultUpdateRequest(completedMatch, 'HOME', 'PPT', raceEdits(['T', 'P', 'P', 'P', 'T', 'P'])),
+    ).toEqual({
+      winnerTeam: 'HOME',
+      raceComposition: 'PPT',
+      participantRaces: [
+        { playerId: 1, race: 'T' },
+        { playerId: 2, race: 'P' },
+        { playerId: 3, race: 'P' },
+        { playerId: 4, race: 'P' },
+        { playerId: 5, race: 'T' },
+        { playerId: 6, race: 'P' },
+      ],
+    })
+  })
+
+  it('carries a composition change that comes from the player races', () => {
+    expect(
+      buildMatchResultUpdateRequest(completedMatch, 'HOME', 'PPZ', raceEdits(['P', 'P', 'Z', 'P', 'P', 'Z'])),
+    ).toMatchObject({ winnerTeam: 'HOME', raceComposition: 'PPZ' })
+  })
+
+  it('leaves player races out while they do not add up to a composition', () => {
+    const request = buildMatchResultUpdateRequest(
+      completedMatch,
+      'HOME',
+      null,
+      raceEdits(['T', 'P', 'T', 'P', 'P', 'T']),
+    )
+
+    expect(request).not.toHaveProperty('participantRaces')
+    expect(request).not.toHaveProperty('raceComposition')
   })
 
   it('ignores race composition for unsupported team sizes while preserving winner changes', () => {

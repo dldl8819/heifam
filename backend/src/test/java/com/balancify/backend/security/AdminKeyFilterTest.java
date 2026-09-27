@@ -1650,8 +1650,8 @@ class AdminKeyFilterTest {
                         "운영진",
                         "PTZ",
                         "PTZ",
-                        List.of(new GroupRecentMatchPlayerResponse(10L, "alpha", "HOME", 1200)),
-                        List.of(new GroupRecentMatchPlayerResponse(20L, "bravo", "AWAY", 1184)),
+                        List.of(new GroupRecentMatchPlayerResponse(10L, "alpha", "HOME", 1200, "T")),
+                        List.of(new GroupRecentMatchPlayerResponse(20L, "bravo", "AWAY", 1184, "Z")),
                         3600,
                         3552,
                         48,
@@ -1686,8 +1686,8 @@ class AdminKeyFilterTest {
                         "운영진",
                         "PTZ",
                         "PTZ",
-                        List.of(new GroupRecentMatchPlayerResponse(10L, "alpha", "HOME", 1200)),
-                        List.of(new GroupRecentMatchPlayerResponse(20L, "bravo", "AWAY", 1184)),
+                        List.of(new GroupRecentMatchPlayerResponse(10L, "alpha", "HOME", 1200, "T")),
+                        List.of(new GroupRecentMatchPlayerResponse(20L, "bravo", "AWAY", 1184, "Z")),
                         3600,
                         3552,
                         48,
@@ -1705,7 +1705,9 @@ class AdminKeyFilterTest {
             .andExpect(jsonPath("$[0].awayMmr").doesNotExist())
             .andExpect(jsonPath("$[0].mmrDiff").doesNotExist())
             .andExpect(jsonPath("$[0].homeTeam[0].mmr").doesNotExist())
-            .andExpect(jsonPath("$[0].awayTeam[0].mmr").doesNotExist());
+            .andExpect(jsonPath("$[0].awayTeam[0].mmr").doesNotExist())
+            .andExpect(jsonPath("$[0].homeTeam[0].assignedRace").value("T"))
+            .andExpect(jsonPath("$[0].awayTeam[0].assignedRace").value("Z"));
     }
 
     @Test

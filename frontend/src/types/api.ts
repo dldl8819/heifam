@@ -90,8 +90,14 @@ export type MultiBalanceResponse = {
   matches: MultiBalanceMatch[]
 }
 
+export type ParticipantRaceRequest = {
+  playerId: number
+  race: AssignedRace
+}
+
 export type MatchResultRequest = {
   winnerTeam: TeamSide
+  participantRaces?: ParticipantRaceRequest[]
 }
 
 export type MatchResultUpdateRequest = MatchResultRequest & {
@@ -166,6 +172,7 @@ export type RecentMatchPlayer = {
   nickname: string
   team: MatchTeamSide
   mmr?: number
+  assignedRace: AssignedRace | null
 }
 
 export type RecentMatchItem = {
