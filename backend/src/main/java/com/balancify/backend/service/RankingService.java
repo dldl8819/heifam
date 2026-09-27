@@ -7,7 +7,9 @@ import com.balancify.backend.domain.PlayerTierPolicy;
 import com.balancify.backend.repository.PlayerMonthlyStatsRepository;
 import com.balancify.backend.repository.PlayerRepository;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -22,6 +24,7 @@ import org.springframework.stereotype.Service;
 public class RankingService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    private static final Duration NEW_PLAYER_WINDOW = Duration.ofDays(14);
 
     private final PlayerRepository playerRepository;
     private final PlayerMonthlyStatsRepository playerMonthlyStatsRepository;
@@ -71,6 +74,7 @@ public class RankingService {
             statsByPlayerId.put(stats.getPlayerId(), toRankingStats(stats));
         }
 
+        OffsetDateTime newPlayerCutoff = OffsetDateTime.now(clock).minus(NEW_PLAYER_WINDOW);
         List<RankingCandidate> candidates = new ArrayList<>();
         for (Player player : players) {
             RankingStats stats = statsByPlayerId.getOrDefault(player.getId(), RankingStats.empty());
@@ -85,7 +89,8 @@ public class RankingService {
                 normalizeRace(player.getRace()),
                 currentTier,
                 currentMmr,
-                stats
+                stats,
+                player.getCreatedAt() != null && player.getCreatedAt().isAfter(newPlayerCutoff)
             ));
         }
 
@@ -112,7 +117,8 @@ public class RankingService {
                 stats.winRate(),
                 stats.streak(),
                 stats.last10(),
-                stats.mmrDelta()
+                stats.mmrDelta(),
+                candidate.isNew()
             ));
         }
 
@@ -189,7 +195,8 @@ public class RankingService {
         String race,
         String tier,
         int mmr,
-        RankingStats stats
+        RankingStats stats,
+        boolean isNew
     ) {
     }
 

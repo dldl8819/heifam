@@ -363,6 +363,11 @@ export default function RankingPage() {
                         </span>
                       )}
                       {row.nickname}
+                      {row.isNew && (
+                        <span className="ml-1.5 inline-block rounded-full bg-emerald-100 px-1.5 py-0.5 align-middle text-[10px] font-bold leading-none tracking-wide text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
+                          {t('ranking.newBadge')}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{row.race}</td>
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{formatTier(resolveDisplayTier(row))}</td>

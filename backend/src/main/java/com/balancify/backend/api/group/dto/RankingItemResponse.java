@@ -15,6 +15,7 @@ public record RankingItemResponse(
     double winRate,
     String streak,
     String last10,
-    Integer mmrDelta
+    Integer mmrDelta,
+    boolean isNew
 ) {
 }
