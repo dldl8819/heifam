@@ -9,14 +9,15 @@ import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
 import { findUniquePlayerByNicknamePrefix } from '@/lib/player-autocomplete'
-import { buildMatchResultUpdateRequest } from '@/lib/match-result-edit'
+import { buildMatchResultUpdateRequest, type ParticipantRaceEdit } from '@/lib/match-result-edit'
 import {
   getRaceCompositionOptions,
   normalizeRaceComposition,
   resolveRaceCompositionTeamSize,
-  resolveSharedRaceComposition,
 } from '@/lib/race-composition'
+import { ASSIGNED_RACES, normalizeAssignedRace, resolveCompositionFromTeamRaces } from '@/lib/participant-races'
 import type {
+  AssignedRace,
   BalancePlayerOption,
   MatchResultResponse,
   RaceComposition,
@@ -43,8 +44,17 @@ const manualTeamSizeOptions = [3, 2] as const
 type OperatorEntryMode = 'existing' | 'manual'
 type SupportedTeamSize = (typeof manualTeamSizeOptions)[number]
 type ManualWinnerTeam = TeamSide | ''
-type RecentRaceComposition = RaceComposition | ''
+type RecentTeamRaces = { HOME: Array<AssignedRace | null>; AWAY: Array<AssignedRace | null> }
 type ManualSlotValue = number | ''
+
+const EMPTY_RECENT_TEAM_RACES: RecentTeamRaces = { HOME: [], AWAY: [] }
+
+function readRecentTeamRaces(match: RecentMatchItem): RecentTeamRaces {
+  return {
+    HOME: match.homeTeam.map((player) => player.assignedRace),
+    AWAY: match.awayTeam.map((player) => player.assignedRace),
+  }
+}
 type ManualSlotInputValue = string
 
 function formatTeamLabel(team: TeamSide | string | null): string {
@@ -216,8 +226,8 @@ export default function ResultsPage() {
   const [manualSubmitSuccess, setManualSubmitSuccess] = useState<string | null>(null)
   const [selectedRecentMatchId, setSelectedRecentMatchId] = useState<number | null>(null)
   const [selectedRecentWinnerTeam, setSelectedRecentWinnerTeam] = useState<TeamSide>('HOME')
-  const [selectedRecentRaceComposition, setSelectedRecentRaceComposition] =
-    useState<RecentRaceComposition>('')
+  const [selectedRecentTeamRaces, setSelectedRecentTeamRaces] =
+    useState<RecentTeamRaces>(EMPTY_RECENT_TEAM_RACES)
   const [isRecentSaving, setIsRecentSaving] = useState<boolean>(false)
   const [isRecentDeleting, setIsRecentDeleting] = useState<boolean>(false)
   const [recentActionMessage, setRecentActionMessage] = useState<string | null>(null)
@@ -288,6 +298,43 @@ export default function ResultsPage() {
     [recentMatches, selectedRecentMatchId],
   )
 
+  const selectedRecentTeamSize =
+    selectedRecentMatch === null
+      ? null
+      : resolveRaceCompositionTeamSize(
+          selectedRecentMatch.homeTeam.length,
+          selectedRecentMatch.awayTeam.length,
+        )
+  const selectedRecentRaceComposition =
+    selectedRecentTeamSize === null
+      ? null
+      : resolveCompositionFromTeamRaces(
+          selectedRecentTeamSize,
+          selectedRecentTeamRaces.HOME,
+          selectedRecentTeamRaces.AWAY,
+        )
+
+  const selectedRecentRaceEdits = useMemo<ParticipantRaceEdit[]>(() => {
+    if (selectedRecentMatch === null || selectedRecentTeamSize === null) {
+      return []
+    }
+    const toEdits = (team: TeamSide) =>
+      (team === 'HOME' ? selectedRecentMatch.homeTeam : selectedRecentMatch.awayTeam).map(
+        (player, index) => ({
+          playerId: player.playerId,
+          originalRace: player.assignedRace,
+          race: selectedRecentTeamRaces[team][index] ?? null,
+        }),
+      )
+    return [...toEdits('HOME'), ...toEdits('AWAY')]
+  }, [selectedRecentMatch, selectedRecentTeamRaces, selectedRecentTeamSize])
+
+  const recentRaceError =
+    selectedRecentRaceComposition === null &&
+    selectedRecentRaceEdits.some((edit) => edit.race !== edit.originalRace)
+      ? t('results.recent.raceMismatch')
+      : null
+
   const pendingRecentUpdateRequest = useMemo(
     () =>
       selectedRecentMatch === null
@@ -295,17 +342,21 @@ export default function ResultsPage() {
         : buildMatchResultUpdateRequest(
             {
               winnerTeam: selectedRecentMatch.winningTeam,
-              teamSize: resolveRaceCompositionTeamSize(
-                selectedRecentMatch.homeTeam.length,
-                selectedRecentMatch.awayTeam.length,
-              ),
+              teamSize: selectedRecentTeamSize,
               homeRaceComposition: selectedRecentMatch.homeRaceComposition,
               awayRaceComposition: selectedRecentMatch.awayRaceComposition,
             },
             selectedRecentWinnerTeam,
             selectedRecentRaceComposition,
+            selectedRecentRaceEdits,
           ),
-    [selectedRecentMatch, selectedRecentRaceComposition, selectedRecentWinnerTeam],
+    [
+      selectedRecentMatch,
+      selectedRecentRaceComposition,
+      selectedRecentRaceEdits,
+      selectedRecentTeamSize,
+      selectedRecentWinnerTeam,
+    ],
   )
 
   const formatMatchReference = useCallback(
@@ -352,7 +403,7 @@ export default function ResultsPage() {
           const selectedMatch = response.items.find((match) => match.matchId === selectedRecentMatchId)
           if (!selectedMatch) {
             setSelectedRecentMatchId(null)
-            setSelectedRecentRaceComposition('')
+            setSelectedRecentTeamRaces(EMPTY_RECENT_TEAM_RACES)
             setRecentActionMessage(null)
           } else {
             setSelectedRecentWinnerTeam(
@@ -360,19 +411,7 @@ export default function ResultsPage() {
                 ? selectedMatch.winningTeam
                 : 'HOME',
             )
-            const selectedTeamSize = resolveRaceCompositionTeamSize(
-              selectedMatch.homeTeam.length,
-              selectedMatch.awayTeam.length,
-            )
-            setSelectedRecentRaceComposition(
-              selectedTeamSize === null
-                ? ''
-                : resolveSharedRaceComposition(
-                      selectedTeamSize,
-                      selectedMatch.homeRaceComposition,
-                      selectedMatch.awayRaceComposition,
-                    ) ?? '',
-            )
+            setSelectedRecentTeamRaces(readRecentTeamRaces(selectedMatch))
           }
         }
       } catch {
@@ -435,23 +474,11 @@ export default function ResultsPage() {
         const selectedMatch = completedMatches.find((match) => match.matchId === selectedRecentMatchId)
         if (!selectedMatch || (selectedMatch.winningTeam !== 'HOME' && selectedMatch.winningTeam !== 'AWAY')) {
           setSelectedRecentMatchId(null)
-          setSelectedRecentRaceComposition('')
+          setSelectedRecentTeamRaces(EMPTY_RECENT_TEAM_RACES)
           setRecentActionMessage(null)
         } else {
           setSelectedRecentWinnerTeam(selectedMatch.winningTeam)
-          const selectedTeamSize = resolveRaceCompositionTeamSize(
-            selectedMatch.homeTeam.length,
-            selectedMatch.awayTeam.length,
-          )
-          setSelectedRecentRaceComposition(
-            selectedTeamSize === null
-              ? ''
-              : resolveSharedRaceComposition(
-                    selectedTeamSize,
-                    selectedMatch.homeRaceComposition,
-                    selectedMatch.awayRaceComposition,
-                  ) ?? '',
-          )
+          setSelectedRecentTeamRaces(readRecentTeamRaces(selectedMatch))
         }
       }
     } catch {
@@ -542,7 +569,7 @@ export default function ResultsPage() {
 
     if (requestedFromBalance) {
       setSelectedRecentMatchId(null)
-      setSelectedRecentRaceComposition('')
+      setSelectedRecentTeamRaces(EMPTY_RECENT_TEAM_RACES)
       setSelectedRecentWinnerTeam(
         requestedWinnerTeam ??
           (matched.winningTeam === 'HOME' || matched.winningTeam === 'AWAY'
@@ -565,19 +592,7 @@ export default function ResultsPage() {
           ? matched.winningTeam
           : 'HOME')
     )
-    const matchedTeamSize = resolveRaceCompositionTeamSize(
-      matched.homeTeam.length,
-      matched.awayTeam.length,
-    )
-    setSelectedRecentRaceComposition(
-      matchedTeamSize === null
-        ? ''
-        : resolveSharedRaceComposition(
-              matchedTeamSize,
-              matched.homeRaceComposition,
-              matched.awayRaceComposition,
-            ) ?? '',
-    )
+    setSelectedRecentTeamRaces(readRecentTeamRaces(matched))
 
     setAppliedSearchSelection(true)
   }, [
@@ -596,7 +611,7 @@ export default function ResultsPage() {
     }
 
     setSelectedRecentMatchId(null)
-    setSelectedRecentRaceComposition('')
+    setSelectedRecentTeamRaces(EMPTY_RECENT_TEAM_RACES)
     setRecentActionMessage(t('results.recent.submittedFromBalanceGeneric'))
     setAppliedSearchSelection(true)
   }, [appliedSearchSelection, requestedFromBalance, requestedMatchId])
@@ -607,7 +622,7 @@ export default function ResultsPage() {
     }
 
     setSelectedRecentMatchId(null)
-    setSelectedRecentRaceComposition('')
+    setSelectedRecentTeamRaces(EMPTY_RECENT_TEAM_RACES)
   }, [isAdmin])
 
   useEffect(() => {
@@ -853,7 +868,7 @@ export default function ResultsPage() {
 
       setResult(response)
       setSelectedRecentMatchId(null)
-      setSelectedRecentRaceComposition('')
+      setSelectedRecentTeamRaces(EMPTY_RECENT_TEAM_RACES)
       setSelectedRecentWinnerTeam(response.winnerTeam)
       setManualHomeSlots(createManualSlots(manualTeamSize))
       setManualAwaySlots(createManualSlots(manualTeamSize))
@@ -893,25 +908,67 @@ export default function ResultsPage() {
         ? recentMatch.winningTeam
         : 'HOME'
     setSelectedRecentWinnerTeam(pickedWinnerTeam)
-    const pickedTeamSize = resolveRaceCompositionTeamSize(
-      recentMatch.homeTeam.length,
-      recentMatch.awayTeam.length,
-    )
-    setSelectedRecentRaceComposition(
-      pickedTeamSize === null
-        ? ''
-        : resolveSharedRaceComposition(
-              pickedTeamSize,
-              recentMatch.homeRaceComposition,
-              recentMatch.awayRaceComposition,
-            ) ?? '',
-    )
+    setSelectedRecentTeamRaces(readRecentTeamRaces(recentMatch))
     setError(null)
     setRecentActionMessage(null)
   }
 
+  const handleRecentPlayerRaceChange = (team: TeamSide, index: number, value: string) => {
+    setSelectedRecentTeamRaces((previous) => {
+      const nextTeam = [...previous[team]]
+      nextTeam[index] = normalizeAssignedRace(value)
+      return { ...previous, [team]: nextTeam }
+    })
+  }
+
+  const renderRecentTeamRaceEditor = (recentMatch: RecentMatchItem, team: TeamSide) => {
+    const players = team === 'HOME' ? recentMatch.homeTeam : recentMatch.awayTeam
+    return (
+      <ul className="space-y-1">
+        {players.map((player, index) => {
+          const race = selectedRecentTeamRaces[team][index] ?? null
+          return (
+            <li
+              key={`${recentMatch.matchId}-${team}-${index}`}
+              className="flex items-center justify-between gap-2"
+            >
+              <span className="truncate">{player.nickname}</span>
+              {player.playerId === null ? (
+                <span className="text-xs text-slate-500 dark:text-slate-400">{race ?? '-'}</span>
+              ) : (
+                <select
+                  value={race ?? ''}
+                  onChange={(event) => handleRecentPlayerRaceChange(team, index, event.target.value)}
+                  disabled={isRecentSaving || isRecentDeleting}
+                  aria-label={t('results.recent.playerRaceAriaLabel', { nickname: player.nickname })}
+                  className="rounded-md border border-slate-300 bg-white px-1.5 py-0.5 text-xs text-slate-800 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                >
+                  {race === null && (
+                    <option value="" disabled>
+                      -
+                    </option>
+                  )}
+                  {ASSIGNED_RACES.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+    )
+  }
+
   const handleUpdateRecentMatch = async () => {
     if (selectedRecentMatchId === null) {
+      return
+    }
+
+    if (recentRaceError !== null) {
+      setError(recentRaceError)
       return
     }
 
@@ -942,7 +999,7 @@ export default function ResultsPage() {
       )
       await loadRecentMatches()
       setSelectedRecentMatchId(null)
-      setSelectedRecentRaceComposition('')
+      setSelectedRecentTeamRaces(EMPTY_RECENT_TEAM_RACES)
     } catch (updateError) {
       if (isApiForbiddenError(updateError)) {
         setError(t('common.permissionDenied'))
@@ -980,7 +1037,7 @@ export default function ResultsPage() {
     try {
       await apiClient.deleteMatch(targetMatchId)
       setSelectedRecentMatchId(null)
-      setSelectedRecentRaceComposition('')
+      setSelectedRecentTeamRaces(EMPTY_RECENT_TEAM_RACES)
       setResult((previousResult) =>
         previousResult && previousResult.matchId === targetMatchId ? null : previousResult,
       )
@@ -1364,12 +1421,10 @@ export default function ResultsPage() {
               </thead>
               <tbody>
                 {recentMatches.map((recentMatch) => {
-                  const recentTeamSize = resolveRaceCompositionTeamSize(
-                    recentMatch.homeTeam.length,
-                    recentMatch.awayTeam.length,
-                  )
-                  const recentRaceCompositionOptions =
-                    recentTeamSize === null ? [] : getRaceCompositionOptions(recentTeamSize)
+                  const isEditingRecentRaces =
+                    selectedRecentMatchId === recentMatch.matchId &&
+                    (isAdmin || recentMatch.canEditRaceComposition) &&
+                    selectedRecentTeamSize !== null
 
                   return (
                   <tr
@@ -1405,38 +1460,15 @@ export default function ResultsPage() {
                       )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-slate-700 dark:text-slate-300">
-                      {selectedRecentMatchId === recentMatch.matchId &&
-                        (isAdmin || recentMatch.canEditRaceComposition) &&
-                        recentTeamSize !== null ? (
-                        <select
-                          value={selectedRecentRaceComposition}
-                          onChange={(event) => {
-                            setSelectedRecentRaceComposition(
-                              recentTeamSize === null
-                                ? ''
-                                : normalizeRaceComposition(recentTeamSize, event.target.value) ?? '',
-                            )
-                          }}
-                          disabled={isRecentSaving || isRecentDeleting}
-                          aria-label={t('results.recent.raceCompositionAriaLabel', {
-                            matchReference: formatMatchReference(recentMatch.matchId),
-                          })}
-                          className="min-w-[5.5rem] whitespace-nowrap rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
-                        >
-                          {selectedRecentRaceComposition === '' && (
-                            <option value="" disabled>
-                              {t('results.recent.selectRaceComposition')}
-                            </option>
+                      {isEditingRecentRaces ? (
+                        <div className="space-y-1">
+                          <span className="font-medium">{selectedRecentRaceComposition ?? '-'}</span>
+                          {recentRaceError && (
+                            <p className="max-w-[12rem] whitespace-normal text-xs text-rose-600 dark:text-rose-300">
+                              {recentRaceError}
+                            </p>
                           )}
-                          {recentRaceCompositionOptions.map((raceComposition) => (
-                            <option
-                              key={`${recentMatch.matchId}-${raceComposition}`}
-                              value={raceComposition}
-                            >
-                              {raceComposition}
-                            </option>
-                          ))}
-                        </select>
+                        </div>
                       ) : (
                         formatRaceMatchup(recentMatch)
                       )}
@@ -1448,7 +1480,9 @@ export default function ResultsPage() {
                           : 'text-slate-700 dark:text-slate-300'
                       }`}
                     >
-                      {formatTeamPlayers(recentMatch, 'HOME')}
+                      {isEditingRecentRaces
+                        ? renderRecentTeamRaceEditor(recentMatch, 'HOME')
+                        : formatTeamPlayers(recentMatch, 'HOME')}
                     </td>
                     <td
                       className={`min-w-[8rem] break-keep px-3 py-2 ${
@@ -1457,7 +1491,9 @@ export default function ResultsPage() {
                           : 'text-slate-700 dark:text-slate-300'
                       }`}
                     >
-                      {formatTeamPlayers(recentMatch, 'AWAY')}
+                      {isEditingRecentRaces
+                        ? renderRecentTeamRaceEditor(recentMatch, 'AWAY')
+                        : formatTeamPlayers(recentMatch, 'AWAY')}
                     </td>
                     {showMmr && (
                       <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
@@ -1474,12 +1510,14 @@ export default function ResultsPage() {
                             disabled={
                               isRecentSaving ||
                               isRecentDeleting ||
-                              pendingRecentUpdateRequest === null
+                              pendingRecentUpdateRequest === null ||
+                              recentRaceError !== null
                             }
                             title={
-                              pendingRecentUpdateRequest === null
+                              recentRaceError ??
+                              (pendingRecentUpdateRequest === null
                                 ? t('results.recent.noChanges')
-                                : undefined
+                                : undefined)
                             }
                             className="rounded-md border border-slate-900 bg-slate-900 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-300 dark:border-slate-100 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:border-slate-700 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
                           >

@@ -15,6 +15,7 @@ import com.balancify.backend.api.match.dto.MatchResultRequest;
 import com.balancify.backend.api.match.dto.MatchResultUpdateRequest;
 import com.balancify.backend.api.match.dto.MatchResultParticipantResponse;
 import com.balancify.backend.api.match.dto.MatchResultResponse;
+import com.balancify.backend.api.match.dto.ParticipantRaceRequest;
 import com.balancify.backend.domain.Group;
 import com.balancify.backend.domain.Match;
 import com.balancify.backend.domain.MatchParticipant;
@@ -557,6 +558,178 @@ class MatchResultServiceTest {
         verify(playerStatsRefreshService, timeout(ASYNC_STATS_REBUILD_TIMEOUT_MS)).rebuildGroupStats(7L);
         verify(playerRepository, never()).saveAll(any());
         verify(mmrHistoryRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void recordsWhoActuallyPlayedEachRaceWhenTheResultIsEntered() {
+        Match match = new Match();
+        match.setId(70L);
+        match.setStatus(MatchStatus.CONFIRMED);
+        match.setRaceComposition("PPT");
+
+        List<MatchParticipant> participants = buildParticipants(match);
+        for (int index = 0; index < participants.size(); index++) {
+            participants.get(index).setAssignedRace(index % 3 == 2 ? "T" : "P");
+        }
+
+        when(matchRepository.findByIdForUpdate(70L)).thenReturn(Optional.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(70L)).thenReturn(participants);
+        when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(playerRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(mmrHistoryRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MatchResultResponse response = matchResultService.processMatchResult(
+            70L,
+            new MatchResultRequest("HOME", swappedTerranRaces())
+        );
+
+        assertThat(participants.stream().map(MatchParticipant::getAssignedRace).toList())
+            .containsExactly("T", "P", "P", "P", "T", "P");
+        assertThat(response.participants().stream().map(MatchResultParticipantResponse::assignedRace).toList())
+            .containsExactly("T", "P", "P", "P", "T", "P");
+        assertThat(match.getRaceComposition()).isEqualTo("PPT");
+    }
+
+    @Test
+    void rejectsParticipantRacesThatDoNotAddUpToTheRaceComposition() {
+        Match match = new Match();
+        match.setId(71L);
+        match.setStatus(MatchStatus.CONFIRMED);
+        match.setRaceComposition("PPT");
+        List<MatchParticipant> participants = buildParticipants(match);
+
+        when(matchRepository.findByIdForUpdate(71L)).thenReturn(Optional.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(71L)).thenReturn(participants);
+
+        assertThatThrownBy(() -> matchResultService.processMatchResult(
+            71L,
+            new MatchResultRequest("HOME", List.of(
+                new ParticipantRaceRequest(1L, "P"),
+                new ParticipantRaceRequest(2L, "P"),
+                new ParticipantRaceRequest(3L, "P"),
+                new ParticipantRaceRequest(4L, "P"),
+                new ParticipantRaceRequest(5L, "P"),
+                new ParticipantRaceRequest(6L, "T")
+            ))
+        ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("PPT");
+
+        assertThat(match.getWinningTeam()).isNull();
+        verify(matchRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectsParticipantRaceForAPlayerWhoIsNotInTheMatch() {
+        Match match = new Match();
+        match.setId(72L);
+        match.setStatus(MatchStatus.CONFIRMED);
+        match.setRaceComposition("PPT");
+        List<MatchParticipant> participants = buildParticipants(match);
+
+        when(matchRepository.findByIdForUpdate(72L)).thenReturn(Optional.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(72L)).thenReturn(participants);
+
+        assertThatThrownBy(() -> matchResultService.processMatchResult(
+            72L,
+            new MatchResultRequest("HOME", List.of(new ParticipantRaceRequest(99L, "T")))
+        )).isInstanceOf(IllegalArgumentException.class);
+
+        verify(matchRepository, never()).save(any());
+    }
+
+    @Test
+    void updatesOnlyParticipantRacesWhenWinnerAndCompositionAreUnchanged() {
+        Match match = new Match();
+        match.setId(73L);
+        match.setStatus(MatchStatus.COMPLETED);
+        match.setWinningTeam("HOME");
+        match.setRaceComposition("PPT");
+
+        List<MatchParticipant> participants = buildParticipants(match);
+        for (int index = 0; index < participants.size(); index++) {
+            participants.get(index).setRace("PT");
+            participants.get(index).setAssignedRace(index % 3 == 2 ? "T" : "P");
+            participants.get(index).setMmrDelta(10);
+        }
+
+        when(matchRepository.findByIdForUpdate(73L)).thenReturn(Optional.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(73L)).thenReturn(participants);
+        when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MatchResultService.MatchResultUpdateOutcome outcome = matchResultService.updateMatchResult(
+            73L,
+            new MatchResultUpdateRequest("HOME", "PPT", swappedTerranRaces()),
+            null,
+            null
+        );
+
+        assertThat(participants.stream().map(MatchParticipant::getAssignedRace).toList())
+            .containsExactly("T", "P", "P", "P", "T", "P");
+        assertThat(outcome.auditSnapshot().previousRaceComposition()).isEqualTo("PPT");
+        assertThat(outcome.auditSnapshot().nextRaceComposition()).isEqualTo("PPT");
+        assertThat(outcome.auditSnapshot().participantRacesChanged()).isTrue();
+        assertThat(participants.stream().map(MatchParticipant::getMmrDelta).toList())
+            .containsOnly(10);
+        verify(matchParticipantRepository).saveAll(participants);
+        verify(playerStatsRefreshService, timeout(ASYNC_STATS_REBUILD_TIMEOUT_MS)).rebuildGroupStats(7L);
+        verify(playerRepository, never()).saveAll(any());
+        verify(mmrHistoryRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void changesRaceCompositionThroughParticipantRaces() {
+        Match match = new Match();
+        match.setId(74L);
+        match.setStatus(MatchStatus.COMPLETED);
+        match.setWinningTeam("HOME");
+        match.setRaceComposition("PPT");
+
+        List<MatchParticipant> participants = buildParticipants(match);
+        for (int index = 0; index < participants.size(); index++) {
+            participants.get(index).setAssignedRace(index % 3 == 2 ? "T" : "P");
+        }
+
+        when(matchRepository.findByIdForUpdate(74L)).thenReturn(Optional.of(match));
+        when(groupRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(new Group()));
+        when(matchRepository.findRecentDuplicateCandidatesExcludingMatch(
+            any(), any(), any(), any(), any(), any(), any()
+        )).thenReturn(List.of());
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(74L)).thenReturn(participants);
+        when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MatchResultService.MatchResultUpdateOutcome outcome = matchResultService.updateMatchResult(
+            74L,
+            new MatchResultUpdateRequest("HOME", "PPZ", List.of(
+                new ParticipantRaceRequest(1L, "Z"),
+                new ParticipantRaceRequest(2L, "P"),
+                new ParticipantRaceRequest(3L, "P"),
+                new ParticipantRaceRequest(4L, "P"),
+                new ParticipantRaceRequest(5L, "P"),
+                new ParticipantRaceRequest(6L, "Z")
+            )),
+            null,
+            null
+        );
+
+        assertThat(match.getRaceComposition()).isEqualTo("PPZ");
+        assertThat(participants.stream().map(MatchParticipant::getAssignedRace).toList())
+            .containsExactly("Z", "P", "P", "P", "P", "Z");
+        assertThat(outcome.auditSnapshot().nextRaceComposition()).isEqualTo("PPZ");
+    }
+
+    private List<ParticipantRaceRequest> swappedTerranRaces() {
+        return List.of(
+            new ParticipantRaceRequest(1L, "T"),
+            new ParticipantRaceRequest(2L, "P"),
+            new ParticipantRaceRequest(3L, "P"),
+            new ParticipantRaceRequest(4L, "P"),
+            new ParticipantRaceRequest(5L, "T"),
+            new ParticipantRaceRequest(6L, "P")
+        );
     }
 
     @Test

@@ -377,6 +377,7 @@ public class OperationAuditLogService {
                 + formatRaceCompositionForAudit(snapshot.previousRaceComposition())
                 + " -> "
                 + formatRaceCompositionForAudit(snapshot.nextRaceComposition())
+                + (snapshot.participantRacesChanged() ? ", participantRaces=updated" : "")
         );
         operationAuditLogRepository.save(log);
     }

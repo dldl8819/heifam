@@ -54,6 +54,7 @@ import type {
   RankingResponse,
   TeamSide,
 } from '@/types/api'
+import { normalizeAssignedRace } from '@/lib/participant-races'
 import { supabase } from '@/lib/supabase'
 import {
   PROXY_MUTATION_CLIENT_TIMEOUT_MS,
@@ -465,6 +466,7 @@ function normalizeRecentMatchPlayer(value: unknown) {
     nickname,
     team: normalizeMatchTeam(source.team),
     mmr: mmr ?? undefined,
+    assignedRace: normalizeAssignedRace(source.assignedRace),
   }
 }
 

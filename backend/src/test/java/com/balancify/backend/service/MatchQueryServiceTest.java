@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.balancify.backend.api.group.dto.GroupMatchPageResponse;
+import com.balancify.backend.api.group.dto.GroupRecentMatchPlayerResponse;
 import com.balancify.backend.api.group.dto.GroupRecentMatchResponse;
 import com.balancify.backend.domain.Group;
 import com.balancify.backend.domain.Match;
@@ -151,6 +152,9 @@ class MatchQueryServiceTest {
         assertThat(responses).hasSize(1);
         assertThat(responses.get(0).homeRaceComposition()).isEqualTo("PT");
         assertThat(responses.get(0).awayRaceComposition()).isEqualTo("PT");
+        assertThat(responses.get(0).homeTeam())
+            .extracting(GroupRecentMatchPlayerResponse::assignedRace)
+            .containsExactly("P", "T");
     }
 
     @Test

@@ -20,7 +20,9 @@ import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
 import { findUniquePlayerByNicknamePrefix } from '@/lib/player-autocomplete'
 import { getRaceCompositionOptions, normalizeRaceComposition } from '@/lib/race-composition'
+import { ASSIGNED_RACES, composeTeamRaces, normalizeAssignedRace } from '@/lib/participant-races'
 import type {
+  AssignedRace,
   BalancePlayerInput,
   BalancePlayerOption,
   BalanceResponse,
@@ -192,6 +194,10 @@ export default function BalancePage() {
   const [submitting, setSubmitting] = useState<boolean>(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [result, setResult] = useState<BalanceResponse | null>(null)
+  const [actualTeamRaces, setActualTeamRaces] = useState<Record<TeamSide, Array<AssignedRace | null>>>({
+    HOME: [],
+    AWAY: [],
+  })
   const [resultMatchId, setResultMatchId] = useState<string>('')
   const [resultWinnerTeam, setResultWinnerTeam] = useState<WinnerTeamSelection>('')
   const [resultSubmitting, setResultSubmitting] = useState<boolean>(false)
@@ -339,12 +345,35 @@ export default function BalancePage() {
     allSelected &&
     !hasDuplicates &&
     raceComposition !== null
+  useEffect(() => {
+    setActualTeamRaces({
+      HOME: result?.homeTeam.map((player) => normalizeAssignedRace(player.assignedRace)) ?? [],
+      AWAY: result?.awayTeam.map((player) => normalizeAssignedRace(player.assignedRace)) ?? [],
+    })
+  }, [result])
+
+  const handleActualRaceChange = (team: TeamSide, index: number, value: string) => {
+    setActualTeamRaces((previous) => {
+      const nextTeam = [...previous[team]]
+      nextTeam[index] = normalizeAssignedRace(value)
+      return { ...previous, [team]: nextTeam }
+    })
+  }
+
   const hasGeneratedMatchId = Number.isFinite(Number(resultMatchId)) && Number(resultMatchId) > 0
   const canCreateMatchFromResult = result !== null
+  const actualRaceError =
+    result !== null &&
+    raceComposition !== null &&
+    (composeTeamRaces(actualTeamRaces.HOME) !== raceComposition ||
+      composeTeamRaces(actualTeamRaces.AWAY) !== raceComposition)
+      ? t('balance.quickResult.actualRaces.mismatch', { composition: raceComposition })
+      : null
   const canSubmitQuickResult =
     isLoggedIn &&
     (hasGeneratedMatchId || canCreateMatchFromResult) &&
     (resultWinnerTeam === 'HOME' || resultWinnerTeam === 'AWAY') &&
+    actualRaceError === null &&
     !resultSubmitting
   const protectedMmrStyle: CSSProperties | undefined = showMmr
     ? {
@@ -622,6 +651,10 @@ export default function BalancePage() {
       setResultSubmitError(t('balance.validation.raceCompositionRequired'))
       return
     }
+    if (actualRaceError) {
+      setResultSubmitError(actualRaceError)
+      return
+    }
 
     const winningTeamPlayers = resultWinnerTeam === 'HOME' ? result.homeTeam : result.awayTeam
     const winningTeamNames = winningTeamPlayers.map((player) => player.name).join(', ')
@@ -643,8 +676,15 @@ export default function BalancePage() {
         parsedMatchId = createdMatchId
       }
 
+      const participantRaces = winnerTeamOptions.flatMap((team) =>
+        (team === 'HOME' ? result.homeTeam : result.awayTeam).flatMap((player, index) => {
+          const race = actualTeamRaces[team][index]
+          return typeof player.playerId === 'number' && race ? [{ playerId: player.playerId, race }] : []
+        }),
+      )
       const response = await apiClient.submitMatchResult(parsedMatchId, {
         winnerTeam: resultWinnerTeam,
+        participantRaces,
       })
       setResultSubmitSuccess(response)
       if (isSuperAdmin) {
@@ -1021,6 +1061,62 @@ export default function BalancePage() {
               ? t('balance.quickResult.matchWillBeCreatedOnSubmit')
               : t('balance.quickResult.matchNotReady')}
         </p>
+        {result && (
+          <div className="mt-3 space-y-2">
+            <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              {t('balance.quickResult.actualRaces.title')}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {t('balance.quickResult.actualRaces.description')}
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {winnerTeamOptions.map((team) => (
+                <div
+                  key={`actual-races-${team}`}
+                  className="rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700"
+                >
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                    {team === 'HOME' ? t('balance.result.homeTeam') : t('balance.result.awayTeam')}
+                  </p>
+                  <ul className="mt-1 space-y-1">
+                    {(team === 'HOME' ? result.homeTeam : result.awayTeam).map((player, index) => {
+                      const race = actualTeamRaces[team][index] ?? null
+                      return (
+                        <li
+                          key={`actual-race-${team}-${player.name}`}
+                          className="flex items-center justify-between gap-2 text-sm"
+                        >
+                          <span className="text-slate-800 dark:text-slate-200">{player.name}</span>
+                          <select
+                            value={race ?? ''}
+                            onChange={(event) => handleActualRaceChange(team, index, event.target.value)}
+                            disabled={resultSubmitting}
+                            aria-label={t('balance.quickResult.actualRaces.raceAriaLabel', { nickname: player.name })}
+                            className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                          >
+                            {race === null && (
+                              <option value="" disabled>
+                                -
+                              </option>
+                            )}
+                            {ASSIGNED_RACES.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              ))}
+            </div>
+            {actualRaceError && (
+              <p className="text-xs text-rose-600 dark:text-rose-300">{actualRaceError}</p>
+            )}
+          </div>
+        )}
         <div className="mt-3 grid gap-3 md:grid-cols-1">
           <label className="space-y-1 text-xs font-medium text-slate-500 dark:text-slate-400">
             {t('results.form.winnerTeam')}

@@ -964,7 +964,13 @@
       "matchCreateAdminOnly": "밸런스 결과는 계산되었지만 매치 저장은 관리자만 가능합니다.",
       "matchCreateFailed": "밸런스는 생성되었지만 매치 ID 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.",
       "matchCreateMissingPlayers": "밸런스는 생성되었지만 매치 저장용 선수 ID를 확인하지 못했습니다.",
-      "matchCreateOnlyThreeVsThree": "2:2 결과는 아직 자동 매치 저장을 지원하지 않습니다."
+      "matchCreateOnlyThreeVsThree": "2:2 결과는 아직 자동 매치 저장을 지원하지 않습니다.",
+      "actualRaces": {
+        "title": "실제 플레이 종족",
+        "description": "밸런스가 정한 종족과 다르게 했다면 바꿔 주세요. 선수별 종족 승률에 반영됩니다.",
+        "mismatch": "두 팀 모두 {composition} 조합이 되도록 골라 주세요.",
+        "raceAriaLabel": "{nickname} 실제 종족"
+      }
     }
   },
   "multiBalance": {
@@ -1214,8 +1220,8 @@
       "deleteFailure": "매치 삭제에 실패했습니다. 권한과 서버 상태를 확인해 주세요.",
       "deleteConfirm": "{matchReference}를 삭제하시겠습니까? MMR이 롤백됩니다.",
       "selectedHint": "{matchReference}를 선택했습니다. 승리 팀과 종족전을 확인하고 저장하세요.",
-      "selectRaceComposition": "종족전 선택",
-      "raceCompositionAriaLabel": "{matchReference} 종족전 수정",
+      "playerRaceAriaLabel": "{nickname} 종족",
+      "raceMismatch": "두 팀이 같은 종족 조합(PPP·PPT·PPZ·PTZ)이 되도록 선수별 종족을 골라 주세요.",
       "noWinner": "미입력",
       "reference": {
         "matchId": "매치 ID {matchId}",
@@ -1317,10 +1323,16 @@
     "playerNotFound": "선수 정보를 찾지 못했습니다.",
     "table": {
       "gameType": "종족전",
+      "race": "내 종족",
       "wins": "승",
       "losses": "패",
       "games": "경기수",
       "winRate": "승률"
+    },
+    "race": {
+      "P": "프로토스",
+      "T": "테란",
+      "Z": "저그"
     }
   },
   "ranking": {
