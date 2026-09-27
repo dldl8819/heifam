@@ -63,7 +63,7 @@ class GroupRankingControllerTest {
         );
         when(accessControlService.resolveAccessProfile(EMAIL)).thenReturn(accessProfile);
         when(rankingService.getGroupRanking(1L)).thenReturn(List.of(
-            new RankingItemResponse(1, "YOUR_USERNAME", "P", "A", 1500, 7, 3, 10, 0.7, "W2", "WWLWWLWWLW", 12)
+            new RankingItemResponse(1, "YOUR_USERNAME", "P", "A", 1500, 7, 3, 10, 0.7, "W2", "WWLWWLWWLW", 12, false)
         ));
 
         GroupRankingController controller = new GroupRankingController(

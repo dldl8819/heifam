@@ -1381,7 +1381,8 @@ class AdminKeyFilterTest {
                         66.67,
                         "W2",
                         "WWL",
-                        16
+                        16,
+                        true
                     )
                 )
             );
@@ -1395,6 +1396,7 @@ class AdminKeyFilterTest {
             .andExpect(jsonPath("$[0].nickname").value("alpha"))
             .andExpect(jsonPath("$[0].tier").value("A+"))
             .andExpect(jsonPath("$[0].wins").value(2))
+            .andExpect(jsonPath("$[0].isNew").value(true))
             .andExpect(jsonPath("$[0].currentMmr").doesNotExist())
             .andExpect(jsonPath("$[0].mmrDelta").doesNotExist());
     }
@@ -1416,7 +1418,8 @@ class AdminKeyFilterTest {
                         66.67,
                         "W2",
                         "WWL",
-                        16
+                        16,
+                        true
                     )
                 )
             );
@@ -1450,7 +1453,8 @@ class AdminKeyFilterTest {
                         66.67,
                         "W2",
                         "WWL",
-                        16
+                        16,
+                        true
                     )
                 )
             );
@@ -1484,7 +1488,8 @@ class AdminKeyFilterTest {
                         66.67,
                         "W2",
                         "WWL",
-                        16
+                        16,
+                        true
                     )
                 )
             );

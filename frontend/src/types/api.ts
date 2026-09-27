@@ -213,6 +213,7 @@ export type RankingItem = {
   streak: string
   last10: string
   mmrDelta?: number
+  isNew?: boolean
 }
 
 export type RankingResponse = RankingItem[]

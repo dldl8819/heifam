@@ -135,7 +135,8 @@ public final class MmrMaskingMapper {
                     response.winRate(),
                     response.streak(),
                     response.last10(),
-                    null
+                    null,
+                    response.isNew()
                 )
             )
             .toList();

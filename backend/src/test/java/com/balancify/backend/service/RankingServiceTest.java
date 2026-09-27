@@ -14,6 +14,7 @@ import com.balancify.backend.repository.PlayerMonthlyStatsRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -116,6 +117,27 @@ class RankingServiceTest {
         assertThat(item.streak()).isEqualTo("N0");
         assertThat(item.last10()).isEmpty();
         assertThat(item.mmrDelta()).isZero();
+    }
+
+    @Test
+    void flagsPlayersRegisteredWithinTheLastFourteenDaysAsNew() {
+        Group group = new Group();
+        group.setId(1L);
+        Player thirteenDays = player(1L, group, "PlayerAlpha", "P", "B-", 900);
+        thirteenDays.setCreatedAt(OffsetDateTime.parse("2026-06-21T15:00:00Z"));
+        Player exactlyFourteenDays = player(2L, group, "PlayerBravo", "T", "B-", 850);
+        exactlyFourteenDays.setCreatedAt(OffsetDateTime.parse("2026-06-20T15:00:00Z"));
+        Player fifteenDays = player(3L, group, "PlayerCharlie", "Z", "B-", 800);
+        fifteenDays.setCreatedAt(OffsetDateTime.parse("2026-06-19T15:00:00Z"));
+
+        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
+            .thenReturn(List.of(thirteenDays, exactlyFourteenDays, fifteenDays));
+        when(playerMonthlyStatsRepository.findByGroupIdAndStatMonth(1L, JULY_2026))
+            .thenReturn(List.of());
+
+        List<RankingItemResponse> response = rankingService.getGroupRanking(1L);
+
+        assertThat(response).extracting(RankingItemResponse::isNew).containsExactly(true, false, false);
     }
 
     @Test
