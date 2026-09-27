@@ -12,6 +12,7 @@ import com.balancify.backend.repository.PlayerRaceStatsRepository;
 import com.balancify.backend.repository.PlayerRepository;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.HashMap;
@@ -26,6 +27,9 @@ import org.springframework.stereotype.Service;
 public class PlayerRaceStatsQueryService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    // Before this a player's race in a match was the balancer's guess, not what they played, so
+    // the per-race rows only count matches from here on.
+    static final OffsetDateTime RECORDED_RACES_SINCE = OffsetDateTime.parse("2026-09-27T22:13:04+09:00");
     private static final List<String> RACE_ORDER = List.of("P", "T", "Z", "PT", "PZ", "TZ", "PTZ");
     private static final List<String> GAME_TYPE_RACE_ORDER = List.of("P", "T", "Z", "PTZ");
     private static final Set<String> SUPPORTED_GAME_TYPES = Set.of("PP", "PT", "PZ", "PPP", "PPT", "PPZ", "PTZ");
@@ -89,10 +93,26 @@ public class PlayerRaceStatsQueryService {
             .filter(candidate -> !PlayerIdentityPolicy.isIdentityHidden(candidate))
             .orElseThrow(() -> new NoSuchElementException("Player not found"));
 
-        return toResponse(
+        GroupPlayerRaceStatsResponse allTime = toResponse(
             player,
             playerRaceStatsRepository.findByGroupIdAndPlayerId(groupId, playerId),
             playerGameTypeStatsRepository.findByGroupIdAndPlayerId(groupId, playerId)
+        );
+        return new GroupPlayerRaceStatsResponse(
+            allTime.playerId(),
+            allTime.nickname(),
+            allTime.race(),
+            allTime.wins(),
+            allTime.losses(),
+            allTime.games(),
+            allTime.winRate(),
+            loadRecordedRaceStats(
+                groupId,
+                playerId,
+                RECORDED_RACES_SINCE,
+                startOfMonth(currentStatMonth().plusMonths(1))
+            ),
+            allTime.byGameType()
         );
     }
 
@@ -120,27 +140,12 @@ public class PlayerRaceStatsQueryService {
         int wins = byGameType.stream().mapToInt(GroupPlayerGameTypeStatResponse::wins).sum();
         int losses = byGameType.stream().mapToInt(GroupPlayerGameTypeStatResponse::losses).sum();
         int games = wins + losses;
-        List<GroupPlayerRaceStatResponse> byRace = playerRaceStatsRepository
-            .findMonthlyRaceStats(
-                groupId,
-                playerId,
-                statMonth.atStartOfDay(KST).toOffsetDateTime(),
-                statMonth.plusMonths(1).atStartOfDay(KST).toOffsetDateTime()
-            )
-            .stream()
-            .map(row -> {
-                int raceWins = safeInt(row.getWins());
-                int raceGames = raceWins + safeInt(row.getLosses());
-                return new GroupPlayerRaceStatResponse(
-                    row.getRace(),
-                    raceWins,
-                    safeInt(row.getLosses()),
-                    raceGames,
-                    winRate(raceWins, raceGames)
-                );
-            })
-            .sorted(this::compareRaceStat)
-            .toList();
+        List<GroupPlayerRaceStatResponse> byRace = loadRecordedRaceStats(
+            groupId,
+            playerId,
+            startOfMonth(statMonth),
+            startOfMonth(statMonth.plusMonths(1))
+        );
 
         return new GroupPlayerRaceStatsResponse(
             player.getId(),
@@ -238,6 +243,42 @@ public class PlayerRaceStatsQueryService {
             byRace,
             byGameType
         );
+    }
+
+    private List<GroupPlayerRaceStatResponse> loadRecordedRaceStats(
+        Long groupId,
+        Long playerId,
+        OffsetDateTime fromInclusive,
+        OffsetDateTime toExclusive
+    ) {
+        OffsetDateTime effectiveFrom = fromInclusive.isBefore(RECORDED_RACES_SINCE)
+            ? RECORDED_RACES_SINCE
+            : fromInclusive;
+        if (!effectiveFrom.isBefore(toExclusive)) {
+            return List.of();
+        }
+
+        return playerRaceStatsRepository
+            .findRaceStatsPlayedBetween(groupId, playerId, effectiveFrom, toExclusive)
+            .stream()
+            .map(row -> {
+                int raceWins = safeInt(row.getWins());
+                int raceLosses = safeInt(row.getLosses());
+                int raceGames = raceWins + raceLosses;
+                return new GroupPlayerRaceStatResponse(
+                    row.getRace(),
+                    raceWins,
+                    raceLosses,
+                    raceGames,
+                    winRate(raceWins, raceGames)
+                );
+            })
+            .sorted(this::compareRaceStat)
+            .toList();
+    }
+
+    private OffsetDateTime startOfMonth(LocalDate statMonth) {
+        return statMonth.atStartOfDay(KST).toOffsetDateTime();
     }
 
     private LocalDate currentStatMonth() {

@@ -156,6 +156,7 @@ export function PlayerGameTypeStatsModal({
                     })}
                   </tbody>
                 </table>
+                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{t('statsModal.raceSinceNote')}</p>
               </div>
             </div>
           )}
