@@ -61,6 +61,9 @@ public class Match {
     @Column(name = "race_composition", length = 10)
     private String raceComposition;
 
+    @Column(name = "races_recorded", nullable = false)
+    private boolean racesRecorded;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
@@ -170,6 +173,14 @@ public class Match {
 
     public void setRaceComposition(String raceComposition) {
         this.raceComposition = raceComposition;
+    }
+
+    public boolean isRacesRecorded() {
+        return racesRecorded;
+    }
+
+    public void setRacesRecorded(boolean racesRecorded) {
+        this.racesRecorded = racesRecorded;
     }
 
     public OffsetDateTime getCreatedAt() {

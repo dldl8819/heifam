@@ -10,12 +10,14 @@ import static org.mockito.Mockito.when;
 import com.balancify.backend.api.match.dto.ManualMatchCreateRequest;
 import com.balancify.backend.api.match.dto.MatchResultRequest;
 import com.balancify.backend.api.match.dto.MatchResultResponse;
+import com.balancify.backend.api.match.dto.ParticipantRaceRequest;
 import com.balancify.backend.domain.Match;
 import com.balancify.backend.domain.MatchSource;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -78,6 +80,62 @@ class ManualMatchServiceTest {
             eq("운영진"),
             eq(false)
         );
+    }
+
+    @Test
+    void passesThePlayersRacesOnToTheResult() {
+        Match match = new Match();
+        match.setId(501L);
+        List<ParticipantRaceRequest> races = List.of(
+            new ParticipantRaceRequest(1L, "T"),
+            new ParticipantRaceRequest(2L, "P"),
+            new ParticipantRaceRequest(3L, "P"),
+            new ParticipantRaceRequest(4L, "P"),
+            new ParticipantRaceRequest(5L, "T"),
+            new ParticipantRaceRequest(6L, "P")
+        );
+        when(groupMatchAdminService.createConfirmedMatch(
+            eq(1L),
+            eq(List.of(1L, 2L, 3L)),
+            eq(List.of(4L, 5L, 6L)),
+            eq(3),
+            eq(MatchSource.MANUAL),
+            eq(null),
+            eq("PPT")
+        )).thenReturn(match);
+        when(matchResultService.processMatchResult(
+            eq(501L),
+            any(MatchResultRequest.class),
+            eq("admin@hei.gg"),
+            eq("운영진"),
+            eq(false)
+        )).thenReturn(new MatchResultResponse(501L, "HOME", 32, 0.5, 0.5, List.of()));
+
+        manualMatchService.createManualMatch(
+            new ManualMatchCreateRequest(
+                1L,
+                3,
+                List.of(1L, 2L, 3L),
+                List.of(4L, 5L, 6L),
+                "HOME",
+                null,
+                "PPT",
+                races
+            ),
+            "admin@hei.gg",
+            "운영진"
+        );
+
+        ArgumentCaptor<MatchResultRequest> requestCaptor = ArgumentCaptor.forClass(MatchResultRequest.class);
+        verify(matchResultService).processMatchResult(
+            eq(501L),
+            requestCaptor.capture(),
+            eq("admin@hei.gg"),
+            eq("운영진"),
+            eq(false)
+        );
+        assertThat(requestCaptor.getValue().winnerTeam()).isEqualTo("HOME");
+        assertThat(requestCaptor.getValue().participantRaces()).isEqualTo(races);
     }
 
     @Test

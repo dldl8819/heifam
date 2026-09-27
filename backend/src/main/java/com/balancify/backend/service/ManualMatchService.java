@@ -56,7 +56,7 @@ public class ManualMatchService {
 
         return matchResultService.processMatchResult(
             match.getId(),
-            new MatchResultRequest(request.winnerTeam()),
+            new MatchResultRequest(request.winnerTeam(), request.participantRaces()),
             recordedByEmail,
             recordedByNickname,
             false

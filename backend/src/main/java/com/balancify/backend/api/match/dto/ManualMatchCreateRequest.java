@@ -9,8 +9,21 @@ public record ManualMatchCreateRequest(
     List<Long> awayPlayerIds,
     String winnerTeam,
     String note,
-    String raceComposition
+    String raceComposition,
+    List<ParticipantRaceRequest> participantRaces
 ) {
+    public ManualMatchCreateRequest(
+        Long groupId,
+        Integer teamSize,
+        List<Long> homePlayerIds,
+        List<Long> awayPlayerIds,
+        String winnerTeam,
+        String note,
+        String raceComposition
+    ) {
+        this(groupId, teamSize, homePlayerIds, awayPlayerIds, winnerTeam, note, raceComposition, null);
+    }
+
     public ManualMatchCreateRequest(
         Long groupId,
         Integer teamSize,
@@ -19,6 +32,6 @@ public record ManualMatchCreateRequest(
         String winnerTeam,
         String note
     ) {
-        this(groupId, teamSize, homePlayerIds, awayPlayerIds, winnerTeam, note, null);
+        this(groupId, teamSize, homePlayerIds, awayPlayerIds, winnerTeam, note, null, null);
     }
 }

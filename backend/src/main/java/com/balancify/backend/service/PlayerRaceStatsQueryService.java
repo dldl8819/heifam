@@ -27,9 +27,7 @@ import org.springframework.stereotype.Service;
 public class PlayerRaceStatsQueryService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
-    // Before this a player's race in a match was the balancer's guess, not what they played, so
-    // the per-race rows only count matches from here on.
-    static final OffsetDateTime RECORDED_RACES_SINCE = OffsetDateTime.parse("2026-09-27T22:13:04+09:00");
+    private static final OffsetDateTime ALL_TIME_START = OffsetDateTime.parse("1970-01-01T00:00:00Z");
     private static final List<String> RACE_ORDER = List.of("P", "T", "Z", "PT", "PZ", "TZ", "PTZ");
     private static final List<String> GAME_TYPE_RACE_ORDER = List.of("P", "T", "Z", "PTZ");
     private static final Set<String> SUPPORTED_GAME_TYPES = Set.of("PP", "PT", "PZ", "PPP", "PPT", "PPZ", "PTZ");
@@ -109,7 +107,7 @@ public class PlayerRaceStatsQueryService {
             loadRecordedRaceStats(
                 groupId,
                 playerId,
-                RECORDED_RACES_SINCE,
+                ALL_TIME_START,
                 startOfMonth(currentStatMonth().plusMonths(1))
             ),
             allTime.byGameType()
@@ -251,15 +249,8 @@ public class PlayerRaceStatsQueryService {
         OffsetDateTime fromInclusive,
         OffsetDateTime toExclusive
     ) {
-        OffsetDateTime effectiveFrom = fromInclusive.isBefore(RECORDED_RACES_SINCE)
-            ? RECORDED_RACES_SINCE
-            : fromInclusive;
-        if (!effectiveFrom.isBefore(toExclusive)) {
-            return List.of();
-        }
-
         return playerRaceStatsRepository
-            .findRaceStatsPlayedBetween(groupId, playerId, effectiveFrom, toExclusive)
+            .findRaceStatsPlayedBetween(groupId, playerId, fromInclusive, toExclusive)
             .stream()
             .map(row -> {
                 int raceWins = safeInt(row.getWins());
