@@ -111,6 +111,7 @@ export type ManualMatchCreateRequest = {
   awayPlayerIds: number[]
   winnerTeam: TeamSide
   raceComposition?: RaceComposition
+  participantRaces?: ParticipantRaceRequest[]
   note?: string
 }
 

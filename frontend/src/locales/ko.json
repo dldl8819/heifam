@@ -1270,7 +1270,8 @@
     "manual": {
       "teamSizeLabel": "팀 크기",
       "raceCompositionLabel": "종족 조합",
-      "raceCompositionPlaceholder": "종족 조합을 선택해 주세요.",
+      "raceCompositionPlaceholder": "선수별 종족을 고르면 정해집니다.",
+      "playerRaceAriaLabel": "선수 {slot} 종족",
       "winnerLabel": "승리 팀",
       "homeTitle": "홈 팀",
       "awayTitle": "어웨이 팀",
@@ -1286,7 +1287,7 @@
       "validation": {
         "playersRequired": "홈 팀과 어웨이 팀 선수를 모두 선택해 주세요.",
         "duplicatePlayers": "같은 선수를 양 팀에 중복 선택할 수 없습니다.",
-        "raceCompositionRequired": "종족 조합을 선택해 주세요.",
+        "raceCompositionRequired": "두 팀이 같은 종족 조합이 되도록 선수별 종족을 골라 주세요.",
         "winnerRequired": "승리 팀을 선택해 주세요."
       }
     },
@@ -1334,7 +1335,7 @@
       "T": "테란",
       "Z": "저그"
     },
-    "raceSinceNote": "내 종족 승률은 선수별 종족을 직접 기록하기 시작한 2026년 9월 27일 밤 경기부터 집계됩니다."
+    "raceSinceNote": "내 종족 승률은 선수별 종족을 직접 기록한 경기만 집계합니다. (2026년 9월 27일 밤부터 기록)"
   },
   "ranking": {
     "title": "랭킹",

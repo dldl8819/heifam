@@ -325,6 +325,7 @@ class MatchResultServiceTest {
         match.setStatus(MatchStatus.COMPLETED);
         match.setWinningTeam("HOME");
         match.setRaceComposition("PPP");
+        match.setRacesRecorded(true);
         OffsetDateTime recordedAt = OffsetDateTime.parse("2026-08-01T01:00:00Z");
         match.setResultRecordedAt(recordedAt);
         match.setResultRecordedByEmail("recorded@example.test");
@@ -368,6 +369,7 @@ class MatchResultServiceTest {
         );
 
         assertThat(match.getRaceComposition()).isEqualTo("PPT");
+        assertThat(match.isRacesRecorded()).isFalse();
         assertThat(match.getResultRecordedAt()).isEqualTo(recordedAt);
         assertThat(match.getResultRecordedByEmail()).isEqualTo("recorded@example.test");
         assertThat(match.getResultRecordedByNickname()).isEqualTo("Recorder");
@@ -589,6 +591,7 @@ class MatchResultServiceTest {
         assertThat(response.participants().stream().map(MatchResultParticipantResponse::assignedRace).toList())
             .containsExactly("T", "P", "P", "P", "T", "P");
         assertThat(match.getRaceComposition()).isEqualTo("PPT");
+        assertThat(match.isRacesRecorded()).isTrue();
     }
 
     @Test
@@ -617,6 +620,7 @@ class MatchResultServiceTest {
             .hasMessageContaining("PPT");
 
         assertThat(match.getWinningTeam()).isNull();
+        assertThat(match.isRacesRecorded()).isFalse();
         verify(matchRepository, never()).save(any());
     }
 
@@ -671,6 +675,7 @@ class MatchResultServiceTest {
         assertThat(outcome.auditSnapshot().previousRaceComposition()).isEqualTo("PPT");
         assertThat(outcome.auditSnapshot().nextRaceComposition()).isEqualTo("PPT");
         assertThat(outcome.auditSnapshot().participantRacesChanged()).isTrue();
+        assertThat(match.isRacesRecorded()).isTrue();
         assertThat(participants.stream().map(MatchParticipant::getMmrDelta).toList())
             .containsOnly(10);
         verify(matchParticipantRepository).saveAll(participants);

@@ -260,6 +260,7 @@ public class MatchResultService {
 
         ValidatedParticipants validatedParticipants = loadValidatedParticipants(matchId, match);
         applyParticipantRaces(
+            match,
             validatedParticipants,
             normalizeRaceCompositionForAudit(match.getRaceComposition(), validatedParticipants.teamSize()),
             request == null ? null : request.participantRaces()
@@ -445,6 +446,7 @@ public class MatchResultService {
         }
         if (hasParticipantRaces) {
             boolean participantRacesChanged = applyParticipantRaces(
+                match,
                 participants,
                 nextRaceComposition,
                 requestedParticipantRaces
@@ -481,6 +483,7 @@ public class MatchResultService {
         assignRaceComposition(participants.home(), nextRaceComposition);
         assignRaceComposition(participants.away(), nextRaceComposition);
         match.setRaceComposition(nextRaceComposition);
+        match.setRacesRecorded(false);
         return new RaceCompositionUpdate(
             previousRaceComposition,
             nextRaceComposition,
@@ -492,6 +495,7 @@ public class MatchResultService {
     // The recorder's account of who actually played which race; it replaces the automatic
     // assignment, so each team must still add up to the match's race composition.
     private boolean applyParticipantRaces(
+        Match match,
         ValidatedParticipants participants,
         String raceComposition,
         List<ParticipantRaceRequest> requestedParticipantRaces
@@ -538,6 +542,7 @@ public class MatchResultService {
                 "선수별 종족이 종족 조합(" + raceComposition + ")과 맞지 않습니다."
             );
         }
+        match.setRacesRecorded(true);
         return changed;
     }
 

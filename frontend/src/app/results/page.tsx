@@ -10,17 +10,12 @@ import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
 import { findUniquePlayerByNicknamePrefix } from '@/lib/player-autocomplete'
 import { buildMatchResultUpdateRequest, type ParticipantRaceEdit } from '@/lib/match-result-edit'
-import {
-  getRaceCompositionOptions,
-  normalizeRaceComposition,
-  resolveRaceCompositionTeamSize,
-} from '@/lib/race-composition'
+import { resolveRaceCompositionTeamSize } from '@/lib/race-composition'
 import { ASSIGNED_RACES, normalizeAssignedRace, resolveCompositionFromTeamRaces } from '@/lib/participant-races'
 import type {
   AssignedRace,
   BalancePlayerOption,
   MatchResultResponse,
-  RaceComposition,
   RecentMatchItem,
   TeamSide,
 } from '@/types/api'
@@ -44,12 +39,16 @@ const manualTeamSizeOptions = [3, 2] as const
 type OperatorEntryMode = 'existing' | 'manual'
 type SupportedTeamSize = (typeof manualTeamSizeOptions)[number]
 type ManualWinnerTeam = TeamSide | ''
-type RecentTeamRaces = { HOME: Array<AssignedRace | null>; AWAY: Array<AssignedRace | null> }
+type TeamRaces = { HOME: Array<AssignedRace | null>; AWAY: Array<AssignedRace | null> }
 type ManualSlotValue = number | ''
 
-const EMPTY_RECENT_TEAM_RACES: RecentTeamRaces = { HOME: [], AWAY: [] }
+const EMPTY_RECENT_TEAM_RACES: TeamRaces = { HOME: [], AWAY: [] }
 
-function readRecentTeamRaces(match: RecentMatchItem): RecentTeamRaces {
+function createTeamRaces(teamSize: number): TeamRaces {
+  return { HOME: Array(teamSize).fill(null), AWAY: Array(teamSize).fill(null) }
+}
+
+function readRecentTeamRaces(match: RecentMatchItem): TeamRaces {
   return {
     HOME: match.homeTeam.map((player) => player.assignedRace),
     AWAY: match.awayTeam.map((player) => player.assignedRace),
@@ -208,7 +207,7 @@ export default function ResultsPage() {
   const [manualEntryOpen, setManualEntryOpen] = useState<boolean>(false)
   const [operatorEntryMode, setOperatorEntryMode] = useState<OperatorEntryMode>('manual')
   const [manualTeamSize, setManualTeamSize] = useState<SupportedTeamSize>(3)
-  const [manualRaceComposition, setManualRaceComposition] = useState<RaceComposition | null>(null)
+  const [manualTeamRaces, setManualTeamRaces] = useState<TeamRaces>(() => createTeamRaces(3))
   const [manualHomeSlots, setManualHomeSlots] = useState<ManualSlotValue[]>(() => createManualSlots(3))
   const [manualAwaySlots, setManualAwaySlots] = useState<ManualSlotValue[]>(() => createManualSlots(3))
   const [manualHomeInputs, setManualHomeInputs] = useState<ManualSlotInputValue[]>(() =>
@@ -227,7 +226,7 @@ export default function ResultsPage() {
   const [selectedRecentMatchId, setSelectedRecentMatchId] = useState<number | null>(null)
   const [selectedRecentWinnerTeam, setSelectedRecentWinnerTeam] = useState<TeamSide>('HOME')
   const [selectedRecentTeamRaces, setSelectedRecentTeamRaces] =
-    useState<RecentTeamRaces>(EMPTY_RECENT_TEAM_RACES)
+    useState<TeamRaces>(EMPTY_RECENT_TEAM_RACES)
   const [isRecentSaving, setIsRecentSaving] = useState<boolean>(false)
   const [isRecentDeleting, setIsRecentDeleting] = useState<boolean>(false)
   const [recentActionMessage, setRecentActionMessage] = useState<string | null>(null)
@@ -636,7 +635,7 @@ export default function ResultsPage() {
     setManualAwaySlots((previous) => resizeManualSlots(previous, manualTeamSize))
     setManualHomeInputs((previous) => resizeManualSlotInputs(previous, manualTeamSize))
     setManualAwayInputs((previous) => resizeManualSlotInputs(previous, manualTeamSize))
-    setManualRaceComposition((previous) => normalizeRaceComposition(manualTeamSize, previous))
+    setManualTeamRaces(createTeamRaces(manualTeamSize))
   }, [manualTeamSize])
 
   useEffect(() => {
@@ -718,6 +717,35 @@ export default function ResultsPage() {
     return counts
   }, [selectedManualPlayerIds])
 
+  // A player registered for a single race needs no pick; anyone else waits for one.
+  const manualEffectiveRaces = useMemo<TeamRaces>(() => {
+    const singleRaceOf = (playerId: ManualSlotValue): AssignedRace | null =>
+      typeof playerId === 'number'
+        ? normalizeAssignedRace(manualPlayers.find((player) => player.id === playerId)?.race)
+        : null
+    return {
+      HOME: manualHomeSlots.map((playerId, index) => manualTeamRaces.HOME[index] ?? singleRaceOf(playerId)),
+      AWAY: manualAwaySlots.map((playerId, index) => manualTeamRaces.AWAY[index] ?? singleRaceOf(playerId)),
+    }
+  }, [manualAwaySlots, manualHomeSlots, manualPlayers, manualTeamRaces])
+
+  const manualRaceComposition = resolveCompositionFromTeamRaces(
+    manualTeamSize,
+    manualEffectiveRaces.HOME,
+    manualEffectiveRaces.AWAY,
+  )
+
+  const setManualSlotRace = (team: TeamSide, slotIndex: number, race: AssignedRace | null) => {
+    setManualTeamRaces((previous) => {
+      if (previous[team][slotIndex] === race) {
+        return previous
+      }
+      const nextTeam = [...previous[team]]
+      nextTeam[slotIndex] = race
+      return { ...previous, [team]: nextTeam }
+    })
+  }
+
   const handleManualSlotInputChange = (
     team: TeamSide,
     slotIndex: number,
@@ -725,6 +753,10 @@ export default function ResultsPage() {
   ) => {
     const matchedPlayer = findManualPlayerByInput(manualPlayers, value, showMmr)
     const nextValue: ManualSlotValue = matchedPlayer?.id ?? ''
+    const previousValue = team === 'HOME' ? manualHomeSlots[slotIndex] : manualAwaySlots[slotIndex]
+    if (previousValue !== nextValue) {
+      setManualSlotRace(team, slotIndex, null)
+    }
 
     if (team === 'HOME') {
       setManualHomeSlots((previous) =>
@@ -777,6 +809,10 @@ export default function ResultsPage() {
     const matchedPlayer = findUniquePlayerByNicknamePrefix(manualPlayers, currentInput)
     if (!matchedPlayer) {
       return false
+    }
+    const previousValue = team === 'HOME' ? manualHomeSlots[slotIndex] : manualAwaySlots[slotIndex]
+    if (previousValue !== matchedPlayer.id) {
+      setManualSlotRace(team, slotIndex, null)
     }
 
     if (team === 'HOME') {
@@ -837,12 +873,22 @@ export default function ResultsPage() {
 
     // Manual entry is where both kinds of mistake happen: the wrong winner, and the wrong
     // player in a slot. Read the rosters back so both are visible before anything is saved.
-    const nicknameOf = (playerId: number): string =>
-      manualPlayers.find((player) => player.id === playerId)?.nickname ?? String(playerId)
+    const participantRaces = winnerTeamOptions.flatMap((team) =>
+      (team === 'HOME' ? manualHomeSlots : manualAwaySlots).flatMap((playerId, index) => {
+        const race = manualEffectiveRaces[team][index]
+        return typeof playerId === 'number' && race ? [{ playerId, race }] : []
+      }),
+    )
+    const describePlayer = (playerId: number): string => {
+      const nickname =
+        manualPlayers.find((player) => player.id === playerId)?.nickname ?? String(playerId)
+      const race = participantRaces.find((entry) => entry.playerId === playerId)?.race
+      return race ? `${nickname}(${race})` : nickname
+    }
     const confirmed = window.confirm(
       t('results.manual.confirmSubmit', {
-        homeTeam: homePlayerIds.map(nicknameOf).join(', '),
-        awayTeam: awayPlayerIds.map(nicknameOf).join(', '),
+        homeTeam: homePlayerIds.map(describePlayer).join(', '),
+        awayTeam: awayPlayerIds.map(describePlayer).join(', '),
         winner: formatTeamLabel(manualWinnerTeam),
       }),
     )
@@ -864,6 +910,7 @@ export default function ResultsPage() {
         awayPlayerIds,
         winnerTeam: manualWinnerTeam,
         raceComposition: manualRaceComposition,
+        participantRaces,
       })
 
       setResult(response)
@@ -875,7 +922,7 @@ export default function ResultsPage() {
       setManualHomeInputs(createManualSlotInputs(manualTeamSize))
       setManualAwayInputs(createManualSlotInputs(manualTeamSize))
       setManualWinnerTeam('')
-      setManualRaceComposition(null)
+      setManualTeamRaces(createTeamRaces(manualTeamSize))
       setManualSubmitSuccess(
         isSuperAdmin
           ? t('results.manual.successWithMatchId', { matchId: response.matchId })
@@ -1171,23 +1218,16 @@ export default function ResultsPage() {
                   </select>
                 </label>
 
-                <label className="space-y-1 text-sm">
+                <div className="space-y-1 text-sm">
                   <span className="font-medium text-slate-700 dark:text-slate-300">{t('results.manual.raceCompositionLabel')}</span>
-                  <select
-                    value={manualRaceComposition ?? ''}
-                    onChange={(event) =>
-                      setManualRaceComposition(normalizeRaceComposition(manualTeamSize, event.target.value))
-                    }
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
-                  >
-                    <option value="">{t('results.manual.raceCompositionPlaceholder')}</option>
-                    {getRaceCompositionOptions(manualTeamSize).map((option) => (
-                      <option key={`manual-race-${option}`} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                  <p className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+                    {manualRaceComposition ?? (
+                      <span className="text-slate-500 dark:text-slate-400">
+                        {t('results.manual.raceCompositionPlaceholder')}
+                      </span>
+                    )}
+                  </p>
+                </div>
               </div>
 
               <div className="grid gap-4 lg:grid-cols-1">
@@ -1242,30 +1282,49 @@ export default function ResultsPage() {
                             className="space-y-1 text-xs font-medium text-slate-500 dark:text-slate-400"
                             >
                               {t('results.manual.playerPlaceholder', { slot: slotIndex + 1 })}
-                              <input
-                                ref={(element) => {
-                                  if (team === 'HOME') {
-                                    manualHomeInputRefs.current[slotIndex] = element
-                                    return
+                              <div className="mt-1 flex gap-2">
+                                <input
+                                  ref={(element) => {
+                                    if (team === 'HOME') {
+                                      manualHomeInputRefs.current[slotIndex] = element
+                                      return
+                                    }
+                                    manualAwayInputRefs.current[slotIndex] = element
+                                  }}
+                                  value={inputs[slotIndex]}
+                                  onChange={(event) =>
+                                    handleManualSlotInputChange(team, slotIndex, event.target.value)
                                   }
-                                  manualAwayInputRefs.current[slotIndex] = element
-                                }}
-                                value={inputs[slotIndex]}
-                                onChange={(event) =>
-                                  handleManualSlotInputChange(team, slotIndex, event.target.value)
-                                }
-                                onKeyDown={(event) => {
-                                  if (
-                                    event.key === 'Tab' &&
-                                    !event.shiftKey &&
-                                    handleManualSlotAutocomplete(team, slotIndex)
-                                  ) {
-                                    event.preventDefault()
+                                  onKeyDown={(event) => {
+                                    if (
+                                      event.key === 'Tab' &&
+                                      !event.shiftKey &&
+                                      handleManualSlotAutocomplete(team, slotIndex)
+                                    ) {
+                                      event.preventDefault()
+                                    }
+                                  }}
+                                  className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                                  placeholder={t('results.manual.playerInputPlaceholder')}
+                                />
+                                <select
+                                  value={manualEffectiveRaces[team][slotIndex] ?? ''}
+                                  onChange={(event) =>
+                                    setManualSlotRace(team, slotIndex, normalizeAssignedRace(event.target.value))
                                   }
-                                }}
-                              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
-                                placeholder={t('results.manual.playerInputPlaceholder')}
-                              />
+                                  aria-label={t('results.manual.playerRaceAriaLabel', { slot: slotIndex + 1 })}
+                                  className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                                >
+                                  <option value="" disabled>
+                                    -
+                                  </option>
+                                  {ASSIGNED_RACES.map((race) => (
+                                    <option key={race} value={race}>
+                                      {race}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
                               {selectedPlayer && (
                               <p className="text-[11px] text-slate-500 dark:text-slate-400">
                                   {formatManualPlayerLabel(selectedPlayer, showMmr)}

@@ -1,7 +1,6 @@
 package com.balancify.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
@@ -185,6 +184,12 @@ class PlayerRaceStatsQueryServiceTest {
                 monthlyGameTypeStats(1L, 1L, JULY_2026, "PT", 1, 1),
                 monthlyGameTypeStats(1L, 1L, JULY_2026, "PTZPTZPTZ", 3, 0)
             ));
+        when(playerRaceStatsRepository.findRaceStatsPlayedBetween(
+            1L,
+            1L,
+            OffsetDateTime.parse("2026-07-01T00:00:00+09:00"),
+            OffsetDateTime.parse("2026-08-01T00:00:00+09:00")
+        )).thenReturn(List.of(new RaceRow("T", 1, 0), new RaceRow("P", 2, 1)));
 
         GroupPlayerRaceStatsResponse response =
             playerRaceStatsQueryService.getGroupPlayerMonthlyRaceStats(1L, 1L);
@@ -193,8 +198,12 @@ class PlayerRaceStatsQueryServiceTest {
         assertThat(response.wins()).isEqualTo(4);
         assertThat(response.losses()).isEqualTo(2);
         assertThat(response.games()).isEqualTo(6);
-        assertThat(response.byRace()).isEmpty();
-        verify(playerRaceStatsRepository, never()).findRaceStatsPlayedBetween(any(), any(), any(), any());
+        assertThat(response.byRace())
+            .extracting("race", "wins", "losses", "games", "winRate")
+            .containsExactly(
+                org.assertj.core.groups.Tuple.tuple("P", 2, 1, 3, 66.67),
+                org.assertj.core.groups.Tuple.tuple("T", 1, 0, 1, 100.0)
+            );
         assertThat(response.byGameType())
             .extracting("gameType")
             .containsExactly("PPT", "PT", "PPP");
@@ -203,36 +212,7 @@ class PlayerRaceStatsQueryServiceTest {
     }
 
     @Test
-    void countsMonthlyRaceRowsOnlyFromMatchesAfterRacesWereRecorded() {
-        PlayerRaceStatsQueryService septemberService = serviceAt("2026-09-28T03:00:00Z");
-        Group group = new Group();
-        group.setId(1L);
-        Player alpha = player(1L, group, "Alpha", "PT", 1500, true);
-
-        when(playerRepository.findByIdAndGroup_Id(1L, 1L))
-            .thenReturn(java.util.Optional.of(alpha));
-        when(playerMonthlyGameTypeStatsRepository.findByGroupIdAndPlayerIdAndStatMonth(
-            1L, 1L, LocalDate.of(2026, 9, 1)
-        )).thenReturn(List.of());
-        when(playerRaceStatsRepository.findRaceStatsPlayedBetween(
-            1L,
-            1L,
-            OffsetDateTime.parse("2026-09-27T22:13:04+09:00"),
-            OffsetDateTime.parse("2026-10-01T00:00:00+09:00")
-        )).thenReturn(List.of(new RaceRow("T", 1, 0), new RaceRow("P", 2, 1)));
-
-        GroupPlayerRaceStatsResponse response = septemberService.getGroupPlayerMonthlyRaceStats(1L, 1L);
-
-        assertThat(response.byRace())
-            .extracting("race", "wins", "losses", "games", "winRate")
-            .containsExactly(
-                org.assertj.core.groups.Tuple.tuple("P", 2, 1, 3, 66.67),
-                org.assertj.core.groups.Tuple.tuple("T", 1, 0, 1, 100.0)
-            );
-    }
-
-    @Test
-    void keepsAllTimeTotalsButCountsLifetimeRaceRowsFromRecordedRacesOnly() {
+    void keepsAllTimeTotalsButTakesLifetimeRaceRowsFromRecordedRaces() {
         PlayerRaceStatsQueryService octoberService = serviceAt("2026-10-15T03:00:00Z");
         Group group = new Group();
         group.setId(1L);
@@ -246,7 +226,7 @@ class PlayerRaceStatsQueryServiceTest {
         when(playerRaceStatsRepository.findRaceStatsPlayedBetween(
             1L,
             1L,
-            OffsetDateTime.parse("2026-09-27T22:13:04+09:00"),
+            OffsetDateTime.parse("1970-01-01T00:00:00Z"),
             OffsetDateTime.parse("2026-11-01T00:00:00+09:00")
         )).thenReturn(List.of(new RaceRow("Z", 3, 1)));
 
