@@ -15,8 +15,9 @@ public interface PlayerRaceStatsRepository extends JpaRepository<PlayerRaceStats
 
     List<PlayerRaceStats> findByGroupIdAndPlayerId(Long groupId, Long playerId);
 
-    // Only matches whose races a recorder set, since elsewhere the race is the balancer's guess;
-    // 3v3 only, to line up with the composition rows shown beside it.
+    // Only races that are known: a PPP match leaves no doubt, anywhere else the race counts only if
+    // a recorder set it, since otherwise it is the balancer's guess. 3v3 only, to line up with the
+    // composition rows shown beside it.
     @Query(value = """
         select
             race,
@@ -25,7 +26,10 @@ public interface PlayerRaceStatsRepository extends JpaRepository<PlayerRaceStats
         from (
             select
                 case
-                    when upper(coalesce(mp.assigned_race, '')) in ('P', 'T', 'Z')
+                    when upper(coalesce(m.race_composition, '')) = 'PPP'
+                        then 'P'
+                    when m.races_recorded
+                        and upper(coalesce(mp.assigned_race, '')) in ('P', 'T', 'Z')
                         then upper(mp.assigned_race)
                 end as race,
                 case
@@ -37,7 +41,6 @@ public interface PlayerRaceStatsRepository extends JpaRepository<PlayerRaceStats
             where mp.player_id = :playerId
                 and m.group_id = :groupId
                 and m.team_size = 3
-                and m.races_recorded = true
                 and m.winning_team is not null
                 and mp.team is not null
                 and btrim(mp.team) <> ''
