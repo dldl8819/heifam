@@ -116,9 +116,9 @@ function resolveCurrentKstMonthLabel(): string {
 }
 
 export default function RankingPage() {
-  const { isSuperAdmin, isLoading: authLoading } = useAdminAuth()
+  const { canViewMmr, isLoading: authLoading } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
-  const showMmr = isSuperAdmin && mmrVisible
+  const showMmr = canViewMmr && mmrVisible
   const [rows, setRows] = useState<RankingItem[]>([])
   const [tierByNickname, setTierByNickname] = useState<Map<string, PlayerTierStatus>>(new Map())
   const [playerIdByNickname, setPlayerIdByNickname] = useState<Map<string, number>>(new Map())
@@ -193,7 +193,7 @@ export default function RankingPage() {
     return () => {
       active = false
     }
-  }, [authLoading, isSuperAdmin, showMmr])
+  }, [authLoading, canViewMmr, showMmr])
 
   const sortedRows = useMemo(
     () =>

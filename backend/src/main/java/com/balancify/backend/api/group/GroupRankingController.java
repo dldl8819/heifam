@@ -40,7 +40,7 @@ public class GroupRankingController {
         );
 
         List<RankingItemResponse> response = rankingService.getGroupRanking(groupId);
-        if (accessProfile.superAdmin()) {
+        if (accessProfile.canViewMmr()) {
             return response;
         }
 
