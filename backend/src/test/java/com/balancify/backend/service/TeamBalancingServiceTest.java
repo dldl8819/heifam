@@ -55,6 +55,16 @@ class TeamBalancingServiceTest {
     }
 
     @Test
+    void pricesExpectedHomeWinRateOnTeamAverageMmr() {
+        BalanceResponse response = service.toResponse(
+            new TeamBalancingService.BalanceCandidate(3, List.of(), List.of(), 3300, 3500, 200)
+        );
+
+        // Average gap 66.67 at 800: the rate result scoring uses, not the 36% a sum gap of 200 would show.
+        assertThat(response.expectedHomeWinRate()).isEqualTo(0.4522);
+    }
+
+    @Test
     void rejectsMissingRaceComposition() {
         BalanceRequest request = new BalanceRequest(List.of(
             new BalancePlayerDto("A", 1400),

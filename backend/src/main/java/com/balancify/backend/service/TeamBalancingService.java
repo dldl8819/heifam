@@ -193,7 +193,11 @@ public class TeamBalancingService {
     }
 
     public BalanceResponse toResponse(BalanceCandidate candidate) {
-        double expectedWinRate = calculateExpectedWinRate(candidate.homeMmr(), candidate.awayMmr());
+        double expectedWinRate = calculateExpectedWinRate(
+            candidate.homeMmr(),
+            candidate.awayMmr(),
+            candidate.teamSize()
+        );
         return new BalanceResponse(
             candidate.teamSize(),
             candidate.homeTeam(),
@@ -278,8 +282,10 @@ public class TeamBalancingService {
         return resolved;
     }
 
-    private double calculateExpectedWinRate(int homeMmr, int awayMmr) {
-        double ratingGap = (awayMmr - homeMmr) / winRateDenominator;
+    // Team averages, as MatchResultService scores it; a sum gap shows the match far more lopsided.
+    private double calculateExpectedWinRate(int homeMmr, int awayMmr, int teamSize) {
+        double averageGap = (double) (awayMmr - homeMmr) / teamSize;
+        double ratingGap = averageGap / winRateDenominator;
         double winRate = 1.0 / (1.0 + Math.pow(10.0, ratingGap));
         return Math.round(winRate * 10000.0) / 10000.0;
     }
