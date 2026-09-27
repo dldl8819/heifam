@@ -15,8 +15,8 @@ public interface PlayerRaceStatsRepository extends JpaRepository<PlayerRaceStats
 
     List<PlayerRaceStats> findByGroupIdAndPlayerId(Long groupId, Long playerId);
 
-    // 3v3 only, to line up with the composition rows shown beside it; a multi-race player's game
-    // counts only once a single race was recorded for them in that match.
+    // 3v3 only, to line up with the composition rows shown beside it. The caller picks the range,
+    // so it can leave out matches whose recorded race was only the balancer's guess.
     @Query(value = """
         select
             race,
@@ -48,14 +48,14 @@ public interface PlayerRaceStatsRepository extends JpaRepository<PlayerRaceStats
         where race is not null
         group by race
         """, nativeQuery = true)
-    List<MonthlyRaceStatRow> findMonthlyRaceStats(
+    List<RaceStatRow> findRaceStatsPlayedBetween(
         @Param("groupId") Long groupId,
         @Param("playerId") Long playerId,
         @Param("fromInclusive") OffsetDateTime fromInclusive,
         @Param("toExclusive") OffsetDateTime toExclusive
     );
 
-    interface MonthlyRaceStatRow {
+    interface RaceStatRow {
         String getRace();
 
         Integer getWins();
