@@ -15,23 +15,18 @@ public interface PlayerRaceStatsRepository extends JpaRepository<PlayerRaceStats
 
     List<PlayerRaceStats> findByGroupIdAndPlayerId(Long groupId, Long playerId);
 
-    // Only races that are known: a PPP match leaves no doubt, anywhere else the race counts only if
-    // a recorder set it, since otherwise it is the balancer's guess. 3v3 only, to line up with the
-    // composition rows shown beside it.
+    // Only races that are known: a PPP team leaves no doubt, anywhere else the race counts only if
+    // a recorder set it, since otherwise it is the balancer's guess. A team is PPP by the same rule
+    // as the composition rows shown beside it (player_game_type_stats), so both tables agree even
+    // for early matches stored without a composition. 3v3 only.
     @Query(value = """
-        select
-            race,
-            cast(count(*) filter (where result_symbol = 'W') as integer) as wins,
-            cast(count(*) filter (where result_symbol = 'L') as integer) as losses
-        from (
+        with player_rows as (
             select
-                case
-                    when upper(coalesce(m.race_composition, '')) = 'PPP'
-                        then 'P'
-                    when m.races_recorded
-                        and upper(coalesce(mp.assigned_race, '')) in ('P', 'T', 'Z')
-                        then upper(mp.assigned_race)
-                end as race,
+                mp.match_id,
+                upper(mp.team) as team,
+                upper(coalesce(mp.assigned_race, '')) as assigned_race,
+                m.races_recorded,
+                upper(coalesce(m.race_composition, '')) as stored_composition,
                 case
                     when upper(m.winning_team) = upper(mp.team) then 'W'
                     else 'L'
@@ -46,6 +41,50 @@ public interface PlayerRaceStatsRepository extends JpaRepository<PlayerRaceStats
                 and btrim(mp.team) <> ''
                 and m.played_at >= :fromInclusive
                 and m.played_at < :toExclusive
+        ),
+        team_races as (
+            select
+                player_rows.match_id,
+                player_rows.team,
+                count(*) as members,
+                count(teammate_race.race) as known_members,
+                count(*) filter (where teammate_race.race = 'P') as protoss_members
+            from player_rows
+            join match_participants teammate
+                on teammate.match_id = player_rows.match_id
+                and upper(teammate.team) = player_rows.team
+            cross join lateral (
+                select case
+                    when upper(coalesce(teammate.assigned_race, '')) in ('P', 'T', 'Z')
+                        then upper(teammate.assigned_race)
+                    when upper(coalesce(teammate.race, '')) in ('P', 'T', 'Z')
+                        then upper(teammate.race)
+                end as race
+            ) teammate_race
+            group by player_rows.match_id, player_rows.team
+        )
+        select
+            race,
+            cast(count(*) filter (where result_symbol = 'W') as integer) as wins,
+            cast(count(*) filter (where result_symbol = 'L') as integer) as losses
+        from (
+            select
+                case
+                    when team_races.known_members = team_races.members
+                        and team_races.protoss_members = team_races.members
+                        then 'P'
+                    when team_races.known_members < team_races.members
+                        and player_rows.stored_composition = 'PPP'
+                        then 'P'
+                    when player_rows.races_recorded
+                        and player_rows.assigned_race in ('P', 'T', 'Z')
+                        then player_rows.assigned_race
+                end as race,
+                player_rows.result_symbol
+            from player_rows
+            join team_races
+                on team_races.match_id = player_rows.match_id
+                and team_races.team = player_rows.team
         ) participant_results
         where race is not null
         group by race
