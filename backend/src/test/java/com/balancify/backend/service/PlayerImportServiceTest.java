@@ -130,7 +130,7 @@ class PlayerImportServiceTest {
             .filter(player -> "Echo".equals(player.getNickname()))
             .findFirst()
             .orElseThrow();
-        assertThat(echo.getTier()).isEqualTo("재배정대상");
+        assertThat(echo.getTier()).isEqualTo("UNASSIGNED");
         assertThat(echo.getBaseMmr()).isZero();
         assertThat(echo.getMmr()).isZero();
         assertThat(echo.getNote()).isEqualTo("재배정 대상");
@@ -219,8 +219,28 @@ class PlayerImportServiceTest {
         ArgumentCaptor<Player> playerCaptor = ArgumentCaptor.forClass(Player.class);
         verify(playerRepository).save(playerCaptor.capture());
         assertThat(playerCaptor.getValue().getTier()).isEqualTo("D");
-        assertThat(playerCaptor.getValue().getBaseMmr()).isEqualTo(1);
-        assertThat(playerCaptor.getValue().getMmr()).isEqualTo(1);
+        assertThat(playerCaptor.getValue().getBaseMmr()).isEqualTo(-200);
+        assertThat(playerCaptor.getValue().getMmr()).isEqualTo(-200);
+    }
+
+    @Test
+    void placesAReassignmentRowByItsMmrWhenOneIsGiven() {
+        Group group = new Group();
+        group.setId(7L);
+        group.setName("Group 7");
+
+        when(groupRepository.findById(7L)).thenReturn(Optional.of(group));
+        when(playerRepository.findByGroup_IdAndNicknameIgnoreCase(7L, "Returner")).thenReturn(List.of());
+        when(playerRepository.save(any(Player.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        playerImportService.importPlayers(7L, new GroupPlayerImportRequest(List.of(
+            new GroupPlayerImportRowRequest("Returner", "재배정대상", 1630, 1630, "")
+        )));
+
+        ArgumentCaptor<Player> playerCaptor = ArgumentCaptor.forClass(Player.class);
+        verify(playerRepository).save(playerCaptor.capture());
+        assertThat(playerCaptor.getValue().getTier()).isEqualTo("A");
+        assertThat(playerCaptor.getValue().getMmr()).isEqualTo(1630);
     }
 
     @Test

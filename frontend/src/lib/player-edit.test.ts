@@ -94,8 +94,10 @@ describe('resolveDefaultMmrForTier', () => {
     expect(resolveDefaultMmrForTier('C-')).toBe(200)
   })
 
-  it('keeps D and unassigned boundary values distinct', () => {
-    expect(resolveDefaultMmrForTier('D')).toBe(1)
+  it('keeps the D sub-tier floors 200 MMR apart, continuing below zero', () => {
+    expect(resolveDefaultMmrForTier('D+')).toBe(0)
+    expect(resolveDefaultMmrForTier('D')).toBe(-200)
+    expect(resolveDefaultMmrForTier('D-')).toBe(-400)
     expect(resolveDefaultMmrForTier('UNASSIGNED')).toBe(0)
   })
 
@@ -111,12 +113,8 @@ describe('resolveEditableMmrValue', () => {
     expect(resolveEditableMmrValue(player({ tier: 'C-', currentMmr: 399 }))).toBe('399')
   })
 
-  it('replaces a negative legacy MMR with the current tier default', () => {
-    expect(resolveEditableMmrValue(player({ tier: 'C-', currentMmr: -20 }))).toBe('200')
-  })
-
-  it('uses zero for unassigned players with invalid legacy MMR', () => {
-    expect(resolveEditableMmrValue(player({ tier: 'UNASSIGNED', currentMmr: -1 }))).toBe('0')
+  it('preserves a negative MMR, since scores can now go below zero', () => {
+    expect(resolveEditableMmrValue(player({ tier: 'D', currentMmr: -20 }))).toBe('-20')
   })
 
   it('uses the tier default when current MMR is missing', () => {

@@ -15,4 +15,11 @@ describe('toTierOrder', () => {
     expect(toTierOrder('S')).toBeLessThan(toTierOrder('S-'))
     expect(toTierOrder('S-')).toBeLessThan(toTierOrder('A+'))
   })
+
+  it('orders the D sub-tiers below C- and above unassigned', () => {
+    expect(toTierOrder('C-')).toBeLessThan(toTierOrder('D+'))
+    expect(toTierOrder('D+')).toBeLessThan(toTierOrder('D'))
+    expect(toTierOrder('D')).toBeLessThan(toTierOrder('D-'))
+    expect(toTierOrder('D-')).toBeLessThan(toTierOrder('UNASSIGNED'))
+  })
 })

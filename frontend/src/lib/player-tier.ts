@@ -13,8 +13,10 @@ const TIER_ORDER: Record<PlayerTierStatus, number> = {
   'C+': 9,
   C: 10,
   'C-': 11,
-  D: 12,
-  UNASSIGNED: 13,
+  'D+': 12,
+  D: 13,
+  'D-': 14,
+  UNASSIGNED: 15,
 }
 
 export function toTierOrder(tier: PlayerTierStatus): number {

@@ -6,6 +6,7 @@ import com.balancify.backend.api.group.dto.GroupPlayerImportResponse;
 import com.balancify.backend.api.group.dto.GroupPlayerImportRowRequest;
 import com.balancify.backend.domain.Group;
 import com.balancify.backend.domain.Player;
+import com.balancify.backend.domain.PlayerTierPolicy;
 import com.balancify.backend.repository.GroupRepository;
 import com.balancify.backend.repository.PlayerRepository;
 import java.util.ArrayList;
@@ -22,6 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class PlayerImportService {
 
     private static final String REASSIGNMENT_TIER = "재배정대상";
+    private static final String MMR_RANGE_MESSAGE = "%s must be between "
+        + PlayerTierPolicy.MIN_EDITABLE_MMR + " and " + PlayerTierPolicy.MAX_EDITABLE_MMR;
     private static final Map<String, Integer> DEFAULT_BASE_MMR_BY_TIER = defaultBaseMmrByTier();
 
     private final PlayerRepository playerRepository;
@@ -185,22 +188,24 @@ public class PlayerImportService {
             normalizedBaseMmr = defaultBaseMmr;
         }
 
-        if (normalizedBaseMmr < 0) {
-            return ValidationResult.invalid(
-                nickname,
-                "baseMmr must be zero or positive"
-            );
+        if (!isEditableMmr(normalizedBaseMmr)) {
+            return ValidationResult.invalid(nickname, MMR_RANGE_MESSAGE.formatted("baseMmr"));
         }
 
         int normalizedCurrentMmr = currentMmr == null ? normalizedBaseMmr : currentMmr;
 
-        if (normalizedCurrentMmr < 0) {
-            return ValidationResult.invalid(nickname, "currentMmr must be zero or positive");
+        if (!isEditableMmr(normalizedCurrentMmr)) {
+            return ValidationResult.invalid(nickname, MMR_RANGE_MESSAGE.formatted("currentMmr"));
         }
+
+        // A reassignment row with an MMR is placed by it; without one the player waits unassigned.
+        String storedTier = !reassignmentTier
+            ? tier
+            : normalizedCurrentMmr != 0 ? PlayerTierPolicy.resolveTier(normalizedCurrentMmr) : "UNASSIGNED";
 
         return ValidationResult.valid(
             nickname,
-            tier,
+            storedTier,
             normalizedBaseMmr,
             normalizedCurrentMmr,
             race,
@@ -210,6 +215,10 @@ public class PlayerImportService {
 
     private String safeTrim(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private boolean isEditableMmr(int mmr) {
+        return mmr >= PlayerTierPolicy.MIN_EDITABLE_MMR && mmr <= PlayerTierPolicy.MAX_EDITABLE_MMR;
     }
 
     private String trimToNull(String value) {
@@ -260,7 +269,9 @@ public class PlayerImportService {
         mapping.put("C+", 600);
         mapping.put("C", 400);
         mapping.put("C-", 200);
-        mapping.put("D", 1);
+        mapping.put("D+", 0);
+        mapping.put("D", -200);
+        mapping.put("D-", -400);
         return Map.copyOf(mapping);
     }
 

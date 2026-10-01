@@ -239,7 +239,9 @@ export type PlayerTier =
   | 'C+'
   | 'C'
   | 'C-'
+  | 'D+'
   | 'D'
+  | 'D-'
 
 export type PlayerTierStatus = PlayerTier | 'UNASSIGNED'
 

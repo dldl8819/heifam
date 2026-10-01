@@ -87,7 +87,9 @@ const PLAYER_EDIT_TIER_OPTIONS: PlayerTierStatus[] = [
   'C+',
   'C',
   'C-',
+  'D+',
   'D',
+  'D-',
   'UNASSIGNED',
 ]
 const PLAYER_REGISTRATION_TIER_OPTIONS: PlayerRegistrationTier[] = [
@@ -100,7 +102,9 @@ const PLAYER_REGISTRATION_TIER_OPTIONS: PlayerRegistrationTier[] = [
   'C+',
   'C',
   'C-',
+  'D+',
   'D',
+  'D-',
   'UNASSIGNED',
 ]
 const REASSIGNMENT_IMPORT_TIER = '\uC7AC\uBC30\uC815\uB300\uC0C1'
@@ -139,11 +143,11 @@ function sortRosterRows(rows: PlayerRosterItem[], showMmrColumn: boolean): Playe
   })
 }
 
-function formatMmrValue(value: number | undefined): string {
+function formatMmrValue(value: number | undefined, unassigned: boolean): string {
   if (typeof value !== 'number') {
     return '-'
   }
-  return value === 0 ? 'None' : String(value)
+  return unassigned ? 'None' : String(value)
 }
 
 function formatDateTimeLocalInputValue(date: Date): string {
@@ -285,7 +289,9 @@ function getTierBadgeClass(tier: PlayerTierStatus): string {
     case 'C+':
     case 'C':
     case 'C-':
+    case 'D+':
     case 'D':
+    case 'D-':
       return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200'
     case 'UNASSIGNED':
       return 'bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-200'
@@ -569,7 +575,7 @@ export default function PlayersPage() {
       }
 
       const parsedMmr = Number(rawMmr)
-      if (!Number.isInteger(parsedMmr) || parsedMmr < 0 || parsedMmr > 5000) {
+      if (!Number.isInteger(parsedMmr) || parsedMmr < -2000 || parsedMmr > 5000) {
         setPlayerActionError(t('players.actions.mmrInvalid'))
         return
       }
@@ -1671,7 +1677,7 @@ export default function PlayersPage() {
                         ) : isEditing && isSuperAdmin ? (
                           <input
                             type="number"
-                            min={0}
+                            min={-2000}
                             max={5000}
                             step={1}
                             value={editingInlineMmrValue}
@@ -1679,7 +1685,7 @@ export default function PlayersPage() {
                             className="w-24 rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                           />
                         ) : (
-                          formatMmrValue(row.currentMmr)
+                          formatMmrValue(row.currentMmr, (row.liveTier ?? row.tier) === 'UNASSIGNED')
                         )}
                       </td>
                     )}

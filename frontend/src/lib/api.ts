@@ -412,7 +412,9 @@ function normalizeTier(value: unknown): PlayerTierStatus | undefined {
     case 'C+':
     case 'C':
     case 'C-':
+    case 'D+':
     case 'D':
+    case 'D-':
       return normalized
     case 'UNASSIGNED':
     case 'PENDING':

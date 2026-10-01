@@ -46,13 +46,16 @@ export const MONTHLY_TIER_BOARD_COLUMNS: TierBoardColumn[] = [
   { tier: 'C+', headerFill: '#c8dfb8' },
   { tier: 'C', headerFill: '#c8dfb8' },
   { tier: 'C-', headerFill: '#c8dfb8' },
+  { tier: 'D+', headerFill: '#dbead3' },
   { tier: 'D', headerFill: '#dbead3' },
+  { tier: 'D-', headerFill: '#dbead3' },
   { tier: 'UNASSIGNED', headerFill: '#f4b17f' },
 ]
 
 const MINIMUM_ROW_COUNT = 10
 const MAXIMUM_ROW_COUNT = 100
-const CANVAS_WIDTH = 1680
+// Sized so each tier column stays ~110px wide, which the footer date label needs to fit.
+const CANVAS_WIDTH = 1900
 const OUTER_MARGIN = 12
 const TITLE_TOP = 14
 const TITLE_BOTTOM = 92
@@ -78,7 +81,9 @@ function createEmptyBuckets(): Record<PlayerTierStatus, string[]> {
     'C+': [],
     C: [],
     'C-': [],
+    'D+': [],
     D: [],
+    'D-': [],
     UNASSIGNED: [],
   }
 }
@@ -326,7 +331,7 @@ function renderMonthlyTierBoardCanvas(
     const isTotalCell = column.tier === 'UNASSIGNED'
     fillCell(context, x, footerY, width, FOOTER_HEIGHT, isTotalCell ? '#b7d7a8' : '#fbfbfb')
 
-    if (column.tier === 'D') {
+    if (column.tier === 'D-') {
       drawCellText(
         context,
         model.periodLabel,

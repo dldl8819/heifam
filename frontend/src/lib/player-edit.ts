@@ -19,7 +19,9 @@ const DEFAULT_MMR_BY_TIER: Record<PlayerTierStatus, number> = {
   'C+': 600,
   C: 400,
   'C-': 200,
-  D: 1,
+  'D+': 0,
+  D: -200,
+  'D-': -400,
   UNASSIGNED: 0,
 }
 
@@ -28,11 +30,7 @@ export function resolveDefaultMmrForTier(tier: PlayerTierStatus): number {
 }
 
 export function resolveEditableMmrValue(player: PlayerRosterItem): string {
-  if (
-    typeof player.currentMmr === 'number' &&
-    Number.isFinite(player.currentMmr) &&
-    player.currentMmr >= 0
-  ) {
+  if (typeof player.currentMmr === 'number' && Number.isFinite(player.currentMmr)) {
     return String(player.currentMmr)
   }
 

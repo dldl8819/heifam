@@ -92,7 +92,7 @@ class RatingReplayCalculatorTest {
     }
 
     @Test
-    void replayFloorsMmrAtZeroAndAdjustsDelta() {
+    void replayLetsMmrGoBelowZero() {
         RatingReplayCalculator calculator = new RatingReplayCalculator(36, 800, 300, 900, 0.6, 0.7);
         Group group = new Group();
         group.setId(1L);
@@ -121,15 +121,19 @@ class RatingReplayCalculatorTest {
             participantsByMatchId
         );
 
-        assertThat(finalMmrByPlayerId(plan).get(4L)).isZero();
-        assertThat(finalMmrByPlayerId(plan).get(5L)).isZero();
-        assertThat(finalMmrByPlayerId(plan).get(6L)).isZero();
+        int winnerGain = plan.participants().stream()
+            .filter(result -> result.playerId().equals(1L))
+            .findFirst()
+            .orElseThrow()
+            .delta();
+        assertThat(winnerGain).isGreaterThan(5);
+        assertThat(finalMmrByPlayerId(plan).get(4L)).isEqualTo(5 - winnerGain).isNegative();
         plan.participants().stream()
             .filter(result -> List.of(4L, 5L, 6L).contains(result.playerId()))
             .forEach(result -> {
                 assertThat(result.beforeMmr()).isEqualTo(5);
-                assertThat(result.afterMmr()).isZero();
-                assertThat(result.delta()).isEqualTo(-5);
+                assertThat(result.afterMmr()).isEqualTo(5 - winnerGain);
+                assertThat(result.delta()).isEqualTo(-winnerGain);
             });
     }
 

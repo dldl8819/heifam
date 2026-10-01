@@ -8,10 +8,12 @@ class PlayerTierPolicyTest {
 
     @Test
     void resolvesTierByMmrBoundaries() {
-        assertThat(PlayerTierPolicy.resolveTier(-10)).isEqualTo("NONE");
-        assertThat(PlayerTierPolicy.resolveTier(0)).isEqualTo("NONE");
-        assertThat(PlayerTierPolicy.resolveTier(1)).isEqualTo("D");
-        assertThat(PlayerTierPolicy.resolveTier(199)).isEqualTo("D");
+        assertThat(PlayerTierPolicy.resolveTier(-5000)).isEqualTo("D-");
+        assertThat(PlayerTierPolicy.resolveTier(-201)).isEqualTo("D-");
+        assertThat(PlayerTierPolicy.resolveTier(-200)).isEqualTo("D");
+        assertThat(PlayerTierPolicy.resolveTier(-1)).isEqualTo("D");
+        assertThat(PlayerTierPolicy.resolveTier(0)).isEqualTo("D+");
+        assertThat(PlayerTierPolicy.resolveTier(199)).isEqualTo("D+");
         assertThat(PlayerTierPolicy.resolveTier(200)).isEqualTo("C-");
         assertThat(PlayerTierPolicy.resolveTier(399)).isEqualTo("C-");
         assertThat(PlayerTierPolicy.resolveTier(400)).isEqualTo("C");
@@ -67,12 +69,41 @@ class PlayerTierPolicyTest {
     }
 
     @Test
-    void resolvesDefaultMmrForDTier() {
-        assertThat(PlayerTierPolicy.resolveDefaultMmrForTier("D")).isEqualTo(1);
+    void resolvesDefaultMmrForDSubTiers() {
+        assertThat(PlayerTierPolicy.resolveDefaultMmrForTier("D+")).isEqualTo(0);
+        assertThat(PlayerTierPolicy.resolveDefaultMmrForTier("D")).isEqualTo(-200);
+        assertThat(PlayerTierPolicy.resolveDefaultMmrForTier("D-")).isEqualTo(-400);
+        assertThat(PlayerTierPolicy.resolveDefaultMmrForTier("UNASSIGNED")).isEqualTo(0);
     }
 
     @Test
-    void detectsLowTierFromMmrIncludingNone() {
+    void promotesAndDemotesThroughDSubTiersWithBuffer() {
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("D", 29)).isEqualTo("D");
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("D", 30)).isEqualTo("D+");
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("D+", -50)).isEqualTo("D+");
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("D+", -51)).isEqualTo("D");
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("D", -251)).isEqualTo("D-");
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("D-", -9999)).isEqualTo("D-");
+    }
+
+    @Test
+    void placesAnUnassignedPlayerByScoreOnTheirFirstRatedMatch() {
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("UNASSIGNED", -30)).isEqualTo("D");
+        assertThat(PlayerTierPolicy.resolveTierForRankedMatch("NONE", 250)).isEqualTo("C-");
+    }
+
+    @Test
+    void keepsAnUnassignedPlayerUnassignedWhateverTheirScore() {
+        assertThat(PlayerTierPolicy.resolveLiveTier("UNASSIGNED", 0)).isEqualTo("NONE");
+        assertThat(PlayerTierPolicy.resolveLiveTier("재배정대상", 1630)).isEqualTo("NONE");
+        assertThat(PlayerTierPolicy.resolveLiveTier(null, -300)).isEqualTo("NONE");
+        assertThat(PlayerTierPolicy.resolveLiveTier("B", -300)).isEqualTo("D-");
+        assertThat(PlayerTierPolicy.resolveLiveTier("D+", 0)).isEqualTo("D+");
+    }
+
+    @Test
+    void detectsLowTierFromMmrAcrossTheDSubTiers() {
+        assertThat(PlayerTierPolicy.isLowTier(-500)).isTrue();
         assertThat(PlayerTierPolicy.isLowTier(0)).isTrue();
         assertThat(PlayerTierPolicy.isLowTier(1)).isTrue();
         assertThat(PlayerTierPolicy.isLowTier(250)).isTrue();
@@ -110,17 +141,18 @@ class PlayerTierPolicyTest {
     }
 
     @Test
-    void snapshotTierFallsBackToMmrWhenTierIsUnknown() {
-        assertThat(PlayerTierPolicy.resolveTierForSnapshot("재배정대상", 1630))
-            .isEqualTo("A");
+    void snapshotTierTreatsAnUnknownStoredValueAsUnassigned() {
+        assertThat(PlayerTierPolicy.resolveTierForSnapshot("재배정대상")).isEqualTo("NONE");
+        assertThat(PlayerTierPolicy.resolveTierForSnapshot(" b+ ")).isEqualTo("B+");
     }
 
     @Test
     void demotesTierByRequestedSteps() {
         assertThat(PlayerTierPolicy.demoteTier("A+", 1)).isEqualTo("A");
         assertThat(PlayerTierPolicy.demoteTier("A+", 2)).isEqualTo("A-");
-        assertThat(PlayerTierPolicy.demoteTier("C-", 1)).isEqualTo("D");
-        assertThat(PlayerTierPolicy.demoteTier("D", 1)).isEqualTo("D");
+        assertThat(PlayerTierPolicy.demoteTier("C-", 1)).isEqualTo("D+");
+        assertThat(PlayerTierPolicy.demoteTier("D+", 2)).isEqualTo("D-");
+        assertThat(PlayerTierPolicy.demoteTier("D-", 1)).isEqualTo("D-");
     }
 
     @Test

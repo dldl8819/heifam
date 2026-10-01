@@ -120,6 +120,30 @@ class RankingServiceTest {
     }
 
     @Test
+    void ranksUnassignedPlayersLastEvenAbovePlayersBelowZero() {
+        Group group = new Group();
+        group.setId(1L);
+        Player unassigned = player(1L, group, "PlayerWaiting", "P", "UNASSIGNED", 0);
+        Player sliding = player(2L, group, "PlayerSliding", "T", "D", -150);
+        Player ranked = player(3L, group, "PlayerRanked", "Z", "B", 1000);
+
+        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
+            .thenReturn(List.of(ranked, unassigned, sliding));
+        when(playerMonthlyStatsRepository.findByGroupIdAndStatMonth(1L, JULY_2026))
+            .thenReturn(List.of());
+
+        List<RankingItemResponse> response = rankingService.getGroupRanking(1L);
+
+        assertThat(response).extracting(RankingItemResponse::nickname, RankingItemResponse::rank)
+            .containsExactly(
+                org.assertj.core.groups.Tuple.tuple("PlayerRanked", 1),
+                org.assertj.core.groups.Tuple.tuple("PlayerSliding", 2),
+                org.assertj.core.groups.Tuple.tuple("PlayerWaiting", 3)
+            );
+        assertThat(response.get(1).currentMmr()).isEqualTo(-150);
+    }
+
+    @Test
     void flagsPlayersRegisteredWithinTheLastFourteenDaysAsNew() {
         Group group = new Group();
         group.setId(1L);
