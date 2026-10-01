@@ -694,7 +694,7 @@ public class OperationAuditLogService {
     }
 
     private String formatMmrForAudit(Integer value) {
-        return String.valueOf(Math.max(0, value == null ? 0 : value));
+        return String.valueOf(value == null ? 0 : value);
     }
 
     private String formatActiveStatus(boolean active) {

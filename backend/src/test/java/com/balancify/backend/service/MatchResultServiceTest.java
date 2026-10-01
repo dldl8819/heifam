@@ -959,7 +959,7 @@ class MatchResultServiceTest {
     }
 
     @Test
-    void floorsMmrAtZeroWhenLossWouldGoNegative() {
+    void letsMmrGoBelowZeroSoLosersLoseWhatWinnersGain() {
         Match match = new Match();
         match.setId(24L);
         match.setStatus(MatchStatus.CONFIRMED);
@@ -989,20 +989,15 @@ class MatchResultServiceTest {
             new MatchResultRequest("HOME")
         );
 
+        int winnerGain = participantDelta(response, "HOME", "H1");
+        assertThat(winnerGain).isGreaterThan(5);
         participants.stream()
             .filter(participant -> "AWAY".equals(participant.getTeam()))
             .forEach(participant -> {
                 assertThat(participant.getMmrBefore()).isEqualTo(5);
-                assertThat(participant.getMmrAfter()).isZero();
-                assertThat(participant.getMmrDelta()).isEqualTo(-5);
-                assertThat(participant.getPlayer().getMmr()).isZero();
-            });
-        response.participants().stream()
-            .filter(participant -> "AWAY".equals(participant.team()))
-            .forEach(participant -> {
-                assertThat(participant.mmrBefore()).isEqualTo(5);
-                assertThat(participant.mmrAfter()).isZero();
-                assertThat(participant.mmrDelta()).isEqualTo(-5);
+                assertThat(participant.getMmrDelta()).isEqualTo(-winnerGain);
+                assertThat(participant.getMmrAfter()).isEqualTo(5 - winnerGain).isNegative();
+                assertThat(participant.getPlayer().getMmr()).isEqualTo(5 - winnerGain);
             });
 
         ArgumentCaptor<List<MmrHistory>> historyCaptor = ArgumentCaptor.forClass(List.class);
@@ -1011,9 +1006,35 @@ class MatchResultServiceTest {
             .filter(history -> List.of(44L, 45L, 46L).contains(history.getPlayer().getId()))
             .forEach(history -> {
                 assertThat(history.getBeforeMmr()).isEqualTo(5);
-                assertThat(history.getAfterMmr()).isZero();
-                assertThat(history.getDelta()).isEqualTo(-5);
+                assertThat(history.getAfterMmr()).isEqualTo(5 - winnerGain);
+                assertThat(history.getDelta()).isEqualTo(-winnerGain);
             });
+    }
+
+    @Test
+    void placesAnUnassignedPlayerByScoreAfterTheirFirstRatedMatch() {
+        Match match = new Match();
+        match.setId(25L);
+        match.setStatus(MatchStatus.CONFIRMED);
+        match.setTeamSize(3);
+
+        List<MatchParticipant> participants = buildParticipants(match);
+        Player unassigned = participants.get(3).getPlayer();
+        unassigned.setTier("UNASSIGNED");
+        unassigned.setMmr(0);
+
+        when(matchRepository.findByIdForUpdate(25L)).thenReturn(Optional.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(25L)).thenReturn(participants);
+        when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(playerRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(mmrHistoryRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        matchResultService.processMatchResult(25L, new MatchResultRequest("HOME"));
+
+        assertThat(unassigned.getMmr()).isNegative();
+        assertThat(unassigned.getTier()).isEqualTo("D");
+        assertThat(participants.get(0).getPlayer().getTier()).isEqualTo("A");
     }
 
     @Test

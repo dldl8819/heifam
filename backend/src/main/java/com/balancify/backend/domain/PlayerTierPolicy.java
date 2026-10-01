@@ -6,29 +6,37 @@ import java.util.Map;
 
 public final class PlayerTierPolicy {
 
+    public static final int MIN_EDITABLE_MMR = -2000;
+    public static final int MAX_EDITABLE_MMR = 5000;
+
     private static final String TIER_NONE = "NONE";
     private static final List<String> ORDERED_TIERS = List.of(
-        TIER_NONE, "D", "C-", "C", "C+", "B-", "B", "B+", "A-", "A", "A+", "S-", "S", "S+"
+        TIER_NONE, "D-", "D", "D+", "C-", "C", "C+", "B-", "B", "B+", "A-", "A", "A+", "S-", "S", "S+"
     );
     private static final Map<String, Integer> TIER_INDEX = Map.ofEntries(
         Map.entry(TIER_NONE, 0),
-        Map.entry("D", 1),
-        Map.entry("C-", 2),
-        Map.entry("C", 3),
-        Map.entry("C+", 4),
-        Map.entry("B-", 5),
-        Map.entry("B", 6),
-        Map.entry("B+", 7),
-        Map.entry("A-", 8),
-        Map.entry("A", 9),
-        Map.entry("A+", 10),
-        Map.entry("S-", 11),
-        Map.entry("S", 12),
-        Map.entry("S+", 13)
+        Map.entry("D-", 1),
+        Map.entry("D", 2),
+        Map.entry("D+", 3),
+        Map.entry("C-", 4),
+        Map.entry("C", 5),
+        Map.entry("C+", 6),
+        Map.entry("B-", 7),
+        Map.entry("B", 8),
+        Map.entry("B+", 9),
+        Map.entry("A-", 10),
+        Map.entry("A", 11),
+        Map.entry("A+", 12),
+        Map.entry("S-", 13),
+        Map.entry("S", 14),
+        Map.entry("S+", 15)
     );
+    // D- has no lower bound; its entry is only the MMR a player is given when assigned D-.
     private static final Map<String, Integer> TIER_FLOOR_MMR = Map.ofEntries(
         Map.entry(TIER_NONE, 0),
-        Map.entry("D", 1),
+        Map.entry("D-", -400),
+        Map.entry("D", -200),
+        Map.entry("D+", 0),
         Map.entry("C-", 200),
         Map.entry("C", 400),
         Map.entry("C+", 600),
@@ -50,12 +58,14 @@ public final class PlayerTierPolicy {
 
     public static String resolveTier(Integer mmr) {
         int normalizedMmr = mmr == null ? 0 : mmr;
-        if (normalizedMmr <= 0) {
-            return TIER_NONE;
+        if (normalizedMmr < -200) {
+            return "D-";
         }
-
-        if (normalizedMmr < 200) {
+        if (normalizedMmr < 0) {
             return "D";
+        }
+        if (normalizedMmr < 200) {
+            return "D+";
         }
         if (normalizedMmr < 400) {
             return "C-";
@@ -93,14 +103,23 @@ public final class PlayerTierPolicy {
         return "S+";
     }
 
+    // A player is unassigned until a tier is set for them; their next rated match places them by score.
+    public static String resolveLiveTier(String storedTier, Integer mmr) {
+        return isUnassigned(storedTier) ? TIER_NONE : resolveTier(mmr);
+    }
+
+    public static boolean isUnassigned(String storedTier) {
+        return TIER_NONE.equals(canonicalTier(storedTier, TIER_NONE));
+    }
+
     public static String resolveTierForRankedMatch(String currentTier, Integer mmr) {
         int normalizedMmr = mmr == null ? 0 : mmr;
         String targetTier = resolveTier(normalizedMmr);
-        if (normalizedMmr <= 0) {
-            return TIER_NONE;
+        String normalizedCurrentTier = canonicalTier(currentTier, targetTier);
+        if (TIER_NONE.equals(normalizedCurrentTier)) {
+            return targetTier;
         }
 
-        String normalizedCurrentTier = canonicalTier(currentTier, targetTier);
         int currentTierIndex = tierIndex(normalizedCurrentTier);
         int targetTierIndex = tierIndex(targetTier);
 
@@ -115,8 +134,8 @@ public final class PlayerTierPolicy {
         return normalizedCurrentTier;
     }
 
-    public static String resolveTierForSnapshot(String tier, Integer mmr) {
-        return canonicalTier(tier, resolveTier(mmr));
+    public static String resolveTierForSnapshot(String tier) {
+        return canonicalTier(tier, TIER_NONE);
     }
 
     public static int resolveDefaultMmrForTier(String tier) {
@@ -154,8 +173,7 @@ public final class PlayerTierPolicy {
     }
 
     public static boolean isLowTier(Integer mmr) {
-        String tier = resolveTier(mmr);
-        return TIER_NONE.equals(tier) || "C+".equals(tier) || "C".equals(tier) || "C-".equals(tier) || "D".equals(tier);
+        return tierIndex(resolveTier(mmr)) <= tierIndex("C+");
     }
 
     private static String canonicalTier(String tier, String fallback) {

@@ -287,8 +287,8 @@ public class MatchResultService {
         for (MatchParticipant participant : participants) {
             Player player = participant.getPlayer();
             int baseMmrBefore = participant.getMmrBefore() != null
-                ? floorMmr(participant.getMmrBefore())
-                : floorMmr(player.getMmr());
+                ? safeMmr(participant.getMmrBefore())
+                : safeMmr(player.getMmr());
             boolean homeSide = TEAM_HOME.equals(normalizeTeam(participant.getTeam()));
             double expected = homeSide ? homeExpectedWinRate : awayExpectedWinRate;
             double actual = winnerTeam.equals(normalizeTeam(participant.getTeam())) ? 1.0 : 0.0;
@@ -298,11 +298,11 @@ public class MatchResultService {
             int rawMmrDelta = ratingAffecting
                 ? (int) Math.round(effectiveKFactor * outcomeMultiplier * (actual - expected))
                 : 0;
-            int mmrAfter = floorMmr(baseMmrBefore + rawMmrDelta);
+            int mmrAfter = safeMmr(baseMmrBefore + rawMmrDelta);
             int mmrDelta = mmrAfter - baseMmrBefore;
             int previousDelta = safeMmr(participant.getMmrDelta());
-            int currentPlayerMmr = floorMmr(player.getMmr());
-            int updatedPlayerMmr = floorMmr(alreadyProcessed
+            int currentPlayerMmr = safeMmr(player.getMmr());
+            int updatedPlayerMmr = safeMmr(alreadyProcessed
                 ? currentPlayerMmr - previousDelta + mmrDelta
                 : currentPlayerMmr + mmrDelta);
 
@@ -314,6 +314,9 @@ public class MatchResultService {
             participant.setMmrDelta(mmrDelta);
 
             player.applyRankedMmr(updatedPlayerMmr);
+            if (ratingAffecting && PlayerTierPolicy.isUnassigned(player.getTier())) {
+                player.setTier(PlayerTierPolicy.resolveTier(updatedPlayerMmr));
+            }
             updatedPlayers.put(player.getId(), player);
 
             MmrHistory mmrHistory = existingHistoriesByPlayerId.get(player.getId());
@@ -695,11 +698,11 @@ public class MatchResultService {
                 Player player = participant.getPlayer();
                 int mmrBefore = participant.getMmrBefore() == null
                     ? participantReferenceMmr(participant)
-                    : floorMmr(participant.getMmrBefore());
+                    : safeMmr(participant.getMmrBefore());
                 int mmrDelta = safeMmr(participant.getMmrDelta());
                 int mmrAfter = participant.getMmrAfter() == null
-                    ? floorMmr(mmrBefore + mmrDelta)
-                    : floorMmr(participant.getMmrAfter());
+                    ? safeMmr(mmrBefore + mmrDelta)
+                    : safeMmr(participant.getMmrAfter());
                 return new MatchResultParticipantResponse(
                     responsePlayerId(player),
                     responseNickname(player),
@@ -731,24 +734,16 @@ public class MatchResultService {
 
     private int participantReferenceMmr(MatchParticipant participant) {
         if (participant.getMmrBefore() != null) {
-            return floorMmr(participant.getMmrBefore());
+            return safeMmr(participant.getMmrBefore());
         }
         if (participant.getPlayer() != null) {
-            return floorMmr(participant.getPlayer().getMmr());
+            return safeMmr(participant.getPlayer().getMmr());
         }
         return 0;
     }
 
     private int safeMmr(Integer mmr) {
         return mmr == null ? 0 : mmr;
-    }
-
-    private int floorMmr(Integer mmr) {
-        return Math.max(0, safeMmr(mmr));
-    }
-
-    private int floorMmr(int mmr) {
-        return Math.max(0, mmr);
     }
 
     private int resolveRequiredTeamSize(Match match, List<MatchParticipant> participants) {

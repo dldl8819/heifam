@@ -55,7 +55,7 @@ class PlayerQueryServiceTest {
         group.setId(1L);
 
         Player p1 = player(1L, group, "Alpha", "P", "A", 1500);
-        Player p2 = player(2L, group, "Bravo", "T", null, 1700);
+        Player p2 = player(2L, group, "Bravo", "T", "A", 1700);
         Player p3 = player(3L, group, "Charlie", "Z", "b+", 1600);
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
@@ -149,12 +149,12 @@ class PlayerQueryServiceTest {
     }
 
     @Test
-    void returnsDTierForSnapshotAndLiveTierFields() {
+    void returnsDPlusTierForSnapshotAndLiveTierFields() {
         Group group = new Group();
         group.setId(1L);
 
         OffsetDateTime snapshotAt = OffsetDateTime.parse("2026-04-30T23:59:59+09:00");
-        Player player = player(1L, group, "PlayerDelta", "P", "D", 150);
+        Player player = player(1L, group, "PlayerDelta", "P", "D+", 150);
         player.setLastTierSnapshotAt(snapshotAt);
         player.setLastTierSnapshotMmr(150);
 
@@ -167,10 +167,33 @@ class PlayerQueryServiceTest {
 
         assertThat(response).hasSize(1);
         GroupPlayerResponse item = response.get(0);
-        assertThat(item.tier()).isEqualTo("D");
+        assertThat(item.tier()).isEqualTo("D+");
         assertThat(item.lastTierSnapshotMmr()).isEqualTo(150);
-        assertThat(item.lastTierSnapshotTier()).isEqualTo("D");
-        assertThat(item.liveTier()).isEqualTo("D");
+        assertThat(item.lastTierSnapshotTier()).isEqualTo("D+");
+        assertThat(item.liveTier()).isEqualTo("D+");
+    }
+
+    @Test
+    void keepsAnUnassignedPlayerUnassignedAndPlacesEveryoneElseByScoreBelowZero() {
+        Group group = new Group();
+        group.setId(1L);
+
+        Player waiting = player(1L, group, "PlayerWaiting", "P", "UNASSIGNED", 0);
+        Player sliding = player(2L, group, "PlayerSliding", "T", "C-", -260);
+
+        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
+            .thenReturn(List.of(waiting, sliding));
+        when(playerStatsRepository.findByGroupId(1L))
+            .thenReturn(List.of());
+
+        List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(1L, false);
+
+        assertThat(response).extracting(GroupPlayerResponse::nickname, GroupPlayerResponse::liveTier)
+            .containsExactly(
+                org.assertj.core.groups.Tuple.tuple("PlayerWaiting", "NONE"),
+                org.assertj.core.groups.Tuple.tuple("PlayerSliding", "D-")
+            );
+        assertThat(response.get(1).currentMmr()).isEqualTo(-260);
     }
 
     @Test

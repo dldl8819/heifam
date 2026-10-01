@@ -106,14 +106,14 @@ public class PlayerQueryService {
                 statsByPlayerId.getOrDefault(player.getId(), new StatsAccumulator(0, 0));
             int games = stats.wins() + stats.losses();
             Integer baseMmr = player.getBaseMmr();
-            String baseTier = baseMmr == null ? null : PlayerTierPolicy.resolveTier(baseMmr);
+            String baseTier = baseMmr == null ? null : PlayerTierPolicy.resolveLiveTier(player.getTier(), baseMmr);
             int currentMmr = safeInt(player.getMmr());
-            String currentTier = PlayerTierPolicy.resolveTierForSnapshot(player.getTier(), currentMmr);
+            String currentTier = PlayerTierPolicy.resolveTierForSnapshot(player.getTier());
             Integer lastTierSnapshotMmr = player.getLastTierSnapshotMmr();
             String lastTierSnapshotTier = lastTierSnapshotMmr == null
                 ? null
                 : currentTier;
-            String liveTier = PlayerTierPolicy.resolveTier(currentMmr);
+            String liveTier = PlayerTierPolicy.resolveLiveTier(player.getTier(), currentMmr);
 
             responses.add(new GroupPlayerResponse(
                 player.getId(),
@@ -224,9 +224,8 @@ public class PlayerQueryService {
         return players
             .stream()
             .map(player -> {
-                int currentMmr = safeInt(player.getMmr());
-                String monthlyTier = PlayerTierPolicy.resolveTierForSnapshot(player.getTier(), currentMmr);
-                String liveTier = PlayerTierPolicy.resolveTier(currentMmr);
+                String monthlyTier = PlayerTierPolicy.resolveTierForSnapshot(player.getTier());
+                String liveTier = PlayerTierPolicy.resolveLiveTier(player.getTier(), player.getMmr());
                 return new GroupPlayerTierBoardResponse(
                     player.getId(),
                     player.getNickname(),

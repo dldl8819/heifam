@@ -195,41 +195,8 @@ export default function RankingPage() {
     }
   }, [authLoading, canViewMmr, showMmr])
 
-  const sortedRows = useMemo(
-    () =>
-      [...rows].sort((a, b) => {
-        const aMmr = typeof a.currentMmr === 'number' && Number.isFinite(a.currentMmr)
-          ? a.currentMmr
-          : null
-        const bMmr = typeof b.currentMmr === 'number' && Number.isFinite(b.currentMmr)
-          ? b.currentMmr
-          : null
-
-        if (aMmr !== null || bMmr !== null) {
-          if (aMmr === null) {
-            return 1
-          }
-          if (bMmr === null) {
-            return -1
-          }
-          if (bMmr !== aMmr) {
-            return bMmr - aMmr
-          }
-        }
-
-        if (a.rank !== b.rank) {
-          return a.rank - b.rank
-        }
-        if (b.wins !== a.wins) {
-          return b.wins - a.wins
-        }
-        if (b.games !== a.games) {
-          return b.games - a.games
-        }
-        return a.nickname.localeCompare(b.nickname, 'ko-KR')
-      }),
-    [rows]
-  )
+  // The server's rank already orders by MMR and puts unassigned players last.
+  const sortedRows = useMemo(() => [...rows].sort((a, b) => a.rank - b.rank), [rows])
 
   const resolveDisplayTier = (row: RankingItem): PlayerTierStatus =>
     tierByNickname.get(row.nickname) ?? row.tier

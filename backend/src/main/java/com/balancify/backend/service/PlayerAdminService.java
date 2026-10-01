@@ -25,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PlayerAdminService {
 
     private static final Set<String> ACKNOWLEDGEABLE_TIERS = Set.of(
-        "S+", "S", "S-", "A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D", "UNASSIGNED"
+        "S+", "S", "S-", "A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "D-", "UNASSIGNED"
     );
     private static final Set<String> EDITABLE_TIERS = ACKNOWLEDGEABLE_TIERS;
 
@@ -349,8 +349,10 @@ public class PlayerAdminService {
         if (nextMmr == null) {
             throw new IllegalArgumentException("MMR is required");
         }
-        if (nextMmr < 0 || nextMmr > 5000) {
-            throw new IllegalArgumentException("MMR must be between 0 and 5000");
+        if (nextMmr < PlayerTierPolicy.MIN_EDITABLE_MMR || nextMmr > PlayerTierPolicy.MAX_EDITABLE_MMR) {
+            throw new IllegalArgumentException(
+                "MMR must be between " + PlayerTierPolicy.MIN_EDITABLE_MMR + " and " + PlayerTierPolicy.MAX_EDITABLE_MMR
+            );
         }
 
         player.setMmr(nextMmr);

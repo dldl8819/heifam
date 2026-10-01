@@ -230,7 +230,7 @@ class PlayerAdminServiceTest {
     }
 
     @Test
-    void updatesTierAndMmrWhenTierIsD() {
+    void updatesTierAndMmrWhenTierIsADSubTier() {
         Player player = player(10L, 1L, "PlayerAlpha");
         when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
         when(playerRepository.save(any(Player.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -238,12 +238,12 @@ class PlayerAdminServiceTest {
         playerAdminService.updatePlayer(
             1L,
             10L,
-            new GroupPlayerUpdateRequest(null, null, "d", null, null, null, null, null)
+            new GroupPlayerUpdateRequest(null, null, "d-", null, null, null, null, null)
         );
 
-        assertThat(player.getTier()).isEqualTo("D");
-        assertThat(player.getBaseMmr()).isEqualTo(1);
-        assertThat(player.getMmr()).isEqualTo(1);
+        assertThat(player.getTier()).isEqualTo("D-");
+        assertThat(player.getBaseMmr()).isEqualTo(-400);
+        assertThat(player.getMmr()).isEqualTo(-400);
         verify(playerRepository).save(player);
     }
 
@@ -863,12 +863,23 @@ class PlayerAdminServiceTest {
         when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
 
         assertThatThrownBy(() ->
-            playerAdminService.updatePlayerMmr(1L, 10L, new GroupPlayerMmrUpdateRequest(-1))
+            playerAdminService.updatePlayerMmr(1L, 10L, new GroupPlayerMmrUpdateRequest(-2001))
         )
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("MMR must be between 0 and 5000");
+            .hasMessage("MMR must be between -2000 and 5000");
 
         verify(playerRepository, never()).save(any(Player.class));
+    }
+
+    @Test
+    void acceptsANegativeMmrWithinRange() {
+        Player player = player(10L, 1L, "기존닉");
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(player));
+        when(playerRepository.save(any(Player.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        playerAdminService.updatePlayerMmr(1L, 10L, new GroupPlayerMmrUpdateRequest(-150));
+
+        assertThat(player.getMmr()).isEqualTo(-150);
     }
 
     @Test

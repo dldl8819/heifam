@@ -314,7 +314,7 @@ public class Player {
         this.race = PlayerRacePolicy.normalizeCapabilityOrDefault(this.race, "P");
         this.mmr = normalizeMmr(this.mmr);
         if (this.tier == null || this.tier.isBlank()) {
-            this.tier = PlayerTierPolicy.resolveTier(this.mmr);
+            this.tier = this.mmr == 0 ? "UNASSIGNED" : PlayerTierPolicy.resolveTier(this.mmr);
         }
         if (this.anonymizedAt != null) {
             this.active = false;
@@ -350,6 +350,6 @@ public class Player {
     }
 
     private int normalizeMmr(Integer mmr) {
-        return Math.max(0, mmr == null ? 0 : mmr);
+        return mmr == null ? 0 : mmr;
     }
 }

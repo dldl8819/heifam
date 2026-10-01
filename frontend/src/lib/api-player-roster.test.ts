@@ -58,7 +58,7 @@ describe('normalizePlayerRosterItem', () => {
     expect(item?.lifecycleStatus).toBe('ACTIVE')
   })
 
-  it.each(['S+', 'S', 'S-'] as const)(
+  it.each(['S+', 'S', 'S-', 'D+', 'D', 'D-'] as const)(
     'preserves the %s sub-tier instead of falling back to UNASSIGNED',
     (tier) => {
       const item = normalizePlayerRosterItem({

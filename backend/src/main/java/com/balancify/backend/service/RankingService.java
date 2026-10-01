@@ -79,9 +79,7 @@ public class RankingService {
         for (Player player : players) {
             RankingStats stats = statsByPlayerId.getOrDefault(player.getId(), RankingStats.empty());
             int currentMmr = safeInt(player.getMmr());
-            String currentTier = normalizeTier(
-                PlayerTierPolicy.resolveTierForSnapshot(player.getTier(), currentMmr)
-            );
+            String currentTier = normalizeTier(PlayerTierPolicy.resolveTierForSnapshot(player.getTier()));
 
             candidates.add(new RankingCandidate(
                 player.getId(),
@@ -94,10 +92,11 @@ public class RankingService {
             ));
         }
 
+        // Unassigned players sit at MMR 0, above everyone who has slid below zero, so they go last.
         candidates.sort(
             Comparator
-                .comparingInt(RankingCandidate::mmr)
-                .reversed()
+                .comparing((RankingCandidate candidate) -> "UNASSIGNED".equals(candidate.tier()))
+                .thenComparing(Comparator.comparingInt(RankingCandidate::mmr).reversed())
                 .thenComparing(RankingCandidate::playerId, Comparator.nullsLast(Long::compareTo))
         );
 

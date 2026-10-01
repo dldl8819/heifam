@@ -800,7 +800,7 @@
       "toggling": "처리 중...",
       "nicknameRequired": "닉네임을 입력해 주세요.",
       "mmrRequired": "MMR 값을 입력해 주세요.",
-      "mmrInvalid": "MMR은 0~5000 사이 숫자로 입력해 주세요.",
+      "mmrInvalid": "MMR은 -2000~5000 사이 숫자로 입력해 주세요.",
       "updateSuccess": "선수 정보가 수정되었습니다.",
       "updateAndMmrSuccess": "선수 정보와 MMR이 수정되었습니다.",
       "updateFailure": "선수 정보 수정에 실패했습니다. 닉네임 중복 또는 서버 상태를 확인해 주세요.",

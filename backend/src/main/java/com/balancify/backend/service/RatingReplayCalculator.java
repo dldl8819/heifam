@@ -122,12 +122,11 @@ class RatingReplayCalculator {
                 int rawDelta = ratingAffecting
                     ? (int) Math.round(effectiveKFactor * (actual - expected))
                     : 0;
-                int afterMmr = floorMmr(beforeMmr + rawDelta);
+                int afterMmr = beforeMmr + rawDelta;
                 int delta = afterMmr - beforeMmr;
-                String nextTier = PlayerTierPolicy.resolveTierForRankedMatch(
-                    state.currentTier(),
-                    afterMmr
-                );
+                String nextTier = ratingAffecting
+                    ? PlayerTierPolicy.resolveTierForRankedMatch(state.currentTier(), afterMmr)
+                    : state.currentTier();
 
                 state.currentMmr(afterMmr);
                 state.currentTier(nextTier);
@@ -231,9 +230,9 @@ class RatingReplayCalculator {
                         player.getId(),
                         PlayerIdentityPolicy.responseNickname(player),
                         PlayerIdentityPolicy.isIdentityHidden(player),
-                        floorMmr(player.getMmr()),
+                        safeInt(player.getMmr()),
                         seedMmr,
-                        PlayerTierPolicy.resolveTier(seedMmr),
+                        PlayerTierPolicy.resolveLiveTier(player.getTier(), seedMmr),
                         0
                     )
                 );
@@ -243,12 +242,12 @@ class RatingReplayCalculator {
 
     private int resolveSeedMmr(Player player, Integer earliestRecordedBefore) {
         if (player.getBaseMmr() != null) {
-            return floorMmr(player.getBaseMmr());
+            return safeInt(player.getBaseMmr());
         }
         if (earliestRecordedBefore != null) {
-            return floorMmr(earliestRecordedBefore);
+            return safeInt(earliestRecordedBefore);
         }
-        return floorMmr(player.getMmr());
+        return safeInt(player.getMmr());
     }
 
     private double averageCurrentMmr(List<MatchParticipant> participants, Map<Long, PlayerState> states) {
@@ -319,14 +318,6 @@ class RatingReplayCalculator {
 
     private int safeInt(Integer value) {
         return value == null ? 0 : value;
-    }
-
-    private int floorMmr(Integer value) {
-        return Math.max(0, safeInt(value));
-    }
-
-    private int floorMmr(int value) {
-        return Math.max(0, value);
     }
 
     private static final class PlayerState {
