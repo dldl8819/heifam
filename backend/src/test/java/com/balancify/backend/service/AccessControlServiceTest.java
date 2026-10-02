@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -12,10 +13,12 @@ import static org.mockito.Mockito.when;
 import com.balancify.backend.domain.AdminMmrAccessEmail;
 import com.balancify.backend.domain.AllowedUserEmail;
 import com.balancify.backend.domain.ManagedAdminEmail;
+import com.balancify.backend.domain.MatchResultEditorEmail;
 import com.balancify.backend.domain.UserRacePreference;
 import com.balancify.backend.repository.AdminMmrAccessEmailRepository;
 import com.balancify.backend.repository.AllowedUserEmailRepository;
 import com.balancify.backend.repository.ManagedAdminEmailRepository;
+import com.balancify.backend.repository.MatchResultEditorEmailRepository;
 import com.balancify.backend.repository.UserRacePreferenceRepository;
 import com.balancify.backend.security.AdminKeyProperties;
 import java.util.List;
@@ -45,6 +48,9 @@ class AccessControlServiceTest {
     @Mock
     private UserRacePreferenceRepository userRacePreferenceRepository;
 
+    @Mock
+    private MatchResultEditorEmailRepository matchResultEditorEmailRepository;
+
     private AccessControlService accessControlService;
 
     @BeforeEach
@@ -73,6 +79,7 @@ class AccessControlServiceTest {
             adminMmrAccessEmailRepository,
             allowedUserEmailRepository,
             userRacePreferenceRepository,
+            matchResultEditorEmailRepository,
             60_000L
         );
     }
@@ -122,6 +129,7 @@ class AccessControlServiceTest {
             adminMmrAccessEmailRepository,
             allowedUserEmailRepository,
             userRacePreferenceRepository,
+            matchResultEditorEmailRepository,
             60_000L
         );
 
@@ -157,6 +165,7 @@ class AccessControlServiceTest {
             adminMmrAccessEmailRepository,
             allowedUserEmailRepository,
             userRacePreferenceRepository,
+            matchResultEditorEmailRepository,
             60_000L
         );
 
@@ -171,6 +180,7 @@ class AccessControlServiceTest {
             adminMmrAccessEmailRepository,
             allowedUserEmailRepository,
             userRacePreferenceRepository,
+            matchResultEditorEmailRepository,
             60_000L
         );
 
@@ -254,6 +264,78 @@ class AccessControlServiceTest {
         accessControlService.removeAllowedUserEmail("ops@hei.gg", "fan@hei.gg");
 
         verify(allowedUserEmailRepository).delete(allowedUserEmail);
+    }
+
+    @Test
+    void marksAMemberWithTheEditorRowAsAMatchResultEditor() {
+        when(matchResultEditorEmailRepository.findByNormalizedEmail("member@hei.gg"))
+            .thenReturn(Optional.of(editorRow("member@hei.gg")));
+
+        AccessControlService.AccessProfile profile = accessControlService.resolveAccessProfile("member@hei.gg");
+
+        assertThat(profile.matchResultEditor()).isTrue();
+        assertThat(profile.role()).isEqualTo("MEMBER");
+        assertThat(accessControlService.isMatchResultEditor("member@hei.gg")).isTrue();
+        assertThat(accessControlService.resolveActorRole("member@hei.gg"))
+            .isEqualTo(AccessControlService.ACTOR_ROLE_RESULT_EDITOR);
+    }
+
+    @Test
+    void neverTreatsAnAdminAsAMatchResultEditor() {
+        when(matchResultEditorEmailRepository.findByNormalizedEmail("ops@hei.gg"))
+            .thenReturn(Optional.of(editorRow("ops@hei.gg")));
+
+        assertThat(accessControlService.isMatchResultEditor("ops@hei.gg")).isFalse();
+        assertThat(accessControlService.resolveActorRole("ops@hei.gg")).isEqualTo(AccessControlService.ACTOR_ROLE_ADMIN);
+        assertThat(accessControlService.resolveActorRole("superadmin@hei.gg"))
+            .isEqualTo(AccessControlService.ACTOR_ROLE_SUPER_ADMIN);
+        assertThat(accessControlService.resolveActorRole("member@hei.gg"))
+            .isEqualTo(AccessControlService.ACTOR_ROLE_MEMBER);
+        assertThat(accessControlService.resolveActorRole("stranger@hei.gg")).isNull();
+    }
+
+    @Test
+    void superAdminGrantsMatchResultEditingToARegisteredMember() {
+        accessControlService.addMatchResultEditor("superadmin@hei.gg", "member@hei.gg");
+
+        verify(matchResultEditorEmailRepository).save(argThat(
+            editor -> "member@hei.gg".equals(editor.getEmail())
+                && "superadmin@hei.gg".equals(editor.getCreatedByEmail())
+        ));
+    }
+
+    @Test
+    void refusesMatchResultEditingGrantsThatDoNotFit() {
+        assertThatThrownBy(() -> accessControlService.addMatchResultEditor("ops@hei.gg", "member@hei.gg"))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> accessControlService.addMatchResultEditor("superadmin@hei.gg", "ops@hei.gg"))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> accessControlService.addMatchResultEditor("superadmin@hei.gg", "stranger@hei.gg"))
+            .isInstanceOf(IllegalArgumentException.class);
+
+        verify(matchResultEditorEmailRepository, never()).save(any(MatchResultEditorEmail.class));
+    }
+
+    @Test
+    void removingAMemberAlsoRevokesTheirMatchResultEditing() {
+        AllowedUserEmail allowedUserEmail = new AllowedUserEmail();
+        allowedUserEmail.setEmail("fan@hei.gg");
+        MatchResultEditorEmail editor = editorRow("fan@hei.gg");
+        when(allowedUserEmailRepository.findByNormalizedEmail("fan@hei.gg"))
+            .thenReturn(Optional.of(allowedUserEmail));
+        when(matchResultEditorEmailRepository.findByNormalizedEmail("fan@hei.gg"))
+            .thenReturn(Optional.of(editor));
+
+        accessControlService.removeAllowedUserEmail("ops@hei.gg", "fan@hei.gg");
+
+        verify(matchResultEditorEmailRepository).delete(editor);
+    }
+
+    private MatchResultEditorEmail editorRow(String email) {
+        MatchResultEditorEmail editor = new MatchResultEditorEmail();
+        editor.setEmail(email);
+        editor.setNormalizedEmail(email);
+        return editor;
     }
 
     @Test
@@ -366,6 +448,7 @@ class AccessControlServiceTest {
             adminMmrAccessEmailRepository,
             allowedUserEmailRepository,
             userRacePreferenceRepository,
+            matchResultEditorEmailRepository,
             5L
         );
 

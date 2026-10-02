@@ -59,6 +59,8 @@ public class MatchResultService {
     private final PlayerStatsRefreshService playerStatsRefreshService;
     private final long duplicateWindowMinutes;
     private final AccessControlService accessControlService;
+    private final OperationAuditLogService operationAuditLogService;
+    private final MatchResultEditQuotaService matchResultEditQuotaService;
 
     public MatchResultService(
         MatchRepository matchRepository,
@@ -78,7 +80,9 @@ public class MatchResultService {
         @Value("${balancify.match.confirm.duplicate-window-minutes:5}") long duplicateWindowMinutes,
         GroupReadCacheService groupReadCacheService,
         PlayerStatsRefreshService playerStatsRefreshService,
-        AccessControlService accessControlService
+        AccessControlService accessControlService,
+        OperationAuditLogService operationAuditLogService,
+        MatchResultEditQuotaService matchResultEditQuotaService
     ) {
         this.matchRepository = matchRepository;
         this.groupRepository = groupRepository;
@@ -98,6 +102,8 @@ public class MatchResultService {
         this.playerStatsRefreshService = playerStatsRefreshService;
         this.duplicateWindowMinutes = Math.max(1L, duplicateWindowMinutes);
         this.accessControlService = accessControlService;
+        this.operationAuditLogService = operationAuditLogService;
+        this.matchResultEditQuotaService = matchResultEditQuotaService;
     }
 
     @Transactional
@@ -152,7 +158,9 @@ public class MatchResultService {
             throw new MatchConflictException("취소된 경기의 결과는 수정할 수 없습니다.");
         }
 
-        if (!accessControlService.isAdminEmail(recordedByEmail)) {
+        boolean admin = accessControlService.isAdminEmail(recordedByEmail);
+        boolean resultEditor = !admin && accessControlService.isMatchResultEditor(recordedByEmail);
+        if (!admin && !resultEditor) {
             if (!isSameRecordedByEmail(match.getResultRecordedByEmail(), recordedByEmail)) {
                 throw new MatchEditForbiddenException("본인이 입력한 경기만 종족전을 수정할 수 있습니다.");
             }
@@ -172,15 +180,19 @@ public class MatchResultService {
         boolean sameCompletedWinner = currentStatus == MatchStatus.COMPLETED
             && previousWinnerTeam != null
             && Objects.equals(previousWinnerTeam, winnerTeam);
+        if (sameCompletedWinner && !raceCompositionUpdate.changed()) {
+            return new MatchResultUpdateOutcome(
+                buildExistingResultResponse(match, winnerTeam, validatedParticipants),
+                null
+            );
+        }
+        if (resultEditor) {
+            matchResultEditQuotaService.reserve(recordedByEmail, matchId);
+        }
+
+        MatchResultUpdateOutcome outcome;
         if (sameCompletedWinner) {
             Long groupId = resolveGroupId(match, validatedParticipants.all());
-            if (!raceCompositionUpdate.changed()) {
-                return new MatchResultUpdateOutcome(
-                    buildExistingResultResponse(match, winnerTeam, validatedParticipants),
-                    null
-                );
-            }
-
             matchParticipantRepository.saveAll(validatedParticipants.all());
             matchRepository.save(match);
             TransactionAfterCommit.runAfterCommitAsync(groupStatsKey(groupId), () -> {
@@ -188,13 +200,8 @@ public class MatchResultService {
                 evictGroupReadCache(groupId);
             });
 
-            MatchResultResponse response = buildExistingResultResponse(
-                match,
-                winnerTeam,
-                validatedParticipants
-            );
-            return new MatchResultUpdateOutcome(
-                response,
+            outcome = new MatchResultUpdateOutcome(
+                buildExistingResultResponse(match, winnerTeam, validatedParticipants),
                 new MatchResultUpdateAuditSnapshot(
                     match.getId(),
                     groupId,
@@ -205,28 +212,33 @@ public class MatchResultService {
                     raceCompositionUpdate.participantRacesChanged()
                 )
             );
+        } else {
+            MatchResultProcessOutcome processed = processMatchResultInternal(
+                matchId,
+                new MatchResultRequest(winnerTeam),
+                recordedByEmail,
+                recordedByNickname,
+                true
+            );
+            MatchResultUpdateAuditSnapshot winnerAudit = processed.updateAuditSnapshot();
+            outcome = new MatchResultUpdateOutcome(
+                processed.response(),
+                new MatchResultUpdateAuditSnapshot(
+                    winnerAudit.matchId(),
+                    winnerAudit.groupId(),
+                    winnerAudit.previousWinnerTeam(),
+                    winnerAudit.nextWinnerTeam(),
+                    raceCompositionUpdate.previousRaceComposition(),
+                    raceCompositionUpdate.nextRaceComposition(),
+                    raceCompositionUpdate.participantRacesChanged()
+                )
+            );
         }
 
-        MatchResultProcessOutcome outcome = processMatchResultInternal(
-            matchId,
-            new MatchResultRequest(winnerTeam),
-            recordedByEmail,
-            recordedByNickname,
-            true
-        );
-        MatchResultUpdateAuditSnapshot winnerAudit = outcome.updateAuditSnapshot();
-        return new MatchResultUpdateOutcome(
-            outcome.response(),
-            new MatchResultUpdateAuditSnapshot(
-                winnerAudit.matchId(),
-                winnerAudit.groupId(),
-                winnerAudit.previousWinnerTeam(),
-                winnerAudit.nextWinnerTeam(),
-                raceCompositionUpdate.previousRaceComposition(),
-                raceCompositionUpdate.nextRaceComposition(),
-                raceCompositionUpdate.participantRacesChanged()
-            )
-        );
+        // Logged in this transaction so an edit never commits without its log, and so the editor
+        // quota, which counts these logs, sees every earlier edit.
+        operationAuditLogService.recordMatchResultUpdate(recordedByEmail, recordedByNickname, outcome.auditSnapshot());
+        return outcome;
     }
 
     private MatchResultProcessOutcome processMatchResultInternal(

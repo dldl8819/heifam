@@ -3,7 +3,13 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useAdminAuth } from '@/lib/admin-auth'
-import { apiClient, isApiForbiddenError, isApiNotFoundError, isApiUnauthorizedError } from '@/lib/api'
+import {
+  apiClient,
+  isApiForbiddenError,
+  isApiNotFoundError,
+  isApiTooManyRequestsError,
+  isApiUnauthorizedError,
+} from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
@@ -200,9 +206,18 @@ function findManualPlayerByInput(
 
 export default function ResultsPage() {
   const searchParams = useSearchParams()
-  const { canAccess, isAdmin, isSuperAdmin, canViewMmr, isLoading: adminAuthLoading } = useAdminAuth()
+  const {
+    canAccess,
+    isAdmin,
+    isSuperAdmin,
+    isMatchResultEditor,
+    canViewMmr,
+    isLoading: adminAuthLoading,
+  } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
   const showMmr = canViewMmr && mmrVisible
+  // Other members may only fix races on their own matches; the backend enforces the same rule.
+  const canChangeMatchWinner = isAdmin || isMatchResultEditor
   const canUseManualEntry = canAccess
   const [manualEntryOpen, setManualEntryOpen] = useState<boolean>(false)
   const [operatorEntryMode, setOperatorEntryMode] = useState<OperatorEntryMode>('manual')
@@ -1048,7 +1063,9 @@ export default function ResultsPage() {
       setSelectedRecentMatchId(null)
       setSelectedRecentTeamRaces(EMPTY_RECENT_TEAM_RACES)
     } catch (updateError) {
-      if (isApiForbiddenError(updateError)) {
+      if (isApiTooManyRequestsError(updateError)) {
+        setError(t('results.recent.editLimitReached'))
+      } else if (isApiForbiddenError(updateError)) {
         setError(t('common.permissionDenied'))
       } else {
         setError(t('results.recent.updateFailure'))
@@ -1382,6 +1399,11 @@ export default function ResultsPage() {
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
           {isSuperAdmin ? t('results.recent.history.description') : t('results.recent.description')}
         </p>
+        {isMatchResultEditor && (
+          <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+            {t('results.recent.resultEditorHint')}
+          </p>
+        )}
 
         {isSuperAdmin && (
           <form
@@ -1501,7 +1523,7 @@ export default function ResultsPage() {
                     <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{formatMatchInputAt(recentMatch)}</td>
                     <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{formatRecordedBy(recentMatch.resultRecordedByNickname)}</td>
                     <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
-                      {selectedRecentMatchId === recentMatch.matchId && isAdmin ? (
+                      {selectedRecentMatchId === recentMatch.matchId && canChangeMatchWinner ? (
                         <select
                           value={selectedRecentWinnerTeam}
                           onChange={(event) => setSelectedRecentWinnerTeam(event.target.value as TeamSide)}

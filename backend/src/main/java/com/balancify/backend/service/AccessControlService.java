@@ -3,10 +3,12 @@ package com.balancify.backend.service;
 import com.balancify.backend.domain.AdminMmrAccessEmail;
 import com.balancify.backend.domain.AllowedUserEmail;
 import com.balancify.backend.domain.ManagedAdminEmail;
+import com.balancify.backend.domain.MatchResultEditorEmail;
 import com.balancify.backend.domain.UserRacePreference;
 import com.balancify.backend.repository.AdminMmrAccessEmailRepository;
 import com.balancify.backend.repository.AllowedUserEmailRepository;
 import com.balancify.backend.repository.ManagedAdminEmailRepository;
+import com.balancify.backend.repository.MatchResultEditorEmailRepository;
 import com.balancify.backend.repository.UserRacePreferenceRepository;
 import com.balancify.backend.security.AdminKeyProperties;
 import java.util.ArrayList;
@@ -27,18 +29,25 @@ public class AccessControlService {
     private static final String ACCESS_STATE_CACHE_TTL_PROPERTY =
         "${balancify.access.state-cache-ttl-ms:30000}";
 
+    public static final String ACTOR_ROLE_SUPER_ADMIN = "SUPER_ADMIN";
+    public static final String ACTOR_ROLE_ADMIN = "ADMIN";
+    public static final String ACTOR_ROLE_RESULT_EDITOR = "RESULT_EDITOR";
+    public static final String ACTOR_ROLE_MEMBER = "MEMBER";
+
     private final AdminKeyProperties adminKeyProperties;
     private final ManagedAdminEmailRepository managedAdminEmailRepository;
     private final AdminMmrAccessEmailRepository adminMmrAccessEmailRepository;
     private final AllowedUserEmailRepository allowedUserEmailRepository;
     private final UserRacePreferenceRepository userRacePreferenceRepository;
+    private final MatchResultEditorEmailRepository matchResultEditorEmailRepository;
     private final ConcurrentMap<String, CachedAccessState> accessStateCache = new ConcurrentHashMap<>();
 
     /**
      * How long a resolved access state stays cached in-process.
      *
      * <p>Every authenticated request resolves the caller's access state, and each resolution costs
-     * four single-row lookups (managed admins, MMR access, allowed users, race preference). Those
+     * five single-row lookups (managed admins, MMR access, allowed users, race preference, match
+     * result editors). Those
      * tables hold a handful of rows and only change when an admin edits access, so re-reading them
      * on each request was the largest source of query volume on the database.
      *
@@ -57,6 +66,7 @@ public class AccessControlService {
         AdminMmrAccessEmailRepository adminMmrAccessEmailRepository,
         AllowedUserEmailRepository allowedUserEmailRepository,
         UserRacePreferenceRepository userRacePreferenceRepository,
+        MatchResultEditorEmailRepository matchResultEditorEmailRepository,
         @Value(ACCESS_STATE_CACHE_TTL_PROPERTY) long accessStateCacheTtlMs
     ) {
         this.adminKeyProperties = adminKeyProperties;
@@ -64,6 +74,7 @@ public class AccessControlService {
         this.adminMmrAccessEmailRepository = adminMmrAccessEmailRepository;
         this.allowedUserEmailRepository = allowedUserEmailRepository;
         this.userRacePreferenceRepository = userRacePreferenceRepository;
+        this.matchResultEditorEmailRepository = matchResultEditorEmailRepository;
         this.accessStateCacheTtlMs = Math.max(0L, accessStateCacheTtlMs);
     }
 
@@ -88,8 +99,35 @@ public class AccessControlService {
             superAdmin,
             allowed,
             accessState.canViewMmr(),
-            accessState.preferredRace()
+            accessState.preferredRace(),
+            accessState.matchResultEditor()
         );
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isMatchResultEditor(String email) {
+        String normalizedEmail = normalizeEmail(email);
+        return !normalizedEmail.isEmpty() && resolveAccessState(normalizedEmail).matchResultEditor();
+    }
+
+    // Stamped on audit logs, so who may later read a log follows the actor's role at the time.
+    @Transactional(readOnly = true)
+    public String resolveActorRole(String email) {
+        String normalizedEmail = normalizeEmail(email);
+        if (normalizedEmail.isEmpty()) {
+            return null;
+        }
+        AccessState accessState = resolveAccessState(normalizedEmail);
+        if (accessState.superAdmin()) {
+            return ACTOR_ROLE_SUPER_ADMIN;
+        }
+        if (accessState.admin()) {
+            return ACTOR_ROLE_ADMIN;
+        }
+        if (accessState.matchResultEditor()) {
+            return ACTOR_ROLE_RESULT_EDITOR;
+        }
+        return accessState.allowed() ? ACTOR_ROLE_MEMBER : null;
     }
 
     @Transactional
@@ -209,6 +247,7 @@ public class AccessControlService {
             throw new IllegalArgumentException("Target email is already a super admin");
         }
         upsertManagedAdminEmail(normalizedActorEmail, normalizedTargetEmail, normalizedTargetNickname);
+        removeMatchResultEditorRow(normalizedTargetEmail);
         invalidateAccessState(normalizedTargetEmail);
 
         return getAdminEmailSnapshot();
@@ -320,9 +359,69 @@ public class AccessControlService {
         allowedUserEmailRepository
             .findByNormalizedEmail(normalizedTargetEmail)
             .ifPresent(allowedUserEmailRepository::delete);
+        removeMatchResultEditorRow(normalizedTargetEmail);
         invalidateAccessState(normalizedTargetEmail);
 
         return getAllowedEmailSnapshot();
+    }
+
+    @Transactional(readOnly = true)
+    public List<AccessEmailEntry> getMatchResultEditors() {
+        return matchResultEditorEmailRepository.findAllByOrderByNormalizedEmailAsc()
+            .stream()
+            .map(MatchResultEditorEmail::getNormalizedEmail)
+            .map(editorEmail -> new AccessEmailEntry(editorEmail, resolveNickname(editorEmail), false))
+            .toList();
+    }
+
+    @Transactional
+    public List<AccessEmailEntry> addMatchResultEditor(String actorEmail, String targetEmail) {
+        String normalizedActorEmail = normalizeEmail(actorEmail);
+        String normalizedTargetEmail = normalizeEmail(targetEmail);
+        validateEmail(normalizedTargetEmail);
+
+        if (!isSuperAdminEmail(normalizedActorEmail)) {
+            throw new IllegalArgumentException("Only super admins can grant match result editing");
+        }
+        if (isAdminEmail(normalizedTargetEmail)) {
+            throw new IllegalArgumentException("Operators can already edit match results");
+        }
+        if (!isServiceAccessAllowed(normalizedTargetEmail)) {
+            throw new IllegalArgumentException("Target email is not a registered member");
+        }
+
+        MatchResultEditorEmail editor = matchResultEditorEmailRepository
+            .findByNormalizedEmail(normalizedTargetEmail)
+            .orElseGet(MatchResultEditorEmail::new);
+        editor.setEmail(normalizedTargetEmail);
+        if (editor.getCreatedByEmail() == null || editor.getCreatedByEmail().isBlank()) {
+            editor.setCreatedByEmail(normalizedActorEmail);
+        }
+        matchResultEditorEmailRepository.save(editor);
+        invalidateAccessState(normalizedTargetEmail);
+
+        return getMatchResultEditors();
+    }
+
+    @Transactional
+    public List<AccessEmailEntry> removeMatchResultEditor(String actorEmail, String targetEmail) {
+        String normalizedActorEmail = normalizeEmail(actorEmail);
+        String normalizedTargetEmail = normalizeEmail(targetEmail);
+        validateEmail(normalizedTargetEmail);
+
+        if (!isSuperAdminEmail(normalizedActorEmail)) {
+            throw new IllegalArgumentException("Only super admins can revoke match result editing");
+        }
+        removeMatchResultEditorRow(normalizedTargetEmail);
+        invalidateAccessState(normalizedTargetEmail);
+
+        return getMatchResultEditors();
+    }
+
+    private void removeMatchResultEditorRow(String normalizedEmail) {
+        matchResultEditorEmailRepository
+            .findByNormalizedEmail(normalizedEmail)
+            .ifPresent(matchResultEditorEmailRepository::delete);
     }
 
     @Transactional
@@ -389,10 +488,14 @@ public class AccessControlService {
         UserRacePreference userRacePreference = userRacePreferenceRepository
             .findByNormalizedEmail(normalizedEmail)
             .orElse(null);
+        boolean hasMatchResultEditorRow = matchResultEditorEmailRepository
+            .findByNormalizedEmail(normalizedEmail)
+            .isPresent();
 
         boolean admin = superAdmin || configuredAdmin || managedAdminEmail != null;
         boolean allowed = admin || configuredAllowed || allowedUserEmail != null;
         boolean canViewMmr = superAdmin || (admin && adminMmrAccessEmail != null);
+        boolean matchResultEditor = !admin && allowed && hasMatchResultEditorRow;
         String nickname = managedAdminEmail != null
             ? normalizeNickname(managedAdminEmail.getNickname())
             : allowedUserEmail != null
@@ -403,7 +506,7 @@ public class AccessControlService {
         }
         String preferredRace = userRacePreference == null ? null : userRacePreference.getPreferredRace();
 
-        return new AccessState(superAdmin, admin, allowed, canViewMmr, nickname, preferredRace);
+        return new AccessState(superAdmin, admin, allowed, canViewMmr, nickname, preferredRace, matchResultEditor);
     }
 
     public void evictAccountCache(String email) {
@@ -498,7 +601,8 @@ public class AccessControlService {
         boolean allowed,
         boolean canViewMmr,
         String nickname,
-        String preferredRace
+        String preferredRace,
+        boolean matchResultEditor
     ) {
     }
 
@@ -516,8 +620,21 @@ public class AccessControlService {
         boolean superAdmin,
         boolean allowed,
         boolean canViewMmr,
-        String preferredRace
+        String preferredRace,
+        boolean matchResultEditor
     ) {
+        public AccessProfile(
+            String email,
+            String nickname,
+            String role,
+            boolean admin,
+            boolean superAdmin,
+            boolean allowed,
+            boolean canViewMmr,
+            String preferredRace
+        ) {
+            this(email, nickname, role, admin, superAdmin, allowed, canViewMmr, preferredRace, false);
+        }
     }
 
     public record AccessEmailEntry(

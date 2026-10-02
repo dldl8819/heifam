@@ -114,7 +114,7 @@ function getActionLabel(action: string): string {
 }
 
 export default function OperationAuditPage() {
-  const { isSuperAdmin, isLoading } = useAdminAuth()
+  const { isAdmin, isSuperAdmin, isLoading } = useAdminAuth()
   const [logs, setLogs] = useState<OperationAuditLogItem[]>([])
   const [nextPage, setNextPage] = useState<number>(0)
   const [draftFilters, setDraftFilters] = useState<AuditFilterForm>(() => createEmptyAuditFilters())
@@ -193,14 +193,15 @@ export default function OperationAuditPage() {
       return
     }
 
-    if (!isSuperAdmin) {
+    // Admins get only what match result editors did; the backend decides the scope.
+    if (!isAdmin) {
       setLogs([])
       setTotalElements(0)
       setNextPage(0)
       setHasMoreLogs(false)
       setLoadingMore(false)
       setLoading(false)
-      setError(t('audit.superOnly'))
+      setError(t('audit.adminOnly'))
       return
     }
 
@@ -246,7 +247,7 @@ export default function OperationAuditPage() {
     return () => {
       active = false
     }
-  }, [appliedFilters, isLoading, isSuperAdmin])
+  }, [appliedFilters, isAdmin, isLoading, isSuperAdmin])
 
   const handleFilterSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -273,7 +274,9 @@ export default function OperationAuditPage() {
     <section className="space-y-6">
       <header className="space-y-1 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <h2 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-slate-100">{t('audit.title')}</h2>
-        <p className="text-sm text-slate-600 dark:text-slate-300">{t('audit.description')}</p>
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          {isSuperAdmin ? t('audit.description') : t('audit.resultEditorDescription')}
+        </p>
       </header>
 
       {error && (

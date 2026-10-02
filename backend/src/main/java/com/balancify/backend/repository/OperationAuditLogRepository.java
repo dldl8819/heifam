@@ -2,6 +2,7 @@ package com.balancify.backend.repository;
 
 import com.balancify.backend.domain.OperationAuditLog;
 import java.time.OffsetDateTime;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -22,4 +23,17 @@ public interface OperationAuditLogRepository extends JpaRepository<OperationAudi
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("delete from OperationAuditLog log where log.createdAt < :cutoff")
     int deleteExpiredBefore(@Param("cutoff") OffsetDateTime cutoff);
+
+    @Query("""
+        select distinct log.targetId from OperationAuditLog log
+        where log.action = :action
+            and log.actorEmail = :actorEmail
+            and log.createdAt >= :since
+            and log.targetId is not null
+        """)
+    List<Long> findTargetIdsByActionAndActorSince(
+        @Param("action") String action,
+        @Param("actorEmail") String actorEmail,
+        @Param("since") OffsetDateTime since
+    );
 }

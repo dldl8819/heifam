@@ -8,6 +8,7 @@ import com.balancify.backend.api.access.dto.AccessMeResponse;
 import com.balancify.backend.api.access.dto.AccessMmrPermissionUpdateRequest;
 import com.balancify.backend.api.access.dto.AccessNicknameUpdateRequest;
 import com.balancify.backend.api.access.dto.AccessRaceUpdateRequest;
+import com.balancify.backend.api.access.dto.AccessResultEditorListResponse;
 import com.balancify.backend.security.AuthenticatedRequestResolver;
 import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.AccountDeletionService;
@@ -52,16 +53,7 @@ public class AccessControlController {
         String requestEmail = requireRequestEmail(request);
         AccessProfile profile = accessControlService.resolveAccessProfile(requestEmail);
         accountDeletionService.linkAuthenticatedPlayers(authenticatedRequestResolver.resolve(request));
-        return new AccessMeResponse(
-            profile.email(),
-            profile.nickname(),
-            profile.role(),
-            profile.admin(),
-            profile.superAdmin(),
-            profile.allowed(),
-            profile.canViewMmr(),
-            profile.preferredRace()
-        );
+        return toMeResponse(profile);
     }
 
     @PutMapping("/me/race")
@@ -78,16 +70,7 @@ public class AccessControlController {
         try {
             AccessProfile profile = accessControlService.upsertPreferredRace(requestEmail, race);
             accountDeletionService.linkAuthenticatedPlayers(authenticatedRequestResolver.resolve(request));
-            return new AccessMeResponse(
-                profile.email(),
-                profile.nickname(),
-                profile.role(),
-                profile.admin(),
-                profile.superAdmin(),
-                profile.allowed(),
-                profile.canViewMmr(),
-                profile.preferredRace()
-            );
+            return toMeResponse(profile);
         } catch (IllegalArgumentException illegalArgumentException) {
             throw new ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
@@ -305,6 +288,69 @@ public class AccessControlController {
                 illegalArgumentException
             );
         }
+    }
+
+    @GetMapping("/result-editors")
+    public AccessResultEditorListResponse getResultEditors(HttpServletRequest request) {
+        requireSuperAdmin(requireRequestEmail(request));
+        return new AccessResultEditorListResponse(toEntryResponses(accessControlService.getMatchResultEditors()));
+    }
+
+    @PostMapping("/result-editors")
+    public AccessResultEditorListResponse addResultEditor(
+        @RequestBody AccessEmailUpsertRequest requestBody,
+        HttpServletRequest request
+    ) {
+        String requestEmail = requireRequestEmail(request);
+        requireSuperAdmin(requestEmail);
+        String targetEmail = requireBodyEmail(requestBody);
+
+        try {
+            return new AccessResultEditorListResponse(
+                toEntryResponses(accessControlService.addMatchResultEditor(requestEmail, targetEmail))
+            );
+        } catch (IllegalArgumentException illegalArgumentException) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                illegalArgumentException.getMessage(),
+                illegalArgumentException
+            );
+        }
+    }
+
+    @DeleteMapping("/result-editors/{email}")
+    public AccessResultEditorListResponse removeResultEditor(
+        @PathVariable String email,
+        HttpServletRequest request
+    ) {
+        String requestEmail = requireRequestEmail(request);
+        requireSuperAdmin(requestEmail);
+
+        try {
+            return new AccessResultEditorListResponse(
+                toEntryResponses(accessControlService.removeMatchResultEditor(requestEmail, decodePathValue(email)))
+            );
+        } catch (IllegalArgumentException illegalArgumentException) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                illegalArgumentException.getMessage(),
+                illegalArgumentException
+            );
+        }
+    }
+
+    private AccessMeResponse toMeResponse(AccessProfile profile) {
+        return new AccessMeResponse(
+            profile.email(),
+            profile.nickname(),
+            profile.role(),
+            profile.admin(),
+            profile.superAdmin(),
+            profile.allowed(),
+            profile.canViewMmr(),
+            profile.preferredRace(),
+            profile.matchResultEditor()
+        );
     }
 
     private void requireAdmin(String email) {

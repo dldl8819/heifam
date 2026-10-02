@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.after;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
@@ -30,6 +31,7 @@ import com.balancify.backend.repository.MmrHistoryRepository;
 import com.balancify.backend.repository.PlayerRepository;
 import com.balancify.backend.service.exception.MatchConflictException;
 import com.balancify.backend.service.exception.MatchEditForbiddenException;
+import com.balancify.backend.service.exception.MatchEditQuotaExceededException;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -69,6 +71,12 @@ class MatchResultServiceTest {
     @Mock
     private AccessControlService accessControlService;
 
+    @Mock
+    private OperationAuditLogService operationAuditLogService;
+
+    @Mock
+    private MatchResultEditQuotaService matchResultEditQuotaService;
+
     private MatchResultService matchResultService;
 
     @BeforeEach
@@ -98,7 +106,9 @@ class MatchResultServiceTest {
             5,
             new GroupReadCacheService(0),
             playerStatsRefreshService,
-            accessControlService
+            accessControlService,
+            operationAuditLogService,
+            matchResultEditQuotaService
         );
     }
 
@@ -384,6 +394,8 @@ class MatchResultServiceTest {
         assertThat(outcome.response().winnerTeam()).isEqualTo("HOME");
         assertThat(outcome.auditSnapshot().previousRaceComposition()).isEqualTo("PPP");
         assertThat(outcome.auditSnapshot().nextRaceComposition()).isEqualTo("PPT");
+        verify(operationAuditLogService).recordMatchResultUpdate("editor@example.test", "Editor", outcome.auditSnapshot());
+        verify(matchResultEditQuotaService, never()).reserve(any(), any());
         verify(playerRepository, never()).saveAll(any());
         verify(mmrHistoryRepository, never()).findByMatch_Id(any());
         verify(mmrHistoryRepository, never()).saveAll(any());
@@ -477,6 +489,93 @@ class MatchResultServiceTest {
     }
 
     @Test
+    void letsAMatchResultEditorChangeTheWinnerOfAMatchSomeoneElseRecorded() {
+        Match match = new Match();
+        match.setId(68L);
+        match.setStatus(MatchStatus.COMPLETED);
+        match.setWinningTeam("HOME");
+        match.setResultRecordedByEmail("recorder@example.test");
+        List<MatchParticipant> participants = buildParticipants(match);
+
+        when(accessControlService.isAdminEmail("editor@example.test")).thenReturn(false);
+        when(accessControlService.isMatchResultEditor("editor@example.test")).thenReturn(true);
+        when(matchRepository.findByIdForUpdate(68L)).thenReturn(Optional.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(68L)).thenReturn(participants);
+        when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(playerRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(mmrHistoryRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MatchResultService.MatchResultUpdateOutcome outcome = matchResultService.updateMatchResult(
+            68L,
+            new MatchResultUpdateRequest("AWAY", null),
+            "editor@example.test",
+            "Editor"
+        );
+
+        assertThat(match.getWinningTeam()).isEqualTo("AWAY");
+        assertThat(outcome.auditSnapshot().nextWinnerTeam()).isEqualTo("AWAY");
+        verify(matchResultEditQuotaService).reserve("editor@example.test", 68L);
+        verify(operationAuditLogService).recordMatchResultUpdate("editor@example.test", "Editor", outcome.auditSnapshot());
+    }
+
+    @Test
+    void stopsAMatchResultEditorBeforeSavingOnceTheDailyLimitIsUsed() {
+        Match match = new Match();
+        match.setId(69L);
+        match.setStatus(MatchStatus.COMPLETED);
+        match.setWinningTeam("HOME");
+        match.setResultRecordedByEmail("recorder@example.test");
+        List<MatchParticipant> participants = buildParticipants(match);
+
+        when(accessControlService.isAdminEmail("editor@example.test")).thenReturn(false);
+        when(accessControlService.isMatchResultEditor("editor@example.test")).thenReturn(true);
+        when(matchRepository.findByIdForUpdate(69L)).thenReturn(Optional.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(69L)).thenReturn(participants);
+        doThrow(new MatchEditQuotaExceededException("limit"))
+            .when(matchResultEditQuotaService).reserve("editor@example.test", 69L);
+
+        assertThatThrownBy(() -> matchResultService.updateMatchResult(
+            69L,
+            new MatchResultUpdateRequest("AWAY", null),
+            "editor@example.test",
+            "Editor"
+        )).isInstanceOf(MatchEditQuotaExceededException.class);
+
+        assertThat(match.getWinningTeam()).isEqualTo("HOME");
+        verify(matchRepository, never()).save(any());
+        verify(playerRepository, never()).saveAll(any());
+        verify(operationAuditLogService, never()).recordMatchResultUpdate(any(), any(), any());
+    }
+
+    @Test
+    void doesNotCountAnAdminsEditAgainstTheEditorLimit() {
+        Match match = new Match();
+        match.setId(70L);
+        match.setStatus(MatchStatus.COMPLETED);
+        match.setWinningTeam("HOME");
+        match.setResultRecordedByEmail("recorder@example.test");
+        List<MatchParticipant> participants = buildParticipants(match);
+
+        when(matchRepository.findByIdForUpdate(70L)).thenReturn(Optional.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(70L)).thenReturn(participants);
+        when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(playerRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(mmrHistoryRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        matchResultService.updateMatchResult(
+            70L,
+            new MatchResultUpdateRequest("AWAY", null),
+            "admin@example.test",
+            "Admin"
+        );
+
+        verify(matchResultEditQuotaService, never()).reserve(any(), any());
+        verify(accessControlService, never()).isMatchResultEditor(any());
+    }
+
+    @Test
     void skipsNoOpUpdateWhenWinnerAndRaceCompositionAreUnchanged() {
         Match match = new Match();
         match.setId(64L);
@@ -514,6 +613,7 @@ class MatchResultServiceTest {
             .containsExactly("P", "P", "T", "P", "P", "T");
         assertThat(omittedRaceOutcome.auditSnapshot()).isNull();
         assertThat(repeatedRaceOutcome.auditSnapshot()).isNull();
+        verify(operationAuditLogService, never()).recordMatchResultUpdate(any(), any(), any());
         verify(groupRepository, never()).findByIdForUpdate(any());
         verify(matchParticipantRepository, never()).saveAll(any());
         verify(matchRepository, never()).save(any());

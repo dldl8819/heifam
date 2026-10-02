@@ -13,6 +13,7 @@ import com.balancify.backend.service.MatchResultService;
 import com.balancify.backend.service.OperationAuditLogService;
 import com.balancify.backend.service.exception.MatchConflictException;
 import com.balancify.backend.service.exception.MatchEditForbiddenException;
+import com.balancify.backend.service.exception.MatchEditQuotaExceededException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.NoSuchElementException;
 import org.springframework.http.HttpStatus;
@@ -113,27 +114,19 @@ public class MatchResultController {
         HttpServletRequest httpRequest
     ) {
         try {
-            String actorEmail = extractRequestEmail(httpRequest);
-            String actorNickname = resolveRecordedByNickname(httpRequest);
-            MatchResultService.MatchResultUpdateOutcome outcome = matchResultService.updateMatchResult(
+            MatchResultResponse response = matchResultService.updateMatchResult(
                 matchId,
                 request,
-                actorEmail,
-                actorNickname
-            );
-            if (outcome.auditSnapshot() != null) {
-                operationAuditLogService.recordMatchResultUpdate(
-                    actorEmail,
-                    actorNickname,
-                    outcome.auditSnapshot()
-                );
-            }
-            MatchResultResponse response = outcome.response();
+                extractRequestEmail(httpRequest),
+                resolveRecordedByNickname(httpRequest)
+            ).response();
             if (mmrAccessRequestResolver.canViewMmr(httpRequest)) {
                 return response;
             }
 
             return MmrMaskingMapper.maskMatchResult(response);
+        } catch (MatchEditQuotaExceededException exception) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, exception.getMessage());
         } catch (MatchEditForbiddenException exception) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, exception.getMessage());
         } catch (MatchConflictException | ObjectOptimisticLockingFailureException exception) {
