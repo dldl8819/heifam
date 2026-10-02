@@ -1399,11 +1399,6 @@ export default function ResultsPage() {
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
           {isSuperAdmin ? t('results.recent.history.description') : t('results.recent.description')}
         </p>
-        {isMatchResultEditor && (
-          <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
-            {t('results.recent.resultEditorHint')}
-          </p>
-        )}
 
         {isSuperAdmin && (
           <form
