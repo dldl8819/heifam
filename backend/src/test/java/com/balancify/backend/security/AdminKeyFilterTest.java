@@ -1675,6 +1675,7 @@ class AdminKeyFilterTest {
                         3600,
                         3552,
                         48,
+                        false,
                         false
                     )
                 )
@@ -1711,7 +1712,8 @@ class AdminKeyFilterTest {
                         3600,
                         3552,
                         48,
-                        false
+                        false,
+                        true
                     )
                 )
             );
@@ -1727,7 +1729,8 @@ class AdminKeyFilterTest {
             .andExpect(jsonPath("$[0].homeTeam[0].mmr").doesNotExist())
             .andExpect(jsonPath("$[0].awayTeam[0].mmr").doesNotExist())
             .andExpect(jsonPath("$[0].homeTeam[0].assignedRace").value("T"))
-            .andExpect(jsonPath("$[0].awayTeam[0].assignedRace").value("Z"));
+            .andExpect(jsonPath("$[0].awayTeam[0].assignedRace").value("Z"))
+            .andExpect(jsonPath("$[0].racesRecorded").value(true));
     }
 
     @Test

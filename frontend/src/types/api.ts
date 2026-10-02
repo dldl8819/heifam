@@ -191,6 +191,7 @@ export type RecentMatchItem = {
   awayMmr?: number
   mmrDiff?: number
   canEditRaceComposition: boolean
+  racesRecorded: boolean
 }
 
 export type MatchHistoryPage = {

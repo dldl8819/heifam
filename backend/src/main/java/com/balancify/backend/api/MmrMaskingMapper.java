@@ -219,7 +219,8 @@ public final class MmrMaskingMapper {
                     null,
                     null,
                     null,
-                    response.canEditRaceComposition()
+                    response.canEditRaceComposition(),
+                    response.racesRecorded()
                 )
             )
             .toList();
