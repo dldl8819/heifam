@@ -20,6 +20,16 @@ export function composeTeamRaces(races: ReadonlyArray<AssignedRace | null>): str
   return [...(races as AssignedRace[])].sort((left, right) => RACE_ORDER[left] - RACE_ORDER[right]).join('')
 }
 
+// Protoss needs no marker, so only the players recorded on Terran or Zerg get one. Races the
+// recorder never confirmed were assigned automatically, so they are not shown as if recorded.
+export function formatRecordedRacePlayer(
+  nickname: string,
+  race: AssignedRace | null,
+  racesRecorded: boolean,
+): string {
+  return racesRecorded && (race === 'T' || race === 'Z') ? `${nickname} (${race})` : nickname
+}
+
 // A match stores one race composition for both teams, so both must add up to the same supported one.
 export function resolveCompositionFromTeamRaces(
   teamSize: RaceCompositionTeamSize,

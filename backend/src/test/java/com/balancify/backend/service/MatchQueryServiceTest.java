@@ -457,6 +457,33 @@ class MatchQueryServiceTest {
     }
 
     @Test
+    void tellsWhetherTheRecorderEnteredEachPlayersRace() {
+        Group group = new Group();
+        group.setId(1L);
+        Match recorded = new Match();
+        recorded.setId(214L);
+        recorded.setGroup(group);
+        recorded.setWinningTeam("HOME");
+        recorded.setPlayedAt(OffsetDateTime.parse("2026-03-24T17:00:00Z"));
+        recorded.setRacesRecorded(true);
+        Match assigned = new Match();
+        assigned.setId(215L);
+        assigned.setGroup(group);
+        assigned.setWinningTeam("AWAY");
+        assigned.setPlayedAt(OffsetDateTime.parse("2026-03-23T17:00:00Z"));
+
+        when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of(recorded, assigned));
+        when(matchParticipantRepository.findByMatchIdInWithPlayerAndMatch(List.of(214L, 215L)))
+            .thenReturn(List.of());
+
+        List<GroupRecentMatchResponse> responses = matchQueryService.getRecentMatches(1L, 10, 0, null);
+
+        assertThat(responses)
+            .extracting(GroupRecentMatchResponse::racesRecorded)
+            .containsExactly(true, false);
+    }
+
+    @Test
     void returnsMatchHistoryPageUsingRepositorySpecificationAndPageMetadata() {
         Group group = new Group();
         group.setId(1L);

@@ -19,6 +19,8 @@ public record GroupRecentMatchResponse(
     Integer homeMmr,
     Integer awayMmr,
     Integer mmrDiff,
-    boolean canEditRaceComposition
+    boolean canEditRaceComposition,
+    // True once the recorder entered who played which race; before that the races were assigned automatically.
+    boolean racesRecorded
 ) {
 }

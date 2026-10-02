@@ -17,7 +17,12 @@ import { useMmrVisibility } from '@/lib/mmr-visibility'
 import { findUniquePlayerByNicknamePrefix } from '@/lib/player-autocomplete'
 import { buildMatchResultUpdateRequest, type ParticipantRaceEdit } from '@/lib/match-result-edit'
 import { resolveRaceCompositionTeamSize } from '@/lib/race-composition'
-import { ASSIGNED_RACES, normalizeAssignedRace, resolveCompositionFromTeamRaces } from '@/lib/participant-races'
+import {
+  ASSIGNED_RACES,
+  formatRecordedRacePlayer,
+  normalizeAssignedRace,
+  resolveCompositionFromTeamRaces,
+} from '@/lib/participant-races'
 import type {
   AssignedRace,
   BalancePlayerOption,
@@ -113,7 +118,9 @@ function formatTeamPlayers(match: RecentMatchItem, team: TeamSide): string {
     return '-'
   }
 
-  return players.map((player) => player.nickname).join(', ')
+  return players
+    .map((player) => formatRecordedRacePlayer(player.nickname, player.assignedRace, match.racesRecorded))
+    .join(', ')
 }
 
 function formatRaceMatchup(match: RecentMatchItem): string {

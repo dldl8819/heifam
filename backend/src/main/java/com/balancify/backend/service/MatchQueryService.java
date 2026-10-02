@@ -220,7 +220,8 @@ public class MatchQueryService {
                 homeMmr,
                 awayMmr,
                 Math.abs(homeMmr - awayMmr),
-                requesterCanEditAnyMatch || isSameRecordedByEmail(match.getResultRecordedByEmail(), requesterEmail)
+                requesterCanEditAnyMatch || isSameRecordedByEmail(match.getResultRecordedByEmail(), requesterEmail),
+                match.isRacesRecorded()
             ));
         }
 

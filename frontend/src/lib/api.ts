@@ -521,6 +521,7 @@ function normalizeRecentMatchItem(value: unknown): RecentMatchItem | null {
     awayMmr: awayMmr ?? undefined,
     mmrDiff: mmrDiff ?? undefined,
     canEditRaceComposition: source.canEditRaceComposition === true,
+    racesRecorded: source.racesRecorded === true,
   }
 }
 
