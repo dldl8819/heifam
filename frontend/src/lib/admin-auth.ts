@@ -25,6 +25,7 @@ export type AdminAuthState = {
   isLoggedIn: boolean
   isAdmin: boolean
   isSuperAdmin: boolean
+  isMatchResultEditor: boolean
   canViewMmr: boolean
   canAccess: boolean
   role: AccessRole
@@ -107,6 +108,7 @@ export function useAdminAuthState(): AdminAuthState {
           allowed: false,
           canViewMmr: false,
           preferredRace: null,
+          matchResultEditor: false,
         }
         cachedAccessEmail = email
         cachedAccessProfile = blockedProfile
@@ -127,6 +129,7 @@ export function useAdminAuthState(): AdminAuthState {
           allowed: false,
           canViewMmr: false,
           preferredRace: null,
+          matchResultEditor: false,
         })
       }
       setAccessError(true)
@@ -176,6 +179,7 @@ export function useAdminAuthState(): AdminAuthState {
     isLoggedIn,
     isAdmin: Boolean(accessProfile?.admin),
     isSuperAdmin: Boolean(accessProfile?.superAdmin),
+    isMatchResultEditor: Boolean(accessProfile?.matchResultEditor),
     canViewMmr: Boolean(accessProfile?.canViewMmr),
     canAccess: Boolean(accessProfile?.allowed),
     role: resolveRole(accessProfile),

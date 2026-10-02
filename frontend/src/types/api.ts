@@ -505,6 +505,7 @@ export type AccessMeResponse = {
   allowed: boolean
   canViewMmr: boolean
   preferredRace: PlayerRace | null
+  matchResultEditor: boolean
 }
 
 export type AccessEmailEntry = {
@@ -520,6 +521,10 @@ export type AccessAdminListResponse = {
 
 export type AccessAllowedEmailListResponse = {
   allowedUsers: AccessEmailEntry[]
+}
+
+export type AccessResultEditorListResponse = {
+  resultEditors: AccessEmailEntry[]
 }
 
 export type OperationAuditLogItem = {

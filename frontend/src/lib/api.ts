@@ -2,6 +2,7 @@ import type {
   AccessAdminListResponse,
   AccessAllowedEmailListResponse,
   AccessMeResponse,
+  AccessResultEditorListResponse,
   BalanceRequest,
   BalanceResponse,
   CreateGroupMatchResponse,
@@ -1304,6 +1305,40 @@ export const apiClient = {
         baseUrlOverride: ACCESS_API_BASE_URL,
       }
     ),
+  getMatchResultEditorList: () =>
+    apiRequest<AccessResultEditorListResponse>('/api/access/result-editors', undefined, {
+      requireUserEmail: true,
+      includeUserEmail: true,
+      timeoutMs: ACCESS_API_REQUEST_TIMEOUT_MS,
+      baseUrlOverride: ACCESS_API_BASE_URL,
+    }),
+  addMatchResultEditor: (email: string) =>
+    apiRequest<AccessResultEditorListResponse>(
+      '/api/access/result-editors',
+      {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      },
+      {
+        requireUserEmail: true,
+        includeUserEmail: true,
+        timeoutMs: ACCESS_API_REQUEST_TIMEOUT_MS,
+        baseUrlOverride: ACCESS_API_BASE_URL,
+      }
+    ),
+  removeMatchResultEditor: (email: string) =>
+    apiRequest<AccessResultEditorListResponse>(
+      `/api/access/result-editors/${encodeURIComponent(email)}`,
+      {
+        method: 'DELETE',
+      },
+      {
+        requireUserEmail: true,
+        includeUserEmail: true,
+        timeoutMs: ACCESS_API_REQUEST_TIMEOUT_MS,
+        baseUrlOverride: ACCESS_API_BASE_URL,
+      }
+    ),
   getNotices: (groupId: number) =>
     apiRequest<NoticeItem[]>(`/api/groups/${groupId}/notices`, undefined, {
       includeUserEmail: true,
@@ -1540,6 +1575,14 @@ export function isApiUnauthorizedError(error: unknown): boolean {
 
 export function isApiConflictError(error: unknown): boolean {
   return error instanceof ApiRequestError && error.status === 409
+}
+
+export function isApiBadRequestError(error: unknown): boolean {
+  return error instanceof ApiRequestError && error.status === 400
+}
+
+export function isApiTooManyRequestsError(error: unknown): boolean {
+  return error instanceof ApiRequestError && error.status === 429
 }
 
 export function isApiTimeoutError(error: unknown): boolean {

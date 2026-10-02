@@ -109,6 +109,36 @@ describe('route access', () => {
     expect(decision.redirectTo).toBe('/players')
   })
 
+  it('lets a regular admin open the audit log', () => {
+    const decision = getRouteAccessDecision('/admin/audit', {
+      isLoggedIn: true,
+      canAccess: true,
+      isAdmin: true,
+      isSuperAdmin: false,
+    })
+
+    expect(decision).toEqual({
+      allowed: true,
+      redirectTo: null,
+      blocked: false,
+    })
+  })
+
+  it('keeps the audit log away from regular members', () => {
+    const decision = getRouteAccessDecision('/admin/audit', {
+      isLoggedIn: true,
+      canAccess: true,
+      isAdmin: false,
+      isSuperAdmin: false,
+    })
+
+    expect(decision).toEqual({
+      allowed: false,
+      redirectTo: '/players',
+      blocked: false,
+    })
+  })
+
   it('shows the access notice on home to a signed-in applicant without access', () => {
     const decision = getRouteAccessDecision('/', {
       isLoggedIn: true,

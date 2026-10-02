@@ -433,6 +433,30 @@ class MatchQueryServiceTest {
     }
 
     @Test
+    void marksCanEditRaceCompositionTrueForAMatchResultEditorOnSomeoneElsesMatch() {
+        Group group = new Group();
+        group.setId(1L);
+        Match match = new Match();
+        match.setId(213L);
+        match.setGroup(group);
+        match.setWinningTeam("HOME");
+        match.setPlayedAt(OffsetDateTime.parse("2026-03-23T17:00:00Z"));
+        match.setResultRecordedByEmail("recorder@hei.gg");
+
+        when(matchRepository.findRecentByGroupId(eq(1L), any())).thenReturn(List.of(match));
+        when(matchParticipantRepository.findByMatchIdInWithPlayerAndMatch(List.of(213L))).thenReturn(List.of());
+        when(accessControlService.isAdminEmail("editor@hei.gg")).thenReturn(false);
+        when(accessControlService.isMatchResultEditor("editor@hei.gg")).thenReturn(true);
+        when(accessControlService.resolveAccessProfile("recorder@hei.gg")).thenReturn(recorderProfile());
+
+        List<GroupRecentMatchResponse> responses =
+            matchQueryService.getRecentMatches(1L, 10, 0, "editor@hei.gg");
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).canEditRaceComposition()).isTrue();
+    }
+
+    @Test
     void returnsMatchHistoryPageUsingRepositorySpecificationAndPageMetadata() {
         Group group = new Group();
         group.setId(1L);

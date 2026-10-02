@@ -91,6 +91,20 @@ public class OperationAuditLogService {
 
     @Transactional(readOnly = true)
     public OperationAuditLogPageResponse getLogs(int page, int size, OperationAuditLogFilter filter) {
+        return getLogs(page, size, filter, false);
+    }
+
+    @Transactional(readOnly = true)
+    public OperationAuditLogPageResponse getResultEditorLogs(int page, int size, OperationAuditLogFilter filter) {
+        return getLogs(page, size, filter, true);
+    }
+
+    private OperationAuditLogPageResponse getLogs(
+        int page,
+        int size,
+        OperationAuditLogFilter filter,
+        boolean resultEditorsOnly
+    ) {
         int normalizedPage = Math.max(0, page);
         int normalizedLimit = Math.max(1, Math.min(MAX_PAGE_SIZE, size));
         PageRequest pageRequest = PageRequest.of(
@@ -101,11 +115,11 @@ public class OperationAuditLogService {
         OperationAuditLogFilter normalizedFilter = filter == null ? OperationAuditLogFilter.empty() : filter;
         OffsetDateTime retentionCutoff = OffsetDateTime.now(clock)
             .minusYears(OperationAuditRetentionService.RETENTION_YEARS);
-        Page<OperationAuditLog> logs = normalizedFilter.isEmpty()
+        Page<OperationAuditLog> logs = normalizedFilter.isEmpty() && !resultEditorsOnly
             ? operationAuditLogRepository
                 .findAllByCreatedAtGreaterThanEqualOrderByCreatedAtDescIdDesc(retentionCutoff, pageRequest)
             : operationAuditLogRepository.findAll(
-                buildSpecification(normalizedFilter, retentionCutoff),
+                buildSpecification(normalizedFilter, retentionCutoff, resultEditorsOnly),
                 pageRequest
             );
         List<OperationAuditLogResponse> items = logs
@@ -125,7 +139,8 @@ public class OperationAuditLogService {
 
     private Specification<OperationAuditLog> buildSpecification(
         OperationAuditLogFilter filter,
-        OffsetDateTime retentionCutoff
+        OffsetDateTime retentionCutoff,
+        boolean resultEditorsOnly
     ) {
         return (root, query, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
@@ -134,6 +149,13 @@ public class OperationAuditLogService {
                 root.<OffsetDateTime>get("createdAt"),
                 retentionCutoff
             ));
+
+            if (resultEditorsOnly) {
+                predicates.add(criteriaBuilder.equal(
+                    root.get("actorRole"),
+                    AccessControlService.ACTOR_ROLE_RESULT_EDITOR
+                ));
+            }
 
             if (filter.fromDate() != null) {
                 predicates.add(criteriaBuilder.greaterThanOrEqualTo(
@@ -599,6 +621,7 @@ public class OperationAuditLogService {
         log.setAction(limit(safeTrim(action).toUpperCase(Locale.ROOT), 60));
         log.setActorEmail(limit(normalizeEmail(actorEmail), 320));
         log.setActorNickname(limit(trimToNull(actorNickname), 100));
+        log.setActorRole(accessControlService.resolveActorRole(actorEmail));
         log.setTargetType(limit(safeTrim(targetType).toUpperCase(Locale.ROOT), 60));
         log.setTargetId(targetId);
         log.setTargetLabel(limit(trimToNull(targetLabel), 255));

@@ -115,9 +115,25 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             PathPatternParser.defaultInstance.parse("/api/admin/rating/recalculate"),
             AuthType.SUPER_ADMIN_EMAIL
         ),
+        // Admins see only what match result editors did; the controller narrows the logs to that.
         new ProtectedRoute(
             "GET",
             PathPatternParser.defaultInstance.parse("/api/admin/audit-logs"),
+            AuthType.ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "GET",
+            PathPatternParser.defaultInstance.parse("/api/access/result-editors"),
+            AuthType.SUPER_ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "POST",
+            PathPatternParser.defaultInstance.parse("/api/access/result-editors"),
+            AuthType.SUPER_ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "DELETE",
+            PathPatternParser.defaultInstance.parse("/api/access/result-editors/{email}"),
             AuthType.SUPER_ADMIN_EMAIL
         ),
         new ProtectedRoute(

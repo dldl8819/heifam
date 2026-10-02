@@ -66,7 +66,6 @@ public class MatchQueryService {
         Integer offset,
         String requesterEmail
     ) {
-        boolean requesterIsAdmin = accessControlService.isAdminEmail(requesterEmail);
         int normalizedLimit = normalizeLimit(limit);
         int normalizedOffset = normalizeOffset(offset);
         int page = normalizedOffset / normalizedLimit;
@@ -75,7 +74,7 @@ public class MatchQueryService {
             PageRequest.of(page, normalizedLimit)
         );
 
-        return buildResponses(matches, requesterIsAdmin, requesterEmail);
+        return buildResponses(matches, canEditAnyMatch(requesterEmail), requesterEmail);
     }
 
     /**
@@ -92,7 +91,6 @@ public class MatchQueryService {
         LocalDate toDate,
         String requesterEmail
     ) {
-        boolean requesterIsAdmin = accessControlService.isAdminEmail(requesterEmail);
         int normalizedPage = page == null || page < 0 ? 0 : page;
         int normalizedSize = normalizeHistorySize(size);
         PageRequest pageRequest = PageRequest.of(
@@ -106,7 +104,7 @@ public class MatchQueryService {
             pageRequest
         );
         List<GroupRecentMatchResponse> items =
-            buildResponses(matchPage.getContent(), requesterIsAdmin, requesterEmail);
+            buildResponses(matchPage.getContent(), canEditAnyMatch(requesterEmail), requesterEmail);
 
         return new GroupMatchPageResponse(
             items,
@@ -153,9 +151,14 @@ public class MatchQueryService {
      * Builds the response DTOs for a list of matches, resolving participants and recorder
      * nicknames in batch. Shared by both the "recent matches" and full-history queries above.
      */
+    private boolean canEditAnyMatch(String requesterEmail) {
+        return accessControlService.isAdminEmail(requesterEmail)
+            || accessControlService.isMatchResultEditor(requesterEmail);
+    }
+
     private List<GroupRecentMatchResponse> buildResponses(
         List<Match> matches,
-        boolean requesterIsAdmin,
+        boolean requesterCanEditAnyMatch,
         String requesterEmail
     ) {
         Map<Long, List<MatchParticipant>> participantsByMatchId = loadParticipantsByMatchId(matches);
@@ -217,7 +220,7 @@ public class MatchQueryService {
                 homeMmr,
                 awayMmr,
                 Math.abs(homeMmr - awayMmr),
-                requesterIsAdmin || isSameRecordedByEmail(match.getResultRecordedByEmail(), requesterEmail)
+                requesterCanEditAnyMatch || isSameRecordedByEmail(match.getResultRecordedByEmail(), requesterEmail)
             ));
         }
 

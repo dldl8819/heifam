@@ -26,6 +26,9 @@ public class OperationAuditLog {
     @Column(length = 100)
     private String actorNickname;
 
+    @Column(length = 20)
+    private String actorRole;
+
     @Column(nullable = false, length = 60)
     private String targetType;
 
@@ -71,6 +74,14 @@ public class OperationAuditLog {
 
     public void setActorNickname(String actorNickname) {
         this.actorNickname = actorNickname;
+    }
+
+    public String getActorRole() {
+        return actorRole;
+    }
+
+    public void setActorRole(String actorRole) {
+        this.actorRole = actorRole;
     }
 
     public String getTargetType() {

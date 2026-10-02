@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -11,6 +12,10 @@ import static org.mockito.Mockito.when;
 import com.balancify.backend.domain.OperationAuditLog;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.OperationAuditLogRepository;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Root;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -468,5 +473,46 @@ class OperationAuditLogServiceTest {
         assertThat(response.items()).hasSize(1);
         assertThat(response.totalElements()).isEqualTo(1);
         verify(operationAuditLogRepository).findAll(any(Specification.class), any(Pageable.class));
+    }
+
+    @Test
+    void stampsTheActorsRoleOnEveryLog() {
+        when(accessControlService.resolveActorRole("editor@example.com"))
+            .thenReturn(AccessControlService.ACTOR_ROLE_RESULT_EDITOR);
+
+        operationAuditLogService.recordMatchResultUpdate(
+            "editor@example.com",
+            "Editor",
+            new MatchResultService.MatchResultUpdateAuditSnapshot(99L, 1L, "HOME", "AWAY", "PPT", "PPT")
+        );
+
+        ArgumentCaptor<OperationAuditLog> logCaptor = ArgumentCaptor.forClass(OperationAuditLog.class);
+        verify(operationAuditLogRepository).save(logCaptor.capture());
+        assertThat(logCaptor.getValue().getActorRole()).isEqualTo(AccessControlService.ACTOR_ROLE_RESULT_EDITOR);
+    }
+
+    @Test
+    void limitsTheResultEditorViewToLogsWrittenByEditorsEvenWithoutFilters() {
+        when(operationAuditLogRepository.findAll(any(Specification.class), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+        operationAuditLogService.getResultEditorLogs(0, 20, OperationAuditLogService.OperationAuditLogFilter.empty());
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Specification<OperationAuditLog>> specificationCaptor =
+            ArgumentCaptor.forClass(Specification.class);
+        verify(operationAuditLogRepository).findAll(specificationCaptor.capture(), any(Pageable.class));
+        verify(operationAuditLogRepository, never())
+            .findAllByCreatedAtGreaterThanEqualOrderByCreatedAtDescIdDesc(any(), any());
+
+        @SuppressWarnings("unchecked")
+        Root<OperationAuditLog> root = mock(Root.class);
+        CriteriaBuilder criteriaBuilder = mock(CriteriaBuilder.class);
+        Path<Object> actorRole = mock(Path.class);
+        // The spec also reads other columns; only the role column matters here.
+        lenient().when(root.get("actorRole")).thenReturn(actorRole);
+        specificationCaptor.getValue().toPredicate(root, mock(CriteriaQuery.class), criteriaBuilder);
+
+        verify(criteriaBuilder).equal(actorRole, AccessControlService.ACTOR_ROLE_RESULT_EDITOR);
     }
 }

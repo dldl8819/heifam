@@ -8,6 +8,7 @@ public record AccessMeResponse(
     boolean superAdmin,
     boolean allowed,
     boolean canViewMmr,
-    String preferredRace
+    String preferredRace,
+    boolean matchResultEditor
 ) {
 }

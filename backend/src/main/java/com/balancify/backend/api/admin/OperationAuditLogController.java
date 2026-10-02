@@ -1,7 +1,10 @@
 package com.balancify.backend.api.admin;
 
 import com.balancify.backend.api.admin.dto.OperationAuditLogPageResponse;
+import com.balancify.backend.security.AuthenticatedRequestResolver;
+import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.OperationAuditLogService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
@@ -17,9 +20,17 @@ import org.springframework.web.server.ResponseStatusException;
 public class OperationAuditLogController {
 
     private final OperationAuditLogService operationAuditLogService;
+    private final AccessControlService accessControlService;
+    private final AuthenticatedRequestResolver authenticatedRequestResolver;
 
-    public OperationAuditLogController(OperationAuditLogService operationAuditLogService) {
+    public OperationAuditLogController(
+        OperationAuditLogService operationAuditLogService,
+        AccessControlService accessControlService,
+        AuthenticatedRequestResolver authenticatedRequestResolver
+    ) {
         this.operationAuditLogService = operationAuditLogService;
+        this.accessControlService = accessControlService;
+        this.authenticatedRequestResolver = authenticatedRequestResolver;
     }
 
     @GetMapping
@@ -33,6 +44,7 @@ public class OperationAuditLogController {
         @RequestParam(name = "action", required = false) String action,
         @RequestParam(name = "content", required = false) String content,
         @RequestParam(name = "target", required = false) String target,
+        HttpServletRequest request,
         HttpServletResponse response
     ) {
         response.setHeader("Cache-Control", "no-store, max-age=0");
@@ -44,6 +56,26 @@ public class OperationAuditLogController {
         if (parsedFromDate != null && parsedToDate != null && parsedFromDate.isAfter(parsedToDate)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "fromDate must be before or equal to toDate");
         }
+
+        String requestEmail = authenticatedRequestResolver.resolve(request).email();
+        if (!accessControlService.isSuperAdminEmail(requestEmail)) {
+            if (!accessControlService.isAdminEmail(requestEmail)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin role required");
+            }
+            return operationAuditLogService.getResultEditorLogs(
+                page,
+                requestedSize,
+                new OperationAuditLogService.OperationAuditLogFilter(
+                    parsedFromDate,
+                    parsedToDate,
+                    actor,
+                    action,
+                    content,
+                    target
+                )
+            );
+        }
+
         if (
             parsedFromDate == null
                 && parsedToDate == null

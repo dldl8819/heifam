@@ -91,6 +91,7 @@ import com.balancify.backend.service.PlayerImportService;
 import com.balancify.backend.service.RankingService;
 import com.balancify.backend.service.RatingRecalculationService;
 import com.balancify.backend.service.TeamBalancingService;
+import com.balancify.backend.service.exception.MatchEditQuotaExceededException;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Locale;
@@ -137,9 +138,6 @@ class AdminKeyFilterTest {
 
     @Autowired
     private MockMvc mockMvc;
-
-    @Autowired
-    private AdminKeyProperties adminKeyProperties;
 
     @MockBean
     private MatchResultService matchResultService;
@@ -549,49 +547,23 @@ class AdminKeyFilterTest {
             eq("admin@hei.gg"),
             eq("admin")
         );
-        verify(operationAuditLogService).recordMatchResultUpdate(
-            eq("admin@hei.gg"),
-            eq("admin"),
-            eq(auditSnapshot)
-        );
     }
 
     @Test
-    void skipsAuditLogWhenMatchResultPatchHasNoChanges() throws Exception {
-        String adminEmail = adminKeyProperties
-            .getNormalizedAdminEmails()
-            .stream()
-            .filter(email -> !adminKeyProperties.isConfiguredSuperAdminEmail(email))
-            .findFirst()
-            .orElseThrow();
-        String expectedNickname = adminEmail.substring(0, adminEmail.indexOf('@'));
+    void returnsTooManyRequestsWhenEditorUsedTheDailyEditLimit() throws Exception {
         when(matchResultService.updateMatchResult(eq(1L), any(MatchResultUpdateRequest.class), any(), any()))
-            .thenReturn(
-                new MatchResultService.MatchResultUpdateOutcome(
-                    new MatchResultResponse(1L, "HOME", 32, 0.5, 0.5, List.of()),
-                    null
-                )
-            );
+            .thenThrow(new MatchEditQuotaExceededException("오늘 수정할 수 있는 경기 수(10경기)를 모두 사용했습니다."));
 
         mockMvc
             .perform(
                 patch("/api/matches/1/result")
-                    .header("X-USER-EMAIL", adminEmail)
+                    .header("X-USER-EMAIL", "member@hei.gg")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"winnerTeam\":\"HOME\",\"raceComposition\":\"PPT\"}")
+                    .content("{\"winnerTeam\":\"AWAY\"}")
             )
-            .andExpect(status().isOk());
-
-        verify(matchResultService).updateMatchResult(
-            eq(1L),
-            argThat(request -> request != null
-                && "HOME".equals(request.winnerTeam())
-                && "PPT".equals(request.raceComposition())),
-            eq(adminEmail),
-            eq(expectedNickname)
-        );
-        verify(operationAuditLogService, never()).recordMatchResultUpdate(any(), any(), any());
+            .andExpect(status().isTooManyRequests());
     }
+
     @Test
     void allowsMatchResultPatchWhenSuperAdminEmailIsValid() throws Exception {
         MatchResultService.MatchResultUpdateAuditSnapshot auditSnapshot =
@@ -627,11 +599,6 @@ class AdminKeyFilterTest {
                 && "PPT".equals(request.raceComposition())),
             eq("superadmin@hei.gg"),
             eq("superadmin")
-        );
-        verify(operationAuditLogService).recordMatchResultUpdate(
-            eq("superadmin@hei.gg"),
-            eq("superadmin"),
-            eq(auditSnapshot)
         );
     }
 
@@ -883,13 +850,66 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void returnsForbiddenForAuditLogsWithAdminEmail() throws Exception {
+    void showsAdminOnlyTheMatchResultEditorsLogs() throws Exception {
+        when(operationAuditLogService.getResultEditorLogs(anyInt(), anyInt(), any()))
+            .thenReturn(new OperationAuditLogPageResponse(List.of(), 0, 20, 0, 0, true, true));
+
         mockMvc
             .perform(
                 get("/api/admin/audit-logs")
                     .header("X-USER-EMAIL", "admin@hei.gg")
             )
+            .andExpect(status().isOk());
+
+        verify(operationAuditLogService).getResultEditorLogs(anyInt(), anyInt(), any());
+        verify(operationAuditLogService, never()).getLogs(anyInt(), anyInt());
+        verify(operationAuditLogService, never()).getLogs(anyInt(), anyInt(), any());
+    }
+
+    @Test
+    void returnsForbiddenForAuditLogsWithMemberEmail() throws Exception {
+        mockMvc
+            .perform(
+                get("/api/admin/audit-logs")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+            )
             .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void letsOnlySuperAdminsManageMatchResultEditors() throws Exception {
+        when(accessControlService.getMatchResultEditors()).thenReturn(List.of());
+        when(accessControlService.addMatchResultEditor(eq("superadmin@hei.gg"), eq("member@hei.gg")))
+            .thenReturn(List.of(new AccessControlService.AccessEmailEntry("member@hei.gg", "member", false)));
+
+        mockMvc
+            .perform(get("/api/access/result-editors").header("X-USER-EMAIL", "superadmin@hei.gg"))
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(
+                post("/api/access/result-editors")
+                    .header("X-USER-EMAIL", "superadmin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"email\":\"member@hei.gg\"}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.resultEditors[0].email").value("member@hei.gg"));
+
+        mockMvc
+            .perform(get("/api/access/result-editors").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(
+                post("/api/access/result-editors")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"email\":\"member@hei.gg\"}")
+            )
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(delete("/api/access/result-editors/member@hei.gg").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isForbidden());
+        verify(accessControlService, never()).removeMatchResultEditor(any(), any());
     }
 
     @Test

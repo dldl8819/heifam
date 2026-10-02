@@ -17,8 +17,9 @@ const AUTH_PATH_PREFIX = '/auth'
 const DISABLED_PATHS = ['/dashboard']
 const PUBLIC_PATHS = ['/', '/events', '/ads', '/results', '/privacy', '/terms']
 const MEMBER_PATHS = ['/balance', '/players', '/ranking']
-const ADMIN_PATHS = ['/balance/multi', '/captain-draft', '/import', '/players/import', '/notices']
-const SUPER_ADMIN_PATHS = ['/admin/access', '/admin/audit']
+// Admins see only what match result editors did on /admin/audit; the backend narrows the logs.
+const ADMIN_PATHS = ['/balance/multi', '/captain-draft', '/import', '/players/import', '/notices', '/admin/audit']
+const SUPER_ADMIN_PATHS = ['/admin/access']
 
 function getAuthenticatedDefaultPath(_context: RouteAccessContext): string {
   return '/players'

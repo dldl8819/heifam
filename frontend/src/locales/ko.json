@@ -261,7 +261,15 @@
       "me": "내 권한 상태",
       "superAdmins": "최상위 관리자",
       "admins": "운영진 관리자",
+      "resultEditors": "경기 결과 수정 권한",
       "allowlist": "접속 허용 이메일"
+    },
+    "resultEditors": {
+      "description": "선택한 팸원은 다른 팸원이 입력한 경기의 승패와 종족을 수정할 수 있습니다. 하루(한국 시간 기준) 최대 10경기까지 수정할 수 있고, 수정 기록은 운영진도 운영 로그에서 확인할 수 있습니다.",
+      "placeholder": "접속 허용된 팸원 이메일",
+      "add": "권한 부여",
+      "revoke": "권한 회수",
+      "empty": "경기 결과 수정 권한을 받은 팸원이 없습니다."
     },
     "me": {
       "email": "이메일",
@@ -304,7 +312,11 @@
       "removeConfirm": "{target} 권한을 삭제하시겠습니까?",
       "invalidEmail": "올바른 이메일 형식을 입력해 주세요.",
       "invalidNickname": "닉네임을 입력해 주세요. (최대 100자)",
-      "nicknameSaved": "{email}의 닉네임이 {nickname}(으)로 업데이트되었습니다."
+      "nicknameSaved": "{email}의 닉네임이 {nickname}(으)로 업데이트되었습니다.",
+      "resultEditorSaved": "{target}에게 경기 결과 수정 권한을 부여했습니다.",
+      "resultEditorRemoveConfirm": "{target}의 경기 결과 수정 권한을 회수하시겠습니까?",
+      "resultEditorRemoved": "{target}의 경기 결과 수정 권한을 회수했습니다.",
+      "resultEditorInvalidTarget": "접속 허용 이메일에 등록된 일반 팸원만 추가할 수 있습니다. 운영진은 이미 경기 결과를 수정할 수 있습니다."
     }
   },
   "notices": {
@@ -504,7 +516,8 @@
   "audit": {
     "title": "운영 로그",
     "description": "운영진이 처리한 선수 등록, 경기 결과 수정, 경기 삭제 등 주요 운영 작업을 확인합니다.",
-    "superOnly": "최상위 관리자만 운영 로그를 볼 수 있습니다.",
+    "resultEditorDescription": "경기 결과 수정 권한을 받은 팸원이 처리한 작업을 확인합니다. 최상위 관리자와 운영진의 작업은 표시되지 않습니다.",
+    "adminOnly": "운영진 관리자 이상만 운영 로그를 볼 수 있습니다.",
     "loadError": "운영 로그를 불러오지 못했습니다. 백엔드 상태를 확인해 주세요.",
     "recentTitle": "최근 운영 작업",
     "recentDescription": "최신순으로 10건씩 표시되며 최대 20건까지 확인할 수 있습니다.",
@@ -1216,6 +1229,8 @@
       "submittedFromBalanceGeneric": "경기 결과가 입력되었습니다.",
       "deleted": "{matchReference}를 삭제했습니다.",
       "updateFailure": "경기 결과 수정에 실패했습니다. 권한과 서버 상태를 확인해 주세요.",
+      "editLimitReached": "오늘 수정할 수 있는 경기 수(10경기)를 모두 사용했습니다. 이미 수정한 경기는 다시 고칠 수 있고, 새 경기는 내일 수정해 주세요.",
+      "resultEditorHint": "경기 결과 수정 권한이 있어 모든 경기의 승패와 종족을 수정할 수 있습니다. 하루 최대 10경기까지 수정할 수 있으며, 같은 경기를 다시 고치는 것은 따로 세지 않습니다.",
       "deleteNotFound": "삭제 API를 찾지 못했습니다. 백엔드를 재시작하고 다시 시도해 주세요.",
       "deleteFailure": "매치 삭제에 실패했습니다. 권한과 서버 상태를 확인해 주세요.",
       "deleteConfirm": "{matchReference}를 삭제하시겠습니까? MMR이 롤백됩니다.",
