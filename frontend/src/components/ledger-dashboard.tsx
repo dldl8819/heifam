@@ -653,11 +653,9 @@ export function LedgerDashboardContent({ dashboard }: { dashboard: LedgerDashboa
             )}
             <EquationRow label={t(key('equalsBalance'))} value={formatWon(dashboard.currentBalance)} emphasized />
           </dl>
-          {(dashboard.serverCostPending > 0 || dashboard.serverCostMissingKrwCount > 0) && (
+          {dashboard.serverCostMissingKrwCount > 0 && (
             <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
-              {t(key('serverCostPending'), { amount: formatWon(dashboard.serverCostPending) })}
-              {dashboard.serverCostMissingKrwCount > 0 &&
-                ` ${t(key('serverCostMissingKrw'), { count: String(dashboard.serverCostMissingKrwCount) })}`}
+              {t(key('serverCostMissingKrw'), { count: String(dashboard.serverCostMissingKrwCount) })}
             </p>
           )}
         </section>

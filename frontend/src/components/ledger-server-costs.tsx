@@ -67,13 +67,6 @@ function toForm(cost: LedgerServerCost): ServerCostFormState {
   }
 }
 
-function statusLabel(cost: LedgerServerCost): string {
-  if (cost.reimbursedDate) {
-    return t(key('statusReimbursed'), { date: cost.reimbursedDate })
-  }
-  return cost.krwAmount === null ? t(key('statusMissingKrw')) : t(key('statusPending'))
-}
-
 function SummaryTile({ label, value, foot }: { label: string; value: string; foot: string }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
@@ -185,27 +178,17 @@ export function LedgerServerCosts({ groupId, canManage }: LedgerServerCostsProps
   )
 
   const summary = summarizeServerCosts(costs)
-  const columnCount = canManage ? 10 : 9
+  const columnCount = canManage ? 9 : 8
 
   return (
     <div className="space-y-4">
       <p className="text-xs text-slate-500 dark:text-slate-400">{t(key('hint'))}</p>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3">
         <SummaryTile
           label={t(key('totalKrw'))}
           value={formatWon(summary.totalKrw)}
           foot={t(key('totalUsd'), { amount: formatUsd(summary.totalUsd) })}
-        />
-        <SummaryTile
-          label={t(key('reimbursed'))}
-          value={formatWon(summary.reimbursedKrw)}
-          foot={t(key('count'), { count: String(summary.reimbursedCount) })}
-        />
-        <SummaryTile
-          label={t(key('pending'))}
-          value={formatWon(summary.pendingKrw)}
-          foot={t(key('count'), { count: String(summary.pendingCount) })}
         />
         <SummaryTile
           label={t(key('missingKrw'))}
@@ -305,15 +288,6 @@ export function LedgerServerCosts({ groupId, canManage }: LedgerServerCostsProps
               />
             </label>
             <label className={LABEL_CLASS}>
-              {t(key('reimbursedDate'))}
-              <input
-                type="date"
-                value={form.reimbursedDate}
-                onChange={(event) => setForm({ ...form, reimbursedDate: event.target.value })}
-                className={INPUT_CLASS}
-              />
-            </label>
-            <label className={LABEL_CLASS}>
               {t(key('table.memo'))}
               <input
                 type="text"
@@ -352,7 +326,6 @@ export function LedgerServerCosts({ groupId, canManage }: LedgerServerCostsProps
               <th className="whitespace-nowrap px-4 py-3 text-right">{t(key('table.usdAmount'))}</th>
               <th className="whitespace-nowrap px-4 py-3 text-right">{t(key('table.krwAmount'))}</th>
               <th className="whitespace-nowrap px-4 py-3">{t(key('table.paidBy'))}</th>
-              <th className="whitespace-nowrap px-4 py-3">{t(key('table.status'))}</th>
               <th className="whitespace-nowrap px-4 py-3">{t(key('table.memo'))}</th>
               <th className="whitespace-nowrap px-4 py-3">{t(key('table.author'))}</th>
               {canManage && <th className="px-4 py-3" />}
@@ -397,7 +370,6 @@ export function LedgerServerCosts({ groupId, canManage }: LedgerServerCostsProps
                     {cost.krwAmount === null ? '-' : formatWon(cost.krwAmount)}
                   </td>
                   <td className="px-4 py-3">{cost.paidBy}</td>
-                  <td className="whitespace-nowrap px-4 py-3">{statusLabel(cost)}</td>
                   <td className="px-4 py-3">{cost.memo}</td>
                   <td className="px-4 py-3">{cost.authorNickname}</td>
                   {canManage && (
