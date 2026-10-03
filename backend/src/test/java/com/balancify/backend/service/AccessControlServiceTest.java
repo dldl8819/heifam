@@ -22,6 +22,7 @@ import com.balancify.backend.repository.MatchResultEditorEmailRepository;
 import com.balancify.backend.repository.UserRacePreferenceRepository;
 import com.balancify.backend.security.AdminKeyProperties;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
@@ -252,6 +253,30 @@ class AccessControlServiceTest {
         accessControlService.addAllowedUserEmail("ops@hei.gg", "fan@hei.gg", "팬");
 
         verify(allowedUserEmailRepository).save(any(AllowedUserEmail.class));
+    }
+
+    @Test
+    void resolvesManyNicknamesAtOnceWithAdminNicknamesFirst() {
+        AllowedUserEmail member = new AllowedUserEmail();
+        member.setNormalizedEmail("fan@hei.gg");
+        member.setNickname(" 팬 ");
+        AllowedUserEmail promoted = new AllowedUserEmail();
+        promoted.setNormalizedEmail("newops@hei.gg");
+        promoted.setNickname("예전 닉네임");
+        ManagedAdminEmail admin = new ManagedAdminEmail();
+        admin.setNormalizedEmail("newops@hei.gg");
+        admin.setNickname("운영진");
+        when(allowedUserEmailRepository.findAllByOrderByNormalizedEmailAsc()).thenReturn(List.of(member, promoted));
+        when(managedAdminEmailRepository.findAllByOrderByNormalizedEmailAsc()).thenReturn(List.of(admin));
+
+        Map<String, String> nicknames = accessControlService.resolveDisplayNicknames(
+            List.of("FAN@hei.gg", "newops@hei.gg", "gone@hei.gg")
+        );
+
+        assertThat(nicknames)
+            .containsEntry("fan@hei.gg", "팬")
+            .containsEntry("newops@hei.gg", "운영진")
+            .containsEntry("gone@hei.gg", null);
     }
 
     @Test

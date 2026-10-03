@@ -97,6 +97,22 @@ describe('route access', () => {
     })
   })
 
+  it('keeps points with admins until they open to members', () => {
+    const member = { isLoggedIn: true, canAccess: true, isAdmin: false, isSuperAdmin: false }
+    const admin = { ...member, isAdmin: true }
+
+    expect(getRouteAccessDecision('/points', member)).toEqual({
+      allowed: false,
+      redirectTo: '/players',
+      blocked: false,
+    })
+    expect(getRouteAccessDecision('/points', admin)).toEqual({
+      allowed: true,
+      redirectTo: null,
+      blocked: false,
+    })
+  })
+
   it('keeps super admin routes restricted to super admins', () => {
     const decision = getRouteAccessDecision('/admin/access', {
       isLoggedIn: true,

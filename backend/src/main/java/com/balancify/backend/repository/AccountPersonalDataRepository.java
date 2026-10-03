@@ -201,7 +201,8 @@ public class AccountPersonalDataRepository {
                 "managed_admin_emails",
                 "allowed_user_emails",
                 "admin_mmr_access_emails",
-                "match_result_editor_emails"
+                "match_result_editor_emails",
+                "point_transactions"
             )) {
                 jdbcTemplate.update(
                     "UPDATE " + table + " SET created_by_email = NULL "
@@ -216,6 +217,11 @@ public class AccountPersonalDataRepository {
             // Without this, re-allowing the same email would quietly restore result editing.
             jdbcTemplate.update(
                 "DELETE FROM match_result_editor_emails WHERE normalized_email = :email",
+                parameters
+            );
+            // Removes the person's point history with it (ON DELETE CASCADE).
+            jdbcTemplate.update(
+                "DELETE FROM point_accounts WHERE normalized_email = :email",
                 parameters
             );
             jdbcTemplate.update(

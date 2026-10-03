@@ -32,6 +32,24 @@ describe('navigation items', () => {
     expect(items.map((item) => item.href)).toContain('/notices')
   })
 
+  it('shows points to admins only while they are being tried out', () => {
+    const memberItems = getVisibleNavItems({
+      isLoggedIn: true,
+      canAccess: true,
+      isAdmin: false,
+      isSuperAdmin: false,
+    })
+    const adminItems = getVisibleNavItems({
+      isLoggedIn: true,
+      canAccess: true,
+      isAdmin: true,
+      isSuperAdmin: false,
+    })
+
+    expect(memberItems.map((item) => item.href)).not.toContain('/points')
+    expect(adminItems.map((item) => item.href)).toContain('/points')
+  })
+
   it('hides the audit log from regular members', () => {
     const items = getVisibleNavItems({
       isLoggedIn: true,

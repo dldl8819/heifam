@@ -105,3 +105,10 @@ balancify:
   match:
     confirm:
       duplicate-window-minutes: ${MATCH_CONFIRM_DUPLICATE_WINDOW_MINUTES:5}
+  points:
+    # Admins try points out first. true lets every member earn points; seeing them also needs the
+    # point routes in AdminKeyFilter and the /points page opened to members.
+    members-enabled: ${POINTS_MEMBERS_ENABLED:false}
+    daily-login: ${POINTS_DAILY_LOGIN:1}
+    match-result: ${POINTS_MATCH_RESULT:1}
+    match-result-daily-cap: ${POINTS_MATCH_RESULT_DAILY_CAP:10}

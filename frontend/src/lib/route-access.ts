@@ -18,7 +18,8 @@ const DISABLED_PATHS = ['/dashboard']
 const PUBLIC_PATHS = ['/', '/events', '/ads', '/results', '/privacy', '/terms']
 const MEMBER_PATHS = ['/balance', '/players', '/ranking']
 // Admins see only what match result editors did on /admin/audit; the backend narrows the logs.
-const ADMIN_PATHS = ['/balance/multi', '/captain-draft', '/import', '/players/import', '/notices', '/admin/audit']
+// Points stay with admins until they open to members; the backend enforces the same rule.
+const ADMIN_PATHS = ['/balance/multi', '/captain-draft', '/import', '/players/import', '/notices', '/points', '/admin/audit']
 const SUPER_ADMIN_PATHS = ['/admin/access']
 
 function getAuthenticatedDefaultPath(_context: RouteAccessContext): string {

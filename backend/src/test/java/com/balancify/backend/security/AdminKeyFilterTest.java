@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
@@ -66,6 +67,9 @@ import com.balancify.backend.api.match.dto.MultiBalancePenaltySummaryResponse;
 import com.balancify.backend.api.match.dto.MultiBalanceRaceSummaryResponse;
 import com.balancify.backend.api.match.dto.MultiBalanceResponse;
 import com.balancify.backend.api.match.dto.MultiBalanceWaitingPlayerResponse;
+import com.balancify.backend.api.points.PointController;
+import com.balancify.backend.api.points.dto.PointAdjustmentResponse;
+import com.balancify.backend.api.points.dto.PointSummaryResponse;
 import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.AccountDeletionService;
 import com.balancify.backend.service.CaptainDraftService;
@@ -91,6 +95,7 @@ import com.balancify.backend.service.PlayerQueryService;
 import com.balancify.backend.service.PlayerRaceStatsQueryService;
 import com.balancify.backend.service.PlayerTeammateStatsQueryService;
 import com.balancify.backend.service.PlayerImportService;
+import com.balancify.backend.service.PointService;
 import com.balancify.backend.service.RankingService;
 import com.balancify.backend.service.RatingRecalculationService;
 import com.balancify.backend.service.TeamBalancingService;
@@ -129,7 +134,8 @@ import org.springframework.test.web.servlet.MockMvc;
     OperationAuditLogController.class,
     GroupNoticeAdminController.class,
     GroupLedgerController.class,
-    GroupLedgerAdminController.class
+    GroupLedgerAdminController.class,
+    PointController.class
 })
 @Import({ AdminKeyFilter.class, ServiceAccessFilter.class, AdminKeyProperties.class })
 @TestPropertySource(properties = {
@@ -239,6 +245,9 @@ class AdminKeyFilterTest {
 
     @MockitoBean
     private AuthenticatedRequestResolver authenticatedRequestResolver;
+
+    @MockitoBean
+    private PointService pointService;
 
     @BeforeEach
     void setUp() {
@@ -2121,6 +2130,82 @@ class AdminKeyFilterTest {
                     .content("{\"serviceName\":\"Render\",\"billingMonth\":\"2026-08\",\"chargedDate\":\"2026-09-01\",\"usdAmount\":7.41}")
             )
             .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void keepsPointsAwayFromMembersWhileAdminsTryThemOut() throws Exception {
+        mockMvc
+            .perform(get("/api/points/me").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(get("/api/points/ranking").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isForbidden());
+
+        verify(pointService, never()).getSummary(any());
+        verify(pointService, never()).getMonthlyRanking(any());
+    }
+
+    @Test
+    void grantsTheDailyLoginPointWithoutHoldingUpTheAccessCheck() throws Exception {
+        when(pointService.needsDailyLoginPoint("admin@hei.gg")).thenReturn(true);
+        doThrow(new IllegalStateException("ledger unavailable")).when(pointService).grantDailyLoginPoint("admin@hei.gg");
+
+        mockMvc
+            .perform(get("/api/access/me").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(get("/api/access/me").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk());
+
+        verify(pointService).grantDailyLoginPoint("admin@hei.gg");
+        verify(pointService, never()).grantDailyLoginPoint("member@hei.gg");
+    }
+
+    @Test
+    void showsAdminsTheirPoints() throws Exception {
+        when(pointService.canUsePoints("admin@hei.gg")).thenReturn(true);
+        when(pointService.getSummary("admin@hei.gg"))
+            .thenReturn(new PointSummaryResponse(3L, true, 1, 2, 10, 1, List.of()));
+
+        mockMvc
+            .perform(get("/api/points/me").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.balance").value(3));
+    }
+
+    @Test
+    void rejectsAMalformedRankingMonth() throws Exception {
+        when(pointService.canUsePoints("admin@hei.gg")).thenReturn(true);
+
+        mockMvc
+            .perform(get("/api/points/ranking").param("month", "October").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void letsOnlySuperAdminsAdjustPoints() throws Exception {
+        String body = "{\"email\":\"member@hei.gg\",\"amount\":5,\"memo\":\"event\"}";
+        mockMvc
+            .perform(
+                post("/api/admin/points/adjustments")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body)
+            )
+            .andExpect(status().isForbidden());
+        verify(pointService, never()).adjust(any(), any(), any(), any(), any());
+
+        when(pointService.adjust(eq("superadmin@hei.gg"), any(), eq("member@hei.gg"), eq(5), eq("event")))
+            .thenReturn(new PointAdjustmentResponse("member", 5, 5L));
+        mockMvc
+            .perform(
+                post("/api/admin/points/adjustments")
+                    .header("X-USER-EMAIL", "superadmin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.balance").value(5));
     }
 
     @Test

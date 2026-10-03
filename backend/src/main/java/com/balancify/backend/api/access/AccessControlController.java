@@ -12,12 +12,15 @@ import com.balancify.backend.api.access.dto.AccessResultEditorListResponse;
 import com.balancify.backend.security.AuthenticatedRequestResolver;
 import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.AccountDeletionService;
+import com.balancify.backend.service.PointService;
 import com.balancify.backend.service.AccessControlService.AccessProfile;
 import com.balancify.backend.service.exception.AccountDeletionException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -34,18 +37,23 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/access")
 public class AccessControlController {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(AccessControlController.class);
+
     private final AccessControlService accessControlService;
     private final AuthenticatedRequestResolver authenticatedRequestResolver;
     private final AccountDeletionService accountDeletionService;
+    private final PointService pointService;
 
     public AccessControlController(
         AccessControlService accessControlService,
         AuthenticatedRequestResolver authenticatedRequestResolver,
-        AccountDeletionService accountDeletionService
+        AccountDeletionService accountDeletionService,
+        PointService pointService
     ) {
         this.accessControlService = accessControlService;
         this.authenticatedRequestResolver = authenticatedRequestResolver;
         this.accountDeletionService = accountDeletionService;
+        this.pointService = pointService;
     }
 
     @GetMapping("/me")
@@ -53,7 +61,20 @@ public class AccessControlController {
         String requestEmail = requireRequestEmail(request);
         AccessProfile profile = accessControlService.resolveAccessProfile(requestEmail);
         accountDeletionService.linkAuthenticatedPlayers(authenticatedRequestResolver.resolve(request));
+        grantDailyLoginPoint(requestEmail);
         return toMeResponse(profile);
+    }
+
+    // The day's first visit earns a point. A failed grant never keeps anyone from loading the site.
+    private void grantDailyLoginPoint(String email) {
+        if (!pointService.needsDailyLoginPoint(email)) {
+            return;
+        }
+        try {
+            pointService.grantDailyLoginPoint(email);
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Daily login point was not granted: {}", exception.getClass().getSimpleName());
+        }
     }
 
     @PutMapping("/me/race")

@@ -54,6 +54,7 @@ public class OperationAuditLogService {
     public static final String ACTION_LEDGER_SERVER_COST_ADDED = "LEDGER_SERVER_COST_ADDED";
     public static final String ACTION_LEDGER_SERVER_COST_UPDATED = "LEDGER_SERVER_COST_UPDATED";
     public static final String ACTION_LEDGER_SERVER_COST_DELETED = "LEDGER_SERVER_COST_DELETED";
+    public static final String ACTION_POINT_ADJUSTED = "POINT_ADJUSTED";
 
     private static final int MAX_PAGE_SIZE = 200;
 
@@ -593,6 +594,23 @@ public class OperationAuditLogService {
             actorEmail, actorNickname, ACTION_LEDGER_SERVER_COST_DELETED, "LEDGER_SERVER_COST", entryId, entryLabel, groupId
         );
         log.setSummary("서버비 내역 삭제");
+        operationAuditLogRepository.save(log);
+    }
+
+    @Transactional
+    public void recordPointAdjustment(
+        String actorEmail,
+        String actorNickname,
+        Long accountId,
+        String targetNickname,
+        int amount,
+        String memo
+    ) {
+        OperationAuditLog log = baseLog(
+            actorEmail, actorNickname, ACTION_POINT_ADJUSTED, "POINT_ACCOUNT", accountId, targetNickname, null
+        );
+        log.setSummary("포인트 조정");
+        log.setDetails("amount=" + (amount > 0 ? "+" : "") + amount + (memo == null ? "" : ", memo=" + memo));
         operationAuditLogRepository.save(log);
     }
 

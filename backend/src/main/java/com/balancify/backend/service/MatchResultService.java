@@ -7,6 +7,7 @@ import com.balancify.backend.api.match.dto.MatchResultUpdateRequest;
 import com.balancify.backend.api.match.dto.ParticipantRaceRequest;
 import com.balancify.backend.domain.Match;
 import com.balancify.backend.domain.MatchParticipant;
+import com.balancify.backend.domain.MatchSource;
 import com.balancify.backend.domain.MatchStatus;
 import com.balancify.backend.domain.MmrHistory;
 import com.balancify.backend.domain.Player;
@@ -61,6 +62,7 @@ public class MatchResultService {
     private final AccessControlService accessControlService;
     private final OperationAuditLogService operationAuditLogService;
     private final MatchResultEditQuotaService matchResultEditQuotaService;
+    private final PointService pointService;
 
     public MatchResultService(
         MatchRepository matchRepository,
@@ -82,7 +84,8 @@ public class MatchResultService {
         PlayerStatsRefreshService playerStatsRefreshService,
         AccessControlService accessControlService,
         OperationAuditLogService operationAuditLogService,
-        MatchResultEditQuotaService matchResultEditQuotaService
+        MatchResultEditQuotaService matchResultEditQuotaService,
+        PointService pointService
     ) {
         this.matchRepository = matchRepository;
         this.groupRepository = groupRepository;
@@ -104,6 +107,7 @@ public class MatchResultService {
         this.accessControlService = accessControlService;
         this.operationAuditLogService = operationAuditLogService;
         this.matchResultEditQuotaService = matchResultEditQuotaService;
+        this.pointService = pointService;
     }
 
     @Transactional
@@ -366,6 +370,14 @@ public class MatchResultService {
         playerRepository.saveAll(new ArrayList<>(updatedPlayers.values()));
         mmrHistoryRepository.saveAll(mmrHistories);
         matchRepository.save(match);
+        // The first result of a balanced 3v3 match earns its recorder a point. Manual entries do not,
+        // so made-up matches cannot be used to collect points.
+        if (!allowReprocess
+            && ratingAffecting
+            && match.getSource() == MatchSource.BALANCED
+            && normalizedRecordedByEmail != null) {
+            pointService.grantMatchResultPoint(normalizedRecordedByEmail, match.getId());
+        }
         Long groupId = resolveGroupId(match, participants);
         TransactionAfterCommit.runAfterCommitAsync(groupStatsKey(groupId), () -> {
             playerStatsRefreshService.rebuildGroupStats(groupId);
@@ -959,6 +971,7 @@ public class MatchResultService {
         }
 
         mmrHistoryRepository.deleteByMatch_Id(matchId);
+        pointService.reverseMatchResultPoints(matchId);
         matchParticipantRepository.deleteByMatch_Id(matchId);
         matchRepository.delete(match);
         TransactionAfterCommit.runAfterCommitAsync(groupStatsKey(groupId), () -> {

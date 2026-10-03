@@ -77,6 +77,9 @@ class MatchResultServiceTest {
     @Mock
     private MatchResultEditQuotaService matchResultEditQuotaService;
 
+    @Mock
+    private PointService pointService;
+
     private MatchResultService matchResultService;
 
     @BeforeEach
@@ -108,8 +111,51 @@ class MatchResultServiceTest {
             playerStatsRefreshService,
             accessControlService,
             operationAuditLogService,
-            matchResultEditQuotaService
+            matchResultEditQuotaService,
+            pointService
         );
+    }
+
+    @Test
+    void givesTheRecorderAPointForTheFirstResultOfABalancedMatch() {
+        Match match = new Match();
+        match.setId(1L);
+        match.setStatus(MatchStatus.CONFIRMED);
+        stubFirstResult(match);
+
+        matchResultService.processMatchResult(1L, new MatchResultRequest("HOME"), "YOUR_USERNAME@example.com");
+
+        verify(pointService).grantMatchResultPoint("your_username@example.com", 1L);
+    }
+
+    @Test
+    void givesNoPointForManualMatchesOrResultsWithoutARecorder() {
+        Match manualMatch = new Match();
+        manualMatch.setId(1L);
+        manualMatch.setStatus(MatchStatus.CONFIRMED);
+        manualMatch.setSource(MatchSource.MANUAL);
+        stubFirstResult(manualMatch);
+
+        matchResultService.processMatchResult(1L, new MatchResultRequest("HOME"), "YOUR_USERNAME@example.com");
+
+        Match importedMatch = new Match();
+        importedMatch.setId(2L);
+        importedMatch.setStatus(MatchStatus.CONFIRMED);
+        stubFirstResult(importedMatch);
+
+        matchResultService.processMatchResult(2L, new MatchResultRequest("HOME"));
+
+        verify(pointService, never()).grantMatchResultPoint(any(), any());
+    }
+
+    private void stubFirstResult(Match match) {
+        List<MatchParticipant> participants = buildParticipants(match);
+        when(matchRepository.findByIdForUpdate(match.getId())).thenReturn(Optional.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(match.getId())).thenReturn(participants);
+        lenient().when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(playerRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(mmrHistoryRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
@@ -1223,6 +1269,7 @@ class MatchResultServiceTest {
         verify(mmrHistoryRepository).deleteByMatch_Id(99L);
         verify(matchParticipantRepository).deleteByMatch_Id(99L);
         verify(matchRepository).delete(match);
+        verify(pointService).reverseMatchResultPoints(99L);
         verify(playerStatsRefreshService, timeout(ASYNC_STATS_REBUILD_TIMEOUT_MS)).rebuildGroupStats(1L);
     }
 
