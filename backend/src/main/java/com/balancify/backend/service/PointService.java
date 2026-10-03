@@ -1,0 +1,349 @@
+package com.balancify.backend.service;
+
+import com.balancify.backend.api.points.dto.PointAdjustmentResponse;
+import com.balancify.backend.api.points.dto.PointHistoryItemResponse;
+import com.balancify.backend.api.points.dto.PointRankingEntryResponse;
+import com.balancify.backend.api.points.dto.PointRankingResponse;
+import com.balancify.backend.api.points.dto.PointSummaryResponse;
+import com.balancify.backend.config.PointProperties;
+import com.balancify.backend.domain.PointAccount;
+import com.balancify.backend.domain.PointTransaction;
+import com.balancify.backend.repository.PointAccountRepository;
+import com.balancify.backend.repository.PointTransactionRepository;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+/**
+ * Points members earn for activity. Every change is a new row in an append-only ledger, and
+ * each grant first locks the person's account row, so daily caps hold under concurrent requests.
+ */
+@Service
+public class PointService {
+
+    public static final String REASON_DAILY_LOGIN = "DAILY_LOGIN";
+    public static final String REASON_MATCH_RESULT = "MATCH_RESULT";
+    public static final String REASON_MATCH_RESULT_REVERSED = "MATCH_RESULT_REVERSED";
+    public static final String REASON_ADJUSTMENT = "ADJUSTMENT";
+
+    static final int MAX_ADJUSTMENT = 1000;
+    private static final int RANKING_LIMIT = 50;
+    private static final int MEMO_MAX_LENGTH = 200;
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
+    private final PointAccountRepository pointAccountRepository;
+    private final PointTransactionRepository pointTransactionRepository;
+    private final AccessControlService accessControlService;
+    private final OperationAuditLogService operationAuditLogService;
+    private final PointProperties pointProperties;
+    private final Clock clock;
+    // /api/access/me runs on every page load; this keeps it from touching the ledger once a day is done.
+    private final ConcurrentMap<String, LocalDate> dailyLoginGrantedOn = new ConcurrentHashMap<>();
+
+    @Autowired
+    public PointService(
+        PointAccountRepository pointAccountRepository,
+        PointTransactionRepository pointTransactionRepository,
+        AccessControlService accessControlService,
+        OperationAuditLogService operationAuditLogService,
+        PointProperties pointProperties
+    ) {
+        this(
+            pointAccountRepository,
+            pointTransactionRepository,
+            accessControlService,
+            operationAuditLogService,
+            pointProperties,
+            Clock.system(KST)
+        );
+    }
+
+    PointService(
+        PointAccountRepository pointAccountRepository,
+        PointTransactionRepository pointTransactionRepository,
+        AccessControlService accessControlService,
+        OperationAuditLogService operationAuditLogService,
+        PointProperties pointProperties,
+        Clock clock
+    ) {
+        this.pointAccountRepository = pointAccountRepository;
+        this.pointTransactionRepository = pointTransactionRepository;
+        this.accessControlService = accessControlService;
+        this.operationAuditLogService = operationAuditLogService;
+        this.pointProperties = pointProperties;
+        this.clock = clock;
+    }
+
+    /** Until points open to members, only admins earn and see them. */
+    public boolean canUsePoints(String email) {
+        String normalizedEmail = normalizeEmail(email);
+        if (normalizedEmail.isEmpty()) {
+            return false;
+        }
+        return pointProperties.isMembersEnabled()
+            ? accessControlService.isServiceAccessAllowed(normalizedEmail)
+            : accessControlService.isAdminEmail(normalizedEmail);
+    }
+
+    public boolean needsDailyLoginPoint(String email) {
+        String normalizedEmail = normalizeEmail(email);
+        return !normalizedEmail.isEmpty()
+            && !today().equals(dailyLoginGrantedOn.get(normalizedEmail))
+            && canUsePoints(normalizedEmail);
+    }
+
+    @Transactional
+    public void grantDailyLoginPoint(String email) {
+        String normalizedEmail = normalizeEmail(email);
+        if (!canUsePoints(normalizedEmail)) {
+            return;
+        }
+
+        LocalDate today = today();
+        String referenceKey = today.toString();
+        PointAccount account = lockAccount(normalizedEmail);
+        if (!pointTransactionRepository.existsByAccount_IdAndReasonAndReferenceKey(
+            account.getId(), REASON_DAILY_LOGIN, referenceKey
+        )) {
+            record(account, REASON_DAILY_LOGIN, pointProperties.getDailyLogin(), referenceKey, today, null, null);
+        }
+        rememberDailyLoginAfterCommit(normalizedEmail, today);
+    }
+
+    /** A first result entry for a balanced 3v3 match; the recorder earns a point, up to a daily cap. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void grantMatchResultPoint(String recorderEmail, Long matchId) {
+        String normalizedEmail = normalizeEmail(recorderEmail);
+        if (matchId == null || !canUsePoints(normalizedEmail)) {
+            return;
+        }
+
+        LocalDate today = today();
+        String referenceKey = matchReference(matchId);
+        PointAccount account = lockAccount(normalizedEmail);
+        if (pointTransactionRepository.existsByAccount_IdAndReasonAndReferenceKey(
+            account.getId(), REASON_MATCH_RESULT, referenceKey
+        )) {
+            return;
+        }
+        long earnedToday = pointTransactionRepository.countByAccount_IdAndReasonAndKstDate(
+            account.getId(), REASON_MATCH_RESULT, today
+        );
+        if (earnedToday >= pointProperties.getMatchResultDailyCap()) {
+            return;
+        }
+        record(account, REASON_MATCH_RESULT, pointProperties.getMatchResult(), referenceKey, today, null, null);
+    }
+
+    /** Takes back the result-entry point of a deleted match; the original row stays as history. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void reverseMatchResultPoints(Long matchId) {
+        if (matchId == null) {
+            return;
+        }
+
+        String referenceKey = matchReference(matchId);
+        for (PointTransaction grant : pointTransactionRepository.findByReasonAndReferenceKey(REASON_MATCH_RESULT, referenceKey)) {
+            PointAccount account = lockAccount(grant.getAccount().getNormalizedEmail());
+            if (pointTransactionRepository.existsByAccount_IdAndReasonAndReferenceKey(
+                account.getId(), REASON_MATCH_RESULT_REVERSED, referenceKey
+            )) {
+                continue;
+            }
+            record(account, REASON_MATCH_RESULT_REVERSED, -grant.getAmount(), referenceKey, today(), null, null);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public PointSummaryResponse getSummary(String email) {
+        String normalizedEmail = normalizeEmail(email);
+        LocalDate today = today();
+        Optional<PointAccount> account = pointAccountRepository.findByNormalizedEmail(normalizedEmail);
+        if (account.isEmpty()) {
+            return new PointSummaryResponse(
+                0L,
+                false,
+                pointProperties.getDailyLogin(),
+                0,
+                pointProperties.getMatchResultDailyCap(),
+                pointProperties.getMatchResult(),
+                List.of()
+            );
+        }
+
+        Long accountId = account.get().getId();
+        List<PointHistoryItemResponse> recent = pointTransactionRepository.findTop20ByAccount_IdOrderByIdDesc(accountId)
+            .stream()
+            .map(transaction -> new PointHistoryItemResponse(
+                transaction.getReason(),
+                transaction.getAmount(),
+                transaction.getKstDate(),
+                transaction.getMemo(),
+                transaction.getCreatedAt()
+            ))
+            .toList();
+        return new PointSummaryResponse(
+            pointTransactionRepository.sumAmountByAccountId(accountId),
+            pointTransactionRepository.existsByAccount_IdAndReasonAndReferenceKey(
+                accountId, REASON_DAILY_LOGIN, today.toString()
+            ),
+            pointProperties.getDailyLogin(),
+            (int) pointTransactionRepository.countByAccount_IdAndReasonAndKstDate(accountId, REASON_MATCH_RESULT, today),
+            pointProperties.getMatchResultDailyCap(),
+            pointProperties.getMatchResult(),
+            recent
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public PointRankingResponse getMonthlyRanking(YearMonth month) {
+        YearMonth targetMonth = month == null ? currentMonth() : month;
+        List<PointTransactionRepository.PointTotal> totals = pointTransactionRepository.sumPositiveTotalsBetween(
+            targetMonth.atDay(1),
+            targetMonth.atEndOfMonth()
+        );
+        List<PointTransactionRepository.PointTotal> ranked = totals.subList(0, Math.min(totals.size(), RANKING_LIMIT));
+        Map<String, String> nicknames = accessControlService.resolveDisplayNicknames(
+            ranked.stream().map(PointTransactionRepository.PointTotal::getNormalizedEmail).toList()
+        );
+
+        // Equal totals share a rank (1, 2, 2, 4). Emails stay on the server; only nicknames go out.
+        List<PointRankingEntryResponse> entries = new ArrayList<>();
+        long previousPoints = Long.MIN_VALUE;
+        int rank = 0;
+        for (int index = 0; index < ranked.size(); index++) {
+            PointTransactionRepository.PointTotal total = ranked.get(index);
+            long points = total.getPoints() == null ? 0L : total.getPoints();
+            if (points != previousPoints) {
+                rank = index + 1;
+                previousPoints = points;
+            }
+            entries.add(new PointRankingEntryResponse(rank, nicknames.get(total.getNormalizedEmail()), points));
+        }
+        return new PointRankingResponse(targetMonth.toString(), entries);
+    }
+
+    @Transactional
+    public PointAdjustmentResponse adjust(
+        String actorEmail,
+        String actorNickname,
+        String targetEmail,
+        Integer amount,
+        String memo
+    ) {
+        String normalizedTargetEmail = normalizeEmail(targetEmail);
+        if (normalizedTargetEmail.isEmpty() || !normalizedTargetEmail.contains("@")) {
+            throw new IllegalArgumentException("A valid email is required");
+        }
+        if (amount == null || amount == 0 || Math.abs(amount) > MAX_ADJUSTMENT) {
+            throw new IllegalArgumentException("Amount must be between -" + MAX_ADJUSTMENT + " and " + MAX_ADJUSTMENT + ", not 0");
+        }
+        if (!accessControlService.isServiceAccessAllowed(normalizedTargetEmail)) {
+            throw new IllegalArgumentException("Target email is not a registered member");
+        }
+
+        String normalizedMemo = memo == null ? null : memo.trim();
+        if (normalizedMemo != null && normalizedMemo.isEmpty()) {
+            normalizedMemo = null;
+        }
+        if (normalizedMemo != null && normalizedMemo.length() > MEMO_MAX_LENGTH) {
+            normalizedMemo = normalizedMemo.substring(0, MEMO_MAX_LENGTH);
+        }
+
+        PointAccount account = lockAccount(normalizedTargetEmail);
+        record(
+            account,
+            REASON_ADJUSTMENT,
+            amount,
+            "adjust:" + UUID.randomUUID(),
+            today(),
+            normalizedMemo,
+            normalizeEmail(actorEmail)
+        );
+        String targetNickname = accessControlService.resolveDisplayNickname(normalizedTargetEmail);
+        operationAuditLogService.recordPointAdjustment(
+            actorEmail,
+            actorNickname,
+            account.getId(),
+            targetNickname,
+            amount,
+            normalizedMemo
+        );
+        return new PointAdjustmentResponse(
+            targetNickname,
+            amount,
+            pointTransactionRepository.sumAmountByAccountId(account.getId())
+        );
+    }
+
+    public YearMonth currentMonth() {
+        return YearMonth.now(clock.withZone(KST));
+    }
+
+    private PointAccount lockAccount(String normalizedEmail) {
+        pointAccountRepository.insertIfMissing(normalizedEmail);
+        return pointAccountRepository.findByNormalizedEmailForUpdate(normalizedEmail)
+            .orElseThrow(() -> new IllegalStateException("Point account could not be created"));
+    }
+
+    private void record(
+        PointAccount account,
+        String reason,
+        int amount,
+        String referenceKey,
+        LocalDate kstDate,
+        String memo,
+        String createdByEmail
+    ) {
+        PointTransaction transaction = new PointTransaction();
+        transaction.setAccount(account);
+        transaction.setReason(reason);
+        transaction.setAmount(amount);
+        transaction.setReferenceKey(referenceKey);
+        transaction.setKstDate(kstDate);
+        transaction.setMemo(memo);
+        transaction.setCreatedByEmail(createdByEmail);
+        pointTransactionRepository.save(transaction);
+    }
+
+    // Remembered only after the commit, so a rolled-back grant is tried again on the next page load.
+    private void rememberDailyLoginAfterCommit(String normalizedEmail, LocalDate day) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            dailyLoginGrantedOn.put(normalizedEmail, day);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                dailyLoginGrantedOn.put(normalizedEmail, day);
+            }
+        });
+    }
+
+    private LocalDate today() {
+        return LocalDate.now(clock.withZone(KST));
+    }
+
+    private static String matchReference(Long matchId) {
+        return "match:" + matchId;
+    }
+
+    private static String normalizeEmail(String value) {
+        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+    }
+}

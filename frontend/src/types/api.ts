@@ -725,3 +725,46 @@ export type LedgerImportResponse = {
   importedCount: number
   skippedRows: LedgerImportRowError[]
 }
+
+export type PointReason = 'DAILY_LOGIN' | 'MATCH_RESULT' | 'MATCH_RESULT_REVERSED' | 'ADJUSTMENT'
+
+export type PointHistoryItem = {
+  reason: PointReason | string
+  amount: number
+  kstDate: string
+  memo: string | null
+  createdAt: string
+}
+
+export type PointSummaryResponse = {
+  balance: number
+  dailyLoginEarnedToday: boolean
+  dailyLoginPoints: number
+  matchResultsToday: number
+  matchResultDailyCap: number
+  matchResultPoints: number
+  recent: PointHistoryItem[]
+}
+
+export type PointRankingEntry = {
+  rank: number
+  nickname: string | null
+  points: number
+}
+
+export type PointRankingResponse = {
+  month: string
+  entries: PointRankingEntry[]
+}
+
+export type PointAdjustmentRequest = {
+  email: string
+  amount: number
+  memo: string | null
+}
+
+export type PointAdjustmentResponse = {
+  nickname: string | null
+  amount: number
+  balance: number
+}

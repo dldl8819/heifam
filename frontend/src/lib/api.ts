@@ -49,6 +49,10 @@ import type {
   PlayerLifecycleStatus,
   PlayerRace,
   PlayerTierStatus,
+  PointAdjustmentRequest,
+  PointAdjustmentResponse,
+  PointRankingResponse,
+  PointSummaryResponse,
   RatingRecalculationRequest,
   RatingRecalculationResponse,
   RecentMatchItem,
@@ -1499,6 +1503,29 @@ export const apiClient = {
       `/api/groups/${groupId}/ledger/dashboard`,
       undefined,
       { includeUserEmail: true }
+    ),
+  getMyPoints: () =>
+    apiRequest<PointSummaryResponse>('/api/points/me', undefined, {
+      requireUserEmail: true,
+      includeUserEmail: true,
+    }),
+  getPointRanking: (month?: string) => {
+    const params = new URLSearchParams()
+    appendOptionalSearchParam(params, 'month', month)
+    const query = params.toString()
+    return apiRequest<PointRankingResponse>(`/api/points/ranking${query ? `?${query}` : ''}`, undefined, {
+      requireUserEmail: true,
+      includeUserEmail: true,
+    })
+  },
+  adjustPoints: (payload: PointAdjustmentRequest) =>
+    apiRequest<PointAdjustmentResponse>(
+      '/api/admin/points/adjustments',
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      { requireUserEmail: true, includeUserEmail: true }
     ),
   updateMyPreferredRace: (race: PlayerRace) =>
     apiRequest<AccessMeResponse>(

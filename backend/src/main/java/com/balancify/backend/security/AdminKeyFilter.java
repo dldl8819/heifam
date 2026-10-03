@@ -70,6 +70,23 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             PathPatternParser.defaultInstance.parse("/api/matches/import"),
             AuthType.ADMIN_EMAIL
         ),
+        // Admins try points out first. Opening them to members takes these two routes as well as
+        // balancify.points.members-enabled; the flag alone only lets members earn points.
+        new ProtectedRoute(
+            "GET",
+            PathPatternParser.defaultInstance.parse("/api/points/me"),
+            AuthType.ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "GET",
+            PathPatternParser.defaultInstance.parse("/api/points/ranking"),
+            AuthType.ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "POST",
+            PathPatternParser.defaultInstance.parse("/api/admin/points/adjustments"),
+            AuthType.SUPER_ADMIN_EMAIL
+        ),
         // Captain drafts are run from an admin-only screen, and these calls change draft data.
         new ProtectedRoute(
             "POST",

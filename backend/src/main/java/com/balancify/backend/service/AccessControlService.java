@@ -12,9 +12,12 @@ import com.balancify.backend.repository.MatchResultEditorEmailRepository;
 import com.balancify.backend.repository.UserRacePreferenceRepository;
 import com.balancify.backend.security.AdminKeyProperties;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -557,6 +560,37 @@ public class AccessControlService {
             allowedUserEmail.setCreatedByEmail(actorEmail);
         }
         allowedUserEmailRepository.save(allowedUserEmail);
+    }
+
+    /** The nickname shown for an access email, or null when none is set. */
+    public String resolveDisplayNickname(String email) {
+        return resolveNickname(email);
+    }
+
+    /** {@link #resolveDisplayNickname} for many emails with two queries; emails without one map to null. */
+    public Map<String, String> resolveDisplayNicknames(Collection<String> emails) {
+        Map<String, String> knownNicknames = new HashMap<>();
+        for (AllowedUserEmail allowedUser : allowedUserEmailRepository.findAllByOrderByNormalizedEmailAsc()) {
+            putNickname(knownNicknames, allowedUser.getNormalizedEmail(), allowedUser.getNickname());
+        }
+        // An admin entry's nickname wins, as in resolveNickname.
+        for (ManagedAdminEmail admin : managedAdminEmailRepository.findAllByOrderByNormalizedEmailAsc()) {
+            putNickname(knownNicknames, admin.getNormalizedEmail(), admin.getNickname());
+        }
+
+        Map<String, String> nicknames = new HashMap<>();
+        for (String email : emails) {
+            String normalizedEmail = normalizeEmail(email);
+            nicknames.put(normalizedEmail, knownNicknames.get(normalizedEmail));
+        }
+        return nicknames;
+    }
+
+    private void putNickname(Map<String, String> nicknames, String email, String nickname) {
+        String normalizedNickname = normalizeNickname(nickname);
+        if (!normalizedNickname.isEmpty()) {
+            nicknames.put(normalizeEmail(email), normalizedNickname);
+        }
     }
 
     private String resolveNickname(String email) {
