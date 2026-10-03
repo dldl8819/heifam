@@ -11,8 +11,10 @@ public class SupabaseAuthProperties {
     private boolean allowEmailHeaderFallback = false;
     private String supabaseUrl;
     private String apiKey;
+    private static final int MAX_VERIFICATION_CACHE_TTL_SECONDS = 300;
+
     private int verifyTimeoutMs = 3000;
-    private int verificationCacheTtlSeconds = 0;
+    private int verificationCacheTtlSeconds = 60;
     private String serviceRoleKey;
 
     public boolean isRequireJwt() {
@@ -51,8 +53,14 @@ public class SupabaseAuthProperties {
         return verificationCacheTtlSeconds;
     }
 
+    // How long a positive Supabase Auth check is reused for the same token. Longer means fewer Auth
+    // requests, but a revoked token keeps working that long, so it is capped at five minutes.
+    // 0 checks every request.
     public void setVerificationCacheTtlSeconds(int verificationCacheTtlSeconds) {
-        this.verificationCacheTtlSeconds = 0;
+        this.verificationCacheTtlSeconds = Math.max(
+            0,
+            Math.min(MAX_VERIFICATION_CACHE_TTL_SECONDS, verificationCacheTtlSeconds)
+        );
     }
 
     public String getApiKey() {

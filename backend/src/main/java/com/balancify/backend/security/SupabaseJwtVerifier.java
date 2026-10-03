@@ -10,6 +10,7 @@ import com.nimbusds.jose.proc.JWSAlgorithmFamilyJWSKeySelector;
 import com.nimbusds.jose.proc.JWSKeySelector;
 import com.nimbusds.jose.proc.SecurityContext;
 import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
 import com.nimbusds.jwt.proc.ConfigurableJWTProcessor;
 import com.nimbusds.jwt.proc.DefaultJWTProcessor;
 import com.nimbusds.jose.util.DefaultResourceRetriever;
@@ -21,15 +22,20 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.text.ParseException;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
+import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -43,11 +49,18 @@ public class SupabaseJwtVerifier {
     private final HttpClient authHttpClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final String expectedIssuer;
+    private final Clock clock;
 
+    @Autowired
     public SupabaseJwtVerifier(
         SupabaseAuthProperties supabaseAuthProperties
     ) {
+        this(supabaseAuthProperties, Clock.systemUTC());
+    }
+
+    SupabaseJwtVerifier(SupabaseAuthProperties supabaseAuthProperties, Clock clock) {
         this.supabaseAuthProperties = supabaseAuthProperties;
+        this.clock = clock;
         this.expectedIssuer = resolveExpectedIssuer();
         this.jwtProcessor = createJwtProcessor();
         this.authHttpClient = HttpClient
@@ -62,11 +75,23 @@ public class SupabaseJwtVerifier {
             return Optional.empty();
         }
 
-        long now = System.currentTimeMillis();
+        long now = clock.millis();
 
         if (expectedIssuer.isEmpty()) {
-            verificationCache.remove(normalizedToken);
             return Optional.empty();
+        }
+
+        // A page load sends several API calls with the same token, and each check is a Supabase
+        // Auth request that Supabase also logs. A positive answer is reused for a short while
+        // (verification-cache-ttl-seconds), so a token revoked meanwhile still works until its
+        // entry runs out. Deleting an account clears that user's entries at once (invalidateUser).
+        String cacheKey = cacheKey(normalizedToken);
+        CachedVerification cached = verificationCache.get(cacheKey);
+        if (cached != null) {
+            if (cached.expiresAtEpochMs() > now) {
+                return Optional.of(cached.user());
+            }
+            verificationCache.remove(cacheKey, cached);
         }
 
         Optional<VerifiedUser> jwksVerifiedUser = jwtProcessor == null
@@ -79,7 +104,7 @@ public class SupabaseJwtVerifier {
                 VerifiedUser signedUser = jwksVerifiedUser.get();
                 if (!signedUser.userId().equals(activeUser.userId())
                     || !signedUser.email().equals(activeUser.email())) {
-                    verificationCache.remove(normalizedToken);
+                    verificationCache.remove(cacheKey);
                     return Optional.empty();
                 }
                 activeUser = new VerifiedUser(
@@ -89,11 +114,11 @@ public class SupabaseJwtVerifier {
                     signedUser.sessionId()
                 );
             }
-            cacheVerification(normalizedToken, activeUser, now, 0L);
+            cacheVerification(cacheKey, activeUser, now, tokenExpiresAt(normalizedToken));
             return Optional.of(activeUser);
         }
 
-        verificationCache.remove(normalizedToken);
+        verificationCache.remove(cacheKey);
         return Optional.empty();
     }
 
@@ -174,7 +199,7 @@ public class SupabaseJwtVerifier {
     }
 
     private void cacheVerification(
-        String normalizedToken,
+        String cacheKey,
         VerifiedUser verifiedUser,
         long now,
         long expirationBound
@@ -187,7 +212,31 @@ public class SupabaseJwtVerifier {
         long expiresAt = expirationBound > 0
             ? Math.min(now + ttlMillis, expirationBound)
             : now + ttlMillis;
-        verificationCache.put(normalizedToken, new CachedVerification(verifiedUser, expiresAt));
+        if (expiresAt <= now) {
+            return;
+        }
+        verificationCache.values().removeIf(entry -> entry.expiresAtEpochMs() <= now);
+        verificationCache.put(cacheKey, new CachedVerification(verifiedUser, expiresAt));
+    }
+
+    // Entries are keyed by a hash so the cache never holds raw access tokens.
+    private static String cacheKey(String token) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is not available", exception);
+        }
+    }
+
+    // The Auth API has just accepted this token, so its expiry claim can bound the cache entry.
+    private static long tokenExpiresAt(String token) {
+        try {
+            Date expirationTime = SignedJWT.parse(token).getJWTClaimsSet().getExpirationTime();
+            return expirationTime == null ? 0L : expirationTime.getTime();
+        } catch (ParseException exception) {
+            return 0L;
+        }
     }
 
     private ConfigurableJWTProcessor<SecurityContext> createJwtProcessor() {
