@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -23,6 +24,7 @@ import com.balancify.backend.api.access.AccessControlController;
 import com.balancify.backend.api.admin.AdminRatingController;
 import com.balancify.backend.api.admin.OperationAuditLogController;
 import com.balancify.backend.api.admin.dto.OperationAuditLogPageResponse;
+import com.balancify.backend.api.group.CaptainDraftController;
 import com.balancify.backend.api.group.GroupMatchAdminController;
 import com.balancify.backend.api.group.GroupMatchController;
 import com.balancify.backend.api.group.GroupLedgerAdminController;
@@ -66,6 +68,7 @@ import com.balancify.backend.api.match.dto.MultiBalanceResponse;
 import com.balancify.backend.api.match.dto.MultiBalanceWaitingPlayerResponse;
 import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.AccountDeletionService;
+import com.balancify.backend.service.CaptainDraftService;
 import com.balancify.backend.service.DashboardQueryService;
 import com.balancify.backend.service.GroupMatchAdminService;
 import com.balancify.backend.service.LedgerExpenseAdminService;
@@ -92,6 +95,7 @@ import com.balancify.backend.service.RankingService;
 import com.balancify.backend.service.RatingRecalculationService;
 import com.balancify.backend.service.TeamBalancingService;
 import com.balancify.backend.service.exception.MatchEditQuotaExceededException;
+import java.net.URI;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Locale;
@@ -109,6 +113,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(controllers = {
     MatchResultController.class,
+    CaptainDraftController.class,
     AccessControlController.class,
     MatchImportController.class,
     MatchBalanceController.class,
@@ -141,6 +146,9 @@ class AdminKeyFilterTest {
 
     @MockBean
     private MatchResultService matchResultService;
+
+    @MockBean
+    private CaptainDraftService captainDraftService;
 
     @MockBean
     private ManualMatchService manualMatchService;
@@ -2405,5 +2413,83 @@ class AdminKeyFilterTest {
             OffsetDateTime.parse("2031-07-12T03:00:00Z"),
             false
         );
+    }
+
+    @Test
+    void refusesEncodedOrParameterizedMemberPathsWithoutSignIn() throws Exception {
+        // Spring MVC decodes these to /api/groups/... and routes them to the same controllers.
+        mockMvc
+            .perform(get(URI.create("/api/%67roups/1/players")))
+            .andExpect(status().isUnauthorized());
+        mockMvc
+            .perform(get(URI.create("/%61pi/groups/1/ranking")))
+            .andExpect(status().isUnauthorized());
+        mockMvc
+            .perform(get(URI.create("/api/groups;x=1/1/players")))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void refusesEncodedMemberPathsForEmailsWithoutAccess() throws Exception {
+        mockMvc
+            .perform(
+                get(URI.create("/api/%67roups/1/ranking"))
+                    .header("X-USER-EMAIL", "blocked@hei.gg")
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void stillServesEncodedPathsToMembers() throws Exception {
+        when(rankingService.getGroupRanking(eq(1L))).thenReturn(List.of());
+
+        mockMvc
+            .perform(
+                get(URI.create("/api/%67roups/1/ranking"))
+                    .header("X-USER-EMAIL", "member@hei.gg")
+            )
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void keepsHealthAndRecentMatchesOpenWithoutSignIn() throws Exception {
+        when(matchQueryService.getRecentMatches(eq(1L), any(), any(), any())).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/health")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/groups/1/matches/recent")).andExpect(status().isOk());
+    }
+
+    @Test
+    void appliesTheGetRuleToHeadRequests() throws Exception {
+        mockMvc
+            .perform(
+                head("/api/groups/1/ledger/summary")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void keepsCaptainDraftsToAdmins() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/groups/1/captain-drafts")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{}")
+            )
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(
+                get("/api/groups/1/captain-drafts/latest")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+            )
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(
+                get("/api/groups/1/captain-drafts/latest")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+            )
+            .andExpect(status().isOk());
     }
 }
