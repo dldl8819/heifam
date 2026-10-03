@@ -70,6 +70,32 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             PathPatternParser.defaultInstance.parse("/api/matches/import"),
             AuthType.ADMIN_EMAIL
         ),
+        // Captain drafts are run from an admin-only screen, and these calls change draft data.
+        new ProtectedRoute(
+            "POST",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/captain-drafts"),
+            AuthType.ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "GET",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/captain-drafts/latest"),
+            AuthType.ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "GET",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/captain-drafts/{draftId}"),
+            AuthType.ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "PUT",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/captain-drafts/{draftId}/entries"),
+            AuthType.ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "POST",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/captain-drafts/{draftId}/pick"),
+            AuthType.ADMIN_EMAIL
+        ),
         new ProtectedRoute(
             "POST",
             PathPatternParser.defaultInstance.parse("/api/matches/manual"),
@@ -352,7 +378,9 @@ public class AdminKeyFilter extends OncePerRequestFilter {
         AuthType authType
     ) {
         private boolean matches(String requestMethod, PathContainer requestPath) {
-            return method.equalsIgnoreCase(requestMethod) && pattern.matches(requestPath);
+            // Spring MVC answers HEAD with the GET handler, so HEAD must meet the GET rule.
+            String effectiveMethod = "HEAD".equalsIgnoreCase(requestMethod) ? "GET" : requestMethod;
+            return method.equalsIgnoreCase(effectiveMethod) && pattern.matches(requestPath);
         }
     }
 

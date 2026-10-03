@@ -27,6 +27,18 @@ class ApiNoStoreFilterTest {
     }
 
     @Test
+    void preventsCachingForPercentEncodedApiPaths() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/%61pi/groups/1/ranking");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store, max-age=0");
+        verify(chain).doFilter(request, response);
+    }
+
+    @Test
     void leavesNonApiResponsesUnchanged() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/actuator/health");
         MockHttpServletResponse response = new MockHttpServletResponse();
