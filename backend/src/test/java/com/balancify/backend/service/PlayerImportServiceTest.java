@@ -145,7 +145,7 @@ class PlayerImportServiceTest {
         when(groupRepository.findById(5L)).thenReturn(Optional.empty());
         when(groupRepository.save(any(Group.class))).thenAnswer(invocation -> {
             Group group = invocation.getArgument(0);
-            createdGroup.setId(group.getId());
+            // The database assigns the id.
             createdGroup.setName(group.getName());
             return createdGroup;
         });
@@ -165,7 +165,8 @@ class PlayerImportServiceTest {
 
         ArgumentCaptor<Group> groupCaptor = ArgumentCaptor.forClass(Group.class);
         verify(groupRepository).save(groupCaptor.capture());
-        assertThat(groupCaptor.getValue().getId()).isEqualTo(5L);
+        // A preset id would make save() merge a missing row, which Hibernate 6.6 rejects.
+        assertThat(groupCaptor.getValue().getId()).isNull();
         assertThat(groupCaptor.getValue().getName()).isEqualTo("Group 5");
     }
 
