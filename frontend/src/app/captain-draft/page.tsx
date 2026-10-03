@@ -7,6 +7,7 @@ import { TierParticipantBoard } from '@/components/tier-participant-board'
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
+import { startVisiblePolling } from '@/lib/visible-polling'
 import {
   autocompleteParticipantSlot,
   compactParticipantIds,
@@ -332,16 +333,15 @@ export default function CaptainDraftPage() {
       return
     }
 
-    const intervalId = window.setInterval(async () => {
+    const draftId = draft.draftId
+    return startVisiblePolling(async () => {
       try {
-        const refreshed = await apiClient.getCaptainDraft(TEMP_GROUP_ID, draft.draftId)
+        const refreshed = await apiClient.getCaptainDraft(TEMP_GROUP_ID, draftId)
         setDraft(refreshed)
       } catch {
         // Keep current snapshot on polling failure.
       }
     }, 3000)
-
-    return () => window.clearInterval(intervalId)
   }, [draft?.draftId])
 
   useEffect(() => {

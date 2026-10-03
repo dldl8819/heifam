@@ -19,7 +19,10 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.Date;
 import java.util.Map;
 import java.util.Optional;
@@ -158,7 +161,7 @@ class SupabaseJwtVerifierTest {
     }
 
     @Test
-    void checksActiveUserOnEveryRequestWhileReusingJwks() throws Exception {
+    void reusesTheActiveUserCheckForTheSameTokenWithinTheCacheWindow() throws Exception {
         ECKey signingKey = new ECKeyGenerator(Curve.P_256)
             .keyID("hei-test-key")
             .generate();
@@ -183,6 +186,66 @@ class SupabaseJwtVerifierTest {
         assertThat(verifier.verify(token)).isPresent();
         assertThat(verifier.verify(token)).isPresent();
         assertThat(jwksRequestCount.get()).isEqualTo(1);
+        assertThat(authUserRequestCount.get()).isEqualTo(1);
+    }
+
+    @Test
+    void checksTheActiveUserOnEveryRequestWhenCachingIsOff() throws Exception {
+        ECKey signingKey = new ECKeyGenerator(Curve.P_256)
+            .keyID("hei-test-key")
+            .generate();
+        String baseUrl = startJwksServer(new JWKSet(signingKey.toPublicJWK()).toString());
+        registerActiveUserEndpoint();
+
+        SupabaseAuthProperties properties = new SupabaseAuthProperties();
+        properties.setSupabaseUrl(baseUrl);
+        properties.setApiKey(PLACEHOLDER_API_KEY);
+        properties.setVerifyTimeoutMs(1000);
+        properties.setVerificationCacheTtlSeconds(0);
+
+        SupabaseJwtVerifier verifier = new SupabaseJwtVerifier(properties);
+
+        String token = createToken(
+            signingKey,
+            baseUrl + "/auth/v1",
+            "member@example.test",
+            Map.of("nickname", "민식")
+        );
+
+        assertThat(verifier.verify(token)).isPresent();
+        assertThat(verifier.verify(token)).isPresent();
+        assertThat(jwksRequestCount.get()).isEqualTo(1);
+        assertThat(authUserRequestCount.get()).isEqualTo(2);
+    }
+
+    @Test
+    void neverReusesACheckPastTheTokenExpiry() throws Exception {
+        ECKey signingKey = new ECKeyGenerator(Curve.P_256)
+            .keyID("hei-test-key")
+            .generate();
+        String baseUrl = startJwksServer(new JWKSet(signingKey.toPublicJWK()).toString());
+        registerActiveUserEndpoint();
+
+        SupabaseAuthProperties properties = new SupabaseAuthProperties();
+        properties.setSupabaseUrl(baseUrl);
+        properties.setApiKey(PLACEHOLDER_API_KEY);
+        properties.setVerifyTimeoutMs(1000);
+        properties.setVerificationCacheTtlSeconds(60);
+
+        MutableClock clock = new MutableClock(Instant.now());
+        SupabaseJwtVerifier verifier = new SupabaseJwtVerifier(properties, clock);
+
+        String token = createToken(
+            signingKey,
+            baseUrl + "/auth/v1",
+            "member@example.test",
+            Map.of("nickname", "민식"),
+            clock.instant().plusSeconds(40)
+        );
+
+        assertThat(verifier.verify(token)).isPresent();
+        clock.advanceSeconds(41);
+        verifier.verify(token);
         assertThat(authUserRequestCount.get()).isEqualTo(2);
     }
 
@@ -223,8 +286,75 @@ class SupabaseJwtVerifierTest {
     }
 
     @Test
-    void rejectsCachedTokenWhenAuthUserBecomesUnavailable() throws Exception {
+    void rejectsATokenAsSoonAsTheAuthUserIsGoneWhenCachingIsOff() throws Exception {
         String baseUrl = startJwksServer(new JWKSet().toString());
+        registerAuthUserThatDisappearsAfterFirstCheck();
+
+        SupabaseAuthProperties properties = new SupabaseAuthProperties();
+        properties.setSupabaseUrl(baseUrl);
+        properties.setApiKey(PLACEHOLDER_API_KEY);
+        properties.setVerifyTimeoutMs(1000);
+        properties.setVerificationCacheTtlSeconds(0);
+
+        SupabaseJwtVerifier verifier = new SupabaseJwtVerifier(properties);
+
+        assertThat(verifier.verify("placeholder-access-token")).isPresent();
+        assertThat(verifier.verify("placeholder-access-token")).isEmpty();
+        assertThat(authUserRequestCount.get()).isEqualTo(2);
+    }
+
+    @Test
+    void checksAgainOnceTheCacheWindowEnds() throws Exception {
+        String baseUrl = startJwksServer(new JWKSet().toString());
+        registerAuthUserThatDisappearsAfterFirstCheck();
+
+        SupabaseAuthProperties properties = new SupabaseAuthProperties();
+        properties.setSupabaseUrl(baseUrl);
+        properties.setApiKey(PLACEHOLDER_API_KEY);
+        properties.setVerifyTimeoutMs(1000);
+        properties.setVerificationCacheTtlSeconds(60);
+
+        MutableClock clock = new MutableClock(Instant.now());
+        SupabaseJwtVerifier verifier = new SupabaseJwtVerifier(properties, clock);
+
+        assertThat(verifier.verify("placeholder-access-token")).isPresent();
+        clock.advanceSeconds(30);
+        assertThat(verifier.verify("placeholder-access-token")).isPresent();
+        clock.advanceSeconds(31);
+        assertThat(verifier.verify("placeholder-access-token")).isEmpty();
+        assertThat(authUserRequestCount.get()).isEqualTo(2);
+    }
+
+    @Test
+    void dropsCachedChecksForADeletedAccountAtOnce() throws Exception {
+        String baseUrl = startJwksServer(new JWKSet().toString());
+        registerAuthUserThatDisappearsAfterFirstCheck();
+
+        SupabaseAuthProperties properties = new SupabaseAuthProperties();
+        properties.setSupabaseUrl(baseUrl);
+        properties.setApiKey(PLACEHOLDER_API_KEY);
+        properties.setVerifyTimeoutMs(1000);
+        properties.setVerificationCacheTtlSeconds(60);
+
+        SupabaseJwtVerifier verifier = new SupabaseJwtVerifier(properties);
+
+        assertThat(verifier.verify("placeholder-access-token")).isPresent();
+        verifier.invalidateUser(PLACEHOLDER_USER_ID);
+        assertThat(verifier.verify("placeholder-access-token")).isEmpty();
+        assertThat(authUserRequestCount.get()).isEqualTo(2);
+    }
+
+    @Test
+    void capsTheCacheWindowAtFiveMinutes() {
+        SupabaseAuthProperties properties = new SupabaseAuthProperties();
+
+        properties.setVerificationCacheTtlSeconds(3600);
+        assertThat(properties.getVerificationCacheTtlSeconds()).isEqualTo(300);
+        properties.setVerificationCacheTtlSeconds(-5);
+        assertThat(properties.getVerificationCacheTtlSeconds()).isZero();
+    }
+
+    private void registerAuthUserThatDisappearsAfterFirstCheck() {
         jwksServer.createContext(
             "/auth/v1/user",
             exchange -> {
@@ -251,18 +381,6 @@ class SupabaseJwtVerifierTest {
                 }
             }
         );
-
-        SupabaseAuthProperties properties = new SupabaseAuthProperties();
-        properties.setSupabaseUrl(baseUrl);
-        properties.setApiKey(PLACEHOLDER_API_KEY);
-        properties.setVerifyTimeoutMs(1000);
-        properties.setVerificationCacheTtlSeconds(60);
-
-        SupabaseJwtVerifier verifier = new SupabaseJwtVerifier(properties);
-
-        assertThat(verifier.verify("placeholder-access-token")).isPresent();
-        assertThat(verifier.verify("placeholder-access-token")).isEmpty();
-        assertThat(authUserRequestCount.get()).isEqualTo(2);
     }
 
     private void registerActiveUserEndpoint() {
@@ -326,6 +444,34 @@ class SupabaseJwtVerifierTest {
         );
         jwt.sign(new ECDSASigner(signingKey));
         return jwt.serialize();
+    }
+
+    private static final class MutableClock extends Clock {
+
+        private Instant instant;
+
+        private MutableClock(Instant start) {
+            this.instant = start;
+        }
+
+        private void advanceSeconds(long seconds) {
+            instant = instant.plusSeconds(seconds);
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return instant;
+        }
     }
 
     private class StaticBodyHandler implements HttpHandler {
