@@ -200,7 +200,8 @@ public class AccountPersonalDataRepository {
             for (String table : List.of(
                 "managed_admin_emails",
                 "allowed_user_emails",
-                "admin_mmr_access_emails"
+                "admin_mmr_access_emails",
+                "match_result_editor_emails"
             )) {
                 jdbcTemplate.update(
                     "UPDATE " + table + " SET created_by_email = NULL "
@@ -210,6 +211,11 @@ public class AccountPersonalDataRepository {
             }
             jdbcTemplate.update(
                 "DELETE FROM admin_mmr_access_emails WHERE normalized_email = :email",
+                parameters
+            );
+            // Without this, re-allowing the same email would quietly restore result editing.
+            jdbcTemplate.update(
+                "DELETE FROM match_result_editor_emails WHERE normalized_email = :email",
                 parameters
             );
             jdbcTemplate.update(
