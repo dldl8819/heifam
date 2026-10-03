@@ -105,10 +105,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(controllers = {
@@ -144,100 +144,100 @@ class AdminKeyFilterTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private MatchResultService matchResultService;
 
-    @MockBean
+    @MockitoBean
     private CaptainDraftService captainDraftService;
 
-    @MockBean
+    @MockitoBean
     private ManualMatchService manualMatchService;
 
-    @MockBean
+    @MockitoBean
     private MatchImportService matchImportService;
 
-    @MockBean
+    @MockitoBean
     private PlayerImportService playerImportService;
 
-    @MockBean
+    @MockitoBean
     private PlayerAdminService playerAdminService;
 
-    @MockBean
+    @MockitoBean
     private GroupMatchAdminService groupMatchAdminService;
 
-    @MockBean
+    @MockitoBean
     private MatchQueryService matchQueryService;
 
-    @MockBean
+    @MockitoBean
     private DashboardQueryService dashboardQueryService;
 
-    @MockBean
+    @MockitoBean
     private PlayerQueryService playerQueryService;
 
-    @MockBean
+    @MockitoBean
     private PlayerActivityQueryService playerActivityQueryService;
 
-    @MockBean
+    @MockitoBean
     private PlayerRaceStatsQueryService playerRaceStatsQueryService;
 
-    @MockBean
+    @MockitoBean
     private PlayerTeammateStatsQueryService playerTeammateStatsQueryService;
 
-    @MockBean
+    @MockitoBean
     private RankingService rankingService;
 
-    @MockBean
+    @MockitoBean
     private TeamBalancingService teamBalancingService;
 
-    @MockBean
+    @MockitoBean
     private MultiMatchBalancingService multiMatchBalancingService;
 
-    @MockBean
+    @MockitoBean
     private RatingRecalculationService ratingRecalculationService;
 
-    @MockBean
+    @MockitoBean
     private OperationAuditLogService operationAuditLogService;
 
-    @MockBean
+    @MockitoBean
     private NoticeAdminService noticeAdminService;
 
-    @MockBean
+    @MockitoBean
     private LedgerIncomeService ledgerIncomeService;
 
-    @MockBean
+    @MockitoBean
     private LedgerExpenseService ledgerExpenseService;
 
-    @MockBean
+    @MockitoBean
     private LedgerSummaryService ledgerSummaryService;
 
-    @MockBean
+    @MockitoBean
     private LedgerIncomeAdminService ledgerIncomeAdminService;
 
-    @MockBean
+    @MockitoBean
     private LedgerExpenseAdminService ledgerExpenseAdminService;
 
-    @MockBean
+    @MockitoBean
     private LedgerServerCostService ledgerServerCostService;
 
-    @MockBean
+    @MockitoBean
     private LedgerServerCostAdminService ledgerServerCostAdminService;
 
-    @MockBean
+    @MockitoBean
     private AdminRequestResolver adminRequestResolver;
 
-    @MockBean
+    @MockitoBean
     private SuperAdminRequestResolver superAdminRequestResolver;
 
-    @MockBean
+    @MockitoBean
     private MmrAccessRequestResolver mmrAccessRequestResolver;
 
-    @MockBean
+    @MockitoBean
     private AccessControlService accessControlService;
 
-    @MockBean
+    @MockitoBean
     private AccountDeletionService accountDeletionService;
 
-    @MockBean
+    @MockitoBean
     private AuthenticatedRequestResolver authenticatedRequestResolver;
 
     @BeforeEach
