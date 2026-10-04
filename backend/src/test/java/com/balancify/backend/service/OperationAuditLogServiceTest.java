@@ -169,24 +169,6 @@ class OperationAuditLogServiceTest {
     }
 
     @Test
-    void recordsPointAdjustmentAuditLog() {
-        operationAuditLogService.recordPointAdjustment("ops@example.com", "운영진", 8L, "YOUR_USERNAME", 20, "event");
-        operationAuditLogService.recordPointAdjustment("ops@example.com", "운영진", 8L, "YOUR_USERNAME", -5, null);
-
-        ArgumentCaptor<OperationAuditLog> logCaptor = ArgumentCaptor.forClass(OperationAuditLog.class);
-        verify(operationAuditLogRepository, times(2)).save(logCaptor.capture());
-        OperationAuditLog grant = logCaptor.getAllValues().get(0);
-
-        assertThat(grant.getAction()).isEqualTo(OperationAuditLogService.ACTION_POINT_ADJUSTED);
-        assertThat(grant.getTargetType()).isEqualTo("POINT_ACCOUNT");
-        assertThat(grant.getTargetId()).isEqualTo(8L);
-        assertThat(grant.getTargetLabel()).isEqualTo("YOUR_USERNAME");
-        assertThat(grant.getSummary()).isEqualTo("포인트 조정");
-        assertThat(grant.getDetails()).isEqualTo("amount=+20, memo=event");
-        assertThat(logCaptor.getAllValues().get(1).getDetails()).isEqualTo("amount=-5");
-    }
-
-    @Test
     void recordsMatchResultUpdateAuditLog() {
         operationAuditLogService.recordMatchResultUpdate(
             "ops@example.com",

@@ -84,7 +84,6 @@ import com.balancify.backend.api.series.dto.BalanceSeriesListResponse;
 import com.balancify.backend.api.tournament.TeamTournamentController;
 import com.balancify.backend.api.tournament.dto.TeamScoreBoardResponse;
 import com.balancify.backend.api.tournament.dto.TeamTournamentResponse;
-import com.balancify.backend.api.points.dto.PointAdjustmentResponse;
 import com.balancify.backend.api.points.dto.PointSummaryResponse;
 import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.AccountDeletionService;
@@ -2243,32 +2242,6 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void letsOnlySuperAdminsAdjustPoints() throws Exception {
-        String body = "{\"email\":\"member@hei.gg\",\"amount\":5,\"memo\":\"event\"}";
-        mockMvc
-            .perform(
-                post("/api/admin/points/adjustments")
-                    .header("X-USER-EMAIL", "admin@hei.gg")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(body)
-            )
-            .andExpect(status().isForbidden());
-        verify(pointService, never()).adjust(any(), any(), any(), any(), any());
-
-        when(pointService.adjust(eq("superadmin@hei.gg"), any(), eq("member@hei.gg"), eq(5), eq("event")))
-            .thenReturn(new PointAdjustmentResponse("member", 5, 5L));
-        mockMvc
-            .perform(
-                post("/api/admin/points/adjustments")
-                    .header("X-USER-EMAIL", "superadmin@hei.gg")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(body)
-            )
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.balance").value(5));
-    }
-
-    @Test
     void letsSuperAdminsRunPrizeEventsAndAdminsSeeThem() throws Exception {
         when(pointService.canUsePoints("admin@hei.gg")).thenReturn(true);
         when(prizeEventService.list(1L)).thenReturn(new PrizeEventListResponse(List.of()));
@@ -2374,6 +2347,40 @@ class AdminKeyFilterTest {
             .andExpect(status().isForbidden());
 
         verify(teamTournamentService, never()).create(any(), any(), any(), any(), anyBoolean());
+    }
+
+    @Test
+    void hasNoPointAdjustmentsEvenForSuperAdmins() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/admin/points/adjustments")
+                    .header("X-USER-EMAIL", "superadmin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"email\":\"member@hei.gg\",\"amount\":5}")
+            )
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void opensAMonthlyPointHistoryFromTheRankingForAdminsOnly() throws Exception {
+        when(pointService.canUsePoints("admin@hei.gg")).thenReturn(true);
+        when(pointService.getMonthlyHistory(eq(21L), any(), eq("admin@hei.gg")))
+            .thenReturn(new com.balancify.backend.api.points.dto.PointMonthlyHistoryResponse(
+                "2026-09", 21L, "YOUR_USERNAME", 3L, List.of(), List.of()
+            ));
+        when(pointService.getMonthlyHistory(eq(99L), any(), eq("admin@hei.gg")))
+            .thenThrow(new java.util.NoSuchElementException("Point account not found"));
+
+        mockMvc
+            .perform(get("/api/points/ranking/21").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(get("/api/points/ranking/21").param("month", "2026-09").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.points").value(3));
+        mockMvc
+            .perform(get("/api/points/ranking/99").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isNotFound());
     }
 
     @Test

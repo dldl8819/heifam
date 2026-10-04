@@ -1,7 +1,8 @@
 package com.balancify.backend.service;
 
-import com.balancify.backend.api.points.dto.PointAdjustmentResponse;
 import com.balancify.backend.api.points.dto.PointHistoryItemResponse;
+import com.balancify.backend.api.points.dto.PointMonthlyHistoryResponse;
+import com.balancify.backend.api.points.dto.PointReasonTotalResponse;
 import com.balancify.backend.api.points.dto.PointRankingEntryResponse;
 import com.balancify.backend.api.points.dto.PointRankingResponse;
 import com.balancify.backend.api.points.dto.PointSummaryResponse;
@@ -15,11 +16,13 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,15 +51,13 @@ public class PointService {
     private static final List<String> NOTICE_REASONS = List.of(REASON_NOTICE_READ, REASON_NOTICE_LIKE, REASON_NOTICE_COMMENT);
     private static final List<String> PREDICTION_REASONS = List.of(REASON_PREDICTION_HIT, REASON_PREDICTION_HIT_REVERSED);
 
-    static final int MAX_ADJUSTMENT = 1000;
     private static final int RANKING_LIMIT = 50;
-    private static final int MEMO_MAX_LENGTH = 200;
+    private static final int MONTHLY_HISTORY_LIMIT = 200;
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final PointAccountRepository pointAccountRepository;
     private final PointTransactionRepository pointTransactionRepository;
     private final AccessControlService accessControlService;
-    private final OperationAuditLogService operationAuditLogService;
     private final PointProperties pointProperties;
     private final Clock clock;
     // /api/access/me runs on every page load; this keeps it from touching the ledger once a day is done.
@@ -67,14 +68,12 @@ public class PointService {
         PointAccountRepository pointAccountRepository,
         PointTransactionRepository pointTransactionRepository,
         AccessControlService accessControlService,
-        OperationAuditLogService operationAuditLogService,
         PointProperties pointProperties
     ) {
         this(
             pointAccountRepository,
             pointTransactionRepository,
             accessControlService,
-            operationAuditLogService,
             pointProperties,
             Clock.system(KST)
         );
@@ -84,14 +83,12 @@ public class PointService {
         PointAccountRepository pointAccountRepository,
         PointTransactionRepository pointTransactionRepository,
         AccessControlService accessControlService,
-        OperationAuditLogService operationAuditLogService,
         PointProperties pointProperties,
         Clock clock
     ) {
         this.pointAccountRepository = pointAccountRepository;
         this.pointTransactionRepository = pointTransactionRepository;
         this.accessControlService = accessControlService;
-        this.operationAuditLogService = operationAuditLogService;
         this.pointProperties = pointProperties;
         this.clock = clock;
     }
@@ -280,13 +277,13 @@ public class PointService {
     @Transactional(readOnly = true)
     public PointRankingResponse getMonthlyRanking(YearMonth month) {
         YearMonth targetMonth = month == null ? currentMonth() : month;
-        List<PointTransactionRepository.PointTotal> totals = pointTransactionRepository.sumPositiveTotalsBetween(
+        List<PointTransactionRepository.AccountPointTotal> totals = pointTransactionRepository.sumPositiveAccountTotalsBetween(
             targetMonth.atDay(1),
             targetMonth.atEndOfMonth()
         );
-        List<PointTransactionRepository.PointTotal> ranked = totals.subList(0, Math.min(totals.size(), RANKING_LIMIT));
+        List<PointTransactionRepository.AccountPointTotal> ranked = totals.subList(0, Math.min(totals.size(), RANKING_LIMIT));
         Map<String, String> nicknames = accessControlService.resolveDisplayNicknames(
-            ranked.stream().map(PointTransactionRepository.PointTotal::getNormalizedEmail).toList()
+            ranked.stream().map(PointTransactionRepository.AccountPointTotal::getNormalizedEmail).toList()
         );
 
         // Equal totals share a rank (1, 2, 2, 4). Emails stay on the server; only nicknames go out.
@@ -294,68 +291,68 @@ public class PointService {
         long previousPoints = Long.MIN_VALUE;
         int rank = 0;
         for (int index = 0; index < ranked.size(); index++) {
-            PointTransactionRepository.PointTotal total = ranked.get(index);
+            PointTransactionRepository.AccountPointTotal total = ranked.get(index);
             long points = total.getPoints() == null ? 0L : total.getPoints();
             if (points != previousPoints) {
                 rank = index + 1;
                 previousPoints = points;
             }
-            entries.add(new PointRankingEntryResponse(rank, nicknames.get(total.getNormalizedEmail()), points));
+            entries.add(new PointRankingEntryResponse(
+                rank,
+                total.getAccountId(),
+                nicknames.get(total.getNormalizedEmail()),
+                points
+            ));
         }
         return new PointRankingResponse(targetMonth.toString(), entries);
     }
 
-    @Transactional
-    public PointAdjustmentResponse adjust(
-        String actorEmail,
-        String actorNickname,
-        String targetEmail,
-        Integer amount,
-        String memo
-    ) {
-        String normalizedTargetEmail = normalizeEmail(targetEmail);
-        if (normalizedTargetEmail.isEmpty() || !normalizedTargetEmail.contains("@")) {
-            throw new IllegalArgumentException("A valid email is required");
+    /**
+     * How one account earned its points in a month, as opened from the ranking: totals per reason
+     * and the latest rows. Adjustment memos show only to the account itself and to super admins.
+     */
+    @Transactional(readOnly = true)
+    public PointMonthlyHistoryResponse getMonthlyHistory(Long accountId, YearMonth month, String requesterEmail) {
+        YearMonth targetMonth = month == null ? currentMonth() : month;
+        PointAccount account = accountId == null ? null : pointAccountRepository.findById(accountId).orElse(null);
+        if (account == null) {
+            throw new NoSuchElementException("Point account not found");
         }
-        if (amount == null || amount == 0 || Math.abs(amount) > MAX_ADJUSTMENT) {
-            throw new IllegalArgumentException("Amount must be between -" + MAX_ADJUSTMENT + " and " + MAX_ADJUSTMENT + ", not 0");
-        }
-        if (!accessControlService.isServiceAccessAllowed(normalizedTargetEmail)) {
-            throw new IllegalArgumentException("Target email is not a registered member");
-        }
+        List<PointTransaction> rows = pointTransactionRepository.findByAccount_IdAndKstDateBetweenOrderByIdDesc(
+            accountId,
+            targetMonth.atDay(1),
+            targetMonth.atEndOfMonth()
+        );
+        String requester = normalizeEmail(requesterEmail);
+        boolean showMemos = requester.equals(account.getNormalizedEmail()) || accessControlService.isSuperAdminEmail(requester);
 
-        String normalizedMemo = memo == null ? null : memo.trim();
-        if (normalizedMemo != null && normalizedMemo.isEmpty()) {
-            normalizedMemo = null;
+        Map<String, long[]> byReason = new LinkedHashMap<>();
+        long total = 0;
+        for (PointTransaction row : rows) {
+            long[] tally = byReason.computeIfAbsent(row.getReason(), ignored -> new long[2]);
+            tally[0]++;
+            tally[1] += row.getAmount();
+            total += row.getAmount();
         }
-        if (normalizedMemo != null && normalizedMemo.length() > MEMO_MAX_LENGTH) {
-            normalizedMemo = normalizedMemo.substring(0, MEMO_MAX_LENGTH);
-        }
-
-        PointAccount account = lockAccount(normalizedTargetEmail);
-        record(
-            account,
-            REASON_ADJUSTMENT,
-            amount,
-            "adjust:" + UUID.randomUUID(),
-            today(),
-            normalizedMemo,
-            normalizeEmail(actorEmail)
-        );
-        String targetNickname = accessControlService.resolveDisplayNickname(normalizedTargetEmail);
-        operationAuditLogService.recordPointAdjustment(
-            actorEmail,
-            actorNickname,
-            account.getId(),
-            targetNickname,
-            amount,
-            normalizedMemo
-        );
-        return new PointAdjustmentResponse(
-            targetNickname,
-            amount,
-            pointTransactionRepository.sumAmountByAccountId(account.getId())
-        );
+        List<PointReasonTotalResponse> reasons = byReason.entrySet().stream()
+            .map(entry -> new PointReasonTotalResponse(entry.getKey(), (int) entry.getValue()[0], entry.getValue()[1]))
+            .sorted(Comparator.comparingLong(PointReasonTotalResponse::points).reversed()
+                .thenComparing(Comparator.comparingInt(PointReasonTotalResponse::count).reversed())
+                .thenComparing(PointReasonTotalResponse::reason))
+            .toList();
+        List<PointHistoryItemResponse> entries = rows.stream()
+            .limit(MONTHLY_HISTORY_LIMIT)
+            .map(row -> new PointHistoryItemResponse(
+                row.getReason(),
+                row.getAmount(),
+                row.getKstDate(),
+                showMemos ? row.getMemo() : null,
+                row.getCreatedAt()
+            ))
+            .toList();
+        String nickname = accessControlService.resolveDisplayNicknames(List.of(account.getNormalizedEmail()))
+            .get(account.getNormalizedEmail());
+        return new PointMonthlyHistoryResponse(targetMonth.toString(), accountId, nickname, total, reasons, entries);
     }
 
     public YearMonth currentMonth() {

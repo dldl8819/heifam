@@ -83,9 +83,9 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             AuthType.ADMIN_EMAIL
         ),
         new ProtectedRoute(
-            "POST",
-            PathPatternParser.defaultInstance.parse("/api/admin/points/adjustments"),
-            AuthType.SUPER_ADMIN_EMAIL
+            "GET",
+            PathPatternParser.defaultInstance.parse("/api/points/ranking/{accountId}"),
+            AuthType.ADMIN_EMAIL
         ),
         // Captain drafts are run from an admin-only screen, and these calls change draft data.
         new ProtectedRoute(

@@ -13,7 +13,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.balancify.backend.api.points.dto.PointAdjustmentResponse;
+import com.balancify.backend.api.points.dto.PointHistoryItemResponse;
+import com.balancify.backend.api.points.dto.PointMonthlyHistoryResponse;
+import com.balancify.backend.api.points.dto.PointReasonTotalResponse;
 import com.balancify.backend.api.points.dto.PointRankingEntryResponse;
 import com.balancify.backend.api.points.dto.PointRankingResponse;
 import com.balancify.backend.api.points.dto.PointSummaryResponse;
@@ -69,7 +71,6 @@ class PointServiceTest {
             pointAccountRepository,
             pointTransactionRepository,
             accessControlService,
-            operationAuditLogService,
             pointProperties,
             CLOCK
         );
@@ -194,58 +195,13 @@ class PointServiceTest {
     }
 
     @Test
-    void adjustsAMembersPointsAndLogsIt() {
-        stubAccount(MEMBER_EMAIL, 8L);
-        when(accessControlService.isServiceAccessAllowed(MEMBER_EMAIL)).thenReturn(true);
-        when(accessControlService.resolveDisplayNickname(MEMBER_EMAIL)).thenReturn("YOUR_USERNAME");
-        when(pointTransactionRepository.sumAmountByAccountId(8L)).thenReturn(25L);
-
-        PointAdjustmentResponse response = pointService.adjust(
-            ADMIN_EMAIL,
-            "YOUR_USERNAME",
-            " Member@Example.com ",
-            20,
-            "  " + "x".repeat(250) + "  "
-        );
-
-        PointTransaction saved = captureSavedTransaction();
-        assertThat(saved.getReason()).isEqualTo(PointService.REASON_ADJUSTMENT);
-        assertThat(saved.getAmount()).isEqualTo(20);
-        assertThat(saved.getReferenceKey()).startsWith("adjust:");
-        assertThat(saved.getMemo()).hasSize(200);
-        assertThat(saved.getCreatedByEmail()).isEqualTo(ADMIN_EMAIL);
-        verify(operationAuditLogService).recordPointAdjustment(
-            eq(ADMIN_EMAIL), eq("YOUR_USERNAME"), eq(8L), eq("YOUR_USERNAME"), eq(20), eq("x".repeat(200))
-        );
-        assertThat(response.nickname()).isEqualTo("YOUR_USERNAME");
-        assertThat(response.amount()).isEqualTo(20);
-        assertThat(response.balance()).isEqualTo(25L);
-    }
-
-    @Test
-    void rejectsAdjustmentsThatAreZeroTooLargeOrForStrangers() {
-        assertThatThrownBy(() -> pointService.adjust(ADMIN_EMAIL, null, "not-an-email", 5, null))
-            .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> pointService.adjust(ADMIN_EMAIL, null, MEMBER_EMAIL, 0, null))
-            .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> pointService.adjust(ADMIN_EMAIL, null, MEMBER_EMAIL, null, null))
-            .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> pointService.adjust(ADMIN_EMAIL, null, MEMBER_EMAIL, -1001, null))
-            .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> pointService.adjust(ADMIN_EMAIL, null, MEMBER_EMAIL, 10, null))
-            .isInstanceOf(IllegalArgumentException.class);
-
-        verifyNoInteractions(pointAccountRepository, pointTransactionRepository, operationAuditLogService);
-    }
-
-    @Test
     void ranksTheMonthWithSharedPlacesAndNicknamesOnly() {
-        when(pointTransactionRepository.sumPositiveTotalsBetween(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30)))
+        when(pointTransactionRepository.sumPositiveAccountTotalsBetween(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30)))
             .thenReturn(List.of(
-                new Total("a@example.com", 5L),
-                new Total("b@example.com", 3L),
-                new Total("c@example.com", 3L),
-                new Total("d@example.com", 1L)
+                new Total(11L, "a@example.com", 5L),
+                new Total(12L, "b@example.com", 3L),
+                new Total(13L, "c@example.com", 3L),
+                new Total(14L, "d@example.com", 1L)
             ));
         when(accessControlService.resolveDisplayNicknames(List.of("a@example.com", "b@example.com", "c@example.com", "d@example.com")))
             .thenReturn(Map.of("a@example.com", "A", "b@example.com", "B", "c@example.com", "C", "d@example.com", "D"));
@@ -261,6 +217,45 @@ class PointServiceTest {
                 tuple(2, "C", 3L),
                 tuple(4, "D", 1L)
             );
+        assertThat(ranking.entries()).extracting(PointRankingEntryResponse::accountId).containsExactly(11L, 12L, 13L, 14L);
+    }
+
+    @Test
+    void showsHowAnAccountEarnedItsPointsInAMonth() {
+        PointAccount account = new PointAccount();
+        account.setNormalizedEmail(MEMBER_EMAIL);
+        ReflectionTestUtils.setField(account, "id", 21L);
+        when(pointAccountRepository.findById(21L)).thenReturn(Optional.of(account));
+        when(pointTransactionRepository.findByAccount_IdAndKstDateBetweenOrderByIdDesc(
+            21L, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30)
+        )).thenReturn(List.of(
+            row(PointService.REASON_PREDICTION_HIT_REVERSED, -1, null),
+            row(PointService.REASON_PREDICTION_HIT, 1, null),
+            row(PointService.REASON_ADJUSTMENT, 5, "YOUR_MEMO"),
+            row(PointService.REASON_DAILY_LOGIN, 1, null),
+            row(PointService.REASON_DAILY_LOGIN, 1, null)
+        ));
+        when(accessControlService.resolveDisplayNicknames(List.of(MEMBER_EMAIL))).thenReturn(Map.of(MEMBER_EMAIL, "YOUR_USERNAME"));
+
+        PointMonthlyHistoryResponse history = pointService.getMonthlyHistory(21L, YearMonth.of(2026, 9), ADMIN_EMAIL);
+
+        assertThat(history.nickname()).isEqualTo("YOUR_USERNAME");
+        assertThat(history.points()).isEqualTo(7L);
+        assertThat(history.reasons())
+            .extracting(PointReasonTotalResponse::reason, PointReasonTotalResponse::count, PointReasonTotalResponse::points)
+            .containsExactly(
+                tuple(PointService.REASON_ADJUSTMENT, 1, 5L),
+                tuple(PointService.REASON_DAILY_LOGIN, 2, 2L),
+                tuple(PointService.REASON_PREDICTION_HIT, 1, 1L),
+                tuple(PointService.REASON_PREDICTION_HIT_REVERSED, 1, -1L)
+            );
+        assertThat(history.entries()).hasSize(5);
+        assertThat(history.entries()).extracting(PointHistoryItemResponse::memo).containsOnlyNulls();
+        assertThat(pointService.getMonthlyHistory(21L, YearMonth.of(2026, 9), " " + MEMBER_EMAIL.toUpperCase(java.util.Locale.ROOT) + " ").entries())
+            .extracting(PointHistoryItemResponse::memo)
+            .contains("YOUR_MEMO");
+        assertThatThrownBy(() -> pointService.getMonthlyHistory(99L, YearMonth.of(2026, 9), ADMIN_EMAIL))
+            .isInstanceOf(java.util.NoSuchElementException.class);
     }
 
     @Test
@@ -344,7 +339,22 @@ class PointServiceTest {
         return captor.getValue();
     }
 
-    private record Total(String normalizedEmail, Long points) implements PointTransactionRepository.PointTotal {
+    private PointTransaction row(String reason, int amount, String memo) {
+        PointTransaction transaction = new PointTransaction();
+        transaction.setReason(reason);
+        transaction.setAmount(amount);
+        transaction.setKstDate(LocalDate.of(2026, 9, 15));
+        transaction.setMemo(memo);
+        return transaction;
+    }
+
+    private record Total(Long accountId, String normalizedEmail, Long points)
+        implements PointTransactionRepository.AccountPointTotal {
+        @Override
+        public Long getAccountId() {
+            return accountId;
+        }
+
         @Override
         public String getNormalizedEmail() {
             return normalizedEmail;

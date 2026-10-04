@@ -821,25 +821,30 @@ export type PointSummaryResponse = {
 
 export type PointRankingEntry = {
   rank: number
+  // Opens the entry's monthly history.
+  accountId: number | null
   nickname: string | null
   points: number
+}
+
+export type PointReasonTotal = {
+  reason: PointReason | string
+  count: number
+  points: number
+}
+
+export type PointMonthlyHistory = {
+  month: string
+  accountId: number
+  nickname: string | null
+  points: number
+  reasons: PointReasonTotal[]
+  entries: PointHistoryItem[]
 }
 
 export type PointRankingResponse = {
   month: string
   entries: PointRankingEntry[]
-}
-
-export type PointAdjustmentRequest = {
-  email: string
-  amount: number
-  memo: string | null
-}
-
-export type PointAdjustmentResponse = {
-  nickname: string | null
-  amount: number
-  balance: number
 }
 
 export type TeamTournamentStatus = 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'

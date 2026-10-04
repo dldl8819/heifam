@@ -1,28 +1,28 @@
 'use client'
 
-import { FormEvent, useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAdminAuth } from '@/lib/admin-auth'
 import { apiClient, isApiForbiddenError } from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
+import { PointHistoryModal } from '@/components/point-history-modal'
 import { PrizeEventsPanel } from '@/components/prize-events-panel'
 import { t } from '@/lib/i18n'
 import {
-  POINT_ADJUSTMENT_MAX,
-  POINT_MEMO_MAX_LENGTH,
-  buildPointMemberOptions,
   currentKstMonth,
   formatPointAmount,
-  parseAdjustmentAmount,
   pointReasonKey,
   shiftMonth,
-  type PointMemberOption,
 } from '@/lib/points'
-import type { PointRankingResponse, PointSummaryResponse } from '@/types/api'
+import type {
+  PointMonthlyHistory,
+  PointRankingEntry,
+  PointRankingResponse,
+  PointSummaryResponse,
+} from '@/types/api'
 
 const TEMP_GROUP_ID = 1
 const CARD_CLASS = 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900'
-const INPUT_CLASS = 'w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900'
 
 function ErrorAlert({ message }: { message: string }) {
   return (
@@ -61,16 +61,13 @@ export default function PointsPage() {
   const [ranking, setRanking] = useState<PointRankingResponse | null>(null)
   const [rankingLoading, setRankingLoading] = useState<boolean>(true)
   const [rankingError, setRankingError] = useState<string | null>(null)
-  const [rankingVersion, setRankingVersion] = useState<number>(0)
+  const [historyEntry, setHistoryEntry] = useState<PointRankingEntry | null>(null)
+  const [history, setHistory] = useState<PointMonthlyHistory | null>(null)
+  const [historyLoading, setHistoryLoading] = useState<boolean>(false)
+  const [historyError, setHistoryError] = useState<string | null>(null)
+  // The account last asked for, so a slower answer for an earlier click is dropped.
+  const historyRequest = useRef<number | null>(null)
 
-  const [memberOptions, setMemberOptions] = useState<PointMemberOption[]>([])
-  const [membersError, setMembersError] = useState<string | null>(null)
-  const [targetEmail, setTargetEmail] = useState<string>('')
-  const [amountText, setAmountText] = useState<string>('')
-  const [memo, setMemo] = useState<string>('')
-  const [adjusting, setAdjusting] = useState<boolean>(false)
-  const [adjustError, setAdjustError] = useState<string | null>(null)
-  const [adjustMessage, setAdjustMessage] = useState<string | null>(null)
 
   const loadSummary = useCallback(async () => {
     setSummaryLoading(true)
@@ -113,70 +110,47 @@ export default function PointsPage() {
     return () => {
       cancelled = true
     }
-  }, [month, rankingVersion])
+  }, [month])
 
-  useEffect(() => {
-    if (!isSuperAdmin) {
+  // A person on the ranking: how they earned their points in the month shown.
+  const openHistory = async (entry: PointRankingEntry) => {
+    if (entry.accountId === null) {
       return
     }
-    let cancelled = false
-    Promise.all([apiClient.getAdminEmailList(), apiClient.getAllowedEmailList()])
-      .then(([admins, allowed]) => {
-        if (!cancelled) {
-          setMemberOptions(buildPointMemberOptions([admins.superAdmins, admins.admins, allowed.allowedUsers]))
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setMembersError(t('points.adjust.membersLoadError'))
-        }
-      })
-    return () => {
-      cancelled = true
+    const accountId = entry.accountId
+    historyRequest.current = accountId
+    setHistoryEntry(entry)
+    setHistory(null)
+    setHistoryError(null)
+    setHistoryLoading(true)
+    try {
+      const response = await apiClient.getPointRankingHistory(accountId, month)
+      if (historyRequest.current === accountId) {
+        setHistory(response)
+      }
+    } catch {
+      if (historyRequest.current === accountId) {
+        setHistoryError(t('points.ranking.history.loadError'))
+      }
+    } finally {
+      if (historyRequest.current === accountId) {
+        setHistoryLoading(false)
+      }
     }
-  }, [isSuperAdmin])
+  }
 
-  const handleAdjust = useCallback(
-    async (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault()
-      setAdjustMessage(null)
-      if (!targetEmail) {
-        setAdjustError(t('points.adjust.targetRequired'))
-        return
-      }
-      const amount = parseAdjustmentAmount(amountText)
-      if (amount === null) {
-        setAdjustError(t('points.adjust.amountInvalid', { max: POINT_ADJUSTMENT_MAX }))
-        return
-      }
+  const closeHistory = useCallback(() => {
+    historyRequest.current = null
+    setHistoryEntry(null)
+    setHistory(null)
+    setHistoryError(null)
+    setHistoryLoading(false)
+  }, [])
 
-      setAdjustError(null)
-      setAdjusting(true)
-      try {
-        const response = await apiClient.adjustPoints({
-          email: targetEmail,
-          amount,
-          memo: memo.trim().length > 0 ? memo.trim() : null,
-        })
-        setAdjustMessage(
-          t('points.adjust.success', {
-            nickname: response.nickname ?? t('points.ranking.unknownNickname'),
-            amount: formatPointAmount(response.amount),
-            balance: response.balance.toLocaleString('ko-KR'),
-          })
-        )
-        setAmountText('')
-        setMemo('')
-        setRankingVersion((version) => version + 1)
-        void loadSummary()
-      } catch {
-        setAdjustError(t('points.adjust.error'))
-      } finally {
-        setAdjusting(false)
-      }
-    },
-    [amountText, loadSummary, memo, targetEmail]
-  )
+  // The history belongs to the month it was opened for.
+  useEffect(() => {
+    closeHistory()
+  }, [closeHistory, month])
 
   return (
     <section className="space-y-6">
@@ -336,7 +310,20 @@ export default function PointsPage() {
                   <tr key={`${entry.rank}-${index}`} className="border-t border-slate-100 dark:border-slate-800">
                     <td className="px-3 py-2 font-medium text-slate-900 dark:text-slate-100">{entry.rank}</td>
                     <td className="px-3 py-2 text-slate-800 dark:text-slate-200">
-                      {entry.nickname ?? t('points.ranking.unknownNickname')}
+                      {entry.accountId !== null ? (
+                        <button
+                          type="button"
+                          onClick={() => void openHistory(entry)}
+                          aria-label={t('points.ranking.openHistory', {
+                            nickname: entry.nickname ?? t('points.ranking.unknownNickname'),
+                          })}
+                          className="font-medium text-indigo-700 underline-offset-2 hover:underline dark:text-indigo-300"
+                        >
+                          {entry.nickname ?? t('points.ranking.unknownNickname')}
+                        </button>
+                      ) : (
+                        entry.nickname ?? t('points.ranking.unknownNickname')
+                      )}
                     </td>
                     <td className="px-3 py-2 text-right font-medium text-slate-900 dark:text-slate-100">
                       {`${entry.points.toLocaleString('ko-KR')}p`}
@@ -349,69 +336,18 @@ export default function PointsPage() {
         )}
       </div>
 
+      <PointHistoryModal
+        open={historyEntry !== null}
+        nickname={historyEntry?.nickname ?? t('points.ranking.unknownNickname')}
+        monthLabel={formatMonthLabel(month)}
+        history={history}
+        loading={historyLoading}
+        error={historyError}
+        onClose={closeHistory}
+      />
+
       <PrizeEventsPanel groupId={TEMP_GROUP_ID} canManage={isSuperAdmin} />
 
-      {isSuperAdmin && (
-        <form onSubmit={handleAdjust} className={`${CARD_CLASS} space-y-3`}>
-          <div className="space-y-0.5">
-            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('points.adjust.title')}</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">{t('points.adjust.description')}</p>
-          </div>
-          {membersError && <ErrorAlert message={membersError} />}
-          {adjustError && (
-            <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300">
-              {adjustError}
-            </p>
-          )}
-          {adjustMessage && (
-            <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
-              {adjustMessage}
-            </p>
-          )}
-          <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
-            <label className="space-y-1 text-xs text-slate-600 dark:text-slate-300">
-              <span>{t('points.adjust.target')}</span>
-              <select value={targetEmail} onChange={(event) => setTargetEmail(event.target.value)} className={INPUT_CLASS}>
-                <option value="">{t('points.adjust.targetPlaceholder')}</option>
-                {memberOptions.map((option) => (
-                  <option key={option.email} value={option.email}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="space-y-1 text-xs text-slate-600 dark:text-slate-300">
-              <span>{t('points.adjust.amount')}</span>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={amountText}
-                onChange={(event) => setAmountText(event.target.value)}
-                placeholder={t('points.adjust.amountPlaceholder')}
-                className={INPUT_CLASS}
-              />
-            </label>
-          </div>
-          <label className="block space-y-1 text-xs text-slate-600 dark:text-slate-300">
-            <span>{t('points.adjust.memo')}</span>
-            <input
-              type="text"
-              value={memo}
-              maxLength={POINT_MEMO_MAX_LENGTH}
-              onChange={(event) => setMemo(event.target.value)}
-              placeholder={t('points.adjust.memoPlaceholder')}
-              className={INPUT_CLASS}
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={adjusting}
-            className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-          >
-            {adjusting ? t('points.adjust.submitting') : t('points.adjust.submit')}
-          </button>
-        </form>
-      )}
     </section>
   )
 }

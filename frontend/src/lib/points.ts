@@ -1,7 +1,5 @@
-import type { AccessEmailEntry, PointReason } from '@/types/api'
+import type { PointReason } from '@/types/api'
 
-export const POINT_ADJUSTMENT_MAX = 1000
-export const POINT_MEMO_MAX_LENGTH = 200
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000
 
@@ -17,10 +15,6 @@ const REASON_KEYS: Record<PointReason, string> = {
   NOTICE_COMMENT: 'points.reasons.noticeComment',
 }
 
-export type PointMemberOption = {
-  email: string
-  label: string
-}
 
 /** The month in Korea at the given moment, as YYYY-MM. Points count days and months in Korean time. */
 export function currentKstMonth(now: Date = new Date()): string {
@@ -45,32 +39,4 @@ export function pointReasonKey(reason: string): string | null {
   return (REASON_KEYS as Record<string, string>)[reason] ?? null
 }
 
-/** A whole number from -1000 to 1000 other than 0, or null. */
-export function parseAdjustmentAmount(value: string): number | null {
-  const trimmed = value.trim()
-  if (!/^[-+]?\d+$/.test(trimmed)) {
-    return null
-  }
-  const amount = Number(trimmed)
-  if (amount === 0 || Math.abs(amount) > POINT_ADJUSTMENT_MAX) {
-    return null
-  }
-  return amount
-}
 
-/** Everyone who can hold points, once each, by the name shown; a nickname beats a bare email. */
-export function buildPointMemberOptions(lists: AccessEmailEntry[][]): PointMemberOption[] {
-  const byEmail = new Map<string, PointMemberOption>()
-  for (const list of lists) {
-    for (const entry of list) {
-      const email = entry.email.trim().toLowerCase()
-      const nickname = entry.nickname?.trim() ?? ''
-      const existing = byEmail.get(email)
-      if (email.length === 0 || (existing && (existing.label !== existing.email || nickname.length === 0))) {
-        continue
-      }
-      byEmail.set(email, { email, label: nickname.length > 0 ? nickname : email })
-    }
-  }
-  return [...byEmail.values()].sort((left, right) => left.label.localeCompare(right.label, 'ko'))
-}
