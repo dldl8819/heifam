@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAdminAuth } from '@/lib/admin-auth'
 import { apiClient } from '@/lib/api'
+import { TeamTournamentPanel } from '@/components/team-tournament-panel'
 import { TierParticipantBoard } from '@/components/tier-participant-board'
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
 import { t } from '@/lib/i18n'
@@ -577,6 +578,8 @@ export default function MultiBalancePage() {
           </div>
         </section>
       )}
+
+      <TeamTournamentPanel groupId={TEMP_GROUP_ID} selectedPlayerIds={selectedIds} showMmr={showMmr} />
     </section>
   )
 }

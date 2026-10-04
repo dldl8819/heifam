@@ -68,6 +68,8 @@ import com.balancify.backend.api.match.dto.MultiBalanceRaceSummaryResponse;
 import com.balancify.backend.api.match.dto.MultiBalanceResponse;
 import com.balancify.backend.api.match.dto.MultiBalanceWaitingPlayerResponse;
 import com.balancify.backend.api.points.PointController;
+import com.balancify.backend.api.tournament.TeamTournamentController;
+import com.balancify.backend.api.tournament.dto.TeamTournamentResponse;
 import com.balancify.backend.api.points.dto.PointAdjustmentResponse;
 import com.balancify.backend.api.points.dto.PointSummaryResponse;
 import com.balancify.backend.service.AccessControlService;
@@ -96,6 +98,10 @@ import com.balancify.backend.service.PlayerRaceStatsQueryService;
 import com.balancify.backend.service.PlayerTeammateStatsQueryService;
 import com.balancify.backend.service.PlayerImportService;
 import com.balancify.backend.service.PointService;
+import com.balancify.backend.service.TeamTournamentService;
+import com.balancify.backend.service.TournamentProgressService;
+import com.balancify.backend.service.exception.MatchConflictException;
+import com.balancify.backend.service.exception.MatchEditForbiddenException;
 import com.balancify.backend.service.RankingService;
 import com.balancify.backend.service.RatingRecalculationService;
 import com.balancify.backend.service.TeamBalancingService;
@@ -135,7 +141,8 @@ import org.springframework.test.web.servlet.MockMvc;
     GroupNoticeAdminController.class,
     GroupLedgerController.class,
     GroupLedgerAdminController.class,
-    PointController.class
+    PointController.class,
+    TeamTournamentController.class
 })
 @Import({ AdminKeyFilter.class, ServiceAccessFilter.class, AdminKeyProperties.class })
 @TestPropertySource(properties = {
@@ -248,6 +255,12 @@ class AdminKeyFilterTest {
 
     @MockitoBean
     private PointService pointService;
+
+    @MockitoBean
+    private TeamTournamentService teamTournamentService;
+
+    @MockitoBean
+    private TournamentProgressService tournamentProgressService;
 
     @BeforeEach
     void setUp() {
@@ -2206,6 +2219,71 @@ class AdminKeyFilterTest {
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.balance").value(5));
+    }
+
+    @Test
+    void keepsTeamTournamentsAwayFromMembers() throws Exception {
+        mockMvc
+            .perform(get("/api/groups/1/tournaments/latest").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(
+                post("/api/groups/1/tournaments")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"playerIds\":[1,2,3,4,5,6]}")
+            )
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(post("/api/groups/1/tournaments/5/cancel").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isForbidden());
+
+        verify(teamTournamentService, never()).create(any(), any(), any(), any(), anyBoolean());
+    }
+
+    @Test
+    void letsAdminsRunTeamTournaments() throws Exception {
+        when(tournamentProgressService.canRunTournaments("admin@hei.gg")).thenReturn(true);
+        when(teamTournamentService.create(eq(1L), eq(List.of(1L, 2L, 3L, 4L, 5L, 6L)), eq("admin@hei.gg"), any(), anyBoolean()))
+            .thenReturn(new TeamTournamentResponse(9L, "IN_PROGRESS", 2, null, null, List.of(), List.of(), List.of()));
+
+        mockMvc
+            .perform(get("/api/groups/1/tournaments/latest").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.tournament").isEmpty());
+        mockMvc
+            .perform(
+                post("/api/groups/1/tournaments")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"playerIds\":[1,2,3,4,5,6]}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.tournamentId").value(9));
+    }
+
+    @Test
+    void answersATournamentGameMemberCannotRecordWithForbidden() throws Exception {
+        when(matchResultService.processMatchResult(eq(1L), any(MatchResultRequest.class), any(), any(), anyBoolean()))
+            .thenThrow(new MatchEditForbiddenException("admins only"));
+
+        mockMvc
+            .perform(
+                post("/api/matches/1/result")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"winnerTeam\":\"HOME\"}")
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void answersADeletionATournamentStillNeedsWithConflict() throws Exception {
+        when(matchResultService.deleteMatch(1L)).thenThrow(new MatchConflictException("later game recorded"));
+
+        mockMvc
+            .perform(delete("/api/matches/1").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isConflict());
     }
 
     @Test

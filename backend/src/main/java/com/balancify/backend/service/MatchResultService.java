@@ -63,6 +63,7 @@ public class MatchResultService {
     private final OperationAuditLogService operationAuditLogService;
     private final MatchResultEditQuotaService matchResultEditQuotaService;
     private final PointService pointService;
+    private final TournamentProgressService tournamentProgressService;
 
     public MatchResultService(
         MatchRepository matchRepository,
@@ -85,7 +86,8 @@ public class MatchResultService {
         AccessControlService accessControlService,
         OperationAuditLogService operationAuditLogService,
         MatchResultEditQuotaService matchResultEditQuotaService,
-        PointService pointService
+        PointService pointService,
+        TournamentProgressService tournamentProgressService
     ) {
         this.matchRepository = matchRepository;
         this.groupRepository = groupRepository;
@@ -108,6 +110,7 @@ public class MatchResultService {
         this.operationAuditLogService = operationAuditLogService;
         this.matchResultEditQuotaService = matchResultEditQuotaService;
         this.pointService = pointService;
+        this.tournamentProgressService = tournamentProgressService;
     }
 
     @Transactional
@@ -273,6 +276,9 @@ public class MatchResultService {
         } else if (currentStatus == MatchStatus.CANCELLED) {
             throw new MatchConflictException("취소된 경기는 결과를 수정할 수 없습니다.");
         }
+        if (match.getSeriesId() != null) {
+            tournamentProgressService.checkResultChange(match, normalizedRecordedByEmail, !allowReprocess);
+        }
 
         ValidatedParticipants validatedParticipants = loadValidatedParticipants(matchId, match);
         applyParticipantRaces(
@@ -377,6 +383,10 @@ public class MatchResultService {
             && match.getSource() == MatchSource.BALANCED
             && normalizedRecordedByEmail != null) {
             pointService.grantMatchResultPoint(normalizedRecordedByEmail, match.getId());
+        }
+        // A tournament game moves its series on: the score, the next game, the next round.
+        if (match.getSeriesId() != null) {
+            tournamentProgressService.sync(match.getSeriesId());
         }
         Long groupId = resolveGroupId(match, participants);
         TransactionAfterCommit.runAfterCommitAsync(groupStatsKey(groupId), () -> {
@@ -684,6 +694,11 @@ public class MatchResultService {
                 continue;
             }
 
+            // Games of one tournament series repeat the same teams on purpose.
+            if (match.getSeriesId() != null && Objects.equals(candidate.getSeriesId(), match.getSeriesId())) {
+                continue;
+            }
+
             OffsetDateTime candidateCreatedAt = candidate.getCreatedAt();
             if (candidateCreatedAt == null
                 || candidateCreatedAt.isBefore(fromInclusive)
@@ -947,6 +962,10 @@ public class MatchResultService {
         Match match = matchRepository.findById(matchId)
             .orElseThrow(() -> new NoSuchElementException("Match not found: " + matchId));
         OffsetDateTime playedAt = match.getPlayedAt();
+        Long seriesId = match.getSeriesId();
+        if (seriesId != null) {
+            tournamentProgressService.checkDeletion(match);
+        }
 
         List<MatchParticipant> participants =
             matchParticipantRepository.findByMatchIdWithPlayerAndMatch(matchId);
@@ -974,6 +993,9 @@ public class MatchResultService {
         pointService.reverseMatchResultPoints(matchId);
         matchParticipantRepository.deleteByMatch_Id(matchId);
         matchRepository.delete(match);
+        if (seriesId != null) {
+            tournamentProgressService.sync(seriesId);
+        }
         TransactionAfterCommit.runAfterCommitAsync(groupStatsKey(groupId), () -> {
             playerStatsRefreshService.rebuildGroupStats(groupId);
             evictGroupReadCache(groupId);

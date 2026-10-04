@@ -79,6 +79,13 @@ public class Match {
     @Column(length = 100)
     private String resultRecordedByNickname;
 
+    // Set for a team tournament game: the series it belongs to and its place (1-3) in it.
+    @Column(name = "series_id")
+    private Long seriesId;
+
+    @Column(name = "series_game_number")
+    private Integer seriesGameNumber;
+
     public Long getId() {
         return id;
     }
@@ -221,6 +228,22 @@ public class Match {
 
     public void setResultRecordedByNickname(String resultRecordedByNickname) {
         this.resultRecordedByNickname = resultRecordedByNickname;
+    }
+
+    public Long getSeriesId() {
+        return seriesId;
+    }
+
+    public void setSeriesId(Long seriesId) {
+        this.seriesId = seriesId;
+    }
+
+    public Integer getSeriesGameNumber() {
+        return seriesGameNumber;
+    }
+
+    public void setSeriesGameNumber(Integer seriesGameNumber) {
+        this.seriesGameNumber = seriesGameNumber;
     }
 
     @PrePersist

@@ -55,6 +55,8 @@ public class OperationAuditLogService {
     public static final String ACTION_LEDGER_SERVER_COST_UPDATED = "LEDGER_SERVER_COST_UPDATED";
     public static final String ACTION_LEDGER_SERVER_COST_DELETED = "LEDGER_SERVER_COST_DELETED";
     public static final String ACTION_POINT_ADJUSTED = "POINT_ADJUSTED";
+    public static final String ACTION_TOURNAMENT_CREATED = "TOURNAMENT_CREATED";
+    public static final String ACTION_TOURNAMENT_CANCELLED = "TOURNAMENT_CANCELLED";
 
     private static final int MAX_PAGE_SIZE = 200;
 
@@ -611,6 +613,33 @@ public class OperationAuditLogService {
         );
         log.setSummary("포인트 조정");
         log.setDetails("amount=" + (amount > 0 ? "+" : "") + amount + (memo == null ? "" : ", memo=" + memo));
+        operationAuditLogRepository.save(log);
+    }
+
+    @Transactional
+    public void recordTournamentCreated(
+        String actorEmail,
+        String actorNickname,
+        Long tournamentId,
+        Long groupId,
+        int teamCount,
+        int waitingCount
+    ) {
+        OperationAuditLog log = baseLog(
+            actorEmail, actorNickname, ACTION_TOURNAMENT_CREATED, "TOURNAMENT", tournamentId, "#" + tournamentId, groupId
+        );
+        log.setSummary("팀 토너먼트 생성");
+        log.setDetails("teams=" + teamCount + ", waiting=" + waitingCount);
+        operationAuditLogRepository.save(log);
+    }
+
+    @Transactional
+    public void recordTournamentCancelled(String actorEmail, String actorNickname, Long tournamentId, Long groupId) {
+        OperationAuditLog log = baseLog(
+            actorEmail, actorNickname, ACTION_TOURNAMENT_CANCELLED, "TOURNAMENT", tournamentId, "#" + tournamentId, groupId
+        );
+        log.setSummary("팀 토너먼트 취소");
+        log.setDetails("tournamentId=" + tournamentId);
         operationAuditLogRepository.save(log);
     }
 

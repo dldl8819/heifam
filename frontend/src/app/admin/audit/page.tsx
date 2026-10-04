@@ -24,6 +24,8 @@ const AUDIT_ACTION_FILTER_OPTIONS = [
   'MATCH_DELETED',
   'MATCH_RESULT_UPDATED',
   'POINT_ADJUSTED',
+  'TOURNAMENT_CREATED',
+  'TOURNAMENT_CANCELLED',
 ] as const
 
 type AuditActionFilter = (typeof AUDIT_ACTION_FILTER_OPTIONS)[number]
@@ -111,6 +113,10 @@ function getActionLabel(action: string): string {
       return t('audit.actions.matchResultUpdated')
     case 'POINT_ADJUSTED':
       return t('audit.actions.pointAdjusted')
+    case 'TOURNAMENT_CREATED':
+      return t('audit.actions.tournamentCreated')
+    case 'TOURNAMENT_CANCELLED':
+      return t('audit.actions.tournamentCancelled')
     default:
       return action
   }

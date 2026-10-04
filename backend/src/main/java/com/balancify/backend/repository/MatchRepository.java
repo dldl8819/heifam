@@ -4,6 +4,7 @@ import com.balancify.backend.domain.Match;
 import com.balancify.backend.domain.MatchStatus;
 import jakarta.persistence.LockModeType;
 import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
@@ -22,6 +23,10 @@ public interface MatchRepository extends JpaRepository<Match, Long>, JpaSpecific
     Optional<Match> findTopByGroup_IdAndStatusOrderByPlayedAtDescIdDesc(Long groupId, MatchStatus status);
 
     long countByGroup_IdAndWinningTeamIsNotNull(Long groupId);
+
+    List<Match> findBySeriesIdOrderBySeriesGameNumberAsc(Long seriesId);
+
+    List<Match> findBySeriesIdInOrderBySeriesGameNumberAsc(Collection<Long> seriesIds);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select m from Match m where m.id = :matchId")
