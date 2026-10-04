@@ -794,6 +794,9 @@ export type PointReason =
   | 'ADJUSTMENT'
   | 'PREDICTION_HIT'
   | 'PREDICTION_HIT_REVERSED'
+  | 'NOTICE_READ'
+  | 'NOTICE_LIKE'
+  | 'NOTICE_COMMENT'
 
 export type PointHistoryItem = {
   reason: PointReason | string
@@ -904,6 +907,26 @@ export type TeamTournament = {
 
 export type LatestTeamTournamentResponse = {
   tournament: TeamTournament | null
+}
+
+export type NotificationItem = {
+  id: number
+  kind: 'NOTICE' | 'PREDICTION' | string
+  title: string
+  body: string | null
+  link: string | null
+  createdAt: string
+  read: boolean
+}
+
+export type NotificationList = {
+  notifications: NotificationItem[]
+  unreadCount: number
+}
+
+export type PushConfig = {
+  enabled: boolean
+  publicKey: string | null
 }
 
 export type BalanceSeriesStatus = 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'

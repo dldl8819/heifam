@@ -17,15 +17,18 @@ public class NoticeAdminService {
     private final NoticeRepository noticeRepository;
     private final AccessControlService accessControlService;
     private final OperationAuditLogService operationAuditLogService;
+    private final NotificationService notificationService;
 
     public NoticeAdminService(
         NoticeRepository noticeRepository,
         AccessControlService accessControlService,
-        OperationAuditLogService operationAuditLogService
+        OperationAuditLogService operationAuditLogService,
+        NotificationService notificationService
     ) {
         this.noticeRepository = noticeRepository;
         this.accessControlService = accessControlService;
         this.operationAuditLogService = operationAuditLogService;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -48,6 +51,7 @@ public class NoticeAdminService {
         noticeRepository.save(notice);
 
         operationAuditLogService.recordNoticePosted(actorEmail, actorNickname, groupId, notice);
+        notificationService.publishNotice(groupId, notice.getId(), notice.getTitle(), notice.isAdminOnly(), actorEmail);
 
         return new NoticeResponse(
             notice.getId(),
@@ -74,6 +78,7 @@ public class NoticeAdminService {
 
         Notice notice = noticeRepository.findByIdAndGroupId(noticeId, groupId)
             .orElseThrow(() -> new NoSuchElementException("Notice not found"));
+        boolean wasAdminOnly = notice.isAdminOnly();
         notice.setTitle(title);
         notice.setContent(content);
         // Leaving the flag out of an update keeps it as it was.
@@ -83,6 +88,10 @@ public class NoticeAdminService {
         noticeRepository.save(notice);
 
         operationAuditLogService.recordNoticeUpdated(actorEmail, actorNickname, groupId, notice);
+        // A notice opened up to members reaches them as a new one.
+        if (wasAdminOnly && !notice.isAdminOnly()) {
+            notificationService.publishNotice(groupId, notice.getId(), notice.getTitle(), false, actorEmail);
+        }
 
         String authorNickname = safeTrim(
             accessControlService.resolveAccessProfile(notice.getAuthorEmail()).nickname()
@@ -106,6 +115,7 @@ public class NoticeAdminService {
         Notice notice = noticeRepository.findByIdAndGroupId(noticeId, groupId)
             .orElseThrow(() -> new NoSuchElementException("Notice not found"));
         noticeRepository.delete(notice);
+        notificationService.removeNotice(notice.getId());
 
         operationAuditLogService.recordNoticeDeleted(actorEmail, actorNickname, groupId, notice.getId(), notice.getTitle());
     }

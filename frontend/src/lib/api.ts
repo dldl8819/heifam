@@ -59,6 +59,8 @@ import type {
   LatestTeamTournamentResponse,
   BalanceSeriesLineup,
   BalanceSeriesList,
+  NotificationList,
+  PushConfig,
   TeamTournament,
   PredictionBoard,
   PredictionMatch,
@@ -1622,6 +1624,40 @@ export const apiClient = {
     apiRequest<TeamTournament>(
       `/api/groups/${groupId}/tournaments/${tournamentId}/cancel`,
       { method: 'POST' },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  getNotifications: (groupId: number) =>
+    apiRequest<NotificationList>(`/api/groups/${groupId}/notifications`, undefined, {
+      requireUserEmail: true,
+      includeUserEmail: true,
+    }),
+  markNotificationsRead: (groupId: number) =>
+    apiRequest<NotificationList>(
+      `/api/groups/${groupId}/notifications/read`,
+      { method: 'POST' },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  getPushConfig: () =>
+    apiRequest<PushConfig>('/api/notifications/push-config', undefined, {
+      requireUserEmail: true,
+      includeUserEmail: true,
+    }),
+  savePushSubscription: (subscription: PushSubscriptionJSON) =>
+    apiRequest<void>(
+      '/api/notifications/push-subscriptions',
+      {
+        method: 'POST',
+        body: JSON.stringify({ endpoint: subscription.endpoint, keys: subscription.keys }),
+      },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  removePushSubscription: (endpoint: string) =>
+    apiRequest<void>(
+      '/api/notifications/push-subscriptions/remove',
+      {
+        method: 'POST',
+        body: JSON.stringify({ endpoint }),
+      },
       { requireUserEmail: true, includeUserEmail: true }
     ),
   getBalanceSeries: (groupId: number) =>

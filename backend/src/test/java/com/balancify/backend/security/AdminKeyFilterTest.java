@@ -77,6 +77,8 @@ import com.balancify.backend.api.prediction.PredictionController;
 import com.balancify.backend.api.prediction.dto.PredictionBoardResponse;
 import com.balancify.backend.api.prediction.dto.PredictionStatsResponse;
 import com.balancify.backend.api.tournament.TeamScoreController;
+import com.balancify.backend.api.notification.NotificationController;
+import com.balancify.backend.api.notification.dto.NotificationListResponse;
 import com.balancify.backend.api.series.BalanceSeriesController;
 import com.balancify.backend.api.series.dto.BalanceSeriesListResponse;
 import com.balancify.backend.api.tournament.TeamTournamentController;
@@ -116,6 +118,7 @@ import com.balancify.backend.service.PrizeEventService;
 import com.balancify.backend.service.TeamScoreService;
 import com.balancify.backend.service.TeamTournamentService;
 import com.balancify.backend.service.BalanceSeriesService;
+import com.balancify.backend.service.NotificationService;
 import com.balancify.backend.service.TournamentProgressService;
 import com.balancify.backend.service.exception.MatchConflictException;
 import com.balancify.backend.service.exception.MatchEditForbiddenException;
@@ -162,6 +165,7 @@ import org.springframework.test.web.servlet.MockMvc;
     PointController.class,
     TeamTournamentController.class,
     BalanceSeriesController.class,
+    NotificationController.class,
     PredictionController.class,
     TeamScoreController.class,
     PrizeEventController.class
@@ -298,6 +302,9 @@ class AdminKeyFilterTest {
 
     @MockitoBean
     private BalanceSeriesService balanceSeriesService;
+
+    @MockitoBean
+    private NotificationService notificationService;
 
     @BeforeEach
     void setUp() {
@@ -2367,6 +2374,53 @@ class AdminKeyFilterTest {
             .andExpect(status().isForbidden());
 
         verify(teamTournamentService, never()).create(any(), any(), any(), any(), anyBoolean());
+    }
+
+    @Test
+    void keepsNotificationsToAdminsWhileTheyAreTriedOut() throws Exception {
+        when(notificationService.canUseNotifications("admin@hei.gg")).thenReturn(true);
+        when(notificationService.list(1L, "admin@hei.gg")).thenReturn(new NotificationListResponse(List.of(), 0));
+        String subscription = "{\"endpoint\":\"https://fcm.googleapis.com/fcm/send/x\"}";
+
+        mockMvc
+            .perform(get("/api/groups/1/notifications"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(get("/api/groups/1/notifications").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(post("/api/groups/1/notifications/read").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(get("/api/notifications/push-config").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(
+                post("/api/notifications/push-subscriptions")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(subscription)
+            )
+            .andExpect(status().isForbidden());
+        verify(notificationService, never()).list(any(), any());
+
+        mockMvc
+            .perform(get("/api/groups/1/notifications").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.unreadCount").value(0));
+        mockMvc
+            .perform(post("/api/groups/1/notifications/read").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(
+                post("/api/notifications/push-subscriptions")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(subscription)
+            )
+            .andExpect(status().isOk());
+        verify(notificationService).markAllRead(1L, "admin@hei.gg");
+        verify(notificationService).subscribe(eq("admin@hei.gg"), any());
     }
 
     @Test

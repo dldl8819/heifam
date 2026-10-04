@@ -12,6 +12,9 @@ const REASON_KEYS: Record<PointReason, string> = {
   ADJUSTMENT: 'points.reasons.adjustment',
   PREDICTION_HIT: 'points.reasons.predictionHit',
   PREDICTION_HIT_REVERSED: 'points.reasons.predictionHitReversed',
+  NOTICE_READ: 'points.reasons.noticeRead',
+  NOTICE_LIKE: 'points.reasons.noticeLike',
+  NOTICE_COMMENT: 'points.reasons.noticeComment',
 }
 
 export type PointMemberOption = {

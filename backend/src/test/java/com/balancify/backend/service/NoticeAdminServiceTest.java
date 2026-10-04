@@ -36,11 +36,19 @@ class NoticeAdminServiceTest {
     @Mock
     private OperationAuditLogService operationAuditLogService;
 
+    @Mock
+    private NotificationService notificationService;
+
     private NoticeAdminService noticeAdminService;
 
     @BeforeEach
     void setUp() {
-        noticeAdminService = new NoticeAdminService(noticeRepository, accessControlService, operationAuditLogService);
+        noticeAdminService = new NoticeAdminService(
+            noticeRepository,
+            accessControlService,
+            operationAuditLogService,
+            notificationService
+        );
         when(accessControlService.isAdminEmail("ops@hei.gg")).thenReturn(true);
         when(accessControlService.isAdminEmail("member@hei.gg")).thenReturn(false);
         when(accessControlService.isAdminEmail("superadmin@hei.gg")).thenReturn(true);
@@ -83,6 +91,30 @@ class NoticeAdminServiceTest {
         verify(noticeRepository).save(saved.capture());
         assertThat(saved.getValue().isAdminOnly()).isTrue();
         assertThat(response.adminOnly()).isTrue();
+    }
+
+    @Test
+    void tellsReadersOfANewNoticeAndOfOneOpenedToMembersLater() {
+        noticeAdminService.createNotice(1L, new NoticeCreateRequest("YOUR_TITLE", "YOUR_CONTENT", true), "ops@hei.gg", "OpsUser");
+        verify(notificationService).publishNotice(1L, 1L, "YOUR_TITLE", true, "ops@hei.gg");
+
+        Notice notice = new Notice();
+        notice.setId(5L);
+        notice.setGroupId(1L);
+        notice.setTitle("YOUR_TITLE");
+        notice.setContent("YOUR_CONTENT");
+        notice.setAuthorEmail("ops@hei.gg");
+        notice.setAdminOnly(true);
+        when(noticeRepository.findByIdAndGroupId(5L, 1L)).thenReturn(Optional.of(notice));
+        when(accessControlService.resolveAccessProfile("ops@hei.gg"))
+            .thenReturn(new AccessControlService.AccessProfile(
+                "ops@hei.gg", "OpsUser", "ADMIN", true, false, true, true, null
+            ));
+
+        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("YOUR_TITLE", "edited", null), "ops@hei.gg", "OpsUser");
+        verify(notificationService, never()).publishNotice(eq(1L), eq(5L), any(), eq(false), any());
+        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("YOUR_TITLE", "edited", false), "ops@hei.gg", "OpsUser");
+        verify(notificationService).publishNotice(1L, 5L, "YOUR_TITLE", false, "ops@hei.gg");
     }
 
     @Test

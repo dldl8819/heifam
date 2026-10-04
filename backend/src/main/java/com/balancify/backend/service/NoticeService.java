@@ -36,17 +36,20 @@ public class NoticeService {
     private final NoticeCommentRepository noticeCommentRepository;
     private final NoticeEngagementRepository noticeEngagementRepository;
     private final AccessControlService accessControlService;
+    private final PointService pointService;
 
     public NoticeService(
         NoticeRepository noticeRepository,
         NoticeCommentRepository noticeCommentRepository,
         NoticeEngagementRepository noticeEngagementRepository,
-        AccessControlService accessControlService
+        AccessControlService accessControlService,
+        PointService pointService
     ) {
         this.noticeRepository = noticeRepository;
         this.noticeCommentRepository = noticeCommentRepository;
         this.noticeEngagementRepository = noticeEngagementRepository;
         this.accessControlService = accessControlService;
+        this.pointService = pointService;
     }
 
     @Transactional(readOnly = true)
@@ -90,12 +93,13 @@ public class NoticeService {
         return new NoticeListResponse(items, readCount, items.size() - readCount);
     }
 
-    /** Opening a notice marks it read for this member. */
+    /** Opening a notice marks it read for this member and earns the reading point once. */
     @Transactional
     public NoticeDetailResponse open(Long groupId, Long noticeId, String email) {
         String reader = normalizeEmail(email);
         Notice notice = requireVisible(groupId, noticeId, reader);
         noticeEngagementRepository.markRead(notice.getId(), reader);
+        pointService.grantNoticePoint(reader, notice.getId(), PointService.REASON_NOTICE_READ);
         return detail(notice, reader);
     }
 
@@ -112,6 +116,7 @@ public class NoticeService {
         comment.setAuthorEmail(author);
         comment.setContent(text);
         noticeCommentRepository.save(comment);
+        pointService.grantNoticePoint(author, notice.getId(), PointService.REASON_NOTICE_COMMENT);
         return detail(notice, author);
     }
 
@@ -135,6 +140,7 @@ public class NoticeService {
         Notice notice = requireVisible(groupId, noticeId, member);
         if (liked) {
             noticeEngagementRepository.like(notice.getId(), member);
+            pointService.grantNoticePoint(member, notice.getId(), PointService.REASON_NOTICE_LIKE);
         } else {
             noticeEngagementRepository.unlike(notice.getId(), member);
         }

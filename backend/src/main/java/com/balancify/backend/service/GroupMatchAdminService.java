@@ -40,6 +40,7 @@ public class GroupMatchAdminService {
     private final PlayerRepository playerRepository;
     private final MatchRepository matchRepository;
     private final MatchParticipantRepository matchParticipantRepository;
+    private final NotificationService notificationService;
     private final long duplicateWindowMinutes;
 
     public GroupMatchAdminService(
@@ -47,12 +48,14 @@ public class GroupMatchAdminService {
         PlayerRepository playerRepository,
         MatchRepository matchRepository,
         MatchParticipantRepository matchParticipantRepository,
+        NotificationService notificationService,
         @Value("${balancify.match.confirm.duplicate-window-minutes:5}") long duplicateWindowMinutes
     ) {
         this.groupRepository = groupRepository;
         this.playerRepository = playerRepository;
         this.matchRepository = matchRepository;
         this.matchParticipantRepository = matchParticipantRepository;
+        this.notificationService = notificationService;
         this.duplicateWindowMinutes = Math.max(1, duplicateWindowMinutes);
     }
 
@@ -354,6 +357,10 @@ public class GroupMatchAdminService {
         }
 
         matchParticipantRepository.saveAll(participants);
+        // A balanced match opens for predictions as it is created; a manual entry comes with its result.
+        if (normalizedSource == MatchSource.BALANCED) {
+            notificationService.publishPredictionsOpen(group.getId(), savedMatch.getId(), normalizedTeamSize);
+        }
         return new MatchCreationOutcome(savedMatch, false, false);
     }
 

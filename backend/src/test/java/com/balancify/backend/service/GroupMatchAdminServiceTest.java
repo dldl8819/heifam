@@ -46,6 +46,9 @@ class GroupMatchAdminServiceTest {
     @Mock
     private MatchParticipantRepository matchParticipantRepository;
 
+    @Mock
+    private NotificationService notificationService;
+
     private GroupMatchAdminService groupMatchAdminService;
 
     @BeforeEach
@@ -55,6 +58,7 @@ class GroupMatchAdminServiceTest {
             playerRepository,
             matchRepository,
             matchParticipantRepository,
+            notificationService,
             5
         );
     }

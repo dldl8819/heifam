@@ -150,6 +150,32 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/predictions/{matchId}/close"),
             AuthType.ADMIN_EMAIL
         ),
+        // Notifications are tried out by admins first; NotificationController checks the same.
+        new ProtectedRoute(
+            "GET",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/notifications"),
+            AuthType.ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "POST",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/notifications/read"),
+            AuthType.ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "GET",
+            PathPatternParser.defaultInstance.parse("/api/notifications/push-config"),
+            AuthType.ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "POST",
+            PathPatternParser.defaultInstance.parse("/api/notifications/push-subscriptions"),
+            AuthType.ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "POST",
+            PathPatternParser.defaultInstance.parse("/api/notifications/push-subscriptions/remove"),
+            AuthType.ADMIN_EMAIL
+        ),
         // Series after a multi-balance belong to the admin-only multi-balance page; BalanceSeriesController checks the same.
         new ProtectedRoute(
             "GET",
