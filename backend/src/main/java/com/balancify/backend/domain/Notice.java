@@ -30,11 +30,23 @@ public class Notice {
     @Column(name = "author_email", nullable = false, length = 320)
     private String authorEmail;
 
+    // Shown to admins only; everyone else sees neither the title nor the notice.
+    @Column(name = "admin_only", nullable = false)
+    private boolean adminOnly;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt = OffsetDateTime.now();
+
+    public boolean isAdminOnly() {
+        return adminOnly;
+    }
+
+    public void setAdminOnly(boolean adminOnly) {
+        this.adminOnly = adminOnly;
+    }
 
     @PrePersist
     @PreUpdate

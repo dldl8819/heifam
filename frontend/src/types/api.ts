@@ -567,16 +567,63 @@ export type NoticeItem = {
   authorNickname?: string
   createdAt: string
   updatedAt: string
+  adminOnly: boolean
+}
+
+export type NoticeTitle = {
+  title: string
+  createdAt: string
+}
+
+export type NoticeListItem = {
+  id: number
+  title: string
+  authorNickname?: string
+  createdAt: string
+  adminOnly: boolean
+  read: boolean
+  likeCount: number
+  commentCount: number
+}
+
+export type NoticeList = {
+  notices: NoticeListItem[]
+  readCount: number
+  unreadCount: number
+}
+
+export type NoticeComment = {
+  id: number
+  authorNickname?: string
+  content: string
+  createdAt: string
+  mine: boolean
+  canDelete: boolean
+}
+
+export type NoticeDetail = {
+  id: number
+  title: string
+  content: string
+  authorNickname?: string
+  createdAt: string
+  updatedAt: string
+  adminOnly: boolean
+  likeCount: number
+  likedByMe: boolean
+  comments: NoticeComment[]
 }
 
 export type NoticeCreateRequest = {
   title: string
   content: string
+  adminOnly?: boolean
 }
 
 export type NoticeUpdateRequest = {
   title: string
   content: string
+  adminOnly?: boolean
 }
 
 export type LedgerExpenseType = 'FIXED' | 'VARIABLE'

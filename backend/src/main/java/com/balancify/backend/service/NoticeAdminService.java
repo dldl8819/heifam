@@ -44,6 +44,7 @@ public class NoticeAdminService {
         notice.setTitle(title);
         notice.setContent(content);
         notice.setAuthorEmail(safeTrim(actorEmail).toLowerCase(java.util.Locale.ROOT));
+        notice.setAdminOnly(request != null && Boolean.TRUE.equals(request.adminOnly()));
         noticeRepository.save(notice);
 
         operationAuditLogService.recordNoticePosted(actorEmail, actorNickname, groupId, notice);
@@ -54,7 +55,8 @@ public class NoticeAdminService {
             notice.getContent(),
             actorNickname,
             notice.getCreatedAt(),
-            notice.getUpdatedAt()
+            notice.getUpdatedAt(),
+            notice.isAdminOnly()
         );
     }
 
@@ -74,6 +76,10 @@ public class NoticeAdminService {
             .orElseThrow(() -> new NoSuchElementException("Notice not found"));
         notice.setTitle(title);
         notice.setContent(content);
+        // Leaving the flag out of an update keeps it as it was.
+        if (request != null && request.adminOnly() != null) {
+            notice.setAdminOnly(request.adminOnly());
+        }
         noticeRepository.save(notice);
 
         operationAuditLogService.recordNoticeUpdated(actorEmail, actorNickname, groupId, notice);
@@ -87,7 +93,8 @@ public class NoticeAdminService {
             notice.getContent(),
             authorNickname.isEmpty() ? null : authorNickname,
             notice.getCreatedAt(),
-            notice.getUpdatedAt()
+            notice.getUpdatedAt(),
+            notice.isAdminOnly()
         );
     }
 

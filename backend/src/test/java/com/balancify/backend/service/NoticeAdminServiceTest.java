@@ -17,6 +17,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -57,7 +58,7 @@ class NoticeAdminServiceTest {
     void createsNoticeForAdmin() {
         NoticeResponse response = noticeAdminService.createNotice(
             1L,
-            new NoticeCreateRequest("YOUR_TITLE", "YOUR_CONTENT"),
+            new NoticeCreateRequest("YOUR_TITLE", "YOUR_CONTENT", null),
             "ops@hei.gg",
             "OpsUser"
         );
@@ -70,9 +71,24 @@ class NoticeAdminServiceTest {
     }
 
     @Test
+    void keepsANoticeToAdminsWhenAsked() {
+        NoticeResponse response = noticeAdminService.createNotice(
+            1L,
+            new NoticeCreateRequest("YOUR_TITLE", "YOUR_CONTENT", true),
+            "ops@hei.gg",
+            "OpsUser"
+        );
+
+        ArgumentCaptor<Notice> saved = ArgumentCaptor.forClass(Notice.class);
+        verify(noticeRepository).save(saved.capture());
+        assertThat(saved.getValue().isAdminOnly()).isTrue();
+        assertThat(response.adminOnly()).isTrue();
+    }
+
+    @Test
     void rejectsCreateWhenActorIsNotAdmin() {
         assertThatThrownBy(() ->
-            noticeAdminService.createNotice(1L, new NoticeCreateRequest("t", "c"), "member@hei.gg", "Member")
+            noticeAdminService.createNotice(1L, new NoticeCreateRequest("t", "c", null), "member@hei.gg", "Member")
         )
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Only admins can manage notices");
@@ -83,7 +99,7 @@ class NoticeAdminServiceTest {
     @Test
     void rejectsCreateWithBlankTitle() {
         assertThatThrownBy(() ->
-            noticeAdminService.createNotice(1L, new NoticeCreateRequest("  ", "content"), "ops@hei.gg", "OpsUser")
+            noticeAdminService.createNotice(1L, new NoticeCreateRequest("  ", "content", null), "ops@hei.gg", "OpsUser")
         )
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Title is required");
@@ -106,7 +122,7 @@ class NoticeAdminServiceTest {
         NoticeResponse response = noticeAdminService.updateNotice(
             1L,
             5L,
-            new NoticeUpdateRequest("new title", "new content"),
+            new NoticeUpdateRequest("new title", "new content", null),
             "ops@hei.gg",
             "OpsUser"
         );
@@ -121,7 +137,7 @@ class NoticeAdminServiceTest {
         when(noticeRepository.findByIdAndGroupId(99L, 1L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() ->
-            noticeAdminService.updateNotice(1L, 99L, new NoticeUpdateRequest("t", "c"), "ops@hei.gg", "OpsUser")
+            noticeAdminService.updateNotice(1L, 99L, new NoticeUpdateRequest("t", "c", null), "ops@hei.gg", "OpsUser")
         )
             .isInstanceOf(java.util.NoSuchElementException.class)
             .hasMessage("Notice not found");

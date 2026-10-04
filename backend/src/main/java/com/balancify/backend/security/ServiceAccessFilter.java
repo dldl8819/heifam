@@ -32,6 +32,9 @@ public class ServiceAccessFilter extends OncePerRequestFilter {
     );
     private static final PathPattern PUBLIC_RECENT_MATCHES =
         PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/matches/recent");
+    // Visitors may read which notices exist: titles and dates of notices not kept to admins.
+    private static final PathPattern PUBLIC_NOTICE_TITLES =
+        PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/notice-titles");
 
     private final AccessControlService accessControlService;
     private final AuthenticatedRequestResolver authenticatedRequestResolver;
@@ -65,7 +68,8 @@ public class ServiceAccessFilter extends OncePerRequestFilter {
         if (PUBLIC_PATHS.stream().anyMatch(publicPath -> publicPath.matches(path))) {
             return true;
         }
-        return "GET".equalsIgnoreCase(method) && PUBLIC_RECENT_MATCHES.matches(path);
+        return "GET".equalsIgnoreCase(method)
+            && (PUBLIC_RECENT_MATCHES.matches(path) || PUBLIC_NOTICE_TITLES.matches(path));
     }
 
     @Override

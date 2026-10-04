@@ -219,6 +219,10 @@ public class AccountPersonalDataRepository {
                 "DELETE FROM match_result_editor_emails WHERE normalized_email = :email",
                 parameters
             );
+            // A member's notice reads, likes and comments go with the account.
+            jdbcTemplate.update("DELETE FROM notice_reads WHERE reader_email = :email", parameters);
+            jdbcTemplate.update("DELETE FROM notice_likes WHERE liker_email = :email", parameters);
+            jdbcTemplate.update("DELETE FROM notice_comments WHERE author_email = :email", parameters);
             // Removes the person's point history with it (ON DELETE CASCADE).
             jdbcTemplate.update(
                 "DELETE FROM point_accounts WHERE normalized_email = :email",

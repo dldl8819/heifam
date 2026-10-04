@@ -40,7 +40,10 @@ import type {
   MatchResultUpdateRequest,
   ManualMatchCreateRequest,
   NoticeCreateRequest,
+  NoticeDetail,
   NoticeItem,
+  NoticeList,
+  NoticeTitle,
   NoticeUpdateRequest,
   OperationAuditLogFilters,
   OperationAuditLogItem,
@@ -1352,14 +1355,39 @@ export const apiClient = {
         baseUrlOverride: ACCESS_API_BASE_URL,
       }
     ),
+  // Open to visitors: titles and dates of the notices members may read.
+  getNoticeTitles: (groupId: number) =>
+    apiRequest<NoticeTitle[]>(`/api/groups/${groupId}/notice-titles`),
   getNotices: (groupId: number) =>
-    apiRequest<NoticeItem[]>(`/api/groups/${groupId}/notices`, undefined, {
+    apiRequest<NoticeList>(`/api/groups/${groupId}/notices`, undefined, {
       includeUserEmail: true,
     }),
+  // Opening a notice marks it read for the member.
   getNotice: (groupId: number, noticeId: number) =>
-    apiRequest<NoticeItem>(`/api/groups/${groupId}/notices/${noticeId}`, undefined, {
+    apiRequest<NoticeDetail>(`/api/groups/${groupId}/notices/${noticeId}`, undefined, {
       includeUserEmail: true,
     }),
+  addNoticeComment: (groupId: number, noticeId: number, content: string) =>
+    apiRequest<NoticeDetail>(
+      `/api/groups/${groupId}/notices/${noticeId}/comments`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ content }),
+      },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  deleteNoticeComment: (groupId: number, noticeId: number, commentId: number) =>
+    apiRequest<NoticeDetail>(
+      `/api/groups/${groupId}/notices/${noticeId}/comments/${commentId}`,
+      { method: 'DELETE' },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  setNoticeLike: (groupId: number, noticeId: number, liked: boolean) =>
+    apiRequest<NoticeDetail>(
+      `/api/groups/${groupId}/notices/${noticeId}/like`,
+      { method: liked ? 'PUT' : 'DELETE' },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
   createNotice: (groupId: number, payload: NoticeCreateRequest) =>
     apiRequest<NoticeItem>(
       `/api/groups/${groupId}/notices`,
