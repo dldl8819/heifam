@@ -17,6 +17,7 @@ import { apiClient, isApiConflictError, isApiForbiddenError, isApiUnauthorizedEr
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
+import { formatPercent } from '@/lib/percent'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
 import { findUniquePlayerByNicknamePrefix } from '@/lib/player-autocomplete'
 import { getRaceCompositionOptions, normalizeRaceComposition } from '@/lib/race-composition'
@@ -47,11 +48,6 @@ type SupportedTeamSize = 2 | 3
 type PersistedBalanceState = {
   teamSize: SupportedTeamSize
   raceComposition: RaceComposition | null
-}
-
-function formatPercent(value: number): string {
-  const percent = value <= 1 ? value * 100 : value
-  return `${percent.toFixed(2)}%`
 }
 
 function formatTeamLabel(team: TeamSide | string): string {

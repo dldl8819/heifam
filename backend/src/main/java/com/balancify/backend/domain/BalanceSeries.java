@@ -33,6 +33,10 @@ public class BalanceSeries {
     @Column(name = "team_size", nullable = false)
     private int teamSize;
 
+    // The match of its multi-balance (1, 2, ...); its teams are 2n-1 (HOME) and 2n (AWAY).
+    @Column(name = "match_number")
+    private Integer matchNumber;
+
     // HOME players first, then AWAY, team_size each.
     @ElementCollection
     @CollectionTable(name = "balance_series_players", joinColumns = @JoinColumn(name = "series_id"))
@@ -89,6 +93,14 @@ public class BalanceSeries {
 
     public void setTeamSize(int teamSize) {
         this.teamSize = teamSize;
+    }
+
+    public Integer getMatchNumber() {
+        return matchNumber;
+    }
+
+    public void setMatchNumber(Integer matchNumber) {
+        this.matchNumber = matchNumber;
     }
 
     public List<Long> getPlayerIds() {

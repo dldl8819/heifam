@@ -126,7 +126,8 @@ public class BalanceSeriesService {
             throw new IllegalArgumentException("그룹에 없는 선수가 있습니다.");
         }
 
-        for (Lineup lineup : normalized) {
+        for (int index = 0; index < normalized.size(); index++) {
+            Lineup lineup = normalized.get(index);
             TournamentSeriesPlanner.SeriesPlan plan = TournamentSeriesPlanner.plan(
                 capabilities(lineup.home(), players),
                 capabilities(lineup.away(), players),
@@ -135,6 +136,8 @@ public class BalanceSeriesService {
             BalanceSeries series = new BalanceSeries();
             series.setGroupId(groupId);
             series.setTeamSize(lineup.home().size());
+            // Lineups come in the multi-balance's match order.
+            series.setMatchNumber(index + 1);
             List<Long> playerIds = new ArrayList<>(lineup.home());
             playerIds.addAll(lineup.away());
             series.setPlayerIds(playerIds);
@@ -257,6 +260,9 @@ public class BalanceSeriesService {
         return seriesList.stream()
             .map(series -> new BalanceSeriesResponse(
                 series.getId(),
+                series.getMatchNumber(),
+                series.getMatchNumber() == null ? null : series.getMatchNumber() * 2 - 1,
+                series.getMatchNumber() == null ? null : series.getMatchNumber() * 2,
                 series.getStatus().name(),
                 series.getFormat().name(),
                 series.getTeamSize(),
