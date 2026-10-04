@@ -187,6 +187,10 @@ class BalanceSeriesServiceTest {
         verify(groupMatchAdminService).createBalanceSeriesGameMatch(7L, List.of(21L, 22L, 23L), List.of(24L, 25L, 26L), 3, "PPP", 101L, 1);
         verify(operationAuditLogService).recordBalanceSeriesStarted(ADMIN, "Ops", 7L, 2);
         assertThat(response.series()).hasSize(2);
+        assertThat(storedSeries).extracting(BalanceSeries::getMatchNumber).containsExactly(1, 2);
+        assertThat(response.series().getFirst().matchNumber()).isEqualTo(2);
+        assertThat(response.series().getFirst().homeTeamNumber()).isEqualTo(3);
+        assertThat(response.series().getFirst().awayTeamNumber()).isEqualTo(4);
         assertThat(response.series().getLast().games()).extracting(TournamentGameResponse::status)
             .containsExactly("NEXT", "UPCOMING", "UPCOMING");
         // Newest first: the mixed series shows who takes Terran in its planned second game.

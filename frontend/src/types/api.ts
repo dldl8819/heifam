@@ -939,6 +939,10 @@ export type BalanceSeriesStatus = 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
 // A series played after a multi-balance; its games read like a tournament series' games.
 export type BalanceSeries = {
   seriesId: number
+  // Its match in the multi-balance and the team numbers shown there; null for older series.
+  matchNumber: number | null
+  homeTeamNumber: number | null
+  awayTeamNumber: number | null
   status: BalanceSeriesStatus
   format: TournamentSeriesFormat
   teamSize: number

@@ -1070,7 +1070,11 @@
     "plan": {
       "formatChoice": "진행 방식",
       "title": "시리즈 계획",
-      "matchTitle": "경기 {number}: 팀 {home} vs 팀 {away}",
+      "matchTitle": "경기 {number}: {home}팀 vs {away}팀",
+      "metricsTitle": "밸런스 지표",
+      "mmrDiff": "MMR 차이",
+      "expectedWinRate": "{team}팀 예상 승률",
+      "averageTeamMmr": "팀 평균 MMR",
       "protossOnly": "프로토스",
       "offRace": "{race}: {players}",
       "unavailable": "두 팀이 함께 할 수 있는 종족 조합이 없어 시리즈를 계획할 수 없습니다.",
@@ -1086,10 +1090,8 @@
       "empty": "진행 중인 시리즈가 없습니다. 팀 편성을 만든 뒤 시리즈를 시작하세요.",
       "loadError": "시리즈를 불러오지 못했습니다.",
       "seriesLabel": "시리즈 #{number}",
-      "sides": {
-        "HOME": "1팀",
-        "AWAY": "2팀"
-      },
+      "matchLabel": "경기 {number}",
+      "teamLabel": "{number}팀",
       "status": {
         "IN_PROGRESS": "진행 중",
         "COMPLETED": "끝남",
@@ -1168,7 +1170,7 @@
       "assignedPlayers": "배정 인원",
       "waitingPlayers": "대기 인원",
       "waitingTitle": "대기 인원",
-      "teamLabel": "팀 {number}",
+      "teamLabel": "{number}팀",
       "teamMemberCount": "{count}명 팀",
       "teamTotalMmr": "팀 총 MMR",
       "matchNumberHeader": "경기",

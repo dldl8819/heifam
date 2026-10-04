@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   buildSeriesLineups,
   canChooseSeriesFormat,
+  matchBalanceMetrics,
   offRaceAssignments,
   orderBoardSeries,
   previewSeriesGames,
+  seriesTeamNumber,
   teamLine,
 } from './balance-series'
 import type { BalanceSeries, MultiBalanceMatch } from '@/types/api'
@@ -24,6 +26,9 @@ function match(homeIds: Array<number | undefined>, awayIds: number[]): MultiBala
 function series(seriesId: number, status: BalanceSeries['status']): BalanceSeries {
   return {
     seriesId,
+    matchNumber: null,
+    homeTeamNumber: null,
+    awayTeamNumber: null,
     status,
     format: 'BEST_OF_THREE',
     teamSize: 3,
@@ -111,9 +116,35 @@ describe('series format choice', () => {
 })
 
 describe('orderBoardSeries', () => {
-  it('puts running series first, newest first within each', () => {
-    const ordered = orderBoardSeries([series(1, 'IN_PROGRESS'), series(3, 'COMPLETED'), series(2, 'IN_PROGRESS')])
-    expect(ordered.map((item) => item.seriesId)).toEqual([2, 1, 3])
+  it('puts running series first, each group in the order started', () => {
+    const ordered = orderBoardSeries([
+      series(2, 'IN_PROGRESS'),
+      series(4, 'COMPLETED'),
+      series(1, 'IN_PROGRESS'),
+      series(3, 'COMPLETED'),
+    ])
+    expect(ordered.map((item) => item.seriesId)).toEqual([1, 2, 3, 4])
+  })
+})
+
+describe('seriesTeamNumber', () => {
+  it('keeps the team numbers of the multi-balance', () => {
+    const second = { ...series(8, 'IN_PROGRESS'), matchNumber: 2, homeTeamNumber: 3, awayTeamNumber: 4 }
+    expect([seriesTeamNumber(second, 'HOME'), seriesTeamNumber(second, 'AWAY')]).toEqual([3, 4])
+    expect([seriesTeamNumber(series(1, 'IN_PROGRESS'), 'HOME'), seriesTeamNumber(series(1, 'IN_PROGRESS'), 'AWAY')]).toEqual([1, 2])
+  })
+})
+
+describe('matchBalanceMetrics', () => {
+  it('gives the win rate always and the MMR figures only when MMR is shown', () => {
+    expect(
+      matchBalanceMetrics({ ...match([1, 2, 3], [4, 5, 6]), homeMmr: 3000, awayMmr: 2961, mmrDiff: 39, expectedHomeWinRate: 0.53 }),
+    ).toEqual({ expectedHomeWinRate: 0.53, mmrDiff: 39, averageTeamMmr: 2981 })
+    expect(matchBalanceMetrics({ ...match([1, 2, 3], [4, 5, 6]), expectedHomeWinRate: 0.5 })).toEqual({
+      expectedHomeWinRate: 0.5,
+      mmrDiff: null,
+      averageTeamMmr: null,
+    })
   })
 })
 

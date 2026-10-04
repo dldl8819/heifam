@@ -9,9 +9,11 @@ import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/
 import {
   buildSeriesLineups,
   canChooseSeriesFormat,
+  matchBalanceMetrics,
   offRaceAssignments,
   previewSeriesGames,
 } from '@/lib/balance-series'
+import { formatPercent } from '@/lib/percent'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
 import {
@@ -227,6 +229,8 @@ export default function MultiBalancePage() {
   const renderSeriesPlan = (match: MultiBalanceMatch, matchIndex: number) => {
     const plan = match.seriesPlan
     const format = seriesFormats[match.matchNumber] ?? plan?.format ?? 'BEST_OF_THREE'
+    const homeTeamNumber = matchIndex * 2 + 1
+    const metrics = matchBalanceMetrics(match)
     return (
       <article
         key={`series-plan-${match.matchNumber}`}
@@ -236,8 +240,8 @@ export default function MultiBalancePage() {
           <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
             {t('balanceSeries.plan.matchTitle', {
               number: match.matchNumber,
-              home: matchIndex * 2 + 1,
-              away: matchIndex * 2 + 2,
+              home: homeTeamNumber,
+              away: homeTeamNumber + 1,
             })}
           </h4>
           {plan && (
@@ -245,6 +249,28 @@ export default function MultiBalancePage() {
               {t(`balanceSeries.formats.${format}`)}
             </span>
           )}
+        </div>
+        {/* The balance page's metrics; the MMR ones only for those who may see MMR, as the server sends them. */}
+        <div className="space-y-1">
+          <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">{t('balanceSeries.plan.metricsTitle')}</p>
+          <div className={`grid gap-2 ${showMmr ? 'sm:grid-cols-3' : 'sm:grid-cols-1'}`}>
+            {showMmr && (
+              <div className="rounded-md bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                {t('balanceSeries.plan.mmrDiff')}: <span className="font-semibold">{metrics.mmrDiff ?? '-'}</span>
+              </div>
+            )}
+            <div className="rounded-md bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+              {t('balanceSeries.plan.expectedWinRate', { team: homeTeamNumber })}:{' '}
+              <span className="font-semibold">
+                {metrics.expectedHomeWinRate === null ? '-' : formatPercent(metrics.expectedHomeWinRate)}
+              </span>
+            </div>
+            {showMmr && (
+              <div className="rounded-md bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                {t('balanceSeries.plan.averageTeamMmr')}: <span className="font-semibold">{metrics.averageTeamMmr ?? '-'}</span>
+              </div>
+            )}
+          </div>
         </div>
         {plan && canChooseSeriesFormat(match) && (
           <div className="flex flex-wrap items-center gap-2">

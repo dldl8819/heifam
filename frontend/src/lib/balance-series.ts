@@ -1,6 +1,7 @@
 import type {
   BalancePlayerInput,
   BalanceSeries,
+  TeamSide,
   BalanceSeriesLineup,
   MultiBalanceMatch,
   MultiBalanceSeriesGame,
@@ -80,13 +81,34 @@ export function offRaceAssignments(
   })
 }
 
-/** Running series first, then the newest. */
+/** Running series first; each group in the order started, so match 1 comes before match 2. */
 export function orderBoardSeries(series: BalanceSeries[]): BalanceSeries[] {
   return [...series].sort((left, right) => {
     const leftRunning = left.status === 'IN_PROGRESS' ? 0 : 1
     const rightRunning = right.status === 'IN_PROGRESS' ? 0 : 1
-    return leftRunning - rightRunning || right.seriesId - left.seriesId
+    return leftRunning - rightRunning || left.seriesId - right.seriesId
   })
+}
+
+/** The team numbers the multi-balance showed (match n is teams 2n-1 and 2n); 1 and 2 for older series. */
+export function seriesTeamNumber(series: BalanceSeries, side: TeamSide): number {
+  return side === 'HOME' ? (series.homeTeamNumber ?? 1) : (series.awayTeamNumber ?? 2)
+}
+
+export type MatchBalanceMetrics = {
+  expectedHomeWinRate: number | null
+  mmrDiff: number | null
+  averageTeamMmr: number | null
+}
+
+/** The balance page's metrics for one multi-balance match; MMR ones are null when MMR is hidden. */
+export function matchBalanceMetrics(match: MultiBalanceMatch): MatchBalanceMetrics {
+  const bothTotals = typeof match.homeMmr === 'number' && typeof match.awayMmr === 'number'
+  return {
+    expectedHomeWinRate: typeof match.expectedHomeWinRate === 'number' ? match.expectedHomeWinRate : null,
+    mmrDiff: typeof match.mmrDiff === 'number' ? match.mmrDiff : null,
+    averageTeamMmr: bothTotals ? Math.round(((match.homeMmr as number) + (match.awayMmr as number)) / 2) : null,
+  }
 }
 
 export function teamLine(players: TournamentPlayer[]): string {
