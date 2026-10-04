@@ -31,6 +31,8 @@ import com.balancify.backend.api.group.GroupMatchController;
 import com.balancify.backend.api.group.GroupLedgerAdminController;
 import com.balancify.backend.api.group.GroupLedgerController;
 import com.balancify.backend.api.group.GroupNoticeAdminController;
+import com.balancify.backend.api.group.GroupNoticeController;
+import com.balancify.backend.api.group.dto.NoticeListResponse;
 import com.balancify.backend.api.group.GroupDashboardController;
 import com.balancify.backend.api.group.GroupPlayerController;
 import com.balancify.backend.api.group.GroupPlayerAdminController;
@@ -98,6 +100,7 @@ import com.balancify.backend.service.MatchResultService;
 import com.balancify.backend.service.ManualMatchService;
 import com.balancify.backend.service.MultiMatchBalancingService;
 import com.balancify.backend.service.NoticeAdminService;
+import com.balancify.backend.service.NoticeService;
 import com.balancify.backend.service.OperationAuditLogService;
 import com.balancify.backend.service.PlayerActivityQueryService;
 import com.balancify.backend.service.PlayerAdminService;
@@ -150,6 +153,7 @@ import org.springframework.test.web.servlet.MockMvc;
     GroupMatchAdminController.class,
     OperationAuditLogController.class,
     GroupNoticeAdminController.class,
+    GroupNoticeController.class,
     GroupLedgerController.class,
     GroupLedgerAdminController.class,
     PointController.class,
@@ -227,6 +231,9 @@ class AdminKeyFilterTest {
 
     @MockitoBean
     private NoticeAdminService noticeAdminService;
+
+    @MockitoBean
+    private NoticeService noticeService;
 
     @MockitoBean
     private LedgerIncomeService ledgerIncomeService;
@@ -2137,13 +2144,13 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void returnsForbiddenForServerCostsWithMemberEmail() throws Exception {
+    void allowsServerCostsWithMemberEmail() throws Exception {
         mockMvc
             .perform(
                 get("/api/groups/1/ledger/server-costs")
                     .header("X-USER-EMAIL", "member@hei.gg")
             )
-            .andExpect(status().isForbidden());
+            .andExpect(status().isOk());
     }
 
     @Test
@@ -2398,6 +2405,57 @@ class AdminKeyFilterTest {
     }
 
     @Test
+    void showsVisitorsNoticeTitlesButNothingMore() throws Exception {
+        when(noticeService.listTitles(1L)).thenReturn(List.of());
+
+        mockMvc
+            .perform(get("/api/groups/1/notice-titles"))
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(get("/api/groups/1/notices"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(get("/api/groups/1/notices/5"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(get("/api/groups/1/notices").header("X-USER-EMAIL", "blocked@hei.gg"))
+            .andExpect(status().isForbidden());
+        verify(noticeService, never()).list(any(), any());
+    }
+
+    @Test
+    void letsMembersReadLikeAndCommentOnNotices() throws Exception {
+        when(noticeService.list(1L, "member@hei.gg")).thenReturn(new NoticeListResponse(List.of(), 0, 0));
+
+        mockMvc
+            .perform(get("/api/groups/1/notices").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.unreadCount").value(0));
+        mockMvc
+            .perform(
+                post("/api/groups/1/notices/5/comments")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"content\":\"hello\"}")
+            )
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(put("/api/groups/1/notices/5/like").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(
+                post("/api/groups/1/notices")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"title\":\"t\",\"content\":\"c\"}")
+            )
+            .andExpect(status().isForbidden());
+
+        verify(noticeService).addComment(1L, 5L, "member@hei.gg", "hello");
+        verify(noticeService).setLike(1L, 5L, "member@hei.gg", true);
+    }
+
+    @Test
     void allowsServerCostCreateWithSuperAdminEmail() throws Exception {
         mockMvc
             .perform(
@@ -2432,11 +2490,24 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void returnsForbiddenForLedgerDashboardWithMemberEmail() throws Exception {
+    void allowsLedgerDashboardWithMemberEmail() throws Exception {
         mockMvc
             .perform(
                 get("/api/groups/1/ledger/dashboard")
                     .header("X-USER-EMAIL", "member@hei.gg")
+            )
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void keepsTheLedgerFromPeopleWithoutAccess() throws Exception {
+        mockMvc
+            .perform(get("/api/groups/1/ledger/dashboard"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(
+                get("/api/groups/1/ledger/income")
+                    .header("X-USER-EMAIL", "blocked@hei.gg")
             )
             .andExpect(status().isForbidden());
     }
@@ -2452,11 +2523,41 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void returnsForbiddenForLedgerSummaryWithMemberEmail() throws Exception {
+    void allowsLedgerSummaryWithMemberEmail() throws Exception {
         mockMvc
             .perform(
                 get("/api/groups/1/ledger/summary")
                     .param("year", "2026")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+            )
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void letsMembersReadButNotChangeTheLedger() throws Exception {
+        mockMvc
+            .perform(
+                get("/api/groups/1/ledger/income")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+            )
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(
+                get("/api/groups/1/ledger/expense/categories")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+            )
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(
+                post("/api/groups/1/ledger/income")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"entryDate\":\"2026-09-01\",\"category\":\"YOUR_CATEGORY\",\"amount\":10000}")
+            )
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(
+                delete("/api/groups/1/ledger/expense/5")
                     .header("X-USER-EMAIL", "member@hei.gg")
             )
             .andExpect(status().isForbidden());
@@ -2737,7 +2838,7 @@ class AdminKeyFilterTest {
     void appliesTheGetRuleToHeadRequests() throws Exception {
         mockMvc
             .perform(
-                head("/api/groups/1/ledger/summary")
+                head("/api/groups/1/players/dormant")
                     .header("X-USER-EMAIL", "member@hei.gg")
             )
             .andExpect(status().isForbidden());

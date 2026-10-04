@@ -1,8 +1,18 @@
 package com.balancify.backend.service;
 
-import com.balancify.backend.api.group.dto.NoticeResponse;
+import com.balancify.backend.api.group.dto.NoticeCommentResponse;
+import com.balancify.backend.api.group.dto.NoticeDetailResponse;
+import com.balancify.backend.api.group.dto.NoticeListItemResponse;
+import com.balancify.backend.api.group.dto.NoticeListResponse;
+import com.balancify.backend.api.group.dto.NoticeTitleResponse;
 import com.balancify.backend.domain.Notice;
+import com.balancify.backend.domain.NoticeComment;
+import com.balancify.backend.repository.NoticeCommentRepository;
+import com.balancify.backend.repository.NoticeEngagementRepository;
 import com.balancify.backend.repository.NoticeRepository;
+import com.balancify.backend.service.exception.NoticeForbiddenException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -13,66 +23,186 @@ import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Notices as members see them. Visitors get the titles only; members open notices, which marks
+ * them read, and like and comment on them. A notice kept to admins is invisible to everyone else.
+ */
 @Service
 public class NoticeService {
 
+    static final int MAX_COMMENT_LENGTH = 500;
+
     private final NoticeRepository noticeRepository;
+    private final NoticeCommentRepository noticeCommentRepository;
+    private final NoticeEngagementRepository noticeEngagementRepository;
     private final AccessControlService accessControlService;
 
-    public NoticeService(NoticeRepository noticeRepository, AccessControlService accessControlService) {
+    public NoticeService(
+        NoticeRepository noticeRepository,
+        NoticeCommentRepository noticeCommentRepository,
+        NoticeEngagementRepository noticeEngagementRepository,
+        AccessControlService accessControlService
+    ) {
         this.noticeRepository = noticeRepository;
+        this.noticeCommentRepository = noticeCommentRepository;
+        this.noticeEngagementRepository = noticeEngagementRepository;
         this.accessControlService = accessControlService;
     }
 
     @Transactional(readOnly = true)
-    public List<NoticeResponse> getNotices(Long groupId) {
-        List<Notice> notices = noticeRepository.findByGroupIdOrderByCreatedAtDescIdDesc(groupId);
-        Map<String, String> nicknameByEmail = loadAuthorNicknamesByEmail(notices);
-        return notices.stream()
-            .map(notice -> toResponse(notice, nicknameByEmail))
+    public List<NoticeTitleResponse> listTitles(Long groupId) {
+        return noticeRepository.findByGroupIdOrderByCreatedAtDescIdDesc(groupId).stream()
+            .filter(notice -> !notice.isAdminOnly())
+            .map(notice -> new NoticeTitleResponse(notice.getTitle(), notice.getCreatedAt()))
             .toList();
     }
 
     @Transactional(readOnly = true)
-    public NoticeResponse getNotice(Long groupId, Long noticeId) {
-        Notice notice = noticeRepository.findByIdAndGroupId(noticeId, groupId)
-            .orElseThrow(() -> new NoSuchElementException("Notice not found"));
-        Map<String, String> nicknameByEmail = loadAuthorNicknamesByEmail(List.of(notice));
-        return toResponse(notice, nicknameByEmail);
+    public NoticeListResponse list(Long groupId, String email) {
+        String reader = normalizeEmail(email);
+        boolean admin = accessControlService.isAdminEmail(reader);
+        List<Notice> notices = noticeRepository.findByGroupIdOrderByCreatedAtDescIdDesc(groupId).stream()
+            .filter(notice -> admin || !notice.isAdminOnly())
+            .toList();
+        List<Long> noticeIds = notices.stream().map(Notice::getId).toList();
+        Set<Long> readIds = noticeEngagementRepository.findReadNoticeIds(reader, noticeIds);
+        Map<Long, Long> likeCounts = noticeEngagementRepository.countLikes(noticeIds);
+        Map<Long, Long> commentCounts = new HashMap<>();
+        if (!noticeIds.isEmpty()) {
+            noticeCommentRepository.countByNotice(noticeIds)
+                .forEach(count -> commentCounts.put(count.getNoticeId(), count.getTotal()));
+        }
+        Map<String, String> nicknames = nicknames(notices.stream().map(Notice::getAuthorEmail).toList());
+
+        List<NoticeListItemResponse> items = notices.stream()
+            .map(notice -> new NoticeListItemResponse(
+                notice.getId(),
+                notice.getTitle(),
+                nicknames.get(normalizeEmail(notice.getAuthorEmail())),
+                notice.getCreatedAt(),
+                notice.isAdminOnly(),
+                readIds.contains(notice.getId()),
+                likeCounts.getOrDefault(notice.getId(), 0L),
+                commentCounts.getOrDefault(notice.getId(), 0L)
+            ))
+            .toList();
+        int readCount = (int) items.stream().filter(NoticeListItemResponse::read).count();
+        return new NoticeListResponse(items, readCount, items.size() - readCount);
     }
 
-    private Map<String, String> loadAuthorNicknamesByEmail(List<Notice> notices) {
-        Set<String> emails = new LinkedHashSet<>();
-        for (Notice notice : notices) {
-            String email = safeTrim(notice.getAuthorEmail()).toLowerCase(Locale.ROOT);
-            if (!email.isEmpty()) {
-                emails.add(email);
-            }
-        }
-
-        Map<String, String> nicknameByEmail = new LinkedHashMap<>();
-        for (String email : emails) {
-            String nickname = safeTrim(accessControlService.resolveAccessProfile(email).nickname());
-            if (!nickname.isEmpty()) {
-                nicknameByEmail.put(email, nickname);
-            }
-        }
-        return nicknameByEmail;
+    /** Opening a notice marks it read for this member. */
+    @Transactional
+    public NoticeDetailResponse open(Long groupId, Long noticeId, String email) {
+        String reader = normalizeEmail(email);
+        Notice notice = requireVisible(groupId, noticeId, reader);
+        noticeEngagementRepository.markRead(notice.getId(), reader);
+        return detail(notice, reader);
     }
 
-    private NoticeResponse toResponse(Notice notice, Map<String, String> nicknameByEmail) {
-        String email = safeTrim(notice.getAuthorEmail()).toLowerCase(Locale.ROOT);
-        return new NoticeResponse(
+    @Transactional
+    public NoticeDetailResponse addComment(Long groupId, Long noticeId, String email, String content) {
+        String author = normalizeEmail(email);
+        Notice notice = requireVisible(groupId, noticeId, author);
+        String text = content == null ? "" : content.trim();
+        if (text.isEmpty() || text.length() > MAX_COMMENT_LENGTH) {
+            throw new IllegalArgumentException("댓글은 1~" + MAX_COMMENT_LENGTH + "자로 입력해 주세요.");
+        }
+        NoticeComment comment = new NoticeComment();
+        comment.setNoticeId(notice.getId());
+        comment.setAuthorEmail(author);
+        comment.setContent(text);
+        noticeCommentRepository.save(comment);
+        return detail(notice, author);
+    }
+
+    /** Writers remove their own comments; admins can remove any. */
+    @Transactional
+    public NoticeDetailResponse deleteComment(Long groupId, Long noticeId, Long commentId, String email) {
+        String actor = normalizeEmail(email);
+        Notice notice = requireVisible(groupId, noticeId, actor);
+        NoticeComment comment = noticeCommentRepository.findByIdAndNoticeId(commentId, notice.getId())
+            .orElseThrow(() -> new NoSuchElementException("Comment not found"));
+        if (!actor.equals(normalizeEmail(comment.getAuthorEmail())) && !accessControlService.isAdminEmail(actor)) {
+            throw new NoticeForbiddenException("본인 댓글만 지울 수 있습니다.");
+        }
+        noticeCommentRepository.delete(comment);
+        return detail(notice, actor);
+    }
+
+    @Transactional
+    public NoticeDetailResponse setLike(Long groupId, Long noticeId, String email, boolean liked) {
+        String member = normalizeEmail(email);
+        Notice notice = requireVisible(groupId, noticeId, member);
+        if (liked) {
+            noticeEngagementRepository.like(notice.getId(), member);
+        } else {
+            noticeEngagementRepository.unlike(notice.getId(), member);
+        }
+        return detail(notice, member);
+    }
+
+    private NoticeDetailResponse detail(Notice notice, String reader) {
+        boolean admin = accessControlService.isAdminEmail(reader);
+        List<NoticeComment> comments = noticeCommentRepository.findByNoticeIdOrderByIdAsc(notice.getId());
+        List<String> emails = new ArrayList<>();
+        emails.add(notice.getAuthorEmail());
+        comments.forEach(comment -> emails.add(comment.getAuthorEmail()));
+        Map<String, String> nicknames = nicknames(emails);
+        return new NoticeDetailResponse(
             notice.getId(),
             notice.getTitle(),
             notice.getContent(),
-            nicknameByEmail.get(email),
+            nicknames.get(normalizeEmail(notice.getAuthorEmail())),
             notice.getCreatedAt(),
-            notice.getUpdatedAt()
+            notice.getUpdatedAt(),
+            notice.isAdminOnly(),
+            noticeEngagementRepository.countLikes(List.of(notice.getId())).getOrDefault(notice.getId(), 0L),
+            noticeEngagementRepository.hasLiked(notice.getId(), reader),
+            comments.stream()
+                .map(comment -> {
+                    boolean mine = reader.equals(normalizeEmail(comment.getAuthorEmail()));
+                    return new NoticeCommentResponse(
+                        comment.getId(),
+                        nicknames.get(normalizeEmail(comment.getAuthorEmail())),
+                        comment.getContent(),
+                        comment.getCreatedAt(),
+                        mine,
+                        mine || admin
+                    );
+                })
+                .toList()
         );
     }
 
-    private String safeTrim(String value) {
-        return value == null ? "" : value.trim();
+    private Notice requireVisible(Long groupId, Long noticeId, String email) {
+        Notice notice = noticeRepository.findByIdAndGroupId(noticeId, groupId)
+            .orElseThrow(() -> new NoSuchElementException("Notice not found"));
+        if (notice.isAdminOnly() && !accessControlService.isAdminEmail(email)) {
+            throw new NoSuchElementException("Notice not found");
+        }
+        return notice;
+    }
+
+    private Map<String, String> nicknames(List<String> emails) {
+        Set<String> unique = new LinkedHashSet<>();
+        emails.forEach(email -> {
+            String normalized = normalizeEmail(email);
+            if (!normalized.isEmpty()) {
+                unique.add(normalized);
+            }
+        });
+        Map<String, String> nicknames = new LinkedHashMap<>();
+        if (!unique.isEmpty()) {
+            accessControlService.resolveDisplayNicknames(unique).forEach((email, nickname) -> {
+                if (nickname != null) {
+                    nicknames.put(email, nickname);
+                }
+            });
+        }
+        return nicknames;
+    }
+
+    private static String normalizeEmail(String value) {
+        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
     }
 }

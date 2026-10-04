@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getRouteAccessDecision } from '@/lib/route-access'
+import { getRouteAccessDecision, isPublicRoute } from '@/lib/route-access'
 
 describe('route access', () => {
   it('allows ads page without login', () => {
@@ -47,17 +47,59 @@ describe('route access', () => {
     })
   })
 
-  it('blocks a regular member from viewing notices', () => {
-    const decision = getRouteAccessDecision('/notices', {
+  it('lets a regular member view notices', () => {
+    const context = {
       isLoggedIn: true,
       canAccess: true,
       isAdmin: false,
       isSuperAdmin: false,
-    })
+    }
 
-    expect(decision).toEqual({
+    expect(getRouteAccessDecision('/notices', context)).toEqual({
+      allowed: true,
+      redirectTo: null,
+      blocked: false,
+    })
+    expect(getRouteAccessDecision('/notices/5', context)).toEqual({
+      allowed: true,
+      redirectTo: null,
+      blocked: false,
+    })
+  })
+
+  it('shows the notice list to everyone but keeps notices themselves to members', () => {
+    const withoutAccess = {
+      isLoggedIn: true,
+      canAccess: false,
+      isAdmin: false,
+      isSuperAdmin: false,
+    }
+    const visitor = {
+      isLoggedIn: false,
+      canAccess: false,
+      isAdmin: false,
+      isSuperAdmin: false,
+    }
+
+    expect(isPublicRoute('/notices')).toBe(true)
+    expect(getRouteAccessDecision('/notices', withoutAccess)).toEqual({
+      allowed: true,
+      redirectTo: null,
+      blocked: false,
+    })
+    expect(getRouteAccessDecision('/notices', visitor)).toEqual({
+      allowed: true,
+      redirectTo: null,
+      blocked: false,
+    })
+    expect(getRouteAccessDecision('/notices/5', withoutAccess)).toEqual({
       allowed: false,
-      redirectTo: '/players',
+      redirectTo: null,
+      blocked: true,
+    })
+    expect(getRouteAccessDecision('/notices/5', visitor)).toEqual({
+      allowed: false,
+      redirectTo: '/',
       blocked: false,
     })
   })

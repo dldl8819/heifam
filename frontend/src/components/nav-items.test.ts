@@ -77,7 +77,7 @@ describe('navigation items', () => {
     expect(items.filter((item) => item.href === '/admin/audit')).toHaveLength(1)
   })
 
-  it('hides notices from regular members', () => {
+  it('shows notices to regular members', () => {
     const items = getVisibleNavItems({
       isLoggedIn: true,
       canAccess: true,
@@ -85,7 +85,18 @@ describe('navigation items', () => {
       isSuperAdmin: false,
     })
 
-    expect(items.map((item) => item.href)).not.toContain('/notices')
+    expect(items.map((item) => item.href)).toContain('/notices')
+  })
+
+  it('shows notices to visitors who are not signed in', () => {
+    const items = getVisibleNavItems({
+      isLoggedIn: false,
+      canAccess: false,
+      isAdmin: false,
+      isSuperAdmin: false,
+    })
+
+    expect(items.map((item) => item.href)).toContain('/notices')
   })
 
   it('shows notices to super admins', () => {

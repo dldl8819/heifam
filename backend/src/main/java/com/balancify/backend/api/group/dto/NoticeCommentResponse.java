@@ -2,13 +2,12 @@ package com.balancify.backend.api.group.dto;
 
 import java.time.OffsetDateTime;
 
-public record NoticeResponse(
+public record NoticeCommentResponse(
     Long id,
-    String title,
-    String content,
     String authorNickname,
+    String content,
     OffsetDateTime createdAt,
-    OffsetDateTime updatedAt,
-    boolean adminOnly
+    boolean mine,
+    boolean canDelete
 ) {
 }
