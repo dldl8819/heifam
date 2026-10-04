@@ -845,6 +845,27 @@ export type LatestTeamTournamentResponse = {
   tournament: TeamTournament | null
 }
 
+export type TeamScoreEntry = {
+  rank: number
+  playerId: number
+  nickname: string | null
+  points: number
+  championships: number
+  runnerUps: number
+  thirdPlaces: number
+  tournaments: number
+  seriesWins: number
+  seriesLosses: number
+  seriesWinRate: number | null
+  wins: number
+  losses: number
+  winRate: number | null
+}
+
+export type TeamScoreBoard = {
+  entries: TeamScoreEntry[]
+}
+
 // OPEN: picks taken. CLOSED: waiting for the result. RESOLVED: result in.
 export type PredictionState = 'OPEN' | 'CLOSED' | 'RESOLVED'
 

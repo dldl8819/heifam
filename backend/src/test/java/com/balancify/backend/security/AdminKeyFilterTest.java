@@ -71,7 +71,9 @@ import com.balancify.backend.api.points.PointController;
 import com.balancify.backend.api.prediction.PredictionController;
 import com.balancify.backend.api.prediction.dto.PredictionBoardResponse;
 import com.balancify.backend.api.prediction.dto.PredictionStatsResponse;
+import com.balancify.backend.api.tournament.TeamScoreController;
 import com.balancify.backend.api.tournament.TeamTournamentController;
+import com.balancify.backend.api.tournament.dto.TeamScoreBoardResponse;
 import com.balancify.backend.api.tournament.dto.TeamTournamentResponse;
 import com.balancify.backend.api.points.dto.PointAdjustmentResponse;
 import com.balancify.backend.api.points.dto.PointSummaryResponse;
@@ -102,6 +104,7 @@ import com.balancify.backend.service.PlayerTeammateStatsQueryService;
 import com.balancify.backend.service.PlayerImportService;
 import com.balancify.backend.service.PointService;
 import com.balancify.backend.service.PredictionService;
+import com.balancify.backend.service.TeamScoreService;
 import com.balancify.backend.service.TeamTournamentService;
 import com.balancify.backend.service.TournamentProgressService;
 import com.balancify.backend.service.exception.MatchConflictException;
@@ -147,7 +150,8 @@ import org.springframework.test.web.servlet.MockMvc;
     GroupLedgerAdminController.class,
     PointController.class,
     TeamTournamentController.class,
-    PredictionController.class
+    PredictionController.class,
+    TeamScoreController.class
 })
 @Import({ AdminKeyFilter.class, ServiceAccessFilter.class, AdminKeyProperties.class })
 @TestPropertySource(properties = {
@@ -269,6 +273,9 @@ class AdminKeyFilterTest {
 
     @MockitoBean
     private PredictionService predictionService;
+
+    @MockitoBean
+    private TeamScoreService teamScoreService;
 
     @BeforeEach
     void setUp() {
@@ -2227,6 +2234,21 @@ class AdminKeyFilterTest {
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.balance").value(5));
+    }
+
+    @Test
+    void showsTeamScoresToAdminsOnly() throws Exception {
+        when(tournamentProgressService.canRunTournaments("admin@hei.gg")).thenReturn(true);
+        when(teamScoreService.board(1L)).thenReturn(new TeamScoreBoardResponse(List.of()));
+
+        mockMvc
+            .perform(get("/api/groups/1/team-scores").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(get("/api/groups/1/team-scores").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.entries").isArray());
+        verify(teamScoreService).board(1L);
     }
 
     @Test

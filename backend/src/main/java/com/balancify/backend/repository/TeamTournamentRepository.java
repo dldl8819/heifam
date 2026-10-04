@@ -3,6 +3,7 @@ package com.balancify.backend.repository;
 import com.balancify.backend.domain.TeamTournament;
 import com.balancify.backend.domain.TeamTournamentStatus;
 import jakarta.persistence.LockModeType;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -18,6 +19,8 @@ public interface TeamTournamentRepository extends JpaRepository<TeamTournament, 
     Optional<TeamTournament> findFirstByGroup_IdAndStatusNotOrderByIdDesc(Long groupId, TeamTournamentStatus status);
 
     Optional<TeamTournament> findByIdAndGroup_Id(Long id, Long groupId);
+
+    List<TeamTournament> findByGroup_Id(Long groupId);
 
     // Series results in one tournament move its bracket, so they take this lock one at a time.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
