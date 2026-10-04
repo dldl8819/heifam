@@ -125,6 +125,25 @@ class OperationAuditLogServiceTest {
     }
 
     @Test
+    void recordsTournamentCreationAndCancellation() {
+        operationAuditLogService.recordTournamentCreated("ops@example.com", "운영진", 9L, 1L, 4, 2);
+        operationAuditLogService.recordTournamentCancelled("ops@example.com", "운영진", 9L, 1L);
+
+        ArgumentCaptor<OperationAuditLog> logCaptor = ArgumentCaptor.forClass(OperationAuditLog.class);
+        verify(operationAuditLogRepository, times(2)).save(logCaptor.capture());
+        OperationAuditLog created = logCaptor.getAllValues().get(0);
+        OperationAuditLog cancelled = logCaptor.getAllValues().get(1);
+
+        assertThat(created.getAction()).isEqualTo(OperationAuditLogService.ACTION_TOURNAMENT_CREATED);
+        assertThat(created.getTargetType()).isEqualTo("TOURNAMENT");
+        assertThat(created.getTargetLabel()).isEqualTo("#9");
+        assertThat(created.getGroupId()).isEqualTo(1L);
+        assertThat(created.getDetails()).isEqualTo("teams=4, waiting=2");
+        assertThat(cancelled.getAction()).isEqualTo(OperationAuditLogService.ACTION_TOURNAMENT_CANCELLED);
+        assertThat(cancelled.getSummary()).isEqualTo("팀 토너먼트 취소");
+    }
+
+    @Test
     void recordsPointAdjustmentAuditLog() {
         operationAuditLogService.recordPointAdjustment("ops@example.com", "운영진", 8L, "YOUR_USERNAME", 20, "event");
         operationAuditLogService.recordPointAdjustment("ops@example.com", "운영진", 8L, "YOUR_USERNAME", -5, null);

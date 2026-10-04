@@ -768,3 +768,70 @@ export type PointAdjustmentResponse = {
   amount: number
   balance: number
 }
+
+export type TeamTournamentStatus = 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
+export type TournamentSeriesRound = 'SEMIFINAL' | 'FINAL' | 'THIRD_PLACE'
+export type TournamentSeriesFormat = 'BEST_OF_THREE' | 'MIXED_THREE'
+// PLAYED: result recorded. NEXT: its match waits for a result. UPCOMING: not set up yet.
+// SKIPPED: the series ended before it.
+export type TournamentGameStatus = 'PLAYED' | 'NEXT' | 'UPCOMING' | 'SKIPPED'
+
+export type TournamentPlayer = {
+  playerId: number | null
+  nickname: string | null
+  race: string | null
+  mmr: number | null
+}
+
+export type TournamentTeam = {
+  teamId: number
+  teamNumber: number
+  finalRank: number | null
+  totalMmr: number | null
+  members: TournamentPlayer[]
+}
+
+export type TournamentGamePlayer = {
+  playerId: number | null
+  nickname: string | null
+  assignedRace: AssignedRace | null
+}
+
+export type TournamentGame = {
+  gameNumber: number
+  raceComposition: RaceComposition | null
+  status: TournamentGameStatus
+  matchId: number | null
+  winnerTeam: TeamSide | null
+  homePlayers: TournamentGamePlayer[]
+  awayPlayers: TournamentGamePlayer[]
+}
+
+export type TournamentSeries = {
+  seriesId: number
+  round: TournamentSeriesRound
+  bracketSlot: number
+  format: TournamentSeriesFormat
+  status: 'IN_PROGRESS' | 'COMPLETED'
+  homeTeamNumber: number
+  awayTeamNumber: number
+  homeWins: number
+  awayWins: number
+  winnerTeamNumber: number | null
+  games: TournamentGame[]
+}
+
+export type TeamTournament = {
+  tournamentId: number
+  status: TeamTournamentStatus
+  teamCount: number
+  createdAt: string
+  finishedAt: string | null
+  waitingPlayers: TournamentPlayer[]
+  teams: TournamentTeam[]
+  series: TournamentSeries[]
+}
+
+export type LatestTeamTournamentResponse = {
+  tournament: TeamTournament | null
+}

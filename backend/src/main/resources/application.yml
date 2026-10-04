@@ -112,3 +112,7 @@ balancify:
     daily-login: ${POINTS_DAILY_LOGIN:1}
     match-result: ${POINTS_MATCH_RESULT:1}
     match-result-daily-cap: ${POINTS_MATCH_RESULT_DAILY_CAP:10}
+  tournament:
+    # Admins try team tournaments out first. true lets members record tournament games; running
+    # tournaments also needs the tournament routes in AdminKeyFilter and the screen opened to members.
+    members-enabled: ${TOURNAMENT_MEMBERS_ENABLED:false}

@@ -70,7 +70,9 @@ public class GroupMatchAdminService {
             MatchSource.BALANCED,
             null,
             request.raceComposition(),
-            DuplicateHandling.REUSE_ACTIVE_REJECT_COMPLETED
+            DuplicateHandling.REUSE_ACTIVE_REJECT_COMPLETED,
+            null,
+            null
         );
 
         if (outcome.duplicateRejected()) {
@@ -114,7 +116,36 @@ public class GroupMatchAdminService {
             source,
             note,
             raceComposition,
-            DuplicateHandling.REJECT
+            DuplicateHandling.REJECT,
+            null,
+            null
+        ).match();
+    }
+
+    /**
+     * A team tournament game. It skips the duplicate check, since the same teams play up to three
+     * games in a row and each game number of a series is created only once.
+     */
+    @Transactional
+    public Match createSeriesGameMatch(
+        Long groupId,
+        List<Long> homePlayerIds,
+        List<Long> awayPlayerIds,
+        String raceComposition,
+        Long seriesId,
+        int seriesGameNumber
+    ) {
+        return createMatchInternal(
+            groupId,
+            homePlayerIds,
+            awayPlayerIds,
+            TEAM_SIZE_3V3,
+            MatchSource.BALANCED,
+            null,
+            raceComposition,
+            DuplicateHandling.NONE,
+            seriesId,
+            seriesGameNumber
         ).match();
     }
 
@@ -163,7 +194,9 @@ public class GroupMatchAdminService {
         MatchSource source,
         String note,
         String rawRaceComposition,
-        DuplicateHandling duplicateHandling
+        DuplicateHandling duplicateHandling,
+        Long seriesId,
+        Integer seriesGameNumber
     ) {
         int normalizedTeamSize = normalizeRequestedTeamSize(requestedTeamSize);
         String normalizedRaceComposition = RaceCompositionPolicy.normalizeForTeamSize(
@@ -270,6 +303,8 @@ public class GroupMatchAdminService {
         match.setTeamSignature(requestedSignature.teamSignature());
         match.setNote(normalizeNote(note));
         match.setRaceComposition(normalizedRaceComposition);
+        match.setSeriesId(seriesId);
+        match.setSeriesGameNumber(seriesGameNumber);
         Match savedMatch = matchRepository.save(match);
 
         List<MatchParticipant> participants = new ArrayList<>();

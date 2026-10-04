@@ -541,7 +541,9 @@
       "playerReactivated": "복구",
       "matchDeleted": "경기 삭제",
       "matchResultUpdated": "경기 결과 수정",
-      "pointAdjusted": "포인트 조정"
+      "pointAdjusted": "포인트 조정",
+      "tournamentCreated": "팀 토너먼트 생성",
+      "tournamentCancelled": "팀 토너먼트 취소"
     },
     "pagination": {
       "status": "현재 {shown} / {max}건 표시",
@@ -1397,6 +1399,75 @@
     "hint": "같은 팀으로 {count}경기 이상 함께한 선수만 보여줍니다.",
     "hintWinningOnly": "같은 팀으로 {count}경기 이상 함께하고 승률 {winRate}% 이상인 팀메이트만 보여줍니다.",
     "emptyWinningOnly": "같은 팀으로 {count}경기 이상 함께하고 승률 {winRate}% 이상인 팀메이트가 아직 없습니다."
+  },
+  "teamTournament": {
+    "title": "팀 토너먼트",
+    "description": "선택한 선수로 3인 팀을 만들어 시리즈로 겨룹니다. 6~8명이면 2팀(결승), 9~11명이면 3팀(준결승 승자가 결승 직행 팀과 결승), 12~14명이면 4팀(준결승 → 결승·3·4위전)입니다. 남는 1~2명은 팀 밸런스가 가장 좋아지도록 쉬고, 다음 대회에 먼저 들어갑니다.",
+    "rules": "두 팀 모두 PPT나 PPZ를 할 수 있으면 PPP·PPT·PPZ 3판을 모두 하고, 아니면 PPP 3판 2선승입니다. 각 판은 일반 경기로 저장돼 MMR·랭킹·종족 통계에 반영됩니다.",
+    "trialNotice": "지금은 운영진만 쓰는 시험 기능입니다.",
+    "loadError": "팀 토너먼트를 불러오지 못했습니다.",
+    "create": {
+      "button": "선택한 {count}명으로 팀 토너먼트 만들기",
+      "creating": "팀을 나누는 중...",
+      "unsupportedCount": "팀 토너먼트는 6~14명일 때 만들 수 있습니다. 지금 {count}명 선택했습니다.",
+      "waitingHint": "{count}명은 이번에 대기합니다.",
+      "confirm": "선택한 {count}명으로 팀 토너먼트를 만들까요?",
+      "error": "팀 토너먼트를 만들지 못했습니다."
+    },
+    "cancel": {
+      "button": "대회 취소",
+      "cancelling": "취소 중...",
+      "confirm": "진행 중인 대회를 취소할까요? 이미 끝난 판은 일반 경기로 그대로 남습니다.",
+      "error": "대회를 취소하지 못했습니다."
+    },
+    "status": {
+      "IN_PROGRESS": "진행 중",
+      "COMPLETED": "끝남",
+      "CANCELLED": "취소됨"
+    },
+    "teams": {
+      "title": "팀 편성",
+      "label": "{number}팀",
+      "totalMmr": "팀 MMR 합",
+      "waiting": "이번 대기",
+      "waitsInFinal": "결승 직행"
+    },
+    "rounds": {
+      "SEMIFINAL": "준결승 {slot}",
+      "SEMIFINAL_ONLY": "준결승",
+      "FINAL": "결승",
+      "THIRD_PLACE": "3·4위전"
+    },
+    "formats": {
+      "BEST_OF_THREE": "PPP 3판 2선승",
+      "MIXED_THREE": "PPP·PPT·PPZ 3판"
+    },
+    "series": {
+      "versus": "{home} vs {away}",
+      "winner": "{team} 승리"
+    },
+    "games": {
+      "label": "{number}판",
+      "PLAYED": "완료",
+      "NEXT": "결과 입력",
+      "UPCOMING": "예정",
+      "SKIPPED": "안 함",
+      "won": "{team} 승",
+      "plannedHint": "예정된 종족 배정입니다. 실제로 T·Z를 잡은 사람이 다르면 결과를 저장할 때 바꿔 주세요.",
+      "winner": "승리 팀",
+      "winnerPlaceholder": "승리 팀 선택",
+      "racesMismatch": "각 팀 종족이 {composition} 조합과 맞아야 합니다.",
+      "submit": "결과 저장",
+      "submitting": "저장 중...",
+      "confirmWinner": "{team}({players}) 승리로 저장할까요?",
+      "submitError": "결과를 저장하지 못했습니다.",
+      "conflict": "다른 사람이 먼저 결과를 저장했거나 대회가 바뀌었습니다. 최신 상태를 다시 불러왔습니다.",
+      "forbidden": "이 경기 결과를 저장할 권한이 없습니다."
+    },
+    "standings": {
+      "title": "최종 순위",
+      "rank": "{rank}위"
+    }
   },
   "points": {
     "title": "포인트",

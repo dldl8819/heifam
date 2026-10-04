@@ -53,6 +53,8 @@ import type {
   PointAdjustmentResponse,
   PointRankingResponse,
   PointSummaryResponse,
+  LatestTeamTournamentResponse,
+  TeamTournament,
   RatingRecalculationRequest,
   RatingRecalculationResponse,
   RecentMatchItem,
@@ -1518,6 +1520,26 @@ export const apiClient = {
       includeUserEmail: true,
     })
   },
+  getLatestTeamTournament: (groupId: number) =>
+    apiRequest<LatestTeamTournamentResponse>(`/api/groups/${groupId}/tournaments/latest`, undefined, {
+      requireUserEmail: true,
+      includeUserEmail: true,
+    }),
+  createTeamTournament: (groupId: number, playerIds: number[]) =>
+    apiRequest<TeamTournament>(
+      `/api/groups/${groupId}/tournaments`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ playerIds }),
+      },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  cancelTeamTournament: (groupId: number, tournamentId: number) =>
+    apiRequest<TeamTournament>(
+      `/api/groups/${groupId}/tournaments/${tournamentId}/cancel`,
+      { method: 'POST' },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
   adjustPoints: (payload: PointAdjustmentRequest) =>
     apiRequest<PointAdjustmentResponse>(
       '/api/admin/points/adjustments',

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -639,6 +640,35 @@ class GroupMatchAdminServiceTest {
         ArgumentCaptor<Match> matchCaptor = ArgumentCaptor.forClass(Match.class);
         verify(matchRepository).save(matchCaptor.capture());
         assertThat(matchCaptor.getValue().getRaceComposition()).isEqualTo("PPT");
+    }
+
+    @Test
+    void createsTournamentGamesWithoutTheDuplicateCheck() {
+        Group group = new Group();
+        group.setId(1L);
+        List<Player> players = List.of(
+            player(1L, group, "PT"),
+            player(2L, group, "P"),
+            player(3L, group, "P"),
+            player(4L, group, "PT"),
+            player(5L, group, "P"),
+            player(6L, group, "P")
+        );
+        when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
+        when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L, 5L, 6L))).thenReturn(players);
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        groupMatchAdminService.createSeriesGameMatch(1L, List.of(1L, 2L, 3L), List.of(4L, 5L, 6L), "PPT", 70L, 2);
+
+        verify(matchRepository, never()).findRecentDuplicateCandidates(any(), any(), any(), any(), any());
+        ArgumentCaptor<Match> matchCaptor = ArgumentCaptor.forClass(Match.class);
+        verify(matchRepository).save(matchCaptor.capture());
+        Match game = matchCaptor.getValue();
+        assertThat(game.getSource()).isEqualTo(MatchSource.BALANCED);
+        assertThat(game.getStatus()).isEqualTo(MatchStatus.CONFIRMED);
+        assertThat(game.getRaceComposition()).isEqualTo("PPT");
+        assertThat(game.getSeriesId()).isEqualTo(70L);
+        assertThat(game.getSeriesGameNumber()).isEqualTo(2);
     }
 
     @Test

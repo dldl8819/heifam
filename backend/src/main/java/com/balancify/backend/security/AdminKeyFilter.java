@@ -113,6 +113,27 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/captain-drafts/{draftId}/pick"),
             AuthType.ADMIN_EMAIL
         ),
+        // Team tournaments are tried out by admins first; TeamTournamentController checks the same.
+        new ProtectedRoute(
+            "POST",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/tournaments"),
+            AuthType.ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "GET",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/tournaments/latest"),
+            AuthType.ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "GET",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/tournaments/{tournamentId}"),
+            AuthType.ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "POST",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/tournaments/{tournamentId}/cancel"),
+            AuthType.ADMIN_EMAIL
+        ),
         new ProtectedRoute(
             "POST",
             PathPatternParser.defaultInstance.parse("/api/matches/manual"),

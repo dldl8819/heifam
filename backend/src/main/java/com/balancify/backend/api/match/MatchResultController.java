@@ -98,6 +98,8 @@ public class MatchResultController {
             }
 
             return MmrMaskingMapper.maskMatchResult(response);
+        } catch (MatchEditForbiddenException exception) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, exception.getMessage());
         } catch (MatchConflictException | ObjectOptimisticLockingFailureException exception) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, exception.getMessage());
         } catch (NoSuchElementException exception) {
@@ -150,6 +152,8 @@ public class MatchResultController {
                 resolveRecordedByNickname(httpRequest),
                 snapshot
             );
+        } catch (MatchConflictException exception) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, exception.getMessage());
         } catch (NoSuchElementException exception) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, exception.getMessage());
         }

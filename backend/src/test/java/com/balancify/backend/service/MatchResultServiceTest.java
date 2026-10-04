@@ -10,6 +10,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.balancify.backend.api.match.dto.MatchResultRequest;
@@ -80,6 +81,9 @@ class MatchResultServiceTest {
     @Mock
     private PointService pointService;
 
+    @Mock
+    private TournamentProgressService tournamentProgressService;
+
     private MatchResultService matchResultService;
 
     @BeforeEach
@@ -112,7 +116,8 @@ class MatchResultServiceTest {
             accessControlService,
             operationAuditLogService,
             matchResultEditQuotaService,
-            pointService
+            pointService,
+            tournamentProgressService
         );
     }
 
@@ -126,6 +131,52 @@ class MatchResultServiceTest {
         matchResultService.processMatchResult(1L, new MatchResultRequest("HOME"), "YOUR_USERNAME@example.com");
 
         verify(pointService).grantMatchResultPoint("your_username@example.com", 1L);
+        verifyNoInteractions(tournamentProgressService);
+    }
+
+    @Test
+    void movesTheTournamentOnWhenOneOfItsGamesIsRecorded() {
+        Match match = new Match();
+        match.setId(1L);
+        match.setStatus(MatchStatus.CONFIRMED);
+        match.setSeriesId(70L);
+        match.setSeriesGameNumber(1);
+        stubFirstResult(match);
+
+        matchResultService.processMatchResult(1L, new MatchResultRequest("HOME"), "YOUR_USERNAME@example.com");
+
+        verify(tournamentProgressService).checkResultChange(match, "your_username@example.com", true);
+        verify(tournamentProgressService).sync(70L);
+    }
+
+    @Test
+    void checksTheTournamentBeforeDeletingOneOfItsGames() {
+        Match match = new Match();
+        match.setId(99L);
+        match.setSeriesId(70L);
+        match.setSeriesGameNumber(2);
+        when(matchRepository.findById(99L)).thenReturn(Optional.of(match));
+
+        matchResultService.deleteMatch(99L);
+
+        verify(tournamentProgressService).checkDeletion(match);
+        verify(tournamentProgressService).sync(70L);
+    }
+
+    @Test
+    void stopsBeforeChangingAnythingWhenTheTournamentRefusesTheResult() {
+        Match match = new Match();
+        match.setId(1L);
+        match.setStatus(MatchStatus.CONFIRMED);
+        match.setSeriesId(70L);
+        when(matchRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(match));
+        doThrow(new MatchEditForbiddenException("admins only"))
+            .when(tournamentProgressService).checkResultChange(match, "member@example.com", true);
+
+        assertThatThrownBy(() -> matchResultService.processMatchResult(1L, new MatchResultRequest("HOME"), "member@example.com"))
+            .isInstanceOf(MatchEditForbiddenException.class);
+        verify(playerRepository, never()).saveAll(any());
+        verify(tournamentProgressService, never()).sync(any());
     }
 
     @Test
