@@ -18,6 +18,8 @@ public interface PointTransactionRepository extends JpaRepository<PointTransacti
 
     List<PointTransaction> findTop20ByAccount_IdOrderByIdDesc(Long accountId);
 
+    List<PointTransaction> findByAccount_IdAndKstDateBetweenOrderByIdDesc(Long accountId, LocalDate fromDate, LocalDate toDate);
+
     long countByAccount_IdAndReferenceKeyStartingWith(Long accountId, String referencePrefix);
 
     @Query("""
@@ -48,16 +50,6 @@ public interface PointTransactionRepository extends JpaRepository<PointTransacti
     long sumAmountByAccountId(@Param("accountId") Long accountId);
 
     @Query("""
-        select pointTransaction.account.normalizedEmail as normalizedEmail, sum(pointTransaction.amount) as points
-        from PointTransaction pointTransaction
-        where pointTransaction.kstDate between :fromDate and :toDate
-        group by pointTransaction.account.normalizedEmail
-        having sum(pointTransaction.amount) > 0
-        order by sum(pointTransaction.amount) desc, pointTransaction.account.normalizedEmail asc
-        """)
-    List<PointTotal> sumPositiveTotalsBetween(@Param("fromDate") LocalDate fromDate, @Param("toDate") LocalDate toDate);
-
-    @Query("""
         select pointTransaction.account.id as accountId,
                pointTransaction.account.normalizedEmail as normalizedEmail,
                sum(pointTransaction.amount) as points
@@ -80,9 +72,4 @@ public interface PointTransactionRepository extends JpaRepository<PointTransacti
         Long getPoints();
     }
 
-    interface PointTotal {
-        String getNormalizedEmail();
-
-        Long getPoints();
-    }
 }

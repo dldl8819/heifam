@@ -52,8 +52,7 @@ import type {
   PlayerLifecycleStatus,
   PlayerRace,
   PlayerTierStatus,
-  PointAdjustmentRequest,
-  PointAdjustmentResponse,
+  PointMonthlyHistory,
   PointRankingResponse,
   PointSummaryResponse,
   LatestTeamTournamentResponse,
@@ -1549,6 +1548,15 @@ export const apiClient = {
       requireUserEmail: true,
       includeUserEmail: true,
     }),
+  getPointRankingHistory: (accountId: number, month?: string) => {
+    const params = new URLSearchParams()
+    appendOptionalSearchParam(params, 'month', month)
+    const query = params.toString()
+    return apiRequest<PointMonthlyHistory>(`/api/points/ranking/${accountId}${query ? `?${query}` : ''}`, undefined, {
+      requireUserEmail: true,
+      includeUserEmail: true,
+    })
+  },
   getPointRanking: (month?: string) => {
     const params = new URLSearchParams()
     appendOptionalSearchParam(params, 'month', month)
@@ -1678,15 +1686,6 @@ export const apiClient = {
     apiRequest<BalanceSeriesList>(
       `/api/groups/${groupId}/balance-series/${seriesId}/cancel`,
       { method: 'POST' },
-      { requireUserEmail: true, includeUserEmail: true }
-    ),
-  adjustPoints: (payload: PointAdjustmentRequest) =>
-    apiRequest<PointAdjustmentResponse>(
-      '/api/admin/points/adjustments',
-      {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      },
       { requireUserEmail: true, includeUserEmail: true }
     ),
   updateMyPreferredRace: (race: PlayerRace) =>

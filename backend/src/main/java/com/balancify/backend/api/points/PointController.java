@@ -1,19 +1,17 @@
 package com.balancify.backend.api.points;
 
-import com.balancify.backend.api.points.dto.PointAdjustmentRequest;
-import com.balancify.backend.api.points.dto.PointAdjustmentResponse;
+import com.balancify.backend.api.points.dto.PointMonthlyHistoryResponse;
 import com.balancify.backend.api.points.dto.PointRankingResponse;
 import com.balancify.backend.api.points.dto.PointSummaryResponse;
 import com.balancify.backend.security.AuthenticatedRequestResolver;
-import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.PointService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
+import java.util.NoSuchElementException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -22,16 +20,13 @@ import org.springframework.web.server.ResponseStatusException;
 public class PointController {
 
     private final PointService pointService;
-    private final AccessControlService accessControlService;
     private final AuthenticatedRequestResolver authenticatedRequestResolver;
 
     public PointController(
         PointService pointService,
-        AccessControlService accessControlService,
         AuthenticatedRequestResolver authenticatedRequestResolver
     ) {
         this.pointService = pointService;
-        this.accessControlService = accessControlService;
         this.authenticatedRequestResolver = authenticatedRequestResolver;
     }
 
@@ -51,33 +46,18 @@ public class PointController {
         return pointService.getMonthlyRanking(parseMonth(month));
     }
 
-    @PostMapping("/api/admin/points/adjustments")
-    public PointAdjustmentResponse adjust(
-        @RequestBody PointAdjustmentRequest requestBody,
+    @GetMapping("/api/points/ranking/{accountId}")
+    public PointMonthlyHistoryResponse getRankingHistory(
+        @PathVariable Long accountId,
+        @RequestParam(name = "month", required = false) String month,
         HttpServletRequest request
     ) {
         String requestEmail = requireRequestEmail(request);
-        if (!accessControlService.isSuperAdminEmail(requestEmail)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Super admin role required");
-        }
-        if (requestBody == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body is required");
-        }
-
+        requirePointAccess(requestEmail);
         try {
-            return pointService.adjust(
-                requestEmail,
-                resolveActorNickname(requestEmail),
-                requestBody.email(),
-                requestBody.amount(),
-                requestBody.memo()
-            );
-        } catch (IllegalArgumentException illegalArgumentException) {
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                illegalArgumentException.getMessage(),
-                illegalArgumentException
-            );
+            return pointService.getMonthlyHistory(accountId, parseMonth(month), requestEmail);
+        } catch (NoSuchElementException exception) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, exception.getMessage(), exception);
         }
     }
 
@@ -106,8 +86,4 @@ public class PointController {
         return requestEmail;
     }
 
-    private String resolveActorNickname(String email) {
-        String nickname = accessControlService.resolveAccessProfile(email).nickname();
-        return nickname == null || nickname.isBlank() ? null : nickname.trim();
-    }
 }
