@@ -125,6 +125,17 @@ class OperationAuditLogServiceTest {
     }
 
     @Test
+    void recordsAnEarlyPredictionClose() {
+        operationAuditLogService.recordPredictionsClosed("ops@example.com", "운영진", 30L, 1L);
+
+        ArgumentCaptor<OperationAuditLog> logCaptor = ArgumentCaptor.forClass(OperationAuditLog.class);
+        verify(operationAuditLogRepository).save(logCaptor.capture());
+        assertThat(logCaptor.getValue().getAction()).isEqualTo(OperationAuditLogService.ACTION_PREDICTIONS_CLOSED);
+        assertThat(logCaptor.getValue().getTargetLabel()).isEqualTo("#30");
+        assertThat(logCaptor.getValue().getSummary()).isEqualTo("승부 예측 마감");
+    }
+
+    @Test
     void recordsTournamentCreationAndCancellation() {
         operationAuditLogService.recordTournamentCreated("ops@example.com", "운영진", 9L, 1L, 4, 2);
         operationAuditLogService.recordTournamentCancelled("ops@example.com", "운영진", 9L, 1L);

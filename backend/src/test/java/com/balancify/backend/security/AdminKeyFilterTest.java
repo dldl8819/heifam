@@ -68,6 +68,9 @@ import com.balancify.backend.api.match.dto.MultiBalanceRaceSummaryResponse;
 import com.balancify.backend.api.match.dto.MultiBalanceResponse;
 import com.balancify.backend.api.match.dto.MultiBalanceWaitingPlayerResponse;
 import com.balancify.backend.api.points.PointController;
+import com.balancify.backend.api.prediction.PredictionController;
+import com.balancify.backend.api.prediction.dto.PredictionBoardResponse;
+import com.balancify.backend.api.prediction.dto.PredictionStatsResponse;
 import com.balancify.backend.api.tournament.TeamTournamentController;
 import com.balancify.backend.api.tournament.dto.TeamTournamentResponse;
 import com.balancify.backend.api.points.dto.PointAdjustmentResponse;
@@ -98,6 +101,7 @@ import com.balancify.backend.service.PlayerRaceStatsQueryService;
 import com.balancify.backend.service.PlayerTeammateStatsQueryService;
 import com.balancify.backend.service.PlayerImportService;
 import com.balancify.backend.service.PointService;
+import com.balancify.backend.service.PredictionService;
 import com.balancify.backend.service.TeamTournamentService;
 import com.balancify.backend.service.TournamentProgressService;
 import com.balancify.backend.service.exception.MatchConflictException;
@@ -142,7 +146,8 @@ import org.springframework.test.web.servlet.MockMvc;
     GroupLedgerController.class,
     GroupLedgerAdminController.class,
     PointController.class,
-    TeamTournamentController.class
+    TeamTournamentController.class,
+    PredictionController.class
 })
 @Import({ AdminKeyFilter.class, ServiceAccessFilter.class, AdminKeyProperties.class })
 @TestPropertySource(properties = {
@@ -261,6 +266,9 @@ class AdminKeyFilterTest {
 
     @MockitoBean
     private TournamentProgressService tournamentProgressService;
+
+    @MockitoBean
+    private PredictionService predictionService;
 
     @BeforeEach
     void setUp() {
@@ -2178,7 +2186,7 @@ class AdminKeyFilterTest {
     void showsAdminsTheirPoints() throws Exception {
         when(pointService.canUsePoints("admin@hei.gg")).thenReturn(true);
         when(pointService.getSummary("admin@hei.gg"))
-            .thenReturn(new PointSummaryResponse(3L, true, 1, 2, 10, 1, List.of()));
+            .thenReturn(new PointSummaryResponse(3L, true, 1, 2, 10, 1, 0, 10, 1, List.of()));
 
         mockMvc
             .perform(get("/api/points/me").header("X-USER-EMAIL", "admin@hei.gg"))
@@ -2219,6 +2227,49 @@ class AdminKeyFilterTest {
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.balance").value(5));
+    }
+
+    @Test
+    void keepsPredictionsAwayFromMembers() throws Exception {
+        mockMvc
+            .perform(get("/api/groups/1/predictions").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(
+                put("/api/groups/1/predictions/5")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"team\":\"HOME\"}")
+            )
+            .andExpect(status().isForbidden());
+
+        verify(predictionService, never()).predict(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void letsAdminsPredictAndCloseEarly() throws Exception {
+        when(predictionService.canPredict("admin@hei.gg")).thenReturn(true);
+        when(predictionService.board(eq(1L), eq("admin@hei.gg"), any()))
+            .thenReturn(new PredictionBoardResponse(null, 3, List.of(), List.of(), List.of(), new PredictionStatsResponse(0, 0)));
+
+        mockMvc
+            .perform(get("/api/groups/1/predictions").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.windowMinutes").value(3));
+        mockMvc
+            .perform(
+                put("/api/groups/1/predictions/5")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"team\":\"HOME\"}")
+            )
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(post("/api/groups/1/predictions/5/close").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isOk());
+
+        verify(predictionService).predict(eq(1L), eq(5L), eq("admin@hei.gg"), any(), eq("HOME"));
+        verify(predictionService).close(eq(1L), eq(5L), eq("admin@hei.gg"), any());
     }
 
     @Test

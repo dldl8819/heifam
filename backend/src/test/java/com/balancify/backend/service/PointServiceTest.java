@@ -269,6 +269,52 @@ class PointServiceTest {
     }
 
     @Test
+    void paysAPredictionHitOnceAndTakesItBackWhenTheResultFlips() {
+        stubAccount(ADMIN_EMAIL, 7L);
+        when(pointTransactionRepository.sumAmountByReferencePattern(7L, "prediction:30#%")).thenReturn(0L);
+
+        pointService.syncPredictionPoint(ADMIN_EMAIL, 30L, true);
+
+        PointTransaction granted = captureSavedTransaction();
+        assertThat(granted.getReason()).isEqualTo(PointService.REASON_PREDICTION_HIT);
+        assertThat(granted.getAmount()).isEqualTo(1);
+        assertThat(granted.getReferenceKey()).isEqualTo("prediction:30#1");
+
+        when(pointTransactionRepository.sumAmountByReferencePattern(7L, "prediction:30#%")).thenReturn(1L);
+        when(pointTransactionRepository.countByAccount_IdAndReferenceKeyStartingWith(7L, "prediction:30#")).thenReturn(1L);
+        pointService.syncPredictionPoint(ADMIN_EMAIL, 30L, true);
+        pointService.syncPredictionPoint(ADMIN_EMAIL, 30L, false);
+
+        ArgumentCaptor<PointTransaction> saved = ArgumentCaptor.forClass(PointTransaction.class);
+        verify(pointTransactionRepository, org.mockito.Mockito.times(2)).save(saved.capture());
+        PointTransaction reversed = saved.getAllValues().get(1);
+        assertThat(reversed.getReason()).isEqualTo(PointService.REASON_PREDICTION_HIT_REVERSED);
+        assertThat(reversed.getAmount()).isEqualTo(-1);
+        assertThat(reversed.getReferenceKey()).isEqualTo("prediction:30#2");
+    }
+
+    @Test
+    void stopsPredictionPointsAtTheDailyCap() {
+        stubAccount(ADMIN_EMAIL, 7L);
+        when(pointTransactionRepository.sumAmountByReasonsOnDate(eq(7L), any(), eq(TODAY))).thenReturn(10L);
+
+        pointService.syncPredictionPoint(ADMIN_EMAIL, 30L, true);
+
+        verify(pointTransactionRepository, never()).save(any());
+    }
+
+    @Test
+    void leavesPeopleWithoutPointsAloneWhenTheirPickMissed() {
+        when(pointAccountRepository.findByNormalizedEmail(MEMBER_EMAIL)).thenReturn(Optional.empty());
+
+        pointService.syncPredictionPoint(MEMBER_EMAIL, 30L, false);
+        pointService.syncPredictionPoint(MEMBER_EMAIL, 30L, true);
+
+        verify(pointAccountRepository, never()).insertIfMissing(any());
+        verify(pointTransactionRepository, never()).save(any());
+    }
+
+    @Test
     void summarizesAnAccountThatHasNoPointsYet() {
         when(pointAccountRepository.findByNormalizedEmail(ADMIN_EMAIL)).thenReturn(Optional.empty());
 
@@ -288,6 +334,7 @@ class PointServiceTest {
         account.setNormalizedEmail(email);
         ReflectionTestUtils.setField(account, "id", id);
         when(pointAccountRepository.findByNormalizedEmailForUpdate(email)).thenReturn(Optional.of(account));
+        lenient().when(pointAccountRepository.findByNormalizedEmail(email)).thenReturn(Optional.of(account));
         return account;
     }
 

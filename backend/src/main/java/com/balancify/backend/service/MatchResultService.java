@@ -64,6 +64,7 @@ public class MatchResultService {
     private final MatchResultEditQuotaService matchResultEditQuotaService;
     private final PointService pointService;
     private final TournamentProgressService tournamentProgressService;
+    private final PredictionService predictionService;
 
     public MatchResultService(
         MatchRepository matchRepository,
@@ -87,7 +88,8 @@ public class MatchResultService {
         OperationAuditLogService operationAuditLogService,
         MatchResultEditQuotaService matchResultEditQuotaService,
         PointService pointService,
-        TournamentProgressService tournamentProgressService
+        TournamentProgressService tournamentProgressService,
+        PredictionService predictionService
     ) {
         this.matchRepository = matchRepository;
         this.groupRepository = groupRepository;
@@ -111,6 +113,7 @@ public class MatchResultService {
         this.matchResultEditQuotaService = matchResultEditQuotaService;
         this.pointService = pointService;
         this.tournamentProgressService = tournamentProgressService;
+        this.predictionService = predictionService;
     }
 
     @Transactional
@@ -384,6 +387,8 @@ public class MatchResultService {
             && normalizedRecordedByEmail != null) {
             pointService.grantMatchResultPoint(normalizedRecordedByEmail, match.getId());
         }
+        // Every result change settles the free predictions on the match again.
+        predictionService.settle(match);
         // A tournament game moves its series on: the score, the next game, the next round.
         if (match.getSeriesId() != null) {
             tournamentProgressService.sync(match.getSeriesId());
@@ -991,6 +996,7 @@ public class MatchResultService {
 
         mmrHistoryRepository.deleteByMatch_Id(matchId);
         pointService.reverseMatchResultPoints(matchId);
+        predictionService.revoke(matchId);
         matchParticipantRepository.deleteByMatch_Id(matchId);
         matchRepository.delete(match);
         if (seriesId != null) {

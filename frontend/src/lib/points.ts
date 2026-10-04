@@ -10,6 +10,8 @@ const REASON_KEYS: Record<PointReason, string> = {
   MATCH_RESULT: 'points.reasons.matchResult',
   MATCH_RESULT_REVERSED: 'points.reasons.matchResultReversed',
   ADJUSTMENT: 'points.reasons.adjustment',
+  PREDICTION_HIT: 'points.reasons.predictionHit',
+  PREDICTION_HIT_REVERSED: 'points.reasons.predictionHitReversed',
 }
 
 export type PointMemberOption = {

@@ -30,6 +30,7 @@ const sections = [
       t('legal.privacy.sections.collect.items.six'),
       t('legal.privacy.sections.collect.items.seven'),
       t('legal.privacy.sections.collect.items.eight'),
+      t('legal.privacy.sections.collect.items.nine'),
     ],
   },
   {
@@ -140,7 +141,7 @@ export default function PrivacyPage() {
           {t('legal.privacy.description')}
         </p>
         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-          {t('legal.common.updatedAt', { date: '2026-08-07' })}
+          {t('legal.common.updatedAt', { date: '2026-10-04' })}
         </p>
       </header>
 

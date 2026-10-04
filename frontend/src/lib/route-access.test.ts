@@ -106,6 +106,16 @@ describe('route access', () => {
       redirectTo: '/players',
       blocked: false,
     })
+    expect(getRouteAccessDecision('/predictions', member)).toEqual({
+      allowed: false,
+      redirectTo: '/players',
+      blocked: false,
+    })
+    expect(getRouteAccessDecision('/predictions', admin)).toEqual({
+      allowed: true,
+      redirectTo: null,
+      blocked: false,
+    })
     expect(getRouteAccessDecision('/points', admin)).toEqual({
       allowed: true,
       redirectTo: null,

@@ -48,6 +48,8 @@ describe('navigation items', () => {
 
     expect(memberItems.map((item) => item.href)).not.toContain('/points')
     expect(adminItems.map((item) => item.href)).toContain('/points')
+    expect(memberItems.map((item) => item.href)).not.toContain('/predictions')
+    expect(adminItems.map((item) => item.href)).toContain('/predictions')
   })
 
   it('hides the audit log from regular members', () => {

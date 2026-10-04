@@ -726,7 +726,13 @@ export type LedgerImportResponse = {
   skippedRows: LedgerImportRowError[]
 }
 
-export type PointReason = 'DAILY_LOGIN' | 'MATCH_RESULT' | 'MATCH_RESULT_REVERSED' | 'ADJUSTMENT'
+export type PointReason =
+  | 'DAILY_LOGIN'
+  | 'MATCH_RESULT'
+  | 'MATCH_RESULT_REVERSED'
+  | 'ADJUSTMENT'
+  | 'PREDICTION_HIT'
+  | 'PREDICTION_HIT_REVERSED'
 
 export type PointHistoryItem = {
   reason: PointReason | string
@@ -743,6 +749,9 @@ export type PointSummaryResponse = {
   matchResultsToday: number
   matchResultDailyCap: number
   matchResultPoints: number
+  predictionPointsToday: number
+  predictionHitDailyCap: number
+  predictionHitPoints: number
   recent: PointHistoryItem[]
 }
 
@@ -834,4 +843,42 @@ export type TeamTournament = {
 
 export type LatestTeamTournamentResponse = {
   tournament: TeamTournament | null
+}
+
+// OPEN: picks taken. CLOSED: waiting for the result. RESOLVED: result in.
+export type PredictionState = 'OPEN' | 'CLOSED' | 'RESOLVED'
+
+export type PredictionPlayer = {
+  nickname: string | null
+  assignedRace: AssignedRace | null
+}
+
+export type PredictionMatch = {
+  matchId: number
+  state: PredictionState
+  raceComposition: RaceComposition | null
+  seriesGameNumber: number | null
+  createdAt: string
+  closesAt: string | null
+  homePlayers: PredictionPlayer[]
+  awayPlayers: PredictionPlayer[]
+  myPick: TeamSide | null
+  ownMatch: boolean
+  homePicks: number | null
+  awayPicks: number | null
+  winnerTeam: TeamSide | null
+  hit: boolean | null
+  pointsExcluded: boolean
+}
+
+export type PredictionBoard = {
+  now: string
+  windowMinutes: number
+  open: PredictionMatch[]
+  closed: PredictionMatch[]
+  history: PredictionMatch[]
+  stats: {
+    resolved: number
+    hits: number
+  }
 }

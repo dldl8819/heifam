@@ -40,6 +40,9 @@ public class PointService {
     public static final String REASON_MATCH_RESULT = "MATCH_RESULT";
     public static final String REASON_MATCH_RESULT_REVERSED = "MATCH_RESULT_REVERSED";
     public static final String REASON_ADJUSTMENT = "ADJUSTMENT";
+    public static final String REASON_PREDICTION_HIT = "PREDICTION_HIT";
+    public static final String REASON_PREDICTION_HIT_REVERSED = "PREDICTION_HIT_REVERSED";
+    private static final List<String> PREDICTION_REASONS = List.of(REASON_PREDICTION_HIT, REASON_PREDICTION_HIT_REVERSED);
 
     static final int MAX_ADJUSTMENT = 1000;
     private static final int RANKING_LIMIT = 50;
@@ -169,6 +172,41 @@ public class PointService {
         }
     }
 
+    /**
+     * Brings one person's prediction points for a match to what the current result says: the hit
+     * points when their pick won, nothing otherwise. Each change is a new ledger row, so a result
+     * that flips back and forth stays exact; a new hit waits for room under the daily cap.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void syncPredictionPoint(String email, Long matchId, boolean hit) {
+        String normalizedEmail = normalizeEmail(email);
+        if (normalizedEmail.isEmpty() || matchId == null) {
+            return;
+        }
+        int target = hit && canUsePoints(normalizedEmail) ? pointProperties.getPredictionHit() : 0;
+        if (target == 0 && pointAccountRepository.findByNormalizedEmail(normalizedEmail).isEmpty()) {
+            return;
+        }
+
+        PointAccount account = lockAccount(normalizedEmail);
+        String referencePrefix = predictionReferencePrefix(matchId);
+        long current = pointTransactionRepository.sumAmountByReferencePattern(account.getId(), referencePrefix + "%");
+        if (current == target) {
+            return;
+        }
+        LocalDate today = today();
+        String reason = REASON_PREDICTION_HIT_REVERSED;
+        if (target > current) {
+            long earnedToday = pointTransactionRepository.sumAmountByReasonsOnDate(account.getId(), PREDICTION_REASONS, today);
+            if (earnedToday + (target - current) > pointProperties.getPredictionHitDailyCap()) {
+                return;
+            }
+            reason = REASON_PREDICTION_HIT;
+        }
+        long sequence = pointTransactionRepository.countByAccount_IdAndReferenceKeyStartingWith(account.getId(), referencePrefix) + 1;
+        record(account, reason, (int) (target - current), referencePrefix + sequence, today, null, null);
+    }
+
     @Transactional(readOnly = true)
     public PointSummaryResponse getSummary(String email) {
         String normalizedEmail = normalizeEmail(email);
@@ -182,6 +220,9 @@ public class PointService {
                 0,
                 pointProperties.getMatchResultDailyCap(),
                 pointProperties.getMatchResult(),
+                0,
+                pointProperties.getPredictionHitDailyCap(),
+                pointProperties.getPredictionHit(),
                 List.of()
             );
         }
@@ -206,6 +247,9 @@ public class PointService {
             (int) pointTransactionRepository.countByAccount_IdAndReasonAndKstDate(accountId, REASON_MATCH_RESULT, today),
             pointProperties.getMatchResultDailyCap(),
             pointProperties.getMatchResult(),
+            (int) pointTransactionRepository.sumAmountByReasonsOnDate(accountId, PREDICTION_REASONS, today),
+            pointProperties.getPredictionHitDailyCap(),
+            pointProperties.getPredictionHit(),
             recent
         );
     }
@@ -341,6 +385,10 @@ public class PointService {
 
     private static String matchReference(Long matchId) {
         return "match:" + matchId;
+    }
+
+    private static String predictionReferencePrefix(Long matchId) {
+        return "prediction:" + matchId + "#";
     }
 
     private static String normalizeEmail(String value) {

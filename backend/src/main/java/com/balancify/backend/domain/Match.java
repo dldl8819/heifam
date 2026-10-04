@@ -86,6 +86,10 @@ public class Match {
     @Column(name = "series_game_number")
     private Integer seriesGameNumber;
 
+    // Set when an admin closes predictions early; otherwise they close a few minutes after creation.
+    @Column(name = "predictions_closed_at")
+    private OffsetDateTime predictionsClosedAt;
+
     public Long getId() {
         return id;
     }
@@ -244,6 +248,14 @@ public class Match {
 
     public void setSeriesGameNumber(Integer seriesGameNumber) {
         this.seriesGameNumber = seriesGameNumber;
+    }
+
+    public OffsetDateTime getPredictionsClosedAt() {
+        return predictionsClosedAt;
+    }
+
+    public void setPredictionsClosedAt(OffsetDateTime predictionsClosedAt) {
+        this.predictionsClosedAt = predictionsClosedAt;
     }
 
     @PrePersist
