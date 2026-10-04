@@ -1,11 +1,17 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useAdminAuth } from '@/lib/admin-auth'
 import { apiClient } from '@/lib/api'
-import { TeamTournamentPanel } from '@/components/team-tournament-panel'
+import { BalanceSeriesBoard } from '@/components/balance-series-board'
 import { TierParticipantBoard } from '@/components/tier-participant-board'
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
+import {
+  buildSeriesLineups,
+  canChooseSeriesFormat,
+  offRaceAssignments,
+  previewSeriesGames,
+} from '@/lib/balance-series'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
 import {
@@ -14,21 +20,13 @@ import {
   getMultiBalanceModeLabelKey,
   MULTI_BALANCE_MODE_OPTIONS,
 } from '@/lib/multi-balance-mode'
-import {
-  autocompleteParticipantSlot,
-  compactParticipantIds,
-  createParticipantSlots,
-  fillParticipantSlotLabels,
-  type ParticipantSlotState,
-  updateParticipantSlotInput,
-} from '@/lib/participant-slots'
-import { getRaceCompositionOptions, normalizeRaceComposition } from '@/lib/race-composition'
+import { useParticipantSelection } from '@/lib/use-participant-selection'
 import type {
   BalancePlayerInput,
-  BalancePlayerOption,
+  MultiBalanceMatch,
   MultiBalanceMode,
   MultiBalanceResponse,
-  RaceComposition,
+  TournamentSeriesFormat,
 } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
@@ -106,158 +104,48 @@ function buildDisplayTeams(result: MultiBalanceResponse): MultiBalanceDisplayTea
   ])
 }
 
-function deriveMultiBalanceTeamSizes(totalPlayers: number): number[] {
-  if (totalPlayers < 4) {
-    return []
-  }
-
-  let match3Count = Math.floor(totalPlayers / 6)
-  let remaining = totalPlayers - match3Count * 6
-
-  if (remaining === 2 && match3Count > 0 && totalPlayers < 18) {
-    match3Count -= 1
-    remaining += 6
-  }
-
-  const match2Count = Math.floor(remaining / 4)
-  const teamSizes: number[] = []
-
-  for (let index = 0; index < match3Count; index += 1) {
-    teamSizes.push(3)
-  }
-  for (let index = 0; index < match2Count; index += 1) {
-    teamSizes.push(2)
-  }
-
-  return teamSizes
-}
-
-function deriveRaceCompositionTeamSize(totalPlayers: number): 2 | 3 | null {
-  const teamSizes = deriveMultiBalanceTeamSizes(totalPlayers)
-  if (teamSizes.length === 0) {
-    return null
-  }
-
-  const uniqueTeamSizes = [...new Set(teamSizes)]
-  if (uniqueTeamSizes.length !== 1) {
-    return null
-  }
-
-  return uniqueTeamSizes[0] === 2 || uniqueTeamSizes[0] === 3
-    ? (uniqueTeamSizes[0] as 2 | 3)
-    : null
-}
-
 export default function MultiBalancePage() {
   const { canViewMmr } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
   const showMmr = canViewMmr && mmrVisible
-  const [players, setPlayers] = useState<BalancePlayerOption[]>([])
-  const [playersLoading, setPlayersLoading] = useState<boolean>(true)
-  const [playersError, setPlayersError] = useState<string | null>(null)
-  const [participantSlots, setParticipantSlots] = useState<ParticipantSlotState[]>(() =>
-    createParticipantSlots(MINIMUM_SELECTION_SLOTS),
-  )
   const [submitting, setSubmitting] = useState<boolean>(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [result, setResult] = useState<MultiBalanceResponse | null>(null)
   const [balanceMode, setBalanceMode] = useState<MultiBalanceMode>(DEFAULT_MULTI_BALANCE_MODE)
-  const [raceComposition, setRaceComposition] = useState<RaceComposition | null>(null)
-  const participantInputRefs = useRef<Array<HTMLInputElement | null>>([])
-
-  useEffect(() => {
-    let active = true
-
-    const loadPlayers = async () => {
-      setPlayersLoading(true)
-      setPlayersError(null)
-
-      try {
-        const response = await apiClient.getGroupPlayers(TEMP_GROUP_ID)
-        if (!active) {
-          return
-        }
-
-        const mappedPlayers: BalancePlayerOption[] = response
-          .map((player) => ({
-            id: player.id,
-            nickname: player.nickname,
-            race: player.race,
-            currentMmr: player.currentMmr,
-            tier: player.liveTier ?? player.tier,
-          }))
-          .sort((a, b) => {
-            if (!showMmr) {
-              return a.nickname.localeCompare(b.nickname, 'ko-KR')
-            }
-
-            const aMmr = typeof a.currentMmr === 'number' ? a.currentMmr : -1
-            const bMmr = typeof b.currentMmr === 'number' ? b.currentMmr : -1
-            if (bMmr !== aMmr) {
-              return bMmr - aMmr
-            }
-
-            return a.nickname.localeCompare(b.nickname, 'ko-KR')
-          })
-
-        setPlayers(mappedPlayers)
-      } catch {
-        if (!active) {
-          return
-        }
-        setPlayers([])
-        setPlayersError(t('multiBalance.loadError'))
-      } finally {
-        if (active) {
-          setPlayersLoading(false)
-        }
-      }
-    }
-
-    void loadPlayers()
-
-    return () => {
-      active = false
-    }
-  }, [showMmr])
- 
-  useEffect(() => {
-    if (players.length === 0) {
-      return
-    }
-
-    setParticipantSlots((previous) =>
-      fillParticipantSlotLabels(previous, players, MINIMUM_SELECTION_SLOTS),
-    )
-  }, [players])
-
-  const selectedIds = useMemo(
-    () => compactParticipantIds(participantSlots),
-    [participantSlots],
-  )
+  const [startingSeries, setStartingSeries] = useState<boolean>(false)
+  const [seriesStarted, setSeriesStarted] = useState<boolean>(false)
+  const [seriesError, setSeriesError] = useState<string | null>(null)
+  const [seriesRefreshSignal, setSeriesRefreshSignal] = useState<number>(0)
+  // The format picked per match number; a match left out plays its plan.
+  const [seriesFormats, setSeriesFormats] = useState<Record<number, TournamentSeriesFormat>>({})
+  const clearResult = () => {
+    setSubmitError(null)
+    setResult(null)
+    setSeriesStarted(false)
+    setSeriesError(null)
+    setSeriesFormats({})
+  }
+  const {
+    players,
+    playersLoading,
+    playersError,
+    participantSlots,
+    participantInputRefs,
+    selectedIds,
+    resetSelection,
+    handleSlotInputChange,
+    handleSlotAutocomplete,
+  } = useParticipantSelection({
+    groupId: TEMP_GROUP_ID,
+    showMmr,
+    minimumSlots: MINIMUM_SELECTION_SLOTS,
+    onSelectionChange: clearResult,
+  })
 
   const selectedPlayers = useMemo(
     () => players.filter((player) => selectedIds.includes(player.id)),
     [players, selectedIds],
   )
-  const raceCompositionTeamSize = useMemo(
-    () => deriveRaceCompositionTeamSize(selectedIds.length),
-    [selectedIds.length],
-  )
-  const raceCompositionOptions = useMemo(
-    () => (raceCompositionTeamSize ? getRaceCompositionOptions(raceCompositionTeamSize) : []),
-    [raceCompositionTeamSize],
-  )
-
-  useEffect(() => {
-    if (balanceMode === 'RANDOM' || !raceCompositionTeamSize) {
-      setRaceComposition(null)
-      return
-    }
-
-    setRaceComposition((previous) => normalizeRaceComposition(raceCompositionTeamSize, previous))
-  }, [balanceMode, raceCompositionTeamSize])
-
   const selectedTotalMmr = selectedPlayers.reduce(
     (sum, player) => sum + (typeof player.currentMmr === 'number' ? player.currentMmr : 0),
     0
@@ -273,58 +161,13 @@ export default function MultiBalancePage() {
   const displayTeams = useMemo(() => (result ? buildDisplayTeams(result) : []), [result])
 
   const handleResetSelection = () => {
-    setParticipantSlots(createParticipantSlots(MINIMUM_SELECTION_SLOTS))
+    resetSelection()
     setBalanceMode(DEFAULT_MULTI_BALANCE_MODE)
-    setRaceComposition(null)
-    setSubmitError(null)
-    setResult(null)
-  }
-
-  const handleParticipantSlotInputChange = (index: number, value: string) => {
-    setSubmitError(null)
-    setResult(null)
-    setParticipantSlots((previous) =>
-      updateParticipantSlotInput({
-        slots: previous,
-        index,
-        inputValue: value,
-        players,
-        showMmr,
-        minimumSlots: MINIMUM_SELECTION_SLOTS,
-      }),
-    )
-  }
-
-  const handleParticipantSlotAutocomplete = (index: number): boolean => {
-    const nextSlots = autocompleteParticipantSlot({
-      slots: participantSlots,
-      index,
-      players,
-      minimumSlots: MINIMUM_SELECTION_SLOTS,
-    })
-    if (!nextSlots) {
-      return false
-    }
-
-    setSubmitError(null)
-    setResult(null)
-    setParticipantSlots(nextSlots)
-
-    window.requestAnimationFrame(() => {
-      const nextInput = participantInputRefs.current[index + 1]
-      if (!nextInput) {
-        return
-      }
-      nextInput.focus()
-      nextInput.select()
-    })
-
-    return true
+    clearResult()
   }
 
   const handleGenerateMultiBalance = async () => {
-    setSubmitError(null)
-    setResult(null)
+    clearResult()
 
     if (selectedIds.length < 4) {
       setSubmitError(t('multiBalance.validation.minimumFour'))
@@ -334,12 +177,8 @@ export default function MultiBalancePage() {
     setSubmitting(true)
     try {
       const response = await apiClient.balanceMatchMulti(
-        buildMultiBalanceRequestPayload(
-          TEMP_GROUP_ID,
-          selectedIds,
-          balanceMode,
-          balanceMode === 'RANDOM' ? null : raceComposition
-        )
+        // Each match plays a series whose games set the races, so no single composition is asked for.
+        buildMultiBalanceRequestPayload(TEMP_GROUP_ID, selectedIds, balanceMode, null)
       )
       setResult(response)
     } catch (error) {
@@ -353,6 +192,112 @@ export default function MultiBalancePage() {
     }
   }
 
+  const seriesLineups = result ? buildSeriesLineups(result.matches, seriesFormats) : null
+  const canStartSeries =
+    result !== null && result.matches.every((match) => match.seriesPlan) && !startingSeries && !seriesStarted
+
+  const handleStartSeries = async () => {
+    if (!result) {
+      return
+    }
+    if (!seriesLineups) {
+      setSeriesError(t('balanceSeries.plan.missingPlayers'))
+      return
+    }
+    if (!window.confirm(t('balanceSeries.plan.startConfirm', { count: seriesLineups.length }))) {
+      return
+    }
+    setStartingSeries(true)
+    setSeriesError(null)
+    try {
+      await apiClient.startBalanceSeries(TEMP_GROUP_ID, seriesLineups)
+      setSeriesStarted(true)
+      setSeriesRefreshSignal((previous) => previous + 1)
+    } catch (error) {
+      setSeriesError(
+        error instanceof Error && error.message.trim().length > 0
+          ? `${t('balanceSeries.plan.startError')} (${error.message})`
+          : t('balanceSeries.plan.startError'),
+      )
+    } finally {
+      setStartingSeries(false)
+    }
+  }
+
+  const renderSeriesPlan = (match: MultiBalanceMatch, matchIndex: number) => {
+    const plan = match.seriesPlan
+    const format = seriesFormats[match.matchNumber] ?? plan?.format ?? 'BEST_OF_THREE'
+    return (
+      <article
+        key={`series-plan-${match.matchNumber}`}
+        className="space-y-2 rounded-lg border border-indigo-200 bg-white p-4 shadow-sm dark:border-indigo-800 dark:bg-slate-900"
+      >
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+            {t('balanceSeries.plan.matchTitle', {
+              number: match.matchNumber,
+              home: matchIndex * 2 + 1,
+              away: matchIndex * 2 + 2,
+            })}
+          </h4>
+          {plan && (
+            <span className="text-xs font-medium text-indigo-700 dark:text-indigo-300">
+              {t(`balanceSeries.formats.${format}`)}
+            </span>
+          )}
+        </div>
+        {plan && canChooseSeriesFormat(match) && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] text-slate-500 dark:text-slate-400">{t('balanceSeries.plan.formatChoice')}</span>
+            {(['MIXED_THREE', 'BEST_OF_THREE'] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                disabled={seriesStarted}
+                onClick={() => setSeriesFormats((previous) => ({ ...previous, [match.matchNumber]: option }))}
+                className={`rounded-md border px-2 py-1 text-[11px] font-medium disabled:cursor-not-allowed disabled:opacity-60 ${
+                  format === option
+                    ? 'border-indigo-500 bg-indigo-50 text-indigo-900 dark:border-indigo-400 dark:bg-indigo-950/40 dark:text-indigo-200'
+                    : 'border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
+                }`}
+              >
+                {t(`balanceSeries.formats.${option}`)}
+              </button>
+            ))}
+          </div>
+        )}
+        {plan ? (
+          <ol className="space-y-1 text-xs text-slate-700 dark:text-slate-200">
+            {previewSeriesGames(match, format).map((game) => {
+              const offRaces = offRaceAssignments(game, match.homeTeam, match.awayTeam)
+              return (
+                <li key={`series-plan-${match.matchNumber}-${game.gameNumber}`} className="flex flex-wrap gap-x-2">
+                  <span className="font-semibold">
+                    {t('teamTournament.games.label', { number: game.gameNumber })} {game.raceComposition}
+                  </span>
+                  <span className="text-slate-500 dark:text-slate-400">
+                    {offRaces.length === 0
+                      ? t('balanceSeries.plan.protossOnly')
+                      : offRaces
+                          .map((assignment) =>
+                            t('balanceSeries.plan.offRace', {
+                              race: assignment.race,
+                              players: assignment.players.join(', '),
+                            }),
+                          )
+                          .join(' · ')}
+                  </span>
+                </li>
+              )
+            })}
+          </ol>
+        ) : (
+          <p className="text-xs text-amber-700 dark:text-amber-300">{t('balanceSeries.plan.unavailable')}</p>
+        )}
+      </article>
+    )
+  }
+
   return (
     <section className="space-y-6">
       <header className="space-y-1 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
@@ -361,6 +306,7 @@ export default function MultiBalancePage() {
         <p className="text-xs text-slate-500 dark:text-slate-400">{t('multiBalance.helper.defaultPriority')}</p>
         <p className="text-xs text-slate-500 dark:text-slate-400">{t('multiBalance.helper.addTwoVsTwo')}</p>
         <p className="text-xs text-slate-500 dark:text-slate-400">{t('multiBalance.helper.waiting')}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">{t('multiBalance.helper.series')}</p>
       </header>
 
       {playersError && (
@@ -388,8 +334,8 @@ export default function MultiBalancePage() {
             resetLabel={t('multiBalance.selection.reset')}
             inputRefs={participantInputRefs}
             onReset={handleResetSelection}
-            onSlotInputChange={handleParticipantSlotInputChange}
-            onSlotAutocomplete={handleParticipantSlotAutocomplete}
+            onSlotInputChange={handleSlotInputChange}
+            onSlotAutocomplete={handleSlotAutocomplete}
           />
         </div>
 
@@ -429,36 +375,6 @@ export default function MultiBalancePage() {
               })}
             </div>
           </div>
-
-          {balanceMode !== 'RANDOM' && (
-          <label className="mt-4 block space-y-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-              {t('multiBalance.raceComposition.label')}
-              <select
-                value={raceComposition ?? ''}
-                onChange={(event) =>
-                  setRaceComposition(
-                    raceCompositionTeamSize
-                      ? normalizeRaceComposition(raceCompositionTeamSize, event.target.value)
-                      : null,
-                  )
-                }
-                disabled={raceCompositionOptions.length === 0}
-              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700 dark:disabled:bg-slate-800 dark:disabled:text-slate-400"
-              >
-                <option value="">{t('multiBalance.raceComposition.placeholder')}</option>
-                {raceCompositionOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-              {raceCompositionOptions.length === 0 && selectedIds.length >= 4 && (
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  {t('multiBalance.raceComposition.unavailable')}
-                </p>
-              )}
-            </label>
-          )}
 
           {validationMessage && (
             <p className="mt-3 text-xs text-amber-700 dark:text-amber-300">{validationMessage}</p>
@@ -576,10 +492,26 @@ export default function MultiBalancePage() {
               )
             })}
           </div>
+
+          <section className="space-y-3">
+            <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('balanceSeries.plan.title')}</h4>
+            <div className="grid gap-3 md:grid-cols-2">{result.matches.map(renderSeriesPlan)}</div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => void handleStartSeries()}
+                disabled={!canStartSeries}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-300 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
+              >
+                {startingSeries ? t('balanceSeries.plan.starting') : t('balanceSeries.plan.startButton')}
+              </button>
+              {seriesError && <p className="text-xs text-rose-600 dark:text-rose-300">{seriesError}</p>}
+            </div>
+          </section>
         </section>
       )}
 
-      <TeamTournamentPanel groupId={TEMP_GROUP_ID} selectedPlayerIds={selectedIds} showMmr={showMmr} />
+      <BalanceSeriesBoard groupId={TEMP_GROUP_ID} refreshSignal={seriesRefreshSignal} />
     </section>
   )
 }

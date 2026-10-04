@@ -8,6 +8,8 @@ import com.balancify.backend.api.match.dto.MultiBalancePenaltySummaryResponse;
 import com.balancify.backend.api.match.dto.MultiBalanceRaceSummaryResponse;
 import com.balancify.backend.api.match.dto.MultiBalanceRequest;
 import com.balancify.backend.api.match.dto.MultiBalanceResponse;
+import com.balancify.backend.api.match.dto.MultiBalanceSeriesGameResponse;
+import com.balancify.backend.api.match.dto.MultiBalanceSeriesPlanResponse;
 import com.balancify.backend.api.match.dto.MultiBalanceWaitingPlayerResponse;
 import com.balancify.backend.domain.Match;
 import com.balancify.backend.domain.MatchParticipant;
@@ -39,6 +41,12 @@ public class MultiMatchBalancingService {
     private static final String TEAM_AWAY = "AWAY";
     private static final String MATCH_TYPE_2V2 = "2v2";
     private static final String MATCH_TYPE_3V3 = "3v3";
+    // A split that leaves out the Terran or the Zerg game of the series scores like this many MMR
+    // of team difference per game, as tournament teams do.
+    private static final int SERIES_GAME_MMR_EQUIVALENT = 40;
+    // Players who can take Terran or Zerg are moved between matches only for a close MMR swap.
+    private static final int OFF_RACE_SWAP_MMR_LIMIT = 150;
+    private static final int MAX_OFF_RACE_SWAPS = 10;
 
     private final PlayerRepository playerRepository;
     private final MatchRepository matchRepository;
@@ -131,6 +139,9 @@ public class MultiMatchBalancingService {
             allocationPlan.teamSizes(),
             raceComposition
         );
+        if (raceComposition == null) {
+            pairOffRacePlayers(distributedGroups);
+        }
         List<MatchEvaluation> evaluatedMatches = evaluateGroups(
             distributedGroups,
             history,
@@ -227,7 +238,8 @@ public class MultiMatchBalancingService {
                     buildRaceSummary(balanced.homeTeam(), byId),
                     buildRaceSummary(balanced.awayTeam(), byId)
                 ),
-                new MultiBalancePenaltySummaryResponse(0, 0, 0)
+                new MultiBalancePenaltySummaryResponse(0, 0, 0),
+                seriesPlan(balanced.homeTeam(), balanced.awayTeam(), byId)
             ));
             offset += groupPlayerCount;
         }
@@ -605,12 +617,14 @@ public class MultiMatchBalancingService {
                 history.matchupSignatureCounts()
             );
             int interMatchPenalty = calculateInterMatchPenalty(candidate, selectedSoFar);
+            int missingSeriesGames = countMissingSeriesGames(candidate, byId);
 
             double score = (candidate.mmrDiff() * weights.mmrDiffWeight())
                 + (interMatchPenalty * weights.interMatchWeight())
                 + (racePenalty * weights.racePenaltyWeight())
                 + (repeatTeammatePenalty * weights.repeatTeammateWeight())
-                + (repeatMatchupPenalty * weights.repeatMatchupWeight());
+                + (repeatMatchupPenalty * weights.repeatMatchupWeight())
+                + (missingSeriesGames * SERIES_GAME_MMR_EQUIVALENT * weights.mmrDiffWeight());
 
             CandidateScore current = new CandidateScore(
                 candidate,
@@ -650,11 +664,128 @@ public class MultiMatchBalancingService {
                 best.repeatTeammatePenalty(),
                 best.repeatMatchupPenalty(),
                 best.racePenalty()
-            )
+            ),
+            seriesPlan(balanced.homeTeam(), balanced.awayTeam(), byId)
         );
 
         double groupAverage = (balanced.homeMmr() + balanced.awayMmr()) / (double) (teamSize * 2);
         return new MatchEvaluation(response, groupAverage);
+    }
+
+    /**
+     * The Terran and Zerg games of a series (0 to 2) this split leaves out. It counts only against
+     * other splits of the same players, so matches without players for those races are unaffected.
+     */
+    private int countMissingSeriesGames(
+        TeamBalancingService.BalanceCandidate candidate,
+        Map<Long, PlayerSnapshot> byId
+    ) {
+        return 2 - TournamentSeriesPlanner.sharedOffRaceGames(
+            seriesCapabilities(candidate.homeTeam(), byId),
+            seriesCapabilities(candidate.awayTeam(), byId)
+        );
+    }
+
+    /** The series the two teams would play, with each player's race per game; null when they share no composition. */
+    private MultiBalanceSeriesPlanResponse seriesPlan(
+        List<BalancePlayerDto> homeTeam,
+        List<BalancePlayerDto> awayTeam,
+        Map<Long, PlayerSnapshot> byId
+    ) {
+        List<String> homeCapabilities = seriesCapabilities(homeTeam, byId);
+        List<String> awayCapabilities = seriesCapabilities(awayTeam, byId);
+        TournamentSeriesPlanner.SeriesPlan plan;
+        try {
+            plan = TournamentSeriesPlanner.plan(homeCapabilities, awayCapabilities);
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
+        List<MultiBalanceSeriesGameResponse> games = new ArrayList<>();
+        for (int index = 0; index < plan.compositions().size(); index++) {
+            String composition = plan.compositions().get(index);
+            games.add(new MultiBalanceSeriesGameResponse(
+                index + 1,
+                composition,
+                TournamentSeriesPlanner.assignRaces(homeCapabilities, composition),
+                TournamentSeriesPlanner.assignRaces(awayCapabilities, composition)
+            ));
+        }
+        return new MultiBalanceSeriesPlanResponse(plan.format().name(), games);
+    }
+
+    private List<String> seriesCapabilities(List<BalancePlayerDto> team, Map<Long, PlayerSnapshot> byId) {
+        return team.stream()
+            .map(player -> {
+                PlayerSnapshot snapshot = player.playerId() == null ? null : byId.get(player.playerId());
+                return snapshot == null ? "P" : snapshot.race();
+            })
+            .toList();
+    }
+
+    /**
+     * A Terran or Zerg game needs a player for it on both teams, so players who can take those
+     * races do better two to a match than one in each. Swaps players of close MMR between matches
+     * while that lets more matches hold those games.
+     */
+    private void pairOffRacePlayers(List<MatchGroup> groups) {
+        for (int round = 0; round < MAX_OFF_RACE_SWAPS; round++) {
+            MatchGroup bestLeft = null;
+            MatchGroup bestRight = null;
+            int bestLeftIndex = -1;
+            int bestRightIndex = -1;
+            int bestGain = 0;
+            int bestGap = Integer.MAX_VALUE;
+            for (int first = 0; first < groups.size(); first++) {
+                for (int second = first + 1; second < groups.size(); second++) {
+                    MatchGroup left = groups.get(first);
+                    MatchGroup right = groups.get(second);
+                    int before = offRaceGames(left.players()) + offRaceGames(right.players());
+                    for (int leftIndex = 0; leftIndex < left.players().size(); leftIndex++) {
+                        for (int rightIndex = 0; rightIndex < right.players().size(); rightIndex++) {
+                            PlayerSnapshot leftPlayer = left.players().get(leftIndex);
+                            PlayerSnapshot rightPlayer = right.players().get(rightIndex);
+                            int gap = Math.abs(leftPlayer.mmr() - rightPlayer.mmr());
+                            if (leftPlayer.race().equals(rightPlayer.race()) || gap > OFF_RACE_SWAP_MMR_LIMIT) {
+                                continue;
+                            }
+                            int gain = offRaceGames(swapped(left.players(), leftIndex, rightPlayer))
+                                + offRaceGames(swapped(right.players(), rightIndex, leftPlayer))
+                                - before;
+                            if (gain > bestGain || (gain > 0 && gain == bestGain && gap < bestGap)) {
+                                bestLeft = left;
+                                bestRight = right;
+                                bestLeftIndex = leftIndex;
+                                bestRightIndex = rightIndex;
+                                bestGain = gain;
+                                bestGap = gap;
+                            }
+                        }
+                    }
+                }
+            }
+            if (bestLeft == null) {
+                return;
+            }
+            PlayerSnapshot leftPlayer = bestLeft.players().get(bestLeftIndex);
+            PlayerSnapshot rightPlayer = bestRight.players().get(bestRightIndex);
+            bestLeft.players().set(bestLeftIndex, rightPlayer);
+            bestRight.players().set(bestRightIndex, leftPlayer);
+            bestLeft.totalMmr += rightPlayer.mmr() - leftPlayer.mmr();
+            bestRight.totalMmr += leftPlayer.mmr() - rightPlayer.mmr();
+        }
+    }
+
+    // The Terran and Zerg games (0 to 2) a match could hold: each needs two players able to take that race.
+    private int offRaceGames(List<PlayerSnapshot> players) {
+        long terran = players.stream().filter(player -> player.race().contains("T")).count();
+        long zerg = players.stream().filter(player -> player.race().contains("Z")).count();
+        return (terran >= 2 ? 1 : 0) + (zerg >= 2 ? 1 : 0);
+    }
+
+    private List<PlayerSnapshot> swapped(List<PlayerSnapshot> players, int index, PlayerSnapshot replacement) {
+        List<PlayerSnapshot> copy = new ArrayList<>(players);
+        copy.set(index, replacement);
+        return copy;
     }
 
     private int calculateRacePenalty(

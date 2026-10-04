@@ -52,6 +52,50 @@ class MultiMatchBalancingServiceTest {
     }
 
     @Test
+    void putsTheTwoTerranPlayersInOneMatchSoItCanPlayAMixedSeries() {
+        MultiMatchBalancingService service = createService();
+        List<Player> players = createPlayers(1L, 12, 2000, 10, List.of("P"));
+        players.get(0).setRace("PT");
+        players.get(1).setRace("PT");
+        List<Long> playerIds = players.stream().map(Player::getId).toList();
+        when(playerRepository.findByGroup_IdAndIdIn(1L, playerIds)).thenReturn(players);
+
+        MultiBalanceResponse response = service.balance(new MultiBalanceRequest(1L, playerIds, "MMR_FIRST"));
+
+        assertThat(response.matches()).extracting(match -> match.seriesPlan().format())
+            .containsExactlyInAnyOrder("MIXED_THREE", "BEST_OF_THREE");
+        MultiBalanceMatchResponse mixed = response.matches().stream()
+            .filter(match -> match.seriesPlan().format().equals("MIXED_THREE"))
+            .findFirst()
+            .orElseThrow();
+        assertThat(mixed.seriesPlan().games()).extracting(game -> game.raceComposition())
+            .containsExactly("PPP", "PPT", "PPP");
+        // One Terran player on each team takes Terran in the second game.
+        var terranGame = mixed.seriesPlan().games().get(1);
+        assertThat(terranGame.homeRaces()).containsOnlyOnce("T");
+        assertThat(terranGame.awayRaces()).containsOnlyOnce("T");
+        assertThat(mixed.homeTeam().get(terranGame.homeRaces().indexOf("T")).playerId()).isIn(1L, 2L);
+        assertThat(mixed.awayTeam().get(terranGame.awayRaces().indexOf("T")).playerId()).isIn(1L, 2L);
+    }
+
+    @Test
+    void plansBestOfThreeProtossGamesWhenNobodyCanTakeTerranOrZerg() {
+        MultiMatchBalancingService service = createService();
+        List<Player> players = createPlayers(1L, 10, 2000, 10, List.of("P"));
+        List<Long> playerIds = players.stream().map(Player::getId).toList();
+        when(playerRepository.findByGroup_IdAndIdIn(1L, playerIds)).thenReturn(players);
+
+        MultiBalanceResponse response = service.balance(new MultiBalanceRequest(1L, playerIds, "MMR_FIRST"));
+
+        assertThat(response.matches()).allSatisfy(match -> {
+            assertThat(match.seriesPlan().format()).isEqualTo("BEST_OF_THREE");
+            String protoss = "P".repeat(match.teamSize());
+            assertThat(match.seriesPlan().games()).extracting(game -> game.raceComposition())
+                .containsExactly(protoss, protoss, protoss);
+        });
+    }
+
+    @Test
     void generatesTwo3v3AndOne2v2WhenSixteenPlayersAreProvided() {
         MultiMatchBalancingService service = createService();
         List<Player> players = createPlayers(1L, 16, 2400, 20, List.of("P", "T", "Z"));

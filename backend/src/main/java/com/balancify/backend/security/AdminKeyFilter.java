@@ -150,6 +150,22 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/predictions/{matchId}/close"),
             AuthType.ADMIN_EMAIL
         ),
+        // Series after a multi-balance belong to the admin-only multi-balance page; BalanceSeriesController checks the same.
+        new ProtectedRoute(
+            "GET",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/balance-series"),
+            AuthType.ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "POST",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/balance-series"),
+            AuthType.ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "POST",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/balance-series/{seriesId}/cancel"),
+            AuthType.ADMIN_EMAIL
+        ),
         // Team tournaments are tried out by admins first; TeamTournamentController checks the same.
         new ProtectedRoute(
             "POST",

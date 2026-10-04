@@ -52,6 +52,24 @@ describe('navigation items', () => {
     expect(adminItems.map((item) => item.href)).toContain('/predictions')
   })
 
+  it('gives tournaments their own admin menu next to multi-balance', () => {
+    const memberItems = getVisibleNavItems({
+      isLoggedIn: true,
+      canAccess: true,
+      isAdmin: false,
+      isSuperAdmin: false,
+    })
+    const adminHrefs = getVisibleNavItems({
+      isLoggedIn: true,
+      canAccess: true,
+      isAdmin: true,
+      isSuperAdmin: false,
+    }).map((item) => item.href)
+
+    expect(memberItems.map((item) => item.href)).not.toContain('/tournaments')
+    expect(adminHrefs.indexOf('/tournaments')).toBe(adminHrefs.indexOf('/balance/multi') + 1)
+  })
+
   it('hides the audit log from regular members', () => {
     const items = getVisibleNavItems({
       isLoggedIn: true,

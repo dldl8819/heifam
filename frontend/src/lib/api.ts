@@ -57,6 +57,8 @@ import type {
   PointRankingResponse,
   PointSummaryResponse,
   LatestTeamTournamentResponse,
+  BalanceSeriesLineup,
+  BalanceSeriesList,
   TeamTournament,
   PredictionBoard,
   PredictionMatch,
@@ -1619,6 +1621,26 @@ export const apiClient = {
   cancelTeamTournament: (groupId: number, tournamentId: number) =>
     apiRequest<TeamTournament>(
       `/api/groups/${groupId}/tournaments/${tournamentId}/cancel`,
+      { method: 'POST' },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  getBalanceSeries: (groupId: number) =>
+    apiRequest<BalanceSeriesList>(`/api/groups/${groupId}/balance-series`, undefined, {
+      requireUserEmail: true,
+      includeUserEmail: true,
+    }),
+  startBalanceSeries: (groupId: number, lineups: BalanceSeriesLineup[]) =>
+    apiRequest<BalanceSeriesList>(
+      `/api/groups/${groupId}/balance-series`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ lineups }),
+      },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  cancelBalanceSeries: (groupId: number, seriesId: number) =>
+    apiRequest<BalanceSeriesList>(
+      `/api/groups/${groupId}/balance-series/${seriesId}/cancel`,
       { method: 'POST' },
       { requireUserEmail: true, includeUserEmail: true }
     ),

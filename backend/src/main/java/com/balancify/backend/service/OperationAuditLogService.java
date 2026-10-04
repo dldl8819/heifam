@@ -57,6 +57,8 @@ public class OperationAuditLogService {
     public static final String ACTION_POINT_ADJUSTED = "POINT_ADJUSTED";
     public static final String ACTION_TOURNAMENT_CREATED = "TOURNAMENT_CREATED";
     public static final String ACTION_TOURNAMENT_CANCELLED = "TOURNAMENT_CANCELLED";
+    public static final String ACTION_BALANCE_SERIES_STARTED = "BALANCE_SERIES_STARTED";
+    public static final String ACTION_BALANCE_SERIES_CANCELLED = "BALANCE_SERIES_CANCELLED";
     public static final String ACTION_PREDICTIONS_CLOSED = "PREDICTIONS_CLOSED";
     public static final String ACTION_PRIZE_EVENT_CREATED = "PRIZE_EVENT_CREATED";
     public static final String ACTION_PRIZE_EVENT_CONFIRMED = "PRIZE_EVENT_CONFIRMED";
@@ -644,6 +646,26 @@ public class OperationAuditLogService {
         );
         log.setSummary("팀 토너먼트 취소");
         log.setDetails("tournamentId=" + tournamentId);
+        operationAuditLogRepository.save(log);
+    }
+
+    @Transactional
+    public void recordBalanceSeriesStarted(String actorEmail, String actorNickname, Long groupId, int seriesCount) {
+        OperationAuditLog log = baseLog(
+            actorEmail, actorNickname, ACTION_BALANCE_SERIES_STARTED, "BALANCE_SERIES", null, null, groupId
+        );
+        log.setSummary("다중 밸런스 시리즈 시작");
+        log.setDetails("series=" + seriesCount);
+        operationAuditLogRepository.save(log);
+    }
+
+    @Transactional
+    public void recordBalanceSeriesCancelled(String actorEmail, String actorNickname, Long seriesId, Long groupId) {
+        OperationAuditLog log = baseLog(
+            actorEmail, actorNickname, ACTION_BALANCE_SERIES_CANCELLED, "BALANCE_SERIES", seriesId, "#" + seriesId, groupId
+        );
+        log.setSummary("다중 밸런스 시리즈 취소");
+        log.setDetails("seriesId=" + seriesId);
         operationAuditLogRepository.save(log);
     }
 

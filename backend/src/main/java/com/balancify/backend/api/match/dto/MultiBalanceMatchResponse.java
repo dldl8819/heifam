@@ -15,6 +15,7 @@ public record MultiBalanceMatchResponse(
     Integer mmrDiff,
     Double expectedHomeWinRate,
     MultiBalanceRaceSummaryResponse raceSummary,
-    MultiBalancePenaltySummaryResponse penaltySummary
+    MultiBalancePenaltySummaryResponse penaltySummary,
+    MultiBalanceSeriesPlanResponse seriesPlan
 ) {
 }

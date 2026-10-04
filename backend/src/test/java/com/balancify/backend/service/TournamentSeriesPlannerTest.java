@@ -78,6 +78,45 @@ class TournamentSeriesPlannerTest {
     }
 
     @Test
+    void plansTwoPlayerTeamsWithPpPtAndPz() {
+        TournamentSeriesPlanner.SeriesPlan mixed = TournamentSeriesPlanner.plan(List.of("PT", "PZ"), List.of("PTZ", "P"));
+        TournamentSeriesPlanner.SeriesPlan protoss = TournamentSeriesPlanner.plan(List.of("P", "P"), List.of("PT", "P"));
+
+        assertThat(mixed.format()).isEqualTo(MatchSeriesFormat.MIXED_THREE);
+        assertThat(mixed.compositions()).containsExactly("PP", "PT", "PZ");
+        assertThat(protoss.format()).isEqualTo(MatchSeriesFormat.BEST_OF_THREE);
+        assertThat(protoss.compositions()).containsExactly("PP", "PP", "PP");
+    }
+
+    @Test
+    void letsTeamsThatCouldMixPlayProtossBestOfThreeInstead() {
+        List<String> home = List.of("PT", "PZ", "P");
+        List<String> away = List.of("PTZ", "P", "P");
+
+        TournamentSeriesPlanner.SeriesPlan protoss = TournamentSeriesPlanner.plan(home, away, MatchSeriesFormat.BEST_OF_THREE);
+        TournamentSeriesPlanner.SeriesPlan mixed = TournamentSeriesPlanner.plan(home, away, MatchSeriesFormat.MIXED_THREE);
+
+        assertThat(protoss.format()).isEqualTo(MatchSeriesFormat.BEST_OF_THREE);
+        assertThat(protoss.compositions()).containsExactly("PPP", "PPP", "PPP");
+        assertThat(mixed.compositions()).containsExactly("PPP", "PPT", "PPZ");
+        assertThat(TournamentSeriesPlanner.plan(home, away, null).format()).isEqualTo(MatchSeriesFormat.MIXED_THREE);
+        assertThatThrownBy(() -> TournamentSeriesPlanner.plan(
+            List.of("P", "P", "P"),
+            List.of("P", "P", "P"),
+            MatchSeriesFormat.MIXED_THREE
+        )).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void countsTheTerranAndZergGamesBothTeamsCanField() {
+        assertThat(TournamentSeriesPlanner.sharedOffRaceGames(List.of("PT", "PZ", "P"), List.of("PTZ", "P", "P"))).isEqualTo(2);
+        assertThat(TournamentSeriesPlanner.sharedOffRaceGames(List.of("PT", "P", "P"), List.of("PT", "P", "P"))).isEqualTo(1);
+        assertThat(TournamentSeriesPlanner.sharedOffRaceGames(List.of("PT", "PT", "P"), List.of("P", "P", "P"))).isZero();
+        assertThatThrownBy(() -> TournamentSeriesPlanner.plan(List.of("P", "P", "P"), List.of("P", "P")))
+            .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void assignsTheRaceTheCompositionNeeds() {
         assertThat(TournamentSeriesPlanner.assignRaces(List.of("P", "PT", "P"), "PPT")).containsExactly("P", "T", "P");
         assertThat(TournamentSeriesPlanner.assignRaces(List.of("P", "P", "P"), "PPT")).isNull();

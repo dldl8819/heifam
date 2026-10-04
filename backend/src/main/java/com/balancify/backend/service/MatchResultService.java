@@ -64,6 +64,7 @@ public class MatchResultService {
     private final MatchResultEditQuotaService matchResultEditQuotaService;
     private final PointService pointService;
     private final TournamentProgressService tournamentProgressService;
+    private final BalanceSeriesProgressService balanceSeriesProgressService;
     private final PredictionService predictionService;
 
     public MatchResultService(
@@ -89,6 +90,7 @@ public class MatchResultService {
         MatchResultEditQuotaService matchResultEditQuotaService,
         PointService pointService,
         TournamentProgressService tournamentProgressService,
+        BalanceSeriesProgressService balanceSeriesProgressService,
         PredictionService predictionService
     ) {
         this.matchRepository = matchRepository;
@@ -113,6 +115,7 @@ public class MatchResultService {
         this.matchResultEditQuotaService = matchResultEditQuotaService;
         this.pointService = pointService;
         this.tournamentProgressService = tournamentProgressService;
+        this.balanceSeriesProgressService = balanceSeriesProgressService;
         this.predictionService = predictionService;
     }
 
@@ -282,6 +285,9 @@ public class MatchResultService {
         if (match.getSeriesId() != null) {
             tournamentProgressService.checkResultChange(match, normalizedRecordedByEmail, !allowReprocess);
         }
+        if (match.getBalanceSeriesId() != null) {
+            balanceSeriesProgressService.checkResultChange(match, !allowReprocess);
+        }
 
         ValidatedParticipants validatedParticipants = loadValidatedParticipants(matchId, match);
         applyParticipantRaces(
@@ -392,6 +398,10 @@ public class MatchResultService {
         // A tournament game moves its series on: the score, the next game, the next round.
         if (match.getSeriesId() != null) {
             tournamentProgressService.sync(match.getSeriesId());
+        }
+        // So does a game of a series started after a multi-balance: the score and the next game.
+        if (match.getBalanceSeriesId() != null) {
+            balanceSeriesProgressService.sync(match.getBalanceSeriesId());
         }
         Long groupId = resolveGroupId(match, participants);
         TransactionAfterCommit.runAfterCommitAsync(groupStatsKey(groupId), () -> {
@@ -699,8 +709,12 @@ public class MatchResultService {
                 continue;
             }
 
-            // Games of one tournament series repeat the same teams on purpose.
+            // Games of one series repeat the same teams on purpose.
             if (match.getSeriesId() != null && Objects.equals(candidate.getSeriesId(), match.getSeriesId())) {
+                continue;
+            }
+            if (match.getBalanceSeriesId() != null
+                && Objects.equals(candidate.getBalanceSeriesId(), match.getBalanceSeriesId())) {
                 continue;
             }
 
@@ -971,6 +985,10 @@ public class MatchResultService {
         if (seriesId != null) {
             tournamentProgressService.checkDeletion(match);
         }
+        Long balanceSeriesId = match.getBalanceSeriesId();
+        if (balanceSeriesId != null) {
+            balanceSeriesProgressService.checkDeletion(match);
+        }
 
         List<MatchParticipant> participants =
             matchParticipantRepository.findByMatchIdWithPlayerAndMatch(matchId);
@@ -1001,6 +1019,9 @@ public class MatchResultService {
         matchRepository.delete(match);
         if (seriesId != null) {
             tournamentProgressService.sync(seriesId);
+        }
+        if (balanceSeriesId != null) {
+            balanceSeriesProgressService.sync(balanceSeriesId);
         }
         TransactionAfterCommit.runAfterCommitAsync(groupStatsKey(groupId), () -> {
             playerStatsRefreshService.rebuildGroupStats(groupId);
