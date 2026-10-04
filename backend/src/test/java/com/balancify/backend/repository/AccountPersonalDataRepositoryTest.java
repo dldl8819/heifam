@@ -45,6 +45,7 @@ class AccountPersonalDataRepositoryTest {
         verify(jdbcTemplate, atLeastOnce()).update(statements.capture(), any(SqlParameterSource.class));
         List<String> sql = statements.getAllValues();
         assertThat(sql).contains("DELETE FROM point_accounts WHERE normalized_email = :email");
+        assertThat(sql).contains("DELETE FROM match_predictions WHERE predictor_email = :email");
         assertThat(sql).anySatisfy(statement -> assertThat(statement)
             .startsWith("UPDATE point_transactions SET created_by_email = NULL"));
     }

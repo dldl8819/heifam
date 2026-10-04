@@ -9,6 +9,9 @@ public record PointSummaryResponse(
     int matchResultsToday,
     int matchResultDailyCap,
     int matchResultPoints,
+    int predictionPointsToday,
+    int predictionHitDailyCap,
+    int predictionHitPoints,
     List<PointHistoryItemResponse> recent
 ) {
 }

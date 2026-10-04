@@ -181,7 +181,7 @@ function readPersistedBalanceState(): PersistedBalanceState | null {
 
 export default function BalancePage() {
   const router = useRouter()
-  const { isSuperAdmin, isLoggedIn, canViewMmr } = useAdminAuth()
+  const { isAdmin, isSuperAdmin, isLoggedIn, canViewMmr } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
   const showMmr = canViewMmr && mmrVisible
   const [players, setPlayers] = useState<BalancePlayerOption[]>([])
@@ -204,6 +204,7 @@ export default function BalancePage() {
   const [resultSubmitError, setResultSubmitError] = useState<string | null>(null)
   const [resultSubmitSuccess, setResultSubmitSuccess] = useState<MatchResultResponse | null>(null)
   const [matchCreateMessage, setMatchCreateMessage] = useState<string | null>(null)
+  const [matchConfirming, setMatchConfirming] = useState<boolean>(false)
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle')
   const [persistedReady, setPersistedReady] = useState<boolean>(false)
   const slotInputRefs = useRef<Array<HTMLInputElement | null>>([])
@@ -625,6 +626,19 @@ export default function BalancePage() {
         setMatchCreateMessage(readableMessage ?? t('balance.quickResult.matchCreateFailed'))
       }
       return null
+    }
+  }
+
+  // Setting the match up before it is played opens predictions on it; the result is entered later.
+  const handleConfirmMatch = async () => {
+    if (!result || hasGeneratedMatchId) {
+      return
+    }
+    setMatchConfirming(true)
+    try {
+      await createMatchFromResult(result)
+    } finally {
+      setMatchConfirming(false)
     }
   }
 
@@ -1061,6 +1075,23 @@ export default function BalancePage() {
               ? t('balance.quickResult.matchWillBeCreatedOnSubmit')
               : t('balance.quickResult.matchNotReady')}
         </p>
+        {canCreateMatchFromResult && !hasGeneratedMatchId && (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void handleConfirmMatch()}
+              disabled={matchConfirming || resultSubmitting}
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              {matchConfirming ? t('balance.quickResult.confirmingMatch') : t('balance.quickResult.confirmMatch')}
+            </button>
+            {isAdmin && (
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                {t('balance.quickResult.confirmMatchHint')}
+              </span>
+            )}
+          </div>
+        )}
         {result && (
           <div className="mt-3 space-y-2">
             <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">

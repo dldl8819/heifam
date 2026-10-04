@@ -112,7 +112,15 @@ balancify:
     daily-login: ${POINTS_DAILY_LOGIN:1}
     match-result: ${POINTS_MATCH_RESULT:1}
     match-result-daily-cap: ${POINTS_MATCH_RESULT_DAILY_CAP:10}
+    prediction-hit: ${POINTS_PREDICTION_HIT:1}
+    prediction-hit-daily-cap: ${POINTS_PREDICTION_HIT_DAILY_CAP:10}
   tournament:
     # Admins try team tournaments out first. true lets members record tournament games; running
     # tournaments also needs the tournament routes in AdminKeyFilter and the screen opened to members.
     members-enabled: ${TOURNAMENT_MEMBERS_ENABLED:false}
+  predictions:
+    # Admins try predictions out first. true lets members predict; seeing the board also needs the
+    # prediction routes in AdminKeyFilter and the /predictions page opened to members.
+    members-enabled: ${PREDICTIONS_MEMBERS_ENABLED:false}
+    # Minutes after a match is set up during which picks are taken.
+    window-minutes: ${PREDICTIONS_WINDOW_MINUTES:3}

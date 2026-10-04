@@ -84,6 +84,9 @@ class MatchResultServiceTest {
     @Mock
     private TournamentProgressService tournamentProgressService;
 
+    @Mock
+    private PredictionService predictionService;
+
     private MatchResultService matchResultService;
 
     @BeforeEach
@@ -117,7 +120,8 @@ class MatchResultServiceTest {
             operationAuditLogService,
             matchResultEditQuotaService,
             pointService,
-            tournamentProgressService
+            tournamentProgressService,
+            predictionService
         );
     }
 
@@ -147,6 +151,7 @@ class MatchResultServiceTest {
 
         verify(tournamentProgressService).checkResultChange(match, "your_username@example.com", true);
         verify(tournamentProgressService).sync(70L);
+        verify(predictionService).settle(match);
     }
 
     @Test
@@ -161,6 +166,7 @@ class MatchResultServiceTest {
 
         verify(tournamentProgressService).checkDeletion(match);
         verify(tournamentProgressService).sync(70L);
+        verify(predictionService).revoke(99L);
     }
 
     @Test

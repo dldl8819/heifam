@@ -12,6 +12,8 @@ public class PointProperties {
     private int dailyLogin = 1;
     private int matchResult = 1;
     private int matchResultDailyCap = 10;
+    private int predictionHit = 1;
+    private int predictionHitDailyCap = 10;
 
     public boolean isMembersEnabled() {
         return membersEnabled;
@@ -43,5 +45,21 @@ public class PointProperties {
 
     public void setMatchResultDailyCap(int matchResultDailyCap) {
         this.matchResultDailyCap = Math.max(0, matchResultDailyCap);
+    }
+
+    public int getPredictionHit() {
+        return predictionHit;
+    }
+
+    public void setPredictionHit(int predictionHit) {
+        this.predictionHit = Math.max(0, predictionHit);
+    }
+
+    public int getPredictionHitDailyCap() {
+        return predictionHitDailyCap;
+    }
+
+    public void setPredictionHitDailyCap(int predictionHitDailyCap) {
+        this.predictionHitDailyCap = Math.max(0, predictionHitDailyCap);
     }
 }

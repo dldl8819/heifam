@@ -193,7 +193,7 @@ export default function PointsPage() {
         {summaryError && <ErrorAlert message={summaryError} />}
         {summary && (
           <>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <SummaryStat label={t('points.summary.balance')} value={`${summary.balance.toLocaleString('ko-KR')}p`} />
               <SummaryStat
                 label={t('points.summary.dailyLogin')}
@@ -210,6 +210,13 @@ export default function PointsPage() {
                   cap: summary.matchResultDailyCap,
                 })}
               />
+              <SummaryStat
+                label={t('points.summary.predictions')}
+                value={t('points.summary.predictionsValue', {
+                  points: summary.predictionPointsToday,
+                  cap: summary.predictionHitDailyCap,
+                })}
+              />
             </div>
 
             <div className="space-y-1 text-xs text-slate-600 dark:text-slate-300">
@@ -220,6 +227,12 @@ export default function PointsPage() {
                   {t('points.rules.matchResult', {
                     points: summary.matchResultPoints,
                     cap: summary.matchResultDailyCap,
+                  })}
+                </li>
+                <li>
+                  {t('points.rules.prediction', {
+                    points: summary.predictionHitPoints,
+                    cap: summary.predictionHitDailyCap,
                   })}
                 </li>
                 <li>{t('points.rules.reversal')}</li>

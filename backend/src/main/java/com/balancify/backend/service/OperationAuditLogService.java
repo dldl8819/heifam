@@ -57,6 +57,7 @@ public class OperationAuditLogService {
     public static final String ACTION_POINT_ADJUSTED = "POINT_ADJUSTED";
     public static final String ACTION_TOURNAMENT_CREATED = "TOURNAMENT_CREATED";
     public static final String ACTION_TOURNAMENT_CANCELLED = "TOURNAMENT_CANCELLED";
+    public static final String ACTION_PREDICTIONS_CLOSED = "PREDICTIONS_CLOSED";
 
     private static final int MAX_PAGE_SIZE = 200;
 
@@ -640,6 +641,16 @@ public class OperationAuditLogService {
         );
         log.setSummary("팀 토너먼트 취소");
         log.setDetails("tournamentId=" + tournamentId);
+        operationAuditLogRepository.save(log);
+    }
+
+    @Transactional
+    public void recordPredictionsClosed(String actorEmail, String actorNickname, Long matchId, Long groupId) {
+        OperationAuditLog log = baseLog(
+            actorEmail, actorNickname, ACTION_PREDICTIONS_CLOSED, "MATCH", matchId, "#" + matchId, groupId
+        );
+        log.setSummary("승부 예측 마감");
+        log.setDetails("matchId=" + matchId);
         operationAuditLogRepository.save(log);
     }
 

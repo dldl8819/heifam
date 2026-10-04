@@ -55,6 +55,8 @@ import type {
   PointSummaryResponse,
   LatestTeamTournamentResponse,
   TeamTournament,
+  PredictionBoard,
+  PredictionMatch,
   RatingRecalculationRequest,
   RatingRecalculationResponse,
   RecentMatchItem,
@@ -1520,6 +1522,26 @@ export const apiClient = {
       includeUserEmail: true,
     })
   },
+  getPredictionBoard: (groupId: number) =>
+    apiRequest<PredictionBoard>(`/api/groups/${groupId}/predictions`, undefined, {
+      requireUserEmail: true,
+      includeUserEmail: true,
+    }),
+  submitPrediction: (groupId: number, matchId: number, team: TeamSide) =>
+    apiRequest<PredictionMatch>(
+      `/api/groups/${groupId}/predictions/${matchId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ team }),
+      },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  closePredictions: (groupId: number, matchId: number) =>
+    apiRequest<void>(
+      `/api/groups/${groupId}/predictions/${matchId}/close`,
+      { method: 'POST' },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
   getLatestTeamTournament: (groupId: number) =>
     apiRequest<LatestTeamTournamentResponse>(`/api/groups/${groupId}/tournaments/latest`, undefined, {
       requireUserEmail: true,

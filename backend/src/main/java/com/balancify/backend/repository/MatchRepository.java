@@ -28,6 +28,21 @@ public interface MatchRepository extends JpaRepository<Match, Long>, JpaSpecific
 
     List<Match> findBySeriesIdInOrderBySeriesGameNumberAsc(Collection<Long> seriesIds);
 
+    // Matches set up but not played yet: the ones a prediction can be about.
+    @Query("""
+        select m
+        from Match m
+        where m.group.id = :groupId
+          and m.status = com.balancify.backend.domain.MatchStatus.CONFIRMED
+          and m.winningTeam is null
+          and m.createdAt >= :fromInclusive
+        order by m.createdAt desc, m.id desc
+        """)
+    List<Match> findAwaitingResultSince(
+        @Param("groupId") Long groupId,
+        @Param("fromInclusive") OffsetDateTime fromInclusive
+    );
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select m from Match m where m.id = :matchId")
     Optional<Match> findByIdForUpdate(@Param("matchId") Long matchId);

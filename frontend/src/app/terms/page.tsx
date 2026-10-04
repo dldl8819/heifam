@@ -34,6 +34,14 @@ const sections = [
     ],
   },
   {
+    title: t('legal.terms.sections.points.title'),
+    items: [
+      t('legal.terms.sections.points.items.one'),
+      t('legal.terms.sections.points.items.two'),
+      t('legal.terms.sections.points.items.three'),
+    ],
+  },
+  {
     title: t('legal.terms.sections.liability.title'),
     items: [
       t('legal.terms.sections.liability.items.one'),
@@ -58,7 +66,7 @@ export default function TermsPage() {
           {t('legal.terms.description')}
         </p>
         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-          {t('legal.common.updatedAt', { date: '2026-04-01' })}
+          {t('legal.common.updatedAt', { date: '2026-10-04' })}
         </p>
       </header>
 

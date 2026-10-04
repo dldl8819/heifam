@@ -225,6 +225,10 @@ public class AccountPersonalDataRepository {
                 parameters
             );
             jdbcTemplate.update(
+                "DELETE FROM match_predictions WHERE predictor_email = :email",
+                parameters
+            );
+            jdbcTemplate.update(
                 "DELETE FROM managed_admin_emails WHERE normalized_email = :email",
                 parameters
             );
