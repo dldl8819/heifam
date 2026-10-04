@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import Image from 'next/image'
 import { AuthControls } from '@/components/auth-controls'
 import { AccessGate } from '@/components/access-gate'
+import { NotificationBell } from '@/components/notification-bell'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { SiteFooter } from '@/components/site-footer'
 import { TopNavDesktop, TopNavMobile } from '@/components/top-nav'
@@ -39,6 +40,7 @@ export function AppShell({ children }: AppShellProps) {
                 </div>
               </div>
               <div className="flex items-start gap-2">
+                <NotificationBell />
                 <ThemeToggle />
                 <TopNavMobile />
                 <div className="hidden w-full max-w-sm md:block">

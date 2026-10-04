@@ -114,6 +114,8 @@ balancify:
     match-result-daily-cap: ${POINTS_MATCH_RESULT_DAILY_CAP:10}
     prediction-hit: ${POINTS_PREDICTION_HIT:1}
     prediction-hit-daily-cap: ${POINTS_PREDICTION_HIT_DAILY_CAP:10}
+    # Reading, liking and commenting on a notice each earn this once per notice (up to 3 a notice).
+    notice-action: ${POINTS_NOTICE_ACTION:1}
   tournament:
     # Admins try team tournaments out first. true lets members record tournament games; running
     # tournaments also needs the tournament routes in AdminKeyFilter and the screen opened to members.
@@ -124,3 +126,13 @@ balancify:
     members-enabled: ${PREDICTIONS_MEMBERS_ENABLED:false}
     # Minutes after a match is set up during which picks are taken.
     window-minutes: ${PREDICTIONS_WINDOW_MINUTES:3}
+  notifications:
+    # Admins try notifications out first. true shows them to every member with service access;
+    # that also needs the notification routes in AdminKeyFilter and the bell shown to members.
+    members-enabled: ${NOTIFICATIONS_MEMBERS_ENABLED:false}
+  push:
+    # Web Push to browsers and installed apps; off until all three are set. Keys are base64url
+    # (npx web-push generate-vapid-keys), the subject a mailto: or https: contact for push services.
+    vapid-public-key: ${WEB_PUSH_VAPID_PUBLIC_KEY:}
+    vapid-private-key: ${WEB_PUSH_VAPID_PRIVATE_KEY:}
+    subject: ${WEB_PUSH_SUBJECT:}

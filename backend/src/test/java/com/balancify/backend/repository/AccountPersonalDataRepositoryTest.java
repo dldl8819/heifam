@@ -54,6 +54,20 @@ class AccountPersonalDataRepositoryTest {
     }
 
     @Test
+    void removesNotificationStateWithTheAccount() {
+        AccountPersonalDataRepository repository = new AccountPersonalDataRepository(jdbcTemplate);
+
+        repository.deleteAccountIdentity(UUID.randomUUID(), "your_username@example.com");
+
+        ArgumentCaptor<String> statements = ArgumentCaptor.forClass(String.class);
+        verify(jdbcTemplate, atLeastOnce()).update(statements.capture(), any(SqlParameterSource.class));
+        assertThat(statements.getAllValues()).contains(
+            "DELETE FROM notification_cursors WHERE email = :email",
+            "DELETE FROM push_subscriptions WHERE email = :email"
+        );
+    }
+
+    @Test
     void leavesEmailTablesAloneWithoutAnEmail() {
         AccountPersonalDataRepository repository = new AccountPersonalDataRepository(jdbcTemplate);
 

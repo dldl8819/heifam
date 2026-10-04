@@ -42,6 +42,10 @@ public class PointService {
     public static final String REASON_ADJUSTMENT = "ADJUSTMENT";
     public static final String REASON_PREDICTION_HIT = "PREDICTION_HIT";
     public static final String REASON_PREDICTION_HIT_REVERSED = "PREDICTION_HIT_REVERSED";
+    public static final String REASON_NOTICE_READ = "NOTICE_READ";
+    public static final String REASON_NOTICE_LIKE = "NOTICE_LIKE";
+    public static final String REASON_NOTICE_COMMENT = "NOTICE_COMMENT";
+    private static final List<String> NOTICE_REASONS = List.of(REASON_NOTICE_READ, REASON_NOTICE_LIKE, REASON_NOTICE_COMMENT);
     private static final List<String> PREDICTION_REASONS = List.of(REASON_PREDICTION_HIT, REASON_PREDICTION_HIT_REVERSED);
 
     static final int MAX_ADJUSTMENT = 1000;
@@ -169,6 +173,25 @@ public class PointService {
                 continue;
             }
             record(account, REASON_MATCH_RESULT_REVERSED, -grant.getAmount(), referenceKey, today(), null, null);
+        }
+    }
+
+    /**
+     * Reading, liking and commenting on a notice each earn a point once per notice, so a notice is
+     * worth up to three. Unliking or deleting the comment keeps the point and earns no second one.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void grantNoticePoint(String email, Long noticeId, String reason) {
+        String normalizedEmail = normalizeEmail(email);
+        int amount = pointProperties.getNoticeAction();
+        if (noticeId == null || amount <= 0 || !NOTICE_REASONS.contains(reason) || !canUsePoints(normalizedEmail)) {
+            return;
+        }
+
+        String referenceKey = "notice:" + noticeId;
+        PointAccount account = lockAccount(normalizedEmail);
+        if (!pointTransactionRepository.existsByAccount_IdAndReasonAndReferenceKey(account.getId(), reason, referenceKey)) {
+            record(account, reason, amount, referenceKey, today(), null, null);
         }
     }
 

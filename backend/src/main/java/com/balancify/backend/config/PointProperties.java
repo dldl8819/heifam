@@ -14,6 +14,8 @@ public class PointProperties {
     private int matchResultDailyCap = 10;
     private int predictionHit = 1;
     private int predictionHitDailyCap = 10;
+    // Reading, liking and commenting on a notice each earn this once per notice.
+    private int noticeAction = 1;
 
     public boolean isMembersEnabled() {
         return membersEnabled;
@@ -61,5 +63,13 @@ public class PointProperties {
 
     public void setPredictionHitDailyCap(int predictionHitDailyCap) {
         this.predictionHitDailyCap = Math.max(0, predictionHitDailyCap);
+    }
+
+    public int getNoticeAction() {
+        return noticeAction;
+    }
+
+    public void setNoticeAction(int noticeAction) {
+        this.noticeAction = Math.max(0, noticeAction);
     }
 }

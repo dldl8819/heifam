@@ -52,11 +52,20 @@ class NoticeServiceTest {
     @Mock
     private AccessControlService accessControlService;
 
+    @Mock
+    private PointService pointService;
+
     private NoticeService noticeService;
 
     @BeforeEach
     void setUp() {
-        noticeService = new NoticeService(noticeRepository, noticeCommentRepository, noticeEngagementRepository, accessControlService);
+        noticeService = new NoticeService(
+            noticeRepository,
+            noticeCommentRepository,
+            noticeEngagementRepository,
+            accessControlService,
+            pointService
+        );
         when(accessControlService.isAdminEmail(ADMIN)).thenReturn(true);
         when(accessControlService.resolveDisplayNicknames(anyCollection()))
             .thenReturn(Map.of(ADMIN, "OpsUser", MEMBER, "YOUR_USERNAME"));
@@ -150,6 +159,21 @@ class NoticeServiceTest {
         noticeService.deleteComment(1L, 2L, 9L, MEMBER);
         noticeService.deleteComment(1L, 2L, 9L, ADMIN);
         verify(noticeCommentRepository, org.mockito.Mockito.times(2)).delete(comment);
+    }
+
+    @Test
+    void givesAPointForReadingLikingAndCommentingOnANotice() {
+        stubNotice(2L, false);
+
+        noticeService.open(1L, 2L, MEMBER);
+        noticeService.setLike(1L, 2L, MEMBER, true);
+        noticeService.setLike(1L, 2L, MEMBER, false);
+        noticeService.addComment(1L, 2L, MEMBER, "YOUR_COMMENT");
+
+        verify(pointService).grantNoticePoint(MEMBER, 2L, PointService.REASON_NOTICE_READ);
+        verify(pointService).grantNoticePoint(MEMBER, 2L, PointService.REASON_NOTICE_LIKE);
+        verify(pointService).grantNoticePoint(MEMBER, 2L, PointService.REASON_NOTICE_COMMENT);
+        verify(pointService, org.mockito.Mockito.times(3)).grantNoticePoint(any(), any(), any());
     }
 
     @Test
