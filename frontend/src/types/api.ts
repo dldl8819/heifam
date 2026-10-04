@@ -845,6 +845,48 @@ export type LatestTeamTournamentResponse = {
   tournament: TeamTournament | null
 }
 
+export type PrizeEventStatus = 'OPEN' | 'CONFIRMED' | 'CANCELLED'
+
+export type PrizeCandidate = {
+  rank: number
+  pointAccountId: number
+  nickname: string | null
+  points: number
+}
+
+export type PrizeWinner = {
+  place: number
+  nickname: string | null
+  points: number
+  prize: string | null
+  amount: number
+  ledgerLinked: boolean
+}
+
+export type PrizeEvent = {
+  eventId: number
+  title: string
+  periodStart: string
+  periodEnd: string
+  winnerCount: number
+  status: PrizeEventStatus
+  confirmedAt: string | null
+  candidates: PrizeCandidate[]
+  winners: PrizeWinner[]
+}
+
+export type PrizeEventCreateRequest = {
+  title: string
+  periodStart: string
+  periodEnd: string
+  winnerCount: number
+}
+
+export type PrizeEventConfirmRequest = {
+  paidOn: string | null
+  winners: Array<{ pointAccountId: number; prize: string | null; amount: number }>
+}
+
 export type TeamScoreEntry = {
   rank: number
   playerId: number

@@ -46,6 +46,9 @@ class AccountPersonalDataRepositoryTest {
         List<String> sql = statements.getAllValues();
         assertThat(sql).contains("DELETE FROM point_accounts WHERE normalized_email = :email");
         assertThat(sql).contains("DELETE FROM match_predictions WHERE predictor_email = :email");
+        assertThat(sql).contains(
+            "UPDATE prize_event_winners SET normalized_email = NULL, nickname = NULL WHERE normalized_email = :email"
+        );
         assertThat(sql).anySatisfy(statement -> assertThat(statement)
             .startsWith("UPDATE point_transactions SET created_by_email = NULL"));
     }

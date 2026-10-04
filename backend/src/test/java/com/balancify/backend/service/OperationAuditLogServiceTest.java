@@ -125,6 +125,20 @@ class OperationAuditLogServiceTest {
     }
 
     @Test
+    void recordsPrizeEventSteps() {
+        operationAuditLogService.recordPrizeEvent(
+            OperationAuditLogService.ACTION_PRIZE_EVENT_CONFIRMED, "ops@example.com", "운영진", 5L, 1L, "10월 이벤트", "winners=2, total=15000"
+        );
+
+        ArgumentCaptor<OperationAuditLog> logCaptor = ArgumentCaptor.forClass(OperationAuditLog.class);
+        verify(operationAuditLogRepository).save(logCaptor.capture());
+        assertThat(logCaptor.getValue().getTargetType()).isEqualTo("PRIZE_EVENT");
+        assertThat(logCaptor.getValue().getTargetLabel()).isEqualTo("10월 이벤트");
+        assertThat(logCaptor.getValue().getSummary()).isEqualTo("상품 이벤트 확정");
+        assertThat(logCaptor.getValue().getDetails()).isEqualTo("winners=2, total=15000");
+    }
+
+    @Test
     void recordsAnEarlyPredictionClose() {
         operationAuditLogService.recordPredictionsClosed("ops@example.com", "운영진", 30L, 1L);
 

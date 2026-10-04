@@ -5,6 +5,7 @@ import { useAdminAuth } from '@/lib/admin-auth'
 import { apiClient, isApiForbiddenError } from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
+import { PrizeEventsPanel } from '@/components/prize-events-panel'
 import { t } from '@/lib/i18n'
 import {
   POINT_ADJUSTMENT_MAX,
@@ -19,6 +20,7 @@ import {
 } from '@/lib/points'
 import type { PointRankingResponse, PointSummaryResponse } from '@/types/api'
 
+const TEMP_GROUP_ID = 1
 const CARD_CLASS = 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900'
 const INPUT_CLASS = 'w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900'
 
@@ -346,6 +348,8 @@ export default function PointsPage() {
           </div>
         )}
       </div>
+
+      <PrizeEventsPanel groupId={TEMP_GROUP_ID} canManage={isSuperAdmin} />
 
       {isSuperAdmin && (
         <form onSubmit={handleAdjust} className={`${CARD_CLASS} space-y-3`}>

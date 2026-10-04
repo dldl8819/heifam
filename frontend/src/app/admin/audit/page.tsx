@@ -27,6 +27,9 @@ const AUDIT_ACTION_FILTER_OPTIONS = [
   'TOURNAMENT_CREATED',
   'TOURNAMENT_CANCELLED',
   'PREDICTIONS_CLOSED',
+  'PRIZE_EVENT_CREATED',
+  'PRIZE_EVENT_CONFIRMED',
+  'PRIZE_EVENT_CANCELLED',
 ] as const
 
 type AuditActionFilter = (typeof AUDIT_ACTION_FILTER_OPTIONS)[number]
@@ -120,6 +123,12 @@ function getActionLabel(action: string): string {
       return t('audit.actions.tournamentCancelled')
     case 'PREDICTIONS_CLOSED':
       return t('audit.actions.predictionsClosed')
+    case 'PRIZE_EVENT_CREATED':
+      return t('audit.actions.prizeEventCreated')
+    case 'PRIZE_EVENT_CONFIRMED':
+      return t('audit.actions.prizeEventConfirmed')
+    case 'PRIZE_EVENT_CANCELLED':
+      return t('audit.actions.prizeEventCancelled')
     default:
       return action
   }

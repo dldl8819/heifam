@@ -68,6 +68,9 @@ import com.balancify.backend.api.match.dto.MultiBalanceRaceSummaryResponse;
 import com.balancify.backend.api.match.dto.MultiBalanceResponse;
 import com.balancify.backend.api.match.dto.MultiBalanceWaitingPlayerResponse;
 import com.balancify.backend.api.points.PointController;
+import com.balancify.backend.api.points.PrizeEventController;
+import com.balancify.backend.api.points.dto.PrizeEventListResponse;
+import com.balancify.backend.api.points.dto.PrizeEventResponse;
 import com.balancify.backend.api.prediction.PredictionController;
 import com.balancify.backend.api.prediction.dto.PredictionBoardResponse;
 import com.balancify.backend.api.prediction.dto.PredictionStatsResponse;
@@ -104,6 +107,7 @@ import com.balancify.backend.service.PlayerTeammateStatsQueryService;
 import com.balancify.backend.service.PlayerImportService;
 import com.balancify.backend.service.PointService;
 import com.balancify.backend.service.PredictionService;
+import com.balancify.backend.service.PrizeEventService;
 import com.balancify.backend.service.TeamScoreService;
 import com.balancify.backend.service.TeamTournamentService;
 import com.balancify.backend.service.TournamentProgressService;
@@ -151,7 +155,8 @@ import org.springframework.test.web.servlet.MockMvc;
     PointController.class,
     TeamTournamentController.class,
     PredictionController.class,
-    TeamScoreController.class
+    TeamScoreController.class,
+    PrizeEventController.class
 })
 @Import({ AdminKeyFilter.class, ServiceAccessFilter.class, AdminKeyProperties.class })
 @TestPropertySource(properties = {
@@ -276,6 +281,9 @@ class AdminKeyFilterTest {
 
     @MockitoBean
     private TeamScoreService teamScoreService;
+
+    @MockitoBean
+    private PrizeEventService prizeEventService;
 
     @BeforeEach
     void setUp() {
@@ -2234,6 +2242,36 @@ class AdminKeyFilterTest {
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.balance").value(5));
+    }
+
+    @Test
+    void letsSuperAdminsRunPrizeEventsAndAdminsSeeThem() throws Exception {
+        when(pointService.canUsePoints("admin@hei.gg")).thenReturn(true);
+        when(prizeEventService.list(1L)).thenReturn(new PrizeEventListResponse(List.of()));
+        when(prizeEventService.create(eq(1L), any(), eq("superadmin@hei.gg"), any()))
+            .thenReturn(new PrizeEventResponse(5L, "10월", null, null, 3, "OPEN", null, List.of(), List.of()));
+        String body = "{\"title\":\"10월\",\"periodStart\":\"2026-10-01\",\"periodEnd\":\"2026-10-31\",\"winnerCount\":3}";
+
+        mockMvc
+            .perform(get("/api/groups/1/prize-events").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(get("/api/groups/1/prize-events").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(post("/api/groups/1/prize-events").header("X-USER-EMAIL", "admin@hei.gg")
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(post("/api/groups/1/prize-events/5/confirm").header("X-USER-EMAIL", "admin@hei.gg")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"winners\":[]}"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(post("/api/groups/1/prize-events").header("X-USER-EMAIL", "superadmin@hei.gg")
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.eventId").value(5));
+        verify(prizeEventService, never()).confirm(any(), any(), any(), any(), any());
     }
 
     @Test
