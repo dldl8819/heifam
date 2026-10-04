@@ -74,6 +74,20 @@ export type MultiBalanceMatch = {
     repeatMatchupPenalty: number
     racePenalty: number
   }
+  // How the two teams would play their series; the races follow the order of homeTeam and awayTeam.
+  seriesPlan?: MultiBalanceSeriesPlan | null
+}
+
+export type MultiBalanceSeriesGame = {
+  gameNumber: number
+  raceComposition: RaceComposition
+  homeRaces: AssignedRace[] | null
+  awayRaces: AssignedRace[] | null
+}
+
+export type MultiBalanceSeriesPlan = {
+  format: TournamentSeriesFormat
+  games: MultiBalanceSeriesGame[]
 }
 
 export type MultiBalanceWaitingPlayer = {
@@ -890,6 +904,35 @@ export type TeamTournament = {
 
 export type LatestTeamTournamentResponse = {
   tournament: TeamTournament | null
+}
+
+export type BalanceSeriesStatus = 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
+
+// A series played after a multi-balance; its games read like a tournament series' games.
+export type BalanceSeries = {
+  seriesId: number
+  status: BalanceSeriesStatus
+  format: TournamentSeriesFormat
+  teamSize: number
+  homeWins: number
+  awayWins: number
+  winnerTeam: TeamSide | null
+  createdAt: string
+  finishedAt: string | null
+  homePlayers: TournamentPlayer[]
+  awayPlayers: TournamentPlayer[]
+  games: TournamentGame[]
+}
+
+export type BalanceSeriesList = {
+  series: BalanceSeries[]
+}
+
+export type BalanceSeriesLineup = {
+  homePlayerIds: number[]
+  awayPlayerIds: number[]
+  // Teams that could mix may still play the all-Protoss game best of three.
+  format?: TournamentSeriesFormat
 }
 
 export type PrizeEventStatus = 'OPEN' | 'CONFIRMED' | 'CANCELLED'

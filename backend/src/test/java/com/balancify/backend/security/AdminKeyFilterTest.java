@@ -77,6 +77,8 @@ import com.balancify.backend.api.prediction.PredictionController;
 import com.balancify.backend.api.prediction.dto.PredictionBoardResponse;
 import com.balancify.backend.api.prediction.dto.PredictionStatsResponse;
 import com.balancify.backend.api.tournament.TeamScoreController;
+import com.balancify.backend.api.series.BalanceSeriesController;
+import com.balancify.backend.api.series.dto.BalanceSeriesListResponse;
 import com.balancify.backend.api.tournament.TeamTournamentController;
 import com.balancify.backend.api.tournament.dto.TeamScoreBoardResponse;
 import com.balancify.backend.api.tournament.dto.TeamTournamentResponse;
@@ -113,6 +115,7 @@ import com.balancify.backend.service.PredictionService;
 import com.balancify.backend.service.PrizeEventService;
 import com.balancify.backend.service.TeamScoreService;
 import com.balancify.backend.service.TeamTournamentService;
+import com.balancify.backend.service.BalanceSeriesService;
 import com.balancify.backend.service.TournamentProgressService;
 import com.balancify.backend.service.exception.MatchConflictException;
 import com.balancify.backend.service.exception.MatchEditForbiddenException;
@@ -158,6 +161,7 @@ import org.springframework.test.web.servlet.MockMvc;
     GroupLedgerAdminController.class,
     PointController.class,
     TeamTournamentController.class,
+    BalanceSeriesController.class,
     PredictionController.class,
     TeamScoreController.class,
     PrizeEventController.class
@@ -291,6 +295,9 @@ class AdminKeyFilterTest {
 
     @MockitoBean
     private PrizeEventService prizeEventService;
+
+    @MockitoBean
+    private BalanceSeriesService balanceSeriesService;
 
     @BeforeEach
     void setUp() {
@@ -1953,7 +1960,8 @@ class AdminKeyFilterTest {
                             90,
                             0.61,
                             new MultiBalanceRaceSummaryResponse("PPT", "PTZ"),
-                            new MultiBalancePenaltySummaryResponse(0, 0, 0)
+                            new MultiBalancePenaltySummaryResponse(0, 0, 0),
+                            null
                         )
                     )
                 )
@@ -2004,7 +2012,8 @@ class AdminKeyFilterTest {
                             90,
                             0.61,
                             new MultiBalanceRaceSummaryResponse("PPT", "PTZ"),
-                            new MultiBalancePenaltySummaryResponse(0, 0, 0)
+                            new MultiBalancePenaltySummaryResponse(0, 0, 0),
+                            null
                         )
                     )
                 )
@@ -2055,7 +2064,8 @@ class AdminKeyFilterTest {
                             90,
                             0.61,
                             new MultiBalanceRaceSummaryResponse("PPT", "PTZ"),
-                            new MultiBalancePenaltySummaryResponse(0, 0, 0)
+                            new MultiBalancePenaltySummaryResponse(0, 0, 0),
+                            null
                         )
                     )
                 )
@@ -2357,6 +2367,44 @@ class AdminKeyFilterTest {
             .andExpect(status().isForbidden());
 
         verify(teamTournamentService, never()).create(any(), any(), any(), any(), anyBoolean());
+    }
+
+    @Test
+    void keepsMultiBalanceSeriesToAdmins() throws Exception {
+        when(balanceSeriesService.list(eq(1L), anyBoolean())).thenReturn(new BalanceSeriesListResponse(List.of()));
+        when(balanceSeriesService.start(eq(1L), any(), eq("admin@hei.gg"), any(), anyBoolean()))
+            .thenReturn(new BalanceSeriesListResponse(List.of()));
+        String lineup = "{\"lineups\":[{\"homePlayerIds\":[1,2,3],\"awayPlayerIds\":[4,5,6]}]}";
+
+        mockMvc
+            .perform(get("/api/groups/1/balance-series").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(
+                post("/api/groups/1/balance-series")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(lineup)
+            )
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(post("/api/groups/1/balance-series/5/cancel").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isForbidden());
+        verify(balanceSeriesService, never()).start(any(), any(), any(), any(), anyBoolean());
+
+        mockMvc
+            .perform(get("/api/groups/1/balance-series").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.series").isArray());
+        mockMvc
+            .perform(
+                post("/api/groups/1/balance-series")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(lineup)
+            )
+            .andExpect(status().isOk());
+        verify(balanceSeriesService).start(eq(1L), any(), eq("admin@hei.gg"), any(), anyBoolean());
     }
 
     @Test

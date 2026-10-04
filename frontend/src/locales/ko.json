@@ -22,7 +22,8 @@
     "ranking": "랭킹",
     "notices": "공지사항",
     "points": "포인트",
-    "predictions": "승부 예측"
+    "predictions": "승부 예측",
+    "tournaments": "토너먼트"
   },
   "landing": {
     "title": "Hei`Fam 내전 운영 플랫폼",
@@ -579,6 +580,8 @@
       "pointAdjusted": "포인트 조정",
       "tournamentCreated": "팀 토너먼트 생성",
       "tournamentCancelled": "팀 토너먼트 취소",
+      "balanceSeriesStarted": "다중 밸런스 시리즈 시작",
+      "balanceSeriesCancelled": "다중 밸런스 시리즈 취소",
       "predictionsClosed": "승부 예측 마감",
       "prizeEventCreated": "상품 이벤트 생성",
       "prizeEventConfirmed": "상품 이벤트 확정",
@@ -1024,13 +1027,63 @@
       }
     }
   },
+  "tournaments": {
+    "title": "토너먼트",
+    "description": "대회나 리그처럼 여러 팀이 겨룰 때 씁니다. 참가자를 고른 뒤 아래에서 팀 토너먼트를 만드세요.",
+    "selection": {
+      "title": "토너먼트 참가자",
+      "helper": "닉네임을 입력하면 티어표에 바로 배치됩니다."
+    }
+  },
+  "balanceSeries": {
+    "formats": {
+      "MIXED_THREE": "테란·저그 섞어서 3판",
+      "BEST_OF_THREE": "프로토스 3판 2선승"
+    },
+    "plan": {
+      "formatChoice": "진행 방식",
+      "title": "시리즈 계획",
+      "matchTitle": "경기 {number}: 팀 {home} vs 팀 {away}",
+      "protossOnly": "프로토스",
+      "offRace": "{race}: {players}",
+      "unavailable": "두 팀이 함께 할 수 있는 종족 조합이 없어 시리즈를 계획할 수 없습니다.",
+      "startButton": "이 편성으로 시리즈 시작",
+      "starting": "시작하는 중...",
+      "startConfirm": "{count}개 경기를 시리즈로 시작할까요? 각 경기의 1판이 바로 만들어집니다.",
+      "startError": "시리즈를 시작하지 못했습니다.",
+      "missingPlayers": "선수 정보가 빠진 팀이 있어 시리즈를 시작할 수 없습니다."
+    },
+    "board": {
+      "title": "진행 중인 시리즈",
+      "description": "같은 팀으로 이어서 하는 경기입니다. 판마다 결과를 저장하면 다음 판이 바로 준비됩니다.",
+      "empty": "진행 중인 시리즈가 없습니다. 팀 편성을 만든 뒤 시리즈를 시작하세요.",
+      "loadError": "시리즈를 불러오지 못했습니다.",
+      "seriesLabel": "시리즈 #{number}",
+      "sides": {
+        "HOME": "1팀",
+        "AWAY": "2팀"
+      },
+      "status": {
+        "IN_PROGRESS": "진행 중",
+        "COMPLETED": "끝남",
+        "CANCELLED": "취소됨"
+      },
+      "winner": "{team} 승리",
+      "cancelButton": "시리즈 취소",
+      "cancelling": "취소 중...",
+      "cancelConfirm": "이 시리즈를 취소할까요? 이미 끝난 판은 일반 경기로 그대로 남습니다.",
+      "cancelError": "시리즈를 취소하지 못했습니다.",
+      "conflict": "다른 사람이 먼저 결과를 저장했거나 시리즈가 바뀌었습니다. 최신 상태를 다시 불러왔습니다."
+    }
+  },
   "multiBalance": {
     "title": "다중 밸런스",
     "description": "참가자를 MMR 균형 기준으로 여러 팀으로 나눕니다.",
     "helper": {
       "defaultPriority": "기본적으로 3명 팀을 우선으로 편성합니다.",
       "addTwoVsTwo": "남는 인원이 4명일 경우 2명 팀 2개를 추가로 편성합니다.",
-      "waiting": "팀을 만들 수 없는 남는 인원은 대기 인원으로 표시됩니다."
+      "waiting": "팀을 만들 수 없는 남는 인원은 대기 인원으로 표시됩니다.",
+      "series": "경기마다 같은 팀으로 시리즈를 합니다. 양 팀 모두 테란이나 저그를 할 수 있으면 PPP·PPT·PPZ를 섞어 3판을 모두 할지, PPP 3판 2선승으로 할지 고를 수 있고, 아니면 PPP 3판 2선승입니다."
     },
     "loadError": "선수 목록을 불러오지 못했습니다. 백엔드 상태를 확인해 주세요.",
     "generateError": "다중 밸런스 생성에 실패했습니다.",

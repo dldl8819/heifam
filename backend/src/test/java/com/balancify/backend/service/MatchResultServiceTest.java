@@ -85,6 +85,9 @@ class MatchResultServiceTest {
     private TournamentProgressService tournamentProgressService;
 
     @Mock
+    private BalanceSeriesProgressService balanceSeriesProgressService;
+
+    @Mock
     private PredictionService predictionService;
 
     private MatchResultService matchResultService;
@@ -121,6 +124,7 @@ class MatchResultServiceTest {
             matchResultEditQuotaService,
             pointService,
             tournamentProgressService,
+            balanceSeriesProgressService,
             predictionService
         );
     }

@@ -254,7 +254,8 @@ public final class MmrMaskingMapper {
                     null,
                     match.expectedHomeWinRate(),
                     match.raceSummary(),
-                    match.penaltySummary()
+                    match.penaltySummary(),
+                    match.seriesPlan()
                 )
             )
             .toList();

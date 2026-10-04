@@ -165,6 +165,21 @@ describe('route access', () => {
     })
   })
 
+  it('keeps the tournament page with admins', () => {
+    const member = { isLoggedIn: true, canAccess: true, isAdmin: false, isSuperAdmin: false }
+
+    expect(getRouteAccessDecision('/tournaments', member)).toEqual({
+      allowed: false,
+      redirectTo: '/players',
+      blocked: false,
+    })
+    expect(getRouteAccessDecision('/tournaments', { ...member, isAdmin: true })).toEqual({
+      allowed: true,
+      redirectTo: null,
+      blocked: false,
+    })
+  })
+
   it('keeps super admin routes restricted to super admins', () => {
     const decision = getRouteAccessDecision('/admin/access', {
       isLoggedIn: true,

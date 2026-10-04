@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { apiClient, isApiConflictError, isApiForbiddenError } from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon } from '@/components/ui/alert'
+import { SeriesGameView, type GameDraft } from '@/components/series-game-view'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
-import { ASSIGNED_RACES, normalizeAssignedRace } from '@/lib/participant-races'
 import {
   buildParticipantRaces,
   finalWaitingTeamNumber,
@@ -13,21 +13,12 @@ import {
   orderSeries,
   raceDraftMatchesComposition,
   rankedTeams,
-  TEAM_SIDES,
   TEAM_TOURNAMENT_POLL_MS,
   teamTournamentTeamCount,
   teamTournamentWaitingCount,
-  type GameRaceDraft,
 } from '@/lib/team-tournament'
 import { startVisiblePolling } from '@/lib/visible-polling'
-import type {
-  TeamSide,
-  TeamTournament,
-  TournamentGame,
-  TournamentGamePlayer,
-  TournamentPlayer,
-  TournamentSeries,
-} from '@/types/api'
+import type { TeamTournament, TournamentGame, TournamentPlayer, TournamentSeries } from '@/types/api'
 
 type TeamTournamentPanelProps = {
   groupId: number
@@ -35,18 +26,11 @@ type TeamTournamentPanelProps = {
   showMmr: boolean
 }
 
-type GameDraft = {
-  winner: TeamSide | ''
-  races: GameRaceDraft
-}
-
 const CARD_CLASS = 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900'
 const PRIMARY_BUTTON_CLASS =
   'rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400'
 const SECONDARY_BUTTON_CLASS =
   'rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800'
-const SELECT_CLASS =
-  'rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700'
 
 function teamLabel(teamNumber: number): string {
   return t('teamTournament.teams.label', { number: teamNumber })
@@ -54,13 +38,6 @@ function teamLabel(teamNumber: number): string {
 
 function playerName(player: { nickname: string | null }): string {
   return player.nickname ?? '-'
-}
-
-// Protoss needs no marker; Terran and Zerg are what the series games turn on.
-function gamePlayerLine(player: TournamentGamePlayer): string {
-  return player.assignedRace === 'T' || player.assignedRace === 'Z'
-    ? `${playerName(player)} (${player.assignedRace})`
-    : playerName(player)
 }
 
 function memberLine(player: TournamentPlayer, showMmr: boolean): string {
@@ -257,130 +234,19 @@ export function TeamTournamentPanel({ groupId, selectedPlayerIds, showMmr }: Tea
     }
   }
 
-  const renderLineups = (game: TournamentGame, series: TournamentSeries, muted: boolean) => (
-    <div className={`grid gap-2 sm:grid-cols-2 ${muted ? 'opacity-70' : ''}`}>
-      {TEAM_SIDES.map((side) => (
-        <div key={side} className="rounded-md bg-slate-50 px-3 py-2 dark:bg-slate-800/60">
-          <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-            {teamLabel(side === 'HOME' ? series.homeTeamNumber : series.awayTeamNumber)}
-          </p>
-          <p className="mt-0.5 text-xs text-slate-800 dark:text-slate-200">
-            {(side === 'HOME' ? game.homePlayers : game.awayPlayers).map(gamePlayerLine).join(', ')}
-          </p>
-        </div>
-      ))}
-    </div>
+  const renderGame = (series: TournamentSeries, game: TournamentGame) => (
+    <SeriesGameView
+      game={game}
+      homeLabel={teamLabel(series.homeTeamNumber)}
+      awayLabel={teamLabel(series.awayTeamNumber)}
+      editable={game.status === 'NEXT' && running}
+      draft={draftFor(game)}
+      submitting={submittingMatchId === game.matchId}
+      error={game.matchId !== null ? gameErrors[game.matchId] : undefined}
+      onDraftChange={(change) => updateDraft(game, change)}
+      onSubmit={() => void handleSubmitGame(series, game)}
+    />
   )
-
-  const renderResultForm = (series: TournamentSeries, game: TournamentGame) => {
-    const draft = draftFor(game)
-    const submitting = submittingMatchId === game.matchId
-    const gameError = game.matchId !== null ? gameErrors[game.matchId] : undefined
-    return (
-      <div className="space-y-2">
-        <p className="text-[11px] text-slate-500 dark:text-slate-400">{t('teamTournament.games.plannedHint')}</p>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {TEAM_SIDES.map((side) => (
-            <div key={side} className="rounded-md border border-slate-200 px-3 py-2 dark:border-slate-700">
-              <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                {teamLabel(side === 'HOME' ? series.homeTeamNumber : series.awayTeamNumber)}
-              </p>
-              <ul className="mt-1 space-y-1">
-                {(side === 'HOME' ? game.homePlayers : game.awayPlayers).map((player, index) => {
-                  const race = draft.races[side][index] ?? null
-                  return (
-                    <li key={`${side}-${player.playerId ?? index}`} className="flex items-center justify-between gap-2 text-sm">
-                      <span className="text-slate-800 dark:text-slate-200">{playerName(player)}</span>
-                      <select
-                        value={race ?? ''}
-                        disabled={submitting || player.playerId === null}
-                        onChange={(event) =>
-                          updateDraft(game, (current) => {
-                            const nextSide = [...current.races[side]]
-                            nextSide[index] = normalizeAssignedRace(event.target.value)
-                            return { ...current, races: { ...current.races, [side]: nextSide } }
-                          })
-                        }
-                        aria-label={t('balance.quickResult.actualRaces.raceAriaLabel', { nickname: playerName(player) })}
-                        className={SELECT_CLASS}
-                      >
-                        {race === null && (
-                          <option value="" disabled>
-                            -
-                          </option>
-                        )}
-                        {ASSIGNED_RACES.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </li>
-                  )
-                })}
-              </ul>
-            </div>
-          ))}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={draft.winner}
-            disabled={submitting}
-            onChange={(event) =>
-              updateDraft(game, (current) => ({
-                ...current,
-                winner: event.target.value === 'HOME' || event.target.value === 'AWAY' ? event.target.value : '',
-              }))
-            }
-            aria-label={t('teamTournament.games.winner')}
-            className={`${SELECT_CLASS} py-1.5 text-sm`}
-          >
-            <option value="">{t('teamTournament.games.winnerPlaceholder')}</option>
-            <option value="HOME">{teamLabel(series.homeTeamNumber)}</option>
-            <option value="AWAY">{teamLabel(series.awayTeamNumber)}</option>
-          </select>
-          <button
-            type="button"
-            onClick={() => void handleSubmitGame(series, game)}
-            disabled={submitting}
-            className={PRIMARY_BUTTON_CLASS}
-          >
-            {submitting ? t('teamTournament.games.submitting') : t('teamTournament.games.submit')}
-          </button>
-        </div>
-        {gameError && <p className="text-xs text-rose-600 dark:text-rose-300">{gameError}</p>}
-      </div>
-    )
-  }
-
-  const renderGame = (series: TournamentSeries, game: TournamentGame) => {
-    const statusTone =
-      game.status === 'NEXT'
-        ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-200'
-        : game.status === 'PLAYED'
-          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200'
-          : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
-    return (
-      <div className="space-y-2 rounded-lg border border-slate-100 p-3 dark:border-slate-800">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-            {t('teamTournament.games.label', { number: game.gameNumber })}
-            {game.raceComposition && <span className="ml-2 text-xs font-medium text-slate-500">{game.raceComposition}</span>}
-          </p>
-          <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${statusTone}`}>
-            {game.status === 'PLAYED' && game.winnerTeam
-              ? t('teamTournament.games.won', {
-                  team: teamLabel(game.winnerTeam === 'HOME' ? series.homeTeamNumber : series.awayTeamNumber),
-                })
-              : t(`teamTournament.games.${game.status}`)}
-          </span>
-        </div>
-        {game.status === 'NEXT' && running
-          ? renderResultForm(series, game)
-          : game.status !== 'SKIPPED' && renderLineups(game, series, game.status === 'UPCOMING')}
-      </div>
-    )
-  }
 
   const standings = tournament?.status === 'COMPLETED' ? rankedTeams(tournament) : []
   const finalWaitingTeam = tournament ? finalWaitingTeamNumber(tournament) : null

@@ -26,6 +26,8 @@ const AUDIT_ACTION_FILTER_OPTIONS = [
   'POINT_ADJUSTED',
   'TOURNAMENT_CREATED',
   'TOURNAMENT_CANCELLED',
+  'BALANCE_SERIES_STARTED',
+  'BALANCE_SERIES_CANCELLED',
   'PREDICTIONS_CLOSED',
   'PRIZE_EVENT_CREATED',
   'PRIZE_EVENT_CONFIRMED',
@@ -121,6 +123,10 @@ function getActionLabel(action: string): string {
       return t('audit.actions.tournamentCreated')
     case 'TOURNAMENT_CANCELLED':
       return t('audit.actions.tournamentCancelled')
+    case 'BALANCE_SERIES_STARTED':
+      return t('audit.actions.balanceSeriesStarted')
+    case 'BALANCE_SERIES_CANCELLED':
+      return t('audit.actions.balanceSeriesCancelled')
     case 'PREDICTIONS_CLOSED':
       return t('audit.actions.predictionsClosed')
     case 'PRIZE_EVENT_CREATED':

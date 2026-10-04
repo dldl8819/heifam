@@ -86,6 +86,10 @@ public class Match {
     @Column(name = "series_game_number")
     private Integer seriesGameNumber;
 
+    // Set for a game of a series started after a multi-balance; series_game_number is its place in it.
+    @Column(name = "balance_series_id")
+    private Long balanceSeriesId;
+
     // Set when an admin closes predictions early; otherwise they close a few minutes after creation.
     @Column(name = "predictions_closed_at")
     private OffsetDateTime predictionsClosedAt;
@@ -248,6 +252,14 @@ public class Match {
 
     public void setSeriesGameNumber(Integer seriesGameNumber) {
         this.seriesGameNumber = seriesGameNumber;
+    }
+
+    public Long getBalanceSeriesId() {
+        return balanceSeriesId;
+    }
+
+    public void setBalanceSeriesId(Long balanceSeriesId) {
+        this.balanceSeriesId = balanceSeriesId;
     }
 
     public OffsetDateTime getPredictionsClosedAt() {

@@ -71,7 +71,6 @@ public class GroupMatchAdminService {
             null,
             request.raceComposition(),
             DuplicateHandling.REUSE_ACTIVE_REJECT_COMPLETED,
-            null,
             null
         );
 
@@ -117,7 +116,6 @@ public class GroupMatchAdminService {
             note,
             raceComposition,
             DuplicateHandling.REJECT,
-            null,
             null
         ).match();
     }
@@ -144,8 +142,34 @@ public class GroupMatchAdminService {
             null,
             raceComposition,
             DuplicateHandling.NONE,
-            seriesId,
-            seriesGameNumber
+            new SeriesLink(seriesId, null, seriesGameNumber)
+        ).match();
+    }
+
+    /**
+     * A game of a series started after a multi-balance. Like a tournament game it skips the
+     * duplicate check: the same teams play up to three games in a row, each game number once.
+     */
+    @Transactional
+    public Match createBalanceSeriesGameMatch(
+        Long groupId,
+        List<Long> homePlayerIds,
+        List<Long> awayPlayerIds,
+        int teamSize,
+        String raceComposition,
+        Long balanceSeriesId,
+        int seriesGameNumber
+    ) {
+        return createMatchInternal(
+            groupId,
+            homePlayerIds,
+            awayPlayerIds,
+            teamSize,
+            MatchSource.BALANCED,
+            null,
+            raceComposition,
+            DuplicateHandling.NONE,
+            new SeriesLink(null, balanceSeriesId, seriesGameNumber)
         ).match();
     }
 
@@ -195,8 +219,7 @@ public class GroupMatchAdminService {
         String note,
         String rawRaceComposition,
         DuplicateHandling duplicateHandling,
-        Long seriesId,
-        Integer seriesGameNumber
+        SeriesLink seriesLink
     ) {
         int normalizedTeamSize = normalizeRequestedTeamSize(requestedTeamSize);
         String normalizedRaceComposition = RaceCompositionPolicy.normalizeForTeamSize(
@@ -303,8 +326,11 @@ public class GroupMatchAdminService {
         match.setTeamSignature(requestedSignature.teamSignature());
         match.setNote(normalizeNote(note));
         match.setRaceComposition(normalizedRaceComposition);
-        match.setSeriesId(seriesId);
-        match.setSeriesGameNumber(seriesGameNumber);
+        if (seriesLink != null) {
+            match.setSeriesId(seriesLink.seriesId());
+            match.setBalanceSeriesId(seriesLink.balanceSeriesId());
+            match.setSeriesGameNumber(seriesLink.gameNumber());
+        }
         Match savedMatch = matchRepository.save(match);
 
         List<MatchParticipant> participants = new ArrayList<>();
@@ -427,5 +453,9 @@ public class GroupMatchAdminService {
                 new ArrayList<>(java.util.Collections.nCopies(awaySize, null))
             );
         }
+    }
+
+    // The series a game belongs to: a tournament series or a multi-balance series, and its game number.
+    private record SeriesLink(Long seriesId, Long balanceSeriesId, Integer gameNumber) {
     }
 }

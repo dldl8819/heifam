@@ -200,7 +200,8 @@ class MmrMaskingMapperTest {
                     100,
                     0.58,
                     new MultiBalanceRaceSummaryResponse("PPT", "PTZ"),
-                    new MultiBalancePenaltySummaryResponse(2, 1, 0)
+                    new MultiBalancePenaltySummaryResponse(2, 1, 0),
+                    null
                 )
             )
         );

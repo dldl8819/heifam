@@ -28,6 +28,10 @@ public interface MatchRepository extends JpaRepository<Match, Long>, JpaSpecific
 
     List<Match> findBySeriesIdInOrderBySeriesGameNumberAsc(Collection<Long> seriesIds);
 
+    List<Match> findByBalanceSeriesIdOrderBySeriesGameNumberAsc(Long balanceSeriesId);
+
+    List<Match> findByBalanceSeriesIdInOrderBySeriesGameNumberAsc(Collection<Long> balanceSeriesIds);
+
     // Matches set up but not played yet: the ones a prediction can be about.
     @Query("""
         select m

@@ -26,6 +26,7 @@ const ADMIN_PATHS = [
   '/players/import',
   '/points',
   '/predictions',
+  '/tournaments',
   '/admin/audit',
 ]
 // Anyone may see the notice titles; opening a notice needs member access (MEMBER_PATHS).

@@ -31,6 +31,7 @@ export function getVisibleNavItems(context: NavVisibilityContext): NavItem[] {
       { label: t('nav.balance'), href: '/balance' },
       { label: t('nav.captainDraft'), href: '/captain-draft' },
       { label: t('nav.multiBalance'), href: '/balance/multi' },
+      { label: t('nav.tournaments'), href: '/tournaments' },
       { label: t('nav.notices'), href: '/notices' },
       { label: t('nav.points'), href: '/points' },
       { label: t('nav.predictions'), href: '/predictions' },

@@ -1,9 +1,7 @@
 package com.balancify.backend.service;
 
 import com.balancify.backend.api.tournament.dto.TeamTournamentResponse;
-import com.balancify.backend.api.tournament.dto.TournamentGamePlayerResponse;
 import com.balancify.backend.api.tournament.dto.TournamentGameResponse;
-import com.balancify.backend.api.tournament.dto.TournamentPlayerResponse;
 import com.balancify.backend.api.tournament.dto.TournamentSeriesResponse;
 import com.balancify.backend.api.tournament.dto.TournamentTeamResponse;
 import com.balancify.backend.domain.Group;
@@ -30,7 +28,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
@@ -239,7 +236,7 @@ public class TeamTournamentService {
                 team.getTeamNumber(),
                 team.getFinalRank(),
                 showMmr ? totalMmr(team.getMemberPlayerIds(), players) : null,
-                team.getMemberPlayerIds().stream().map(id -> playerResponse(players.get(id), showMmr)).toList()
+                team.getMemberPlayerIds().stream().map(id -> SeriesGameViews.playerResponse(players.get(id), showMmr)).toList()
             ))
             .toList();
         List<TournamentSeriesResponse> seriesResponses = seriesList.stream()
@@ -258,7 +255,7 @@ public class TeamTournamentService {
             tournament.getTeamCount(),
             tournament.getCreatedAt(),
             tournament.getFinishedAt(),
-            tournament.getWaitingPlayerIds().stream().map(id -> playerResponse(players.get(id), showMmr)).toList(),
+            tournament.getWaitingPlayerIds().stream().map(id -> SeriesGameViews.playerResponse(players.get(id), showMmr)).toList(),
             teamResponses,
             seriesResponses
         );
@@ -271,40 +268,15 @@ public class TeamTournamentService {
         Map<Long, Player> players,
         Map<Long, Integer> teamNumbers
     ) {
-        Map<Integer, Match> gamesByNumber = new HashMap<>();
-        games.forEach(game -> gamesByNumber.put(game.getSeriesGameNumber(), game));
-        List<Long> homeIds = series.getHomeTeam().getMemberPlayerIds();
-        List<Long> awayIds = series.getAwayTeam().getMemberPlayerIds();
-        boolean decided = series.getStatus() == MatchSeriesStatus.COMPLETED;
-        List<String> planned = series.plannedCompositions();
-
-        List<TournamentGameResponse> gameResponses = new ArrayList<>();
-        for (int number = 1; number <= planned.size(); number++) {
-            Match game = gamesByNumber.get(number);
-            if (game != null) {
-                Map<Long, MatchParticipant> participants = participantsByGame.getOrDefault(game.getId(), Map.of());
-                gameResponses.add(new TournamentGameResponse(
-                    number,
-                    game.getRaceComposition(),
-                    game.getWinningTeam() == null ? "NEXT" : "PLAYED",
-                    game.getId(),
-                    game.getWinningTeam(),
-                    recordedPlayers(homeIds, participants, players),
-                    recordedPlayers(awayIds, participants, players)
-                ));
-                continue;
-            }
-            String composition = planned.get(number - 1);
-            gameResponses.add(new TournamentGameResponse(
-                number,
-                composition,
-                decided ? "SKIPPED" : "UPCOMING",
-                null,
-                null,
-                plannedPlayers(homeIds, composition, players),
-                plannedPlayers(awayIds, composition, players)
-            ));
-        }
+        List<TournamentGameResponse> gameResponses = SeriesGameViews.games(
+            series.plannedCompositions(),
+            games,
+            series.getHomeTeam().getMemberPlayerIds(),
+            series.getAwayTeam().getMemberPlayerIds(),
+            series.getStatus() == MatchSeriesStatus.COMPLETED,
+            participantsByGame,
+            players
+        );
 
         return new TournamentSeriesResponse(
             series.getId(),
@@ -318,56 +290,6 @@ public class TeamTournamentService {
             series.getAwayWins(),
             series.getWinnerTeam() == null ? null : teamNumbers.get(series.getWinnerTeam().getId()),
             gameResponses
-        );
-    }
-
-    private List<TournamentGamePlayerResponse> recordedPlayers(
-        List<Long> memberIds,
-        Map<Long, MatchParticipant> participants,
-        Map<Long, Player> players
-    ) {
-        return memberIds.stream()
-            .map(id -> {
-                MatchParticipant participant = participants.get(id);
-                String race = participant == null || participant.getAssignedRace() == null
-                    ? null
-                    : participant.getAssignedRace().trim().toUpperCase(Locale.ROOT);
-                return gamePlayer(players.get(id), race);
-            })
-            .toList();
-    }
-
-    private List<TournamentGamePlayerResponse> plannedPlayers(
-        List<Long> memberIds,
-        String composition,
-        Map<Long, Player> players
-    ) {
-        List<String> capabilities = memberIds.stream()
-            .map(id -> TournamentSeriesPlanner.capabilityOf(players.get(id) == null ? null : players.get(id).getRace()))
-            .toList();
-        List<String> races = TournamentSeriesPlanner.assignRaces(capabilities, composition);
-        List<TournamentGamePlayerResponse> planned = new ArrayList<>();
-        for (int index = 0; index < memberIds.size(); index++) {
-            planned.add(gamePlayer(players.get(memberIds.get(index)), races == null ? null : races.get(index)));
-        }
-        return planned;
-    }
-
-    private TournamentGamePlayerResponse gamePlayer(Player player, String assignedRace) {
-        return new TournamentGamePlayerResponse(
-            PlayerIdentityPolicy.responsePlayerId(player),
-            PlayerIdentityPolicy.responseNickname(player),
-            assignedRace
-        );
-    }
-
-    private TournamentPlayerResponse playerResponse(Player player, boolean showMmr) {
-        boolean hidden = PlayerIdentityPolicy.isIdentityHidden(player);
-        return new TournamentPlayerResponse(
-            PlayerIdentityPolicy.responsePlayerId(player),
-            PlayerIdentityPolicy.responseNickname(player),
-            hidden ? null : TournamentSeriesPlanner.capabilityOf(player.getRace()),
-            showMmr && !hidden && player.getMmr() != null ? player.getMmr() : null
         );
     }
 
