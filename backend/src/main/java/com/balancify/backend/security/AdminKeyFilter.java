@@ -113,6 +113,27 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/captain-drafts/{draftId}/pick"),
             AuthType.ADMIN_EMAIL
         ),
+        // Prize events: admins see them while points are tried out, super admins run them.
+        new ProtectedRoute(
+            "GET",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/prize-events"),
+            AuthType.ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "POST",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/prize-events"),
+            AuthType.SUPER_ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "POST",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/prize-events/{eventId}/confirm"),
+            AuthType.SUPER_ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "POST",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/prize-events/{eventId}/cancel"),
+            AuthType.SUPER_ADMIN_EMAIL
+        ),
         // Predictions are tried out by admins first; PredictionController checks the same.
         new ProtectedRoute(
             "GET",

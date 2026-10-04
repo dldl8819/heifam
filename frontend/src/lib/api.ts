@@ -58,6 +58,9 @@ import type {
   PredictionBoard,
   PredictionMatch,
   TeamScoreBoard,
+  PrizeEvent,
+  PrizeEventCreateRequest,
+  PrizeEventConfirmRequest,
   RatingRecalculationRequest,
   RatingRecalculationResponse,
   RecentMatchItem,
@@ -1523,6 +1526,29 @@ export const apiClient = {
       includeUserEmail: true,
     })
   },
+  getPrizeEvents: (groupId: number) =>
+    apiRequest<{ events: PrizeEvent[] }>(`/api/groups/${groupId}/prize-events`, undefined, {
+      requireUserEmail: true,
+      includeUserEmail: true,
+    }),
+  createPrizeEvent: (groupId: number, payload: PrizeEventCreateRequest) =>
+    apiRequest<PrizeEvent>(
+      `/api/groups/${groupId}/prize-events`,
+      { method: 'POST', body: JSON.stringify(payload) },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  confirmPrizeEvent: (groupId: number, eventId: number, payload: PrizeEventConfirmRequest) =>
+    apiRequest<PrizeEvent>(
+      `/api/groups/${groupId}/prize-events/${eventId}/confirm`,
+      { method: 'POST', body: JSON.stringify(payload) },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  cancelPrizeEvent: (groupId: number, eventId: number) =>
+    apiRequest<PrizeEvent>(
+      `/api/groups/${groupId}/prize-events/${eventId}/cancel`,
+      { method: 'POST' },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
   getTeamScores: (groupId: number) =>
     apiRequest<TeamScoreBoard>(`/api/groups/${groupId}/team-scores`, undefined, {
       requireUserEmail: true,

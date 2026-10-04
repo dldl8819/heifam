@@ -57,6 +57,29 @@ public interface PointTransactionRepository extends JpaRepository<PointTransacti
         """)
     List<PointTotal> sumPositiveTotalsBetween(@Param("fromDate") LocalDate fromDate, @Param("toDate") LocalDate toDate);
 
+    @Query("""
+        select pointTransaction.account.id as accountId,
+               pointTransaction.account.normalizedEmail as normalizedEmail,
+               sum(pointTransaction.amount) as points
+        from PointTransaction pointTransaction
+        where pointTransaction.kstDate between :fromDate and :toDate
+        group by pointTransaction.account.id, pointTransaction.account.normalizedEmail
+        having sum(pointTransaction.amount) > 0
+        order by sum(pointTransaction.amount) desc, pointTransaction.account.id asc
+        """)
+    List<AccountPointTotal> sumPositiveAccountTotalsBetween(
+        @Param("fromDate") LocalDate fromDate,
+        @Param("toDate") LocalDate toDate
+    );
+
+    interface AccountPointTotal {
+        Long getAccountId();
+
+        String getNormalizedEmail();
+
+        Long getPoints();
+    }
+
     interface PointTotal {
         String getNormalizedEmail();
 

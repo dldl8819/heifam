@@ -58,6 +58,9 @@ public class OperationAuditLogService {
     public static final String ACTION_TOURNAMENT_CREATED = "TOURNAMENT_CREATED";
     public static final String ACTION_TOURNAMENT_CANCELLED = "TOURNAMENT_CANCELLED";
     public static final String ACTION_PREDICTIONS_CLOSED = "PREDICTIONS_CLOSED";
+    public static final String ACTION_PRIZE_EVENT_CREATED = "PRIZE_EVENT_CREATED";
+    public static final String ACTION_PRIZE_EVENT_CONFIRMED = "PRIZE_EVENT_CONFIRMED";
+    public static final String ACTION_PRIZE_EVENT_CANCELLED = "PRIZE_EVENT_CANCELLED";
 
     private static final int MAX_PAGE_SIZE = 200;
 
@@ -641,6 +644,26 @@ public class OperationAuditLogService {
         );
         log.setSummary("팀 토너먼트 취소");
         log.setDetails("tournamentId=" + tournamentId);
+        operationAuditLogRepository.save(log);
+    }
+
+    @Transactional
+    public void recordPrizeEvent(
+        String action,
+        String actorEmail,
+        String actorNickname,
+        Long eventId,
+        Long groupId,
+        String title,
+        String details
+    ) {
+        OperationAuditLog log = baseLog(actorEmail, actorNickname, action, "PRIZE_EVENT", eventId, title, groupId);
+        log.setSummary(switch (action) {
+            case ACTION_PRIZE_EVENT_CONFIRMED -> "상품 이벤트 확정";
+            case ACTION_PRIZE_EVENT_CANCELLED -> "상품 이벤트 취소";
+            default -> "상품 이벤트 생성";
+        });
+        log.setDetails(details);
         operationAuditLogRepository.save(log);
     }
 

@@ -228,6 +228,11 @@ public class AccountPersonalDataRepository {
                 "DELETE FROM match_predictions WHERE predictor_email = :email",
                 parameters
             );
+            // The prize stays in the event and the ledger; who won it does not.
+            jdbcTemplate.update(
+                "UPDATE prize_event_winners SET normalized_email = NULL, nickname = NULL WHERE normalized_email = :email",
+                parameters
+            );
             jdbcTemplate.update(
                 "DELETE FROM managed_admin_emails WHERE normalized_email = :email",
                 parameters

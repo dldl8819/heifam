@@ -554,7 +554,10 @@
       "pointAdjusted": "포인트 조정",
       "tournamentCreated": "팀 토너먼트 생성",
       "tournamentCancelled": "팀 토너먼트 취소",
-      "predictionsClosed": "승부 예측 마감"
+      "predictionsClosed": "승부 예측 마감",
+      "prizeEventCreated": "상품 이벤트 생성",
+      "prizeEventConfirmed": "상품 이벤트 확정",
+      "prizeEventCancelled": "상품 이벤트 취소"
     },
     "pagination": {
       "status": "현재 {shown} / {max}건 표시",
@@ -1481,6 +1484,50 @@
     "standings": {
       "title": "최종 순위",
       "rank": "{rank}위"
+    }
+  },
+  "prizeEvents": {
+    "title": "상품 이벤트",
+    "description": "기간 동안 포인트를 많이 모은 사람이 후보로 나옵니다. 최고 관리자가 당첨자와 상품을 확정하면 금액이 있는 상품은 후원금 장부 지출(이벤트 상품)로 기록됩니다.",
+    "loadError": "상품 이벤트를 불러오지 못했습니다.",
+    "saveError": "상품 이벤트를 저장하지 못했습니다.",
+    "empty": "아직 상품 이벤트가 없습니다.",
+    "noCandidates": "이 기간에 포인트를 모은 사람이 없습니다.",
+    "period": "{start} ~ {end} · {count}명",
+    "unknownNickname": "알 수 없음",
+    "leftMember": "탈퇴한 회원",
+    "place": "{place}위",
+    "amount": "{amount}원",
+    "ledgerLinked": "장부 기록됨",
+    "paidOn": "지급일",
+    "confirm": "당첨 확정",
+    "cancel": "이벤트 취소",
+    "pickWinners": "당첨자를 한 명 이상 골라 주세요.",
+    "amountInvalid": "상품 금액은 0 이상의 정수로 입력해 주세요.",
+    "confirmPrompt": "{count}명을 당첨으로 확정할까요? 상품 금액 합계 {total}원은 후원금 장부 지출로 기록됩니다.",
+    "cancelPrompt": "'{title}' 이벤트를 취소할까요?",
+    "confirmed": "'{title}' 당첨자를 확정했습니다.",
+    "status": {
+      "OPEN": "후보 확인 중",
+      "CONFIRMED": "확정",
+      "CANCELLED": "취소"
+    },
+    "form": {
+      "title": "이벤트 이름",
+      "titlePlaceholder": "예: 10월 포인트 이벤트",
+      "start": "시작일",
+      "end": "종료일",
+      "winners": "당첨 인원",
+      "create": "이벤트 만들기"
+    },
+    "table": {
+      "pick": "당첨",
+      "rank": "순위",
+      "nickname": "닉네임",
+      "points": "기간 포인트",
+      "prize": "상품",
+      "prizePlaceholder": "예: 커피 쿠폰",
+      "amount": "금액(원)"
     }
   },
   "teamScore": {
