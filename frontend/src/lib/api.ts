@@ -57,6 +57,7 @@ import type {
   TeamTournament,
   PredictionBoard,
   PredictionMatch,
+  TeamScoreBoard,
   RatingRecalculationRequest,
   RatingRecalculationResponse,
   RecentMatchItem,
@@ -1522,6 +1523,11 @@ export const apiClient = {
       includeUserEmail: true,
     })
   },
+  getTeamScores: (groupId: number) =>
+    apiRequest<TeamScoreBoard>(`/api/groups/${groupId}/team-scores`, undefined, {
+      requireUserEmail: true,
+      includeUserEmail: true,
+    }),
   getPredictionBoard: (groupId: number) =>
     apiRequest<PredictionBoard>(`/api/groups/${groupId}/predictions`, undefined, {
       requireUserEmail: true,

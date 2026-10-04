@@ -1483,6 +1483,25 @@
       "rank": "{rank}위"
     }
   },
+  "teamScore": {
+    "title": "팀 점수",
+    "description": "팀 토너먼트 성적입니다. 우승 3점, 준우승 2점, 3위 1점을 더하고, 같으면 시리즈 전적으로 순위를 정합니다. 개인 승률은 낮아도 팀 성적이 좋은 선수를 볼 수 있습니다.",
+    "trialNotice": "지금은 운영진에게만 보입니다.",
+    "loadError": "팀 점수를 불러오지 못했습니다.",
+    "empty": "아직 끝난 토너먼트 시리즈가 없습니다.",
+    "placesValue": "우승 {first} · 준우승 {second} · 3위 {third}",
+    "seriesValue": "{wins}승 {losses}패",
+    "table": {
+      "rank": "순위",
+      "nickname": "닉네임",
+      "points": "팀 점수",
+      "places": "입상",
+      "tournaments": "대회",
+      "series": "시리즈 전적",
+      "seriesWinRate": "시리즈 승률",
+      "winRate": "개인 승률"
+    }
+  },
   "predictions": {
     "title": "승부 예측",
     "description": "경기가 확정되면 {minutes}분 동안 이길 팀을 고를 수 있습니다. 포인트를 걸지 않는 무료 예측이고, 맞히면 포인트를 받습니다.",

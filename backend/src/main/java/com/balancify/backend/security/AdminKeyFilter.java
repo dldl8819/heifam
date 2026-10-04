@@ -151,6 +151,11 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             AuthType.ADMIN_EMAIL
         ),
         new ProtectedRoute(
+            "GET",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/team-scores"),
+            AuthType.ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
             "POST",
             PathPatternParser.defaultInstance.parse("/api/matches/manual"),
             AuthType.SERVICE_ACCESS

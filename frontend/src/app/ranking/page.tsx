@@ -6,6 +6,7 @@ import { apiClient } from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { PlayerGameTypeStatsModal } from '@/components/player-game-type-stats-modal'
+import { TeamScoreBoard } from '@/components/team-score-board'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
 import type { GroupPlayerRaceStatsItem, PlayerTierStatus, RankingItem } from '@/types/api'
@@ -116,7 +117,7 @@ function resolveCurrentKstMonthLabel(): string {
 }
 
 export default function RankingPage() {
-  const { canViewMmr, isLoading: authLoading } = useAdminAuth()
+  const { canViewMmr, isAdmin, isLoading: authLoading } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
   const showMmr = canViewMmr && mmrVisible
   const [rows, setRows] = useState<RankingItem[]>([])
@@ -376,6 +377,8 @@ export default function RankingPage() {
           </tbody>
         </table>
       </div>
+
+      {isAdmin && <TeamScoreBoard groupId={TEMP_GROUP_ID} />}
     </section>
   )
 }
