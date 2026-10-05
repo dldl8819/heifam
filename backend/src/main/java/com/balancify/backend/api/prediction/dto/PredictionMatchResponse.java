@@ -5,7 +5,8 @@ import java.util.List;
 
 /**
  * A match on the prediction board. state is OPEN (picks taken), CLOSED (waiting for the result)
- * or RESOLVED. Pick counts stay null while picks are taken, so nobody follows the crowd.
+ * or RESOLVED. Pick counts and who picked which side stay null while picks are taken, so nobody
+ * follows the crowd. Pickers are display nicknames, null for an account without one.
  */
 public record PredictionMatchResponse(
     Long matchId,
@@ -20,6 +21,8 @@ public record PredictionMatchResponse(
     boolean ownMatch,
     Integer homePicks,
     Integer awayPicks,
+    List<String> homePickers,
+    List<String> awayPickers,
     String winnerTeam,
     Boolean hit,
     boolean pointsExcluded

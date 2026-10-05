@@ -1061,6 +1061,9 @@ export type PredictionMatch = {
   ownMatch: boolean
   homePicks: number | null
   awayPicks: number | null
+  // Who picked each side, by nickname (null: no nickname). Null while picks are still taken.
+  homePickers: (string | null)[] | null
+  awayPickers: (string | null)[] | null
   winnerTeam: TeamSide | null
   hit: boolean | null
   pointsExcluded: boolean
