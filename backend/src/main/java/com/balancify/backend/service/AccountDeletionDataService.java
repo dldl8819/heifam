@@ -4,6 +4,7 @@ import com.balancify.backend.domain.Player;
 import com.balancify.backend.domain.PlayerLifecycleStatus;
 import com.balancify.backend.repository.AccountPersonalDataRepository;
 import com.balancify.backend.repository.PlayerRepository;
+import com.balancify.backend.security.SupabaseAuthAdminClient;
 import com.balancify.backend.service.exception.AccountDeletionException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -33,6 +34,7 @@ public class AccountDeletionDataService {
     private final PlayerRepository playerRepository;
     private final GroupReadCacheService groupReadCacheService;
     private final AccessControlService accessControlService;
+    private final SupabaseAuthAdminClient supabaseAuthAdminClient;
     private final Clock clock;
 
     @Autowired
@@ -40,13 +42,15 @@ public class AccountDeletionDataService {
         AccountPersonalDataRepository accountPersonalDataRepository,
         PlayerRepository playerRepository,
         GroupReadCacheService groupReadCacheService,
-        AccessControlService accessControlService
+        AccessControlService accessControlService,
+        SupabaseAuthAdminClient supabaseAuthAdminClient
     ) {
         this(
             accountPersonalDataRepository,
             playerRepository,
             groupReadCacheService,
             accessControlService,
+            supabaseAuthAdminClient,
             Clock.systemUTC()
         );
     }
@@ -56,12 +60,14 @@ public class AccountDeletionDataService {
         PlayerRepository playerRepository,
         GroupReadCacheService groupReadCacheService,
         AccessControlService accessControlService,
+        SupabaseAuthAdminClient supabaseAuthAdminClient,
         Clock clock
     ) {
         this.accountPersonalDataRepository = accountPersonalDataRepository;
         this.playerRepository = playerRepository;
         this.groupReadCacheService = groupReadCacheService;
         this.accessControlService = accessControlService;
+        this.supabaseAuthAdminClient = supabaseAuthAdminClient;
         this.clock = clock == null ? Clock.systemUTC() : clock;
     }
 
@@ -336,8 +342,10 @@ public class AccountDeletionDataService {
     private ResolvedAccountIdentity resolveInactiveAccountIdentity(Player player) {
         UUID linkedAuthUserId = player.getAuthUserId();
         if (linkedAuthUserId != null) {
+            // public.users only holds accounts the optional profile sync wrote; ask Supabase Auth otherwise.
             String linkedEmail = accountPersonalDataRepository
                 .findAccountEmail(linkedAuthUserId)
+                .or(() -> supabaseAuthAdminClient.findUserEmail(linkedAuthUserId))
                 .orElse("");
             if (linkedEmail.isEmpty()) {
                 throw new AccountDeletionException(
