@@ -104,12 +104,20 @@ public final class TournamentSeriesPlanner {
         return capability.contains("T") || capability.contains("Z");
     }
 
-    /** Best of three ends at two wins; a mixed series always plays its three games. */
+    /** A tournament series: best of three ends at two wins; a mixed series always plays its three games. */
     public static boolean isDecided(MatchSeriesFormat format, int homeWins, int awayWins, int gamesPlayed) {
         if (format == MatchSeriesFormat.BEST_OF_THREE) {
             return homeWins >= 2 || awayWins >= 2;
         }
         return gamesPlayed >= GAMES_PER_SERIES;
+    }
+
+    /**
+     * A multi-balance series is best of three whatever its format: a mixed one stops at two wins
+     * as well, so nobody plays a third game at 2:0.
+     */
+    public static boolean isDecidedAtTwoWins(int homeWins, int awayWins, int gamesPlayed) {
+        return homeWins >= 2 || awayWins >= 2 || gamesPlayed >= GAMES_PER_SERIES;
     }
 
     public static String capabilityOf(String race) {

@@ -1074,7 +1074,7 @@
   },
   "balanceSeries": {
     "formats": {
-      "MIXED_THREE": "테란·저그 섞어서 3판",
+      "MIXED_THREE": "테란·저그 섞어서 3판 2선승",
       "BEST_OF_THREE": "프로토스 3판 2선승"
     },
     "plan": {
@@ -1096,7 +1096,7 @@
     },
     "board": {
       "title": "진행 중인 시리즈",
-      "description": "같은 팀으로 이어서 하는 경기입니다. 판마다 결과를 저장하면 다음 판이 바로 준비됩니다.",
+      "description": "같은 팀으로 이어서 하는 3판 2선승 경기입니다. 판마다 결과를 저장하면 다음 판이 바로 준비되고, 한 팀이 2승하면 끝납니다.",
       "empty": "진행 중인 시리즈가 없습니다. 팀 편성을 만든 뒤 시리즈를 시작하세요.",
       "loadError": "시리즈를 불러오지 못했습니다.",
       "seriesLabel": "시리즈 #{number}",
@@ -1678,7 +1678,7 @@
     "pickAway": "어웨이팀 승",
     "myPick": "내 예측: {team}",
     "ownMatch": "본인이 뛰는 경기라 예측할 수 없습니다.",
-    "tournamentGame": "팀 토너먼트 {number}판",
+    "tournamentGame": "시리즈 {number}판",
     "timeLeft": "남은 시간 {time}",
     "close": "예측 마감",
     "closeConfirm": "이 경기의 승부 예측을 지금 마감할까요?",

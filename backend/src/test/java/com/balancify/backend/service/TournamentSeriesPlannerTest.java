@@ -78,6 +78,15 @@ class TournamentSeriesPlannerTest {
     }
 
     @Test
+    void endsAMultiBalanceSeriesAtTwoWinsWhateverItsFormat() {
+        assertThat(TournamentSeriesPlanner.isDecidedAtTwoWins(2, 0, 2)).isTrue();
+        assertThat(TournamentSeriesPlanner.isDecidedAtTwoWins(0, 2, 2)).isTrue();
+        assertThat(TournamentSeriesPlanner.isDecidedAtTwoWins(1, 1, 2)).isFalse();
+        assertThat(TournamentSeriesPlanner.isDecidedAtTwoWins(1, 0, 1)).isFalse();
+        assertThat(TournamentSeriesPlanner.isDecidedAtTwoWins(2, 1, 3)).isTrue();
+    }
+
+    @Test
     void plansTwoPlayerTeamsWithPpPtAndPz() {
         TournamentSeriesPlanner.SeriesPlan mixed = TournamentSeriesPlanner.plan(List.of("PT", "PZ"), List.of("PTZ", "P"));
         TournamentSeriesPlanner.SeriesPlan protoss = TournamentSeriesPlanner.plan(List.of("P", "P"), List.of("PT", "P"));

@@ -217,19 +217,36 @@ class BalanceSeriesServiceTest {
     }
 
     @Test
-    void playsAllThreeGamesWhenBothTeamsCanTakeTerranOrZerg() {
+    void endsAMixedSeriesAtTwoWinsToo() {
+        service.start(7L, List.of(lineup(1, "PT", "PZ", "P", "PTZ", "P", "P")), ADMIN, null, false);
+        BalanceSeries series = storedSeries.getFirst();
+        assertThat(series.getFormat()).isEqualTo(MatchSeriesFormat.MIXED_THREE);
+
+        playAndSync(series, 1, "HOME");
+        assertThat(game(series, 2).getRaceComposition()).isEqualTo("PPT");
+        playAndSync(series, 2, "HOME");
+
+        // 2:0 is the end: nobody plays the Zerg game for a 3:0.
+        assertThat(series.getStatus()).isEqualTo(BalanceSeriesStatus.COMPLETED);
+        assertThat(series.getWinnerTeam()).isEqualTo("HOME");
+        assertThat(series.getHomeWins()).isEqualTo(2);
+        assertThat(series.getFinishedAt()).isNotNull();
+        assertThat(game(series, 3)).isNull();
+    }
+
+    @Test
+    void playsTheThirdMixedGameOnlyAtOneAll() {
         service.start(7L, List.of(lineup(1, "PT", "PZ", "P", "PTZ", "P", "P")), ADMIN, null, false);
         BalanceSeries series = storedSeries.getFirst();
 
         playAndSync(series, 1, "HOME");
-        playAndSync(series, 2, "HOME");
+        playAndSync(series, 2, "AWAY");
 
         assertThat(series.getStatus()).isEqualTo(BalanceSeriesStatus.IN_PROGRESS);
-        assertThat(game(series, 2).getRaceComposition()).isEqualTo("PPT");
         assertThat(game(series, 3).getRaceComposition()).isEqualTo("PPZ");
         playAndSync(series, 3, "AWAY");
         assertThat(series.getStatus()).isEqualTo(BalanceSeriesStatus.COMPLETED);
-        assertThat(series.getWinnerTeam()).isEqualTo("HOME");
+        assertThat(series.getWinnerTeam()).isEqualTo("AWAY");
     }
 
     @Test
