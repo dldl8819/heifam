@@ -4,7 +4,9 @@ import com.balancify.backend.api.group.dto.NoticeCreateRequest;
 import com.balancify.backend.api.group.dto.NoticeResponse;
 import com.balancify.backend.api.group.dto.NoticeUpdateRequest;
 import com.balancify.backend.domain.Notice;
+import com.balancify.backend.repository.NoticeEngagementRepository;
 import com.balancify.backend.repository.NoticeRepository;
+import java.util.Locale;
 import java.util.NoSuchElementException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,17 +17,20 @@ public class NoticeAdminService {
     private static final int MAX_TITLE_LENGTH = 200;
 
     private final NoticeRepository noticeRepository;
+    private final NoticeEngagementRepository noticeEngagementRepository;
     private final AccessControlService accessControlService;
     private final OperationAuditLogService operationAuditLogService;
     private final NotificationService notificationService;
 
     public NoticeAdminService(
         NoticeRepository noticeRepository,
+        NoticeEngagementRepository noticeEngagementRepository,
         AccessControlService accessControlService,
         OperationAuditLogService operationAuditLogService,
         NotificationService notificationService
     ) {
         this.noticeRepository = noticeRepository;
+        this.noticeEngagementRepository = noticeEngagementRepository;
         this.accessControlService = accessControlService;
         this.operationAuditLogService = operationAuditLogService;
         this.notificationService = notificationService;
@@ -46,7 +51,7 @@ public class NoticeAdminService {
         notice.setGroupId(groupId);
         notice.setTitle(title);
         notice.setContent(content);
-        notice.setAuthorEmail(safeTrim(actorEmail).toLowerCase(java.util.Locale.ROOT));
+        notice.setAuthorEmail(safeTrim(actorEmail).toLowerCase(Locale.ROOT));
         notice.setAdminOnly(request != null && Boolean.TRUE.equals(request.adminOnly()));
         noticeRepository.save(notice);
 
@@ -64,6 +69,11 @@ public class NoticeAdminService {
         );
     }
 
+    /**
+     * Saves an edit. Asked to announce it again, it starts a new revision: the notice turns unread
+     * for everyone but its editor, reading it earns the reading point once more, and its readers
+     * are notified of the edit. Without that, an edit changes the text and nothing else.
+     */
     @Transactional
     public NoticeResponse updateNotice(
         Long groupId,
@@ -76,7 +86,8 @@ public class NoticeAdminService {
         String title = requireTitle(request == null ? null : request.title());
         String content = requireContent(request == null ? null : request.content());
 
-        Notice notice = noticeRepository.findByIdAndGroupId(noticeId, groupId)
+        // Locked before the revision time is taken, so reads in flight end up on the right side of it.
+        Notice notice = noticeRepository.findByIdAndGroupIdForUpdate(noticeId, groupId)
             .orElseThrow(() -> new NoSuchElementException("Notice not found"));
         boolean wasAdminOnly = notice.isAdminOnly();
         notice.setTitle(title);
@@ -85,12 +96,29 @@ public class NoticeAdminService {
         if (request != null && request.adminOnly() != null) {
             notice.setAdminOnly(request.adminOnly());
         }
+        // A notice opened up to members reaches them as a new one; they have no reads to turn back.
+        boolean openedToMembers = wasAdminOnly && !notice.isAdminOnly();
+        boolean announcedAgain = request != null && Boolean.TRUE.equals(request.announceAgain()) && !openedToMembers;
+        if (announcedAgain) {
+            notice.setRevision(notice.getRevision() + 1);
+            notice.setRevisedAt(NoticeRevisions.now());
+        }
         noticeRepository.save(notice);
 
-        operationAuditLogService.recordNoticeUpdated(actorEmail, actorNickname, groupId, notice);
-        // A notice opened up to members reaches them as a new one.
-        if (wasAdminOnly && !notice.isAdminOnly()) {
+        operationAuditLogService.recordNoticeUpdated(actorEmail, actorNickname, groupId, notice, announcedAgain);
+        if (openedToMembers) {
             notificationService.publishNotice(groupId, notice.getId(), notice.getTitle(), false, actorEmail);
+        } else if (announcedAgain) {
+            // The editor has read what they wrote; saved here, their read earns no point for it.
+            noticeEngagementRepository.markRead(
+                notice.getId(),
+                safeTrim(actorEmail).toLowerCase(Locale.ROOT),
+                notice.getRevisedAt(),
+                notice.getRevisedAt()
+            );
+            notificationService.publishNoticeRevised(
+                groupId, notice.getId(), notice.getTitle(), notice.isAdminOnly(), actorEmail
+            );
         }
 
         String authorNickname = safeTrim(

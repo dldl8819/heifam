@@ -3,6 +3,7 @@ package com.balancify.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -12,6 +13,7 @@ import com.balancify.backend.api.group.dto.NoticeCreateRequest;
 import com.balancify.backend.api.group.dto.NoticeResponse;
 import com.balancify.backend.api.group.dto.NoticeUpdateRequest;
 import com.balancify.backend.domain.Notice;
+import com.balancify.backend.repository.NoticeEngagementRepository;
 import com.balancify.backend.repository.NoticeRepository;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +33,9 @@ class NoticeAdminServiceTest {
     private NoticeRepository noticeRepository;
 
     @Mock
+    private NoticeEngagementRepository noticeEngagementRepository;
+
+    @Mock
     private AccessControlService accessControlService;
 
     @Mock
@@ -45,6 +50,7 @@ class NoticeAdminServiceTest {
     void setUp() {
         noticeAdminService = new NoticeAdminService(
             noticeRepository,
+            noticeEngagementRepository,
             accessControlService,
             operationAuditLogService,
             notificationService
@@ -105,16 +111,78 @@ class NoticeAdminServiceTest {
         notice.setContent("YOUR_CONTENT");
         notice.setAuthorEmail("ops@hei.gg");
         notice.setAdminOnly(true);
-        when(noticeRepository.findByIdAndGroupId(5L, 1L)).thenReturn(Optional.of(notice));
+        when(noticeRepository.findByIdAndGroupIdForUpdate(5L, 1L)).thenReturn(Optional.of(notice));
         when(accessControlService.resolveAccessProfile("ops@hei.gg"))
             .thenReturn(new AccessControlService.AccessProfile(
                 "ops@hei.gg", "OpsUser", "ADMIN", true, false, true, true, null
             ));
 
-        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("YOUR_TITLE", "edited", null), "ops@hei.gg", "OpsUser");
+        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("YOUR_TITLE", "edited", null, null), "ops@hei.gg", "OpsUser");
         verify(notificationService, never()).publishNotice(eq(1L), eq(5L), any(), eq(false), any());
-        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("YOUR_TITLE", "edited", false), "ops@hei.gg", "OpsUser");
+        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("YOUR_TITLE", "edited", false, null), "ops@hei.gg", "OpsUser");
         verify(notificationService).publishNotice(1L, 5L, "YOUR_TITLE", false, "ops@hei.gg");
+    }
+
+    @Test
+    void anEditWithoutAnnouncingItChangesTheTextOnly() {
+        Notice notice = existingNotice(5L, false);
+
+        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("new title", "new content", null, null), "ops@hei.gg", "OpsUser");
+        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("new title", "newer content", null, false), "ops@hei.gg", "OpsUser");
+
+        assertThat(notice.getContent()).isEqualTo("newer content");
+        assertThat(notice.getRevision()).isZero();
+        assertThat(notice.getRevisedAt()).isNull();
+        verify(noticeEngagementRepository, never()).markRead(any(), any(), any(), any());
+        verify(notificationService, never()).publishNotice(any(), any(), any(), anyBoolean(), any());
+        verify(notificationService, never()).publishNoticeRevised(any(), any(), any(), anyBoolean(), any());
+        verify(operationAuditLogService, org.mockito.Mockito.times(2))
+            .recordNoticeUpdated(eq("ops@hei.gg"), eq("OpsUser"), eq(1L), eq(notice), eq(false));
+    }
+
+    @Test
+    void announcingAnEditAgainStartsARevisionAndTellsItsReaders() {
+        Notice notice = existingNotice(5L, false);
+        when(accessControlService.isAdminEmail(" Ops@hei.gg ")).thenReturn(true);
+
+        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("new title", "new content", null, true), " Ops@hei.gg ", "OpsUser");
+
+        assertThat(notice.getRevision()).isEqualTo(1);
+        assertThat(notice.getRevisedAt()).isNotNull();
+        // The editor's read is saved at the revision time itself: read, and with no point for it.
+        verify(noticeEngagementRepository).markRead(5L, "ops@hei.gg", notice.getRevisedAt(), notice.getRevisedAt());
+        verify(notificationService).publishNoticeRevised(1L, 5L, "new title", false, " Ops@hei.gg ");
+        verify(notificationService, never()).publishNotice(any(), any(), any(), anyBoolean(), any());
+        verify(operationAuditLogService).recordNoticeUpdated(eq(" Ops@hei.gg "), eq("OpsUser"), eq(1L), eq(notice), eq(true));
+
+        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("new title", "again", null, true), "ops@hei.gg", "OpsUser");
+
+        assertThat(notice.getRevision()).isEqualTo(2);
+        verify(notificationService, org.mockito.Mockito.times(2)).publishNoticeRevised(eq(1L), eq(5L), any(), eq(false), any());
+    }
+
+    @Test
+    void announcesAnAdminOnlyNoticeAgainToAdmins() {
+        Notice notice = existingNotice(5L, true);
+
+        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("t", "c", null, true), "ops@hei.gg", "OpsUser");
+
+        assertThat(notice.getRevision()).isEqualTo(1);
+        verify(notificationService).publishNoticeRevised(1L, 5L, "t", true, "ops@hei.gg");
+    }
+
+    @Test
+    void aNoticeOpenedToMembersIsNewToThemEvenWhenAnnouncedAgain() {
+        Notice notice = existingNotice(5L, true);
+
+        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("t", "c", false, true), "ops@hei.gg", "OpsUser");
+
+        assertThat(notice.getRevision()).isZero();
+        assertThat(notice.getRevisedAt()).isNull();
+        verify(notificationService).publishNotice(1L, 5L, "t", false, "ops@hei.gg");
+        verify(notificationService, never()).publishNoticeRevised(any(), any(), any(), anyBoolean(), any());
+        verify(noticeEngagementRepository, never()).markRead(any(), any(), any(), any());
+        verify(operationAuditLogService).recordNoticeUpdated(any(), any(), eq(1L), eq(notice), eq(false));
     }
 
     @Test
@@ -145,7 +213,7 @@ class NoticeAdminServiceTest {
         notice.setTitle("old title");
         notice.setContent("old content");
         notice.setAuthorEmail("ops@hei.gg");
-        when(noticeRepository.findByIdAndGroupId(5L, 1L)).thenReturn(Optional.of(notice));
+        when(noticeRepository.findByIdAndGroupIdForUpdate(5L, 1L)).thenReturn(Optional.of(notice));
         when(accessControlService.resolveAccessProfile("ops@hei.gg"))
             .thenReturn(new AccessControlService.AccessProfile(
                 "ops@hei.gg", "OpsUser", "ADMIN", true, false, true, true, null
@@ -154,25 +222,41 @@ class NoticeAdminServiceTest {
         NoticeResponse response = noticeAdminService.updateNotice(
             1L,
             5L,
-            new NoticeUpdateRequest("new title", "new content", null),
+            new NoticeUpdateRequest("new title", "new content", null, null),
             "ops@hei.gg",
             "OpsUser"
         );
 
         assertThat(response.title()).isEqualTo("new title");
         assertThat(response.content()).isEqualTo("new content");
-        verify(operationAuditLogService).recordNoticeUpdated(eq("ops@hei.gg"), eq("OpsUser"), eq(1L), any());
+        verify(operationAuditLogService).recordNoticeUpdated(eq("ops@hei.gg"), eq("OpsUser"), eq(1L), any(), eq(false));
     }
 
     @Test
     void throwsWhenUpdatingMissingNotice() {
-        when(noticeRepository.findByIdAndGroupId(99L, 1L)).thenReturn(Optional.empty());
+        when(noticeRepository.findByIdAndGroupIdForUpdate(99L, 1L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() ->
-            noticeAdminService.updateNotice(1L, 99L, new NoticeUpdateRequest("t", "c", null), "ops@hei.gg", "OpsUser")
+            noticeAdminService.updateNotice(1L, 99L, new NoticeUpdateRequest("t", "c", null, null), "ops@hei.gg", "OpsUser")
         )
             .isInstanceOf(java.util.NoSuchElementException.class)
             .hasMessage("Notice not found");
+    }
+
+    private Notice existingNotice(Long id, boolean adminOnly) {
+        Notice notice = new Notice();
+        notice.setId(id);
+        notice.setGroupId(1L);
+        notice.setTitle("old title");
+        notice.setContent("old content");
+        notice.setAuthorEmail("ops@hei.gg");
+        notice.setAdminOnly(adminOnly);
+        when(noticeRepository.findByIdAndGroupIdForUpdate(id, 1L)).thenReturn(Optional.of(notice));
+        when(accessControlService.resolveAccessProfile("ops@hei.gg"))
+            .thenReturn(new AccessControlService.AccessProfile(
+                "ops@hei.gg", "OpsUser", "ADMIN", true, false, true, true, null
+            ));
+        return notice;
     }
 
     @Test

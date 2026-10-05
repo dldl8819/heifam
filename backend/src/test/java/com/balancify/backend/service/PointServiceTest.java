@@ -292,6 +292,67 @@ class PointServiceTest {
     }
 
     @Test
+    void paysReadingANoticeOncePerRevision() {
+        stubAccount(ADMIN_EMAIL, 7L);
+
+        pointService.grantNoticeReadPoint(ADMIN_EMAIL, 5L, 0);
+        pointService.grantNoticeReadPoint(ADMIN_EMAIL, 5L, 1);
+        pointService.grantNoticeReadPoint(ADMIN_EMAIL, 5L, 2);
+
+        ArgumentCaptor<PointTransaction> captor = ArgumentCaptor.forClass(PointTransaction.class);
+        verify(pointTransactionRepository, Mockito.times(3)).save(captor.capture());
+        assertThat(captor.getAllValues())
+            .extracting(PointTransaction::getReason, PointTransaction::getAmount, PointTransaction::getReferenceKey)
+            .containsExactly(
+                tuple(PointService.REASON_NOTICE_READ, 1, "notice:5"),
+                tuple(PointService.REASON_NOTICE_READ, 1, "notice:5:r1"),
+                tuple(PointService.REASON_NOTICE_READ, 1, "notice:5:r2")
+            );
+    }
+
+    @Test
+    void neverPaysTheSameRevisionOfANoticeTwice() {
+        stubAccount(ADMIN_EMAIL, 7L);
+        // Paid for the first posting before revisions existed, and for revision 1 already.
+        when(pointTransactionRepository.existsByAccount_IdAndReasonAndReferenceKey(7L, PointService.REASON_NOTICE_READ, "notice:5"))
+            .thenReturn(true);
+        when(pointTransactionRepository.existsByAccount_IdAndReasonAndReferenceKey(7L, PointService.REASON_NOTICE_READ, "notice:5:r1"))
+            .thenReturn(true);
+
+        pointService.grantNoticeReadPoint(ADMIN_EMAIL, 5L, 0);
+        pointService.grantNoticeReadPoint(ADMIN_EMAIL, 5L, 1);
+        pointService.grantNoticePoint(ADMIN_EMAIL, 5L, PointService.REASON_NOTICE_READ);
+
+        verify(pointTransactionRepository, never()).save(any());
+    }
+
+    @Test
+    void keepsNoticeLikesAndCommentsOncePerNotice() {
+        stubAccount(ADMIN_EMAIL, 7L);
+
+        pointService.grantNoticePoint(ADMIN_EMAIL, 5L, PointService.REASON_NOTICE_LIKE);
+        pointService.grantNoticePoint(ADMIN_EMAIL, 5L, PointService.REASON_NOTICE_COMMENT);
+        pointService.grantNoticePoint(ADMIN_EMAIL, 5L, "SOMETHING_ELSE");
+
+        ArgumentCaptor<PointTransaction> captor = ArgumentCaptor.forClass(PointTransaction.class);
+        verify(pointTransactionRepository, Mockito.times(2)).save(captor.capture());
+        assertThat(captor.getAllValues())
+            .extracting(PointTransaction::getReason, PointTransaction::getReferenceKey)
+            .containsExactly(
+                tuple(PointService.REASON_NOTICE_LIKE, "notice:5"),
+                tuple(PointService.REASON_NOTICE_COMMENT, "notice:5")
+            );
+    }
+
+    @Test
+    void paysNoNoticePointsWhilePointsAreClosedToTheAccount() {
+        pointService.grantNoticeReadPoint(MEMBER_EMAIL, 5L, 1);
+        pointService.grantNoticePoint(MEMBER_EMAIL, 5L, PointService.REASON_NOTICE_LIKE);
+
+        verifyNoInteractions(pointAccountRepository, pointTransactionRepository);
+    }
+
+    @Test
     void ranksTheMonthWithSharedPlacesAndNicknamesOnly() {
         when(pointTransactionRepository.sumPositiveAccountTotalsBetween(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30)))
             .thenReturn(List.of(

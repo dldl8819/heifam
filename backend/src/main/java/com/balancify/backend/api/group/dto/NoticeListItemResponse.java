@@ -9,6 +9,8 @@ public record NoticeListItemResponse(
     OffsetDateTime createdAt,
     boolean adminOnly,
     boolean read,
+    // An edit of this notice was announced again; with read false it explains why it is unread.
+    boolean revised,
     long likeCount,
     long commentCount
 ) {

@@ -40,6 +40,13 @@ public class Notice {
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt = OffsetDateTime.now();
 
+    // Goes up each time an edit is announced again; reads older than revisedAt no longer count.
+    @Column(nullable = false)
+    private int revision;
+
+    @Column(name = "revised_at")
+    private OffsetDateTime revisedAt;
+
     public boolean isAdminOnly() {
         return adminOnly;
     }
@@ -111,5 +118,21 @@ public class Notice {
 
     public void setUpdatedAt(OffsetDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public int getRevision() {
+        return revision;
+    }
+
+    public void setRevision(int revision) {
+        this.revision = revision;
+    }
+
+    public OffsetDateTime getRevisedAt() {
+        return revisedAt;
+    }
+
+    public void setRevisedAt(OffsetDateTime revisedAt) {
+        this.revisedAt = revisedAt;
     }
 }

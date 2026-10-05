@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Notices as members see them. Visitors get the titles only; members open notices, which marks
  * them read, and like and comment on them. A notice kept to admins is invisible to everyone else.
+ * An edit announced again (NoticeAdminService) turns the notice unread for everyone.
  */
 @Service
 public class NoticeService {
@@ -85,6 +87,7 @@ public class NoticeService {
                 notice.getCreatedAt(),
                 notice.isAdminOnly(),
                 readIds.contains(notice.getId()),
+                notice.getRevision() > 0,
                 likeCounts.getOrDefault(notice.getId(), 0L),
                 commentCounts.getOrDefault(notice.getId(), 0L)
             ))
@@ -93,13 +96,25 @@ public class NoticeService {
         return new NoticeListResponse(items, readCount, items.size() - readCount);
     }
 
-    /** Opening a notice marks it read for this member and earns the reading point once. */
+    /**
+     * Opening a notice marks its current revision read for this member and earns the reading point
+     * once per revision. The notice as first posted pays whoever opens it, as it always did. A
+     * re-announced edit pays those this call turns it read for, which leaves out its editor, whose
+     * read was saved with the edit.
+     */
     @Transactional
     public NoticeDetailResponse open(Long groupId, Long noticeId, String email) {
         String reader = normalizeEmail(email);
-        Notice notice = requireVisible(groupId, noticeId, reader);
-        noticeEngagementRepository.markRead(notice.getId(), reader);
-        pointService.grantNoticePoint(reader, notice.getId(), PointService.REASON_NOTICE_READ);
+        Notice notice = requireVisible(noticeRepository.findByIdAndGroupIdForShare(noticeId, groupId), reader);
+        boolean newlyRead = noticeEngagementRepository.markRead(
+            notice.getId(),
+            reader,
+            NoticeRevisions.readTime(notice.getRevisedAt()),
+            notice.getRevisedAt()
+        );
+        if (notice.getRevision() == 0 || newlyRead) {
+            pointService.grantNoticeReadPoint(reader, notice.getId(), notice.getRevision());
+        }
         return detail(notice, reader);
     }
 
@@ -181,8 +196,11 @@ public class NoticeService {
     }
 
     private Notice requireVisible(Long groupId, Long noticeId, String email) {
-        Notice notice = noticeRepository.findByIdAndGroupId(noticeId, groupId)
-            .orElseThrow(() -> new NoSuchElementException("Notice not found"));
+        return requireVisible(noticeRepository.findByIdAndGroupId(noticeId, groupId), email);
+    }
+
+    private Notice requireVisible(Optional<Notice> found, String email) {
+        Notice notice = found.orElseThrow(() -> new NoSuchElementException("Notice not found"));
         if (notice.isAdminOnly() && !accessControlService.isAdminEmail(email)) {
             throw new NoSuchElementException("Notice not found");
         }

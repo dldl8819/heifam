@@ -270,13 +270,32 @@ public class PointService {
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public void grantNoticePoint(String email, Long noticeId, String reason) {
+        if (noticeId == null || !NOTICE_REASONS.contains(reason)) {
+            return;
+        }
+        grantNoticePoint(email, reason, "notice:" + noticeId);
+    }
+
+    /**
+     * Reading earns its point once per revision of a notice: as first posted, and again each time
+     * an edit is announced. The first revision keeps the plain notice reference, so nobody who was
+     * paid for reading it is paid twice.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void grantNoticeReadPoint(String email, Long noticeId, int revision) {
+        if (noticeId == null) {
+            return;
+        }
+        grantNoticePoint(email, REASON_NOTICE_READ, noticeReadReference(noticeId, revision));
+    }
+
+    private void grantNoticePoint(String email, String reason, String referenceKey) {
         String normalizedEmail = normalizeEmail(email);
         int amount = pointProperties.getNoticeAction();
-        if (noticeId == null || amount <= 0 || !NOTICE_REASONS.contains(reason) || !canUsePoints(normalizedEmail)) {
+        if (amount <= 0 || !canUsePoints(normalizedEmail)) {
             return;
         }
 
-        String referenceKey = "notice:" + noticeId;
         PointAccount account = lockAccount(normalizedEmail);
         if (!pointTransactionRepository.existsByAccount_IdAndReasonAndReferenceKey(account.getId(), reason, referenceKey)) {
             record(account, reason, amount, referenceKey, today(), null, null);
@@ -504,6 +523,10 @@ public class PointService {
 
     private static String matchReference(Long matchId) {
         return "match:" + matchId;
+    }
+
+    private static String noticeReadReference(Long noticeId, int revision) {
+        return revision <= 0 ? "notice:" + noticeId : "notice:" + noticeId + ":r" + revision;
     }
 
     private static String predictionReferencePrefix(Long matchId) {

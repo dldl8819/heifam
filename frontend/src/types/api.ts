@@ -596,6 +596,8 @@ export type NoticeListItem = {
   createdAt: string
   adminOnly: boolean
   read: boolean
+  // An edit of this notice was announced again; unread, it is marked as edited in the list.
+  revised: boolean
   likeCount: number
   commentCount: number
 }
@@ -638,6 +640,8 @@ export type NoticeUpdateRequest = {
   title: string
   content: string
   adminOnly?: boolean
+  // Announce the edit again: the notice turns unread for members and they are notified.
+  notify?: boolean
 }
 
 export type LedgerExpenseType = 'FIXED' | 'VARIABLE'

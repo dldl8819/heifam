@@ -7,7 +7,7 @@ import { apiClient } from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { LedgerSection } from '@/components/ledger-section'
-import { filterNotices, type NoticeFilter } from '@/lib/notice-list'
+import { filterNotices, showsRevisedMark, type NoticeFilter } from '@/lib/notice-list'
 import { t } from '@/lib/i18n'
 import type { NoticeList, NoticeTitle } from '@/types/api'
 
@@ -353,6 +353,11 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
                             {notice.title}
                             {!notice.read && <span className="sr-only"> ({t('notices.posts.unreadLabel')})</span>}
                           </Link>
+                          {showsRevisedMark(notice) && (
+                            <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-medium text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">
+                              {t('notices.posts.revisedBadge')}
+                            </span>
+                          )}
                           {notice.adminOnly && (
                             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
                               {t('notices.posts.adminOnlyBadge')}
