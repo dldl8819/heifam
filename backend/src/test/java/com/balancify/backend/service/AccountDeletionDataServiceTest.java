@@ -11,6 +11,7 @@ import com.balancify.backend.domain.Player;
 import com.balancify.backend.domain.PlayerLifecycleStatus;
 import com.balancify.backend.repository.AccountPersonalDataRepository;
 import com.balancify.backend.repository.PlayerRepository;
+import com.balancify.backend.security.SupabaseAuthAdminClient;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -50,6 +51,9 @@ class AccountDeletionDataServiceTest {
     @Mock
     private AccessControlService accessControlService;
 
+    @Mock
+    private SupabaseAuthAdminClient supabaseAuthAdminClient;
+
     private AccountDeletionDataService accountDeletionDataService;
 
     @BeforeEach
@@ -60,6 +64,7 @@ class AccountDeletionDataServiceTest {
             playerRepository,
             groupReadCacheService,
             accessControlService,
+            supabaseAuthAdminClient,
             fixedClock
         );
     }
@@ -633,6 +638,30 @@ class AccountDeletionDataServiceTest {
             PLACEHOLDER_AUTH_USER_ID,
             TRANSITION_AT
         );
+    }
+
+    @Test
+    void asksSupabaseAuthForTheEmailWhenTheProfileCopyHasNone() {
+        Group group = new Group();
+        group.setId(42L);
+        Player player = new Player();
+        player.setId(305L);
+        player.setGroup(group);
+        player.setAuthUserId(PLACEHOLDER_AUTH_USER_ID);
+        player.setNickname(ORIGINAL_NICKNAME);
+        player.setActive(true);
+        player.setChatLeftAt(TRANSITION_AT.minusDays(1));
+        player.setChatLeftReason("본인 요청");
+        when(accountPersonalDataRepository.findAccountEmail(PLACEHOLDER_AUTH_USER_ID)).thenReturn(Optional.empty());
+        when(supabaseAuthAdminClient.findUserEmail(PLACEHOLDER_AUTH_USER_ID)).thenReturn(Optional.of(PLACEHOLDER_EMAIL));
+
+        AccountDeletionDataService.InactivePlayerCleanupOutcome outcome =
+            accountDeletionDataService.retainInactivePlayer(player);
+
+        assertThat(player.isActive()).isFalse();
+        assertThat(player.getLifecycleStatus()).isEqualTo(PlayerLifecycleStatus.INACTIVE);
+        assertThat(outcome.requiresAuthDeletion()).isTrue();
+        verify(accountPersonalDataRepository).deleteAccountIdentity(PLACEHOLDER_AUTH_USER_ID, PLACEHOLDER_EMAIL);
     }
 
     @Test
