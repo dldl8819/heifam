@@ -55,6 +55,20 @@ public interface MatchRepository extends JpaRepository<Match, Long>, JpaSpecific
         select m
         from Match m
         where m.group.id = :groupId
+          and m.source = com.balancify.backend.domain.MatchSource.BALANCED
+          and m.winningTeam is not null
+          and m.resultRecordedAt >= :fromInclusive
+        order by m.resultRecordedAt desc, m.id desc
+        """)
+    List<Match> findBalancedResultsRecordedSince(
+        @Param("groupId") Long groupId,
+        @Param("fromInclusive") OffsetDateTime fromInclusive
+    );
+
+    @Query("""
+        select m
+        from Match m
+        where m.group.id = :groupId
           and m.status = com.balancify.backend.domain.MatchStatus.COMPLETED
         order by m.playedAt desc, m.id desc
         """)

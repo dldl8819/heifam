@@ -32,11 +32,14 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -195,6 +198,100 @@ class PointServiceTest {
     }
 
     @Test
+    void paysAResultConfirmationOncePerMatch() {
+        stubAccount(ADMIN_EMAIL, 7L);
+        when(pointTransactionRepository.countByAccount_IdAndReasonAndKstDate(7L, PointService.REASON_MATCH_CONFIRM, TODAY))
+            .thenReturn(9L);
+
+        assertThat(pointService.grantMatchConfirmPoint(ADMIN_EMAIL, 5L)).isEqualTo(PointService.MatchConfirmOutcome.CONFIRMED);
+
+        PointTransaction saved = captureSavedTransaction();
+        assertThat(saved.getReason()).isEqualTo(PointService.REASON_MATCH_CONFIRM);
+        assertThat(saved.getAmount()).isEqualTo(1);
+        assertThat(saved.getReferenceKey()).isEqualTo("match:5");
+        assertThat(saved.getKstDate()).isEqualTo(TODAY);
+    }
+
+    @Test
+    void neverPaysTwiceForConfirmingTheSameMatch() {
+        stubAccount(ADMIN_EMAIL, 7L);
+        when(pointTransactionRepository.existsByAccount_IdAndReasonAndReferenceKey(
+            7L, PointService.REASON_MATCH_CONFIRM, "match:5"
+        )).thenReturn(true);
+
+        assertThat(pointService.grantMatchConfirmPoint(ADMIN_EMAIL, 5L))
+            .isEqualTo(PointService.MatchConfirmOutcome.ALREADY_CONFIRMED);
+
+        verify(pointTransactionRepository, never()).countByAccount_IdAndReasonAndKstDate(anyLong(), anyString(), any());
+        verify(pointTransactionRepository, never()).save(any());
+    }
+
+    @Test
+    void stopsResultConfirmationsAtTheDailyCap() {
+        stubAccount(ADMIN_EMAIL, 7L);
+        when(pointTransactionRepository.countByAccount_IdAndReasonAndKstDate(7L, PointService.REASON_MATCH_CONFIRM, TODAY))
+            .thenReturn(10L);
+
+        assertThat(pointService.grantMatchConfirmPoint(ADMIN_EMAIL, 5L))
+            .isEqualTo(PointService.MatchConfirmOutcome.DAILY_CAP_REACHED);
+
+        verify(pointTransactionRepository, never()).save(any());
+    }
+
+    @Test
+    void paysNoResultConfirmationWhilePointsAreClosedToTheAccount() {
+        assertThat(pointService.grantMatchConfirmPoint(MEMBER_EMAIL, 5L))
+            .isEqualTo(PointService.MatchConfirmOutcome.NOT_ALLOWED);
+
+        verifyNoInteractions(pointAccountRepository, pointTransactionRepository);
+    }
+
+    @Test
+    void takesBackEveryConfirmationOfADeletedMatchOnceInAccountOrder() {
+        PointAccount second = stubAccount(MEMBER_EMAIL, 8L);
+        PointAccount first = stubAccount(ADMIN_EMAIL, 7L);
+        when(pointTransactionRepository.findByReasonAndReferenceKey(PointService.REASON_MATCH_CONFIRM, "match:5"))
+            .thenReturn(List.of(grant(second, PointService.REASON_MATCH_CONFIRM), grant(first, PointService.REASON_MATCH_CONFIRM)));
+
+        pointService.reverseMatchConfirmPoints(5L);
+
+        InOrder lockOrder = Mockito.inOrder(pointAccountRepository);
+        lockOrder.verify(pointAccountRepository).findByNormalizedEmailForUpdate(ADMIN_EMAIL);
+        lockOrder.verify(pointAccountRepository).findByNormalizedEmailForUpdate(MEMBER_EMAIL);
+        ArgumentCaptor<PointTransaction> captor = ArgumentCaptor.forClass(PointTransaction.class);
+        verify(pointTransactionRepository, Mockito.times(2)).save(captor.capture());
+        assertThat(captor.getAllValues())
+            .extracting(PointTransaction::getAccount, PointTransaction::getReason, PointTransaction::getAmount, PointTransaction::getReferenceKey)
+            .containsExactly(
+                tuple(first, PointService.REASON_MATCH_CONFIRM_REVERSED, -1, "match:5"),
+                tuple(second, PointService.REASON_MATCH_CONFIRM_REVERSED, -1, "match:5")
+            );
+
+        when(pointTransactionRepository.existsByAccount_IdAndReasonAndReferenceKey(anyLong(), eq(PointService.REASON_MATCH_CONFIRM_REVERSED), eq("match:5")))
+            .thenReturn(true);
+        pointService.reverseMatchConfirmPoints(5L);
+
+        verify(pointTransactionRepository, Mockito.times(2)).save(any());
+    }
+
+    @Test
+    void tellsWhichMatchesWereConfirmedAndHowManyToday() {
+        existingAccount(ADMIN_EMAIL, 7L);
+        when(pointTransactionRepository.findByAccount_IdAndReasonAndReferenceKeyIn(
+            eq(7L), eq(PointService.REASON_MATCH_CONFIRM), any()
+        )).thenReturn(List.of(row(PointService.REASON_MATCH_CONFIRM, 1, null, "match:11")));
+        when(pointTransactionRepository.countByAccount_IdAndReasonAndKstDate(7L, PointService.REASON_MATCH_CONFIRM, TODAY))
+            .thenReturn(4L);
+
+        PointService.MatchConfirmState state = pointService.getMatchConfirmState(ADMIN_EMAIL, List.of(10L, 11L));
+
+        assertThat(state.confirmedMatchIds()).isEqualTo(Set.of(11L));
+        assertThat(state.confirmedToday()).isEqualTo(4);
+        assertThat(pointService.getMatchConfirmState(MEMBER_EMAIL, List.of(10L)))
+            .isEqualTo(new PointService.MatchConfirmState(Set.of(), 0));
+    }
+
+    @Test
     void ranksTheMonthWithSharedPlacesAndNicknamesOnly() {
         when(pointTransactionRepository.sumPositiveAccountTotalsBetween(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30)))
             .thenReturn(List.of(
@@ -321,7 +418,20 @@ class PointServiceTest {
         assertThat(summary.matchResultsToday()).isZero();
         assertThat(summary.matchResultDailyCap()).isEqualTo(10);
         assertThat(summary.matchResultPoints()).isEqualTo(1);
+        assertThat(summary.matchConfirmsToday()).isZero();
+        assertThat(summary.matchConfirmDailyCap()).isEqualTo(10);
+        assertThat(summary.matchConfirmPoints()).isEqualTo(1);
+        assertThat(summary.matchConfirmWindowHours()).isEqualTo(48);
         assertThat(summary.recent()).isEmpty();
+    }
+
+    @Test
+    void summarizesTodaysResultConfirmations() {
+        existingAccount(ADMIN_EMAIL, 7L);
+        lenient().when(pointTransactionRepository.countByAccount_IdAndReasonAndKstDate(7L, PointService.REASON_MATCH_CONFIRM, TODAY))
+            .thenReturn(3L);
+
+        assertThat(pointService.getSummary(ADMIN_EMAIL).matchConfirmsToday()).isEqualTo(3);
     }
 
     private PointAccount stubAccount(String email, Long id) {
@@ -331,6 +441,13 @@ class PointServiceTest {
         when(pointAccountRepository.findByNormalizedEmailForUpdate(email)).thenReturn(Optional.of(account));
         lenient().when(pointAccountRepository.findByNormalizedEmail(email)).thenReturn(Optional.of(account));
         return account;
+    }
+
+    private void existingAccount(String email, Long id) {
+        PointAccount account = new PointAccount();
+        account.setNormalizedEmail(email);
+        ReflectionTestUtils.setField(account, "id", id);
+        when(pointAccountRepository.findByNormalizedEmail(email)).thenReturn(Optional.of(account));
     }
 
     private PointTransaction captureSavedTransaction() {
@@ -346,6 +463,18 @@ class PointServiceTest {
         transaction.setKstDate(LocalDate.of(2026, 9, 15));
         transaction.setMemo(memo);
         return transaction;
+    }
+
+    private PointTransaction row(String reason, int amount, String memo, String referenceKey) {
+        PointTransaction transaction = row(reason, amount, memo);
+        transaction.setReferenceKey(referenceKey);
+        return transaction;
+    }
+
+    private PointTransaction grant(PointAccount account, String reason) {
+        PointTransaction grant = row(reason, 1, null, "match:5");
+        grant.setAccount(account);
+        return grant;
     }
 
     private record Total(Long accountId, String normalizedEmail, Long points)

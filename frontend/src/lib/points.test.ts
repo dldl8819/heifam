@@ -27,6 +27,8 @@ describe('points helpers', () => {
   it('knows the ledger reasons', () => {
     expect(pointReasonKey('DAILY_LOGIN')).toBe('points.reasons.dailyLogin')
     expect(pointReasonKey('MATCH_RESULT_REVERSED')).toBe('points.reasons.matchResultReversed')
+    expect(pointReasonKey('MATCH_CONFIRM')).toBe('points.reasons.matchConfirm')
+    expect(pointReasonKey('MATCH_CONFIRM_REVERSED')).toBe('points.reasons.matchConfirmReversed')
     expect(pointReasonKey('SOMETHING_NEW')).toBeNull()
   })
 

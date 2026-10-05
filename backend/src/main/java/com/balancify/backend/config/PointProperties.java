@@ -16,6 +16,10 @@ public class PointProperties {
     private int predictionHitDailyCap = 10;
     // Reading, liking and commenting on a notice each earn this once per notice.
     private int noticeAction = 1;
+    // A player confirming the result of a match they played, once per match.
+    private int matchConfirm = 1;
+    private int matchConfirmDailyCap = 10;
+    private int matchConfirmWindowHours = 48;
 
     public boolean isMembersEnabled() {
         return membersEnabled;
@@ -71,5 +75,29 @@ public class PointProperties {
 
     public void setNoticeAction(int noticeAction) {
         this.noticeAction = Math.max(0, noticeAction);
+    }
+
+    public int getMatchConfirm() {
+        return matchConfirm;
+    }
+
+    public void setMatchConfirm(int matchConfirm) {
+        this.matchConfirm = Math.max(0, matchConfirm);
+    }
+
+    public int getMatchConfirmDailyCap() {
+        return matchConfirmDailyCap;
+    }
+
+    public void setMatchConfirmDailyCap(int matchConfirmDailyCap) {
+        this.matchConfirmDailyCap = Math.max(0, matchConfirmDailyCap);
+    }
+
+    public int getMatchConfirmWindowHours() {
+        return matchConfirmWindowHours;
+    }
+
+    public void setMatchConfirmWindowHours(int matchConfirmWindowHours) {
+        this.matchConfirmWindowHours = Math.max(1, matchConfirmWindowHours);
     }
 }

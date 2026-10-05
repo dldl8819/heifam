@@ -164,7 +164,7 @@ class MatchResultServiceTest {
         match.setId(99L);
         match.setSeriesId(70L);
         match.setSeriesGameNumber(2);
-        when(matchRepository.findById(99L)).thenReturn(Optional.of(match));
+        when(matchRepository.findByIdForUpdate(99L)).thenReturn(Optional.of(match));
 
         matchResultService.deleteMatch(99L);
 
@@ -433,6 +433,9 @@ class MatchResultServiceTest {
         assertThat(participants.stream().filter(participant -> "AWAY".equals(participant.getTeam())))
             .extracting(MatchParticipant::getAssignedRace)
             .containsExactly("P", "P", "T");
+        // A changed winner keeps the result confirmations; only deleting the match takes them back.
+        verify(pointService, never()).reverseMatchConfirmPoints(any());
+        verify(pointService, never()).reverseMatchResultPoints(any());
     }
 
     @Test
@@ -1314,7 +1317,7 @@ class MatchResultServiceTest {
             .filter(participant -> "AWAY".equals(participant.getTeam()))
             .forEach(participant -> participant.setMmrDelta(-10));
 
-        when(matchRepository.findById(99L)).thenReturn(Optional.of(match));
+        when(matchRepository.findByIdForUpdate(99L)).thenReturn(Optional.of(match));
         when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(99L)).thenReturn(participants);
         when(playerRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -1331,6 +1334,8 @@ class MatchResultServiceTest {
         verify(matchParticipantRepository).deleteByMatch_Id(99L);
         verify(matchRepository).delete(match);
         verify(pointService).reverseMatchResultPoints(99L);
+        verify(pointService).reverseMatchConfirmPoints(99L);
+        verify(matchRepository, never()).findById(99L);
         verify(playerStatsRefreshService, timeout(ASYNC_STATS_REBUILD_TIMEOUT_MS)).rebuildGroupStats(1L);
     }
 

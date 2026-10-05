@@ -797,6 +797,8 @@ export type PointReason =
   | 'NOTICE_READ'
   | 'NOTICE_LIKE'
   | 'NOTICE_COMMENT'
+  | 'MATCH_CONFIRM'
+  | 'MATCH_CONFIRM_REVERSED'
 
 export type PointHistoryItem = {
   reason: PointReason | string
@@ -816,6 +818,10 @@ export type PointSummaryResponse = {
   predictionPointsToday: number
   predictionHitDailyCap: number
   predictionHitPoints: number
+  matchConfirmsToday: number
+  matchConfirmDailyCap: number
+  matchConfirmPoints: number
+  matchConfirmWindowHours: number
   recent: PointHistoryItem[]
 }
 
@@ -1054,6 +1060,28 @@ export type PredictionMatch = {
   winnerTeam: TeamSide | null
   hit: boolean | null
   pointsExcluded: boolean
+}
+
+// A balanced 3v3 match the player played, whose result they confirm for a point.
+export type MatchConfirmation = {
+  matchId: number
+  raceComposition: RaceComposition | null
+  seriesGameNumber: number | null
+  resultRecordedAt: string
+  confirmDeadline: string
+  homePlayers: PredictionPlayer[]
+  awayPlayers: PredictionPlayer[]
+  winnerTeam: TeamSide | null
+  myTeam: TeamSide | null
+  confirmed: boolean
+}
+
+export type MatchConfirmationList = {
+  matches: MatchConfirmation[]
+  confirmedToday: number
+  dailyCap: number
+  points: number
+  windowHours: number
 }
 
 export type PredictionBoard = {

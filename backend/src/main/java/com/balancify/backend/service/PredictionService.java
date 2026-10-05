@@ -8,7 +8,6 @@ import com.balancify.backend.domain.Match;
 import com.balancify.backend.domain.MatchParticipant;
 import com.balancify.backend.domain.MatchPrediction;
 import com.balancify.backend.domain.MatchStatus;
-import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.MatchParticipantRepository;
 import com.balancify.backend.repository.MatchPredictionRepository;
 import com.balancify.backend.repository.MatchRepository;
@@ -25,7 +24,6 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
@@ -330,24 +328,8 @@ public class PredictionService {
         return natural;
     }
 
-    // A player counts as the predictor's own when linked to their login, or named like their account.
     private boolean ownMatch(List<MatchParticipant> participants, String email, String userId) {
-        UUID authUserId = parseUuid(userId);
-        String accountNickname = accessControlService.resolveDisplayNickname(email);
-        for (MatchParticipant participant : participants) {
-            Player player = participant.getPlayer();
-            if (player == null) {
-                continue;
-            }
-            if (authUserId != null && authUserId.equals(player.getAuthUserId())) {
-                return true;
-            }
-            if (accountNickname != null && player.getNickname() != null
-                && accountNickname.trim().equalsIgnoreCase(player.getNickname().trim())) {
-                return true;
-            }
-        }
-        return false;
+        return OwnPlayerPolicy.findOwn(participants, userId, accessControlService.resolveDisplayNickname(email)) != null;
     }
 
     private boolean belongsTo(Match match, Long groupId) {
@@ -356,17 +338,6 @@ public class PredictionService {
 
     private OffsetDateTime now() {
         return OffsetDateTime.now(clock);
-    }
-
-    private static UUID parseUuid(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        try {
-            return UUID.fromString(value.trim());
-        } catch (IllegalArgumentException exception) {
-            return null;
-        }
     }
 
     private static String normalizeTeam(String value) {

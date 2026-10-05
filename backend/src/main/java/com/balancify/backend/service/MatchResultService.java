@@ -978,7 +978,9 @@ public class MatchResultService {
 
     @Transactional
     public DeletedMatchAuditSnapshot deleteMatch(Long matchId) {
-        Match match = matchRepository.findById(matchId)
+        // Locked like a result entry, so a result confirmation either lands before the points are
+        // taken back below or finds the match gone.
+        Match match = matchRepository.findByIdForUpdate(matchId)
             .orElseThrow(() -> new NoSuchElementException("Match not found: " + matchId));
         OffsetDateTime playedAt = match.getPlayedAt();
         Long seriesId = match.getSeriesId();
@@ -1014,6 +1016,7 @@ public class MatchResultService {
 
         mmrHistoryRepository.deleteByMatch_Id(matchId);
         pointService.reverseMatchResultPoints(matchId);
+        pointService.reverseMatchConfirmPoints(matchId);
         predictionService.revoke(matchId);
         matchParticipantRepository.deleteByMatch_Id(matchId);
         matchRepository.delete(match);

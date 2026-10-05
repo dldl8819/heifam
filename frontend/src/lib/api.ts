@@ -63,6 +63,7 @@ import type {
   TeamTournament,
   PredictionBoard,
   PredictionMatch,
+  MatchConfirmationList,
   TeamScoreBoard,
   PrizeEvent,
   PrizeEventCreateRequest,
@@ -1611,6 +1612,17 @@ export const apiClient = {
   closePredictions: (groupId: number, matchId: number) =>
     apiRequest<void>(
       `/api/groups/${groupId}/predictions/${matchId}/close`,
+      { method: 'POST' },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  getMatchConfirmations: (groupId: number) =>
+    apiRequest<MatchConfirmationList>(`/api/groups/${groupId}/match-confirmations`, undefined, {
+      requireUserEmail: true,
+      includeUserEmail: true,
+    }),
+  confirmMatchResult: (groupId: number, matchId: number) =>
+    apiRequest<MatchConfirmationList>(
+      `/api/groups/${groupId}/match-confirmations/${matchId}`,
       { method: 'POST' },
       { requireUserEmail: true, includeUserEmail: true }
     ),

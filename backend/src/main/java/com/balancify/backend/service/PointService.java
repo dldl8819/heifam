@@ -16,13 +16,17 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,6 +52,8 @@ public class PointService {
     public static final String REASON_NOTICE_READ = "NOTICE_READ";
     public static final String REASON_NOTICE_LIKE = "NOTICE_LIKE";
     public static final String REASON_NOTICE_COMMENT = "NOTICE_COMMENT";
+    public static final String REASON_MATCH_CONFIRM = "MATCH_CONFIRM";
+    public static final String REASON_MATCH_CONFIRM_REVERSED = "MATCH_CONFIRM_REVERSED";
     private static final List<String> NOTICE_REASONS = List.of(REASON_NOTICE_READ, REASON_NOTICE_LIKE, REASON_NOTICE_COMMENT);
     private static final List<String> PREDICTION_REASONS = List.of(REASON_PREDICTION_HIT, REASON_PREDICTION_HIT_REVERSED);
 
@@ -157,19 +163,104 @@ public class PointService {
     /** Takes back the result-entry point of a deleted match; the original row stays as history. */
     @Transactional(propagation = Propagation.MANDATORY)
     public void reverseMatchResultPoints(Long matchId) {
+        reverseMatchGrants(matchId, REASON_MATCH_RESULT, REASON_MATCH_RESULT_REVERSED);
+    }
+
+    public enum MatchConfirmOutcome {
+        CONFIRMED,
+        ALREADY_CONFIRMED,
+        DAILY_CAP_REACHED,
+        NOT_ALLOWED
+    }
+
+    public record MatchConfirmState(Set<Long> confirmedMatchIds, int confirmedToday) {
+    }
+
+    /**
+     * A player confirming the result of a match they played earns a point once per match, up to a
+     * daily cap. MatchConfirmationService decides which matches a person may confirm.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public MatchConfirmOutcome grantMatchConfirmPoint(String email, Long matchId) {
+        String normalizedEmail = normalizeEmail(email);
+        if (matchId == null || !canUsePoints(normalizedEmail)) {
+            return MatchConfirmOutcome.NOT_ALLOWED;
+        }
+
+        LocalDate today = today();
+        String referenceKey = matchReference(matchId);
+        PointAccount account = lockAccount(normalizedEmail);
+        if (pointTransactionRepository.existsByAccount_IdAndReasonAndReferenceKey(
+            account.getId(), REASON_MATCH_CONFIRM, referenceKey
+        )) {
+            return MatchConfirmOutcome.ALREADY_CONFIRMED;
+        }
+        long confirmedToday = pointTransactionRepository.countByAccount_IdAndReasonAndKstDate(
+            account.getId(), REASON_MATCH_CONFIRM, today
+        );
+        if (confirmedToday >= pointProperties.getMatchConfirmDailyCap()) {
+            return MatchConfirmOutcome.DAILY_CAP_REACHED;
+        }
+        record(account, REASON_MATCH_CONFIRM, pointProperties.getMatchConfirm(), referenceKey, today, null, null);
+        return MatchConfirmOutcome.CONFIRMED;
+    }
+
+    /** Which of these matches the person has confirmed, and how many results they confirmed today. */
+    @Transactional(readOnly = true)
+    public MatchConfirmState getMatchConfirmState(String email, Collection<Long> matchIds) {
+        Optional<PointAccount> account = pointAccountRepository.findByNormalizedEmail(normalizeEmail(email));
+        if (account.isEmpty()) {
+            return new MatchConfirmState(Set.of(), 0);
+        }
+        Long accountId = account.get().getId();
+        Set<Long> confirmed = new HashSet<>();
+        if (matchIds != null && !matchIds.isEmpty()) {
+            Map<String, Long> matchIdsByReference = new HashMap<>();
+            matchIds.forEach(matchId -> matchIdsByReference.put(matchReference(matchId), matchId));
+            for (PointTransaction row : pointTransactionRepository.findByAccount_IdAndReasonAndReferenceKeyIn(
+                accountId, REASON_MATCH_CONFIRM, matchIdsByReference.keySet()
+            )) {
+                confirmed.add(matchIdsByReference.get(row.getReferenceKey()));
+            }
+        }
+        int confirmedToday = (int) pointTransactionRepository.countByAccount_IdAndReasonAndKstDate(
+            accountId, REASON_MATCH_CONFIRM, today()
+        );
+        return new MatchConfirmState(confirmed, confirmedToday);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean hasConfirmedMatch(String email, Long matchId) {
+        return matchId != null && pointAccountRepository.findByNormalizedEmail(normalizeEmail(email))
+            .map(account -> pointTransactionRepository.existsByAccount_IdAndReasonAndReferenceKey(
+                account.getId(), REASON_MATCH_CONFIRM, matchReference(matchId)
+            ))
+            .orElse(false);
+    }
+
+    /** Takes back the result-confirmation points of a deleted match; the original rows stay as history. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void reverseMatchConfirmPoints(Long matchId) {
+        reverseMatchGrants(matchId, REASON_MATCH_CONFIRM, REASON_MATCH_CONFIRM_REVERSED);
+    }
+
+    // Accounts are locked in id order, so two deletions sharing people never wait on each other in a circle.
+    private void reverseMatchGrants(Long matchId, String reason, String reversedReason) {
         if (matchId == null) {
             return;
         }
 
         String referenceKey = matchReference(matchId);
-        for (PointTransaction grant : pointTransactionRepository.findByReasonAndReferenceKey(REASON_MATCH_RESULT, referenceKey)) {
+        List<PointTransaction> grants = new ArrayList<>(pointTransactionRepository.findByReasonAndReferenceKey(reason, referenceKey));
+        grants.sort(Comparator.comparing(grant -> grant.getAccount().getId(), Comparator.nullsLast(Comparator.naturalOrder())));
+        for (PointTransaction grant : grants) {
             PointAccount account = lockAccount(grant.getAccount().getNormalizedEmail());
             if (pointTransactionRepository.existsByAccount_IdAndReasonAndReferenceKey(
-                account.getId(), REASON_MATCH_RESULT_REVERSED, referenceKey
+                account.getId(), reversedReason, referenceKey
             )) {
                 continue;
             }
-            record(account, REASON_MATCH_RESULT_REVERSED, -grant.getAmount(), referenceKey, today(), null, null);
+            record(account, reversedReason, -grant.getAmount(), referenceKey, today(), null, null);
         }
     }
 
@@ -243,6 +334,10 @@ public class PointService {
                 0,
                 pointProperties.getPredictionHitDailyCap(),
                 pointProperties.getPredictionHit(),
+                0,
+                pointProperties.getMatchConfirmDailyCap(),
+                pointProperties.getMatchConfirm(),
+                pointProperties.getMatchConfirmWindowHours(),
                 List.of()
             );
         }
@@ -270,6 +365,10 @@ public class PointService {
             (int) pointTransactionRepository.sumAmountByReasonsOnDate(accountId, PREDICTION_REASONS, today),
             pointProperties.getPredictionHitDailyCap(),
             pointProperties.getPredictionHit(),
+            (int) pointTransactionRepository.countByAccount_IdAndReasonAndKstDate(accountId, REASON_MATCH_CONFIRM, today),
+            pointProperties.getMatchConfirmDailyCap(),
+            pointProperties.getMatchConfirm(),
+            pointProperties.getMatchConfirmWindowHours(),
             recent
         );
     }
