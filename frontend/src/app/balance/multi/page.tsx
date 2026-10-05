@@ -13,6 +13,8 @@ import {
   offRaceAssignments,
   previewSeriesGames,
 } from '@/lib/balance-series'
+import { copyTextWithFallback } from '@/lib/clipboard'
+import { formatMultiBalanceChatText, formatMultiBalanceMatchChatText } from '@/lib/multi-balance-chat'
 import { formatPercent } from '@/lib/percent'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
@@ -147,9 +149,14 @@ export default function MultiBalancePage() {
       seriesFormats,
     })
   }, [result, balanceMode, seriesStarted, seriesFormats])
+  // What was copied last: the whole result, or one match by its number.
+  const [copied, setCopied] = useState<'all' | number | null>(null)
+  const [copyFailed, setCopyFailed] = useState<boolean>(false)
   const clearResult = () => {
     setSubmitError(null)
     setResult(null)
+    setCopied(null)
+    setCopyFailed(false)
     setSeriesStarted(false)
     setSeriesError(null)
     setSeriesFormats({})
@@ -222,6 +229,25 @@ export default function MultiBalancePage() {
     }
   }
 
+  useEffect(() => {
+    if (copied === null) {
+      return
+    }
+    const timeoutId = window.setTimeout(() => setCopied(null), 2000)
+    return () => window.clearTimeout(timeoutId)
+  }, [copied])
+
+  const handleCopy = async (target: 'all' | number, text: string) => {
+    try {
+      await copyTextWithFallback(text)
+      setCopied(target)
+      setCopyFailed(false)
+    } catch {
+      setCopied(null)
+      setCopyFailed(true)
+    }
+  }
+
   const seriesLineups = result ? buildSeriesLineups(result.matches, seriesFormats) : null
   const canStartSeries =
     result !== null && result.matches.every((match) => match.seriesPlan) && !startingSeries && !seriesStarted
@@ -272,11 +298,22 @@ export default function MultiBalancePage() {
               away: homeTeamNumber + 1,
             })}
           </h4>
-          {plan && (
-            <span className="text-xs font-medium text-indigo-700 dark:text-indigo-300">
-              {t(`balanceSeries.formats.${format}`)}
-            </span>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {plan && (
+              <span className="text-xs font-medium text-indigo-700 dark:text-indigo-300">
+                {t(`balanceSeries.formats.${format}`)}
+              </span>
+            )}
+            {/* One line for this match's own lobby chat. */}
+            <button
+              type="button"
+              onClick={() => void handleCopy(match.matchNumber, formatMultiBalanceMatchChatText(match, matchIndex))}
+              aria-label={t('multiBalance.copy.matchAriaLabel', { number: match.matchNumber })}
+              className="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              {copied === match.matchNumber ? t('balance.copy.copiedButton') : t('balance.copy.button')}
+            </button>
+          </div>
         </div>
         {/* The balance page's metrics; the MMR ones only for those who may see MMR, as the server sends them. */}
         <div className="space-y-1">
@@ -455,6 +492,17 @@ export default function MultiBalancePage() {
 
       {result && (
         <section className="space-y-4">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {copyFailed && <p className="text-xs text-rose-700 dark:text-rose-300">{t('balance.copy.failed')}</p>}
+            <button
+              type="button"
+              onClick={() => void handleCopy('all', formatMultiBalanceChatText(result))}
+              aria-label={t('multiBalance.copy.allAriaLabel')}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+            >
+              {copied === 'all' ? t('balance.copy.copiedButton') : t('multiBalance.copy.allButton')}
+            </button>
+          </div>
           <header className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
             <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-700">
               <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">{t('multiBalance.result.title')}</p>
