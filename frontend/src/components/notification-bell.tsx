@@ -195,7 +195,8 @@ function NotificationCenter() {
   const badge = unreadBadge(unreadCount)
 
   return (
-    <div ref={panelRef} className="relative">
+    // On phones the panel hangs from the header row instead of the bell, so it never runs off the left edge.
+    <div ref={panelRef} className="sm:relative">
       <button
         type="button"
         onClick={() => void handleToggle()}

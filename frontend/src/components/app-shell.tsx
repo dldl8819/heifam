@@ -22,9 +22,12 @@ export function AppShell({ children }: AppShellProps) {
       <div className="min-h-screen bg-slate-100 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
         <header className="sticky top-0 z-30 border-b border-slate-700 bg-slate-900/95 text-white backdrop-blur">
           <div className="mx-auto flex max-w-screen-2xl flex-col gap-3 px-4 py-4 sm:px-6">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="flex items-start gap-3">
-                <div className="relative h-11 w-11 overflow-hidden rounded-md border border-slate-700/80 bg-slate-950/70">
+            {/* One row at every width: on a narrow phone the name and tagline give way (the tagline
+                wraps) so the buttons stay on the right. The row is also what the notification panel
+                hangs from on phones. */}
+            <div className="relative flex items-start justify-between gap-3">
+              <div className="flex min-w-0 flex-1 items-start gap-3">
+                <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-md border border-slate-700/80 bg-slate-950/70">
                   <Image
                     src="/logo.jpg"
                     alt={`${t('brand.name')} logo`}
@@ -34,9 +37,9 @@ export function AppShell({ children }: AppShellProps) {
                     priority
                   />
                 </div>
-                <div className="space-y-0.5">
+                <div className="min-w-0 space-y-0.5">
                   <h1 className="text-xl font-bold tracking-tight">{t('brand.name')}</h1>
-                  <p className="text-xs text-slate-300">{t('brand.tagline')}</p>
+                  <p className="break-keep text-xs text-slate-300">{t('brand.tagline')}</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
