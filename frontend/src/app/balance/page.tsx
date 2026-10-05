@@ -177,7 +177,7 @@ function readPersistedBalanceState(): PersistedBalanceState | null {
 
 export default function BalancePage() {
   const router = useRouter()
-  const { isAdmin, isSuperAdmin, isLoggedIn, canViewMmr } = useAdminAuth()
+  const { isSuperAdmin, isLoggedIn, canViewMmr } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
   const showMmr = canViewMmr && mmrVisible
   const [players, setPlayers] = useState<BalancePlayerOption[]>([])
@@ -553,7 +553,11 @@ export default function BalancePage() {
     }
   }
 
-  const createMatchFromResult = async (balanceResult: BalanceResponse): Promise<number | null> => {
+  // resultFollows: the match is saved only because its result is being entered now.
+  const createMatchFromResult = async (
+    balanceResult: BalanceResponse,
+    resultFollows = false,
+  ): Promise<number | null> => {
     const homePlayerIds = balanceResult.homeTeam
       .map((player) => player.playerId)
       .filter((playerId): playerId is number => typeof playerId === 'number' && Number.isFinite(playerId))
@@ -578,6 +582,7 @@ export default function BalancePage() {
         awayPlayerIds,
         teamSize: balanceResult.teamSize,
         raceComposition,
+        resultFollows,
       })
 
       const confirmationStatus = created.confirmationStatus
@@ -679,7 +684,7 @@ export default function BalancePage() {
     try {
       let parsedMatchId = Number(resultMatchId)
       if (!Number.isFinite(parsedMatchId) || parsedMatchId <= 0) {
-        const createdMatchId = await createMatchFromResult(result)
+        const createdMatchId = await createMatchFromResult(result, true)
         if (!createdMatchId) {
           return
         }
@@ -1077,15 +1082,13 @@ export default function BalancePage() {
               type="button"
               onClick={() => void handleConfirmMatch()}
               disabled={matchConfirming || resultSubmitting}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+              className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {matchConfirming ? t('balance.quickResult.confirmingMatch') : t('balance.quickResult.confirmMatch')}
             </button>
-            {isAdmin && (
-              <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                {t('balance.quickResult.confirmMatchHint')}
-              </span>
-            )}
+            <span className="text-[11px] text-slate-500 dark:text-slate-400">
+              {t('balance.quickResult.confirmMatchHint')}
+            </span>
           </div>
         )}
         {result && (

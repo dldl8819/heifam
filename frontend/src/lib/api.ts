@@ -962,7 +962,14 @@ export const apiClient = {
     }, { adminOnly: true }),
   createGroupMatch: (
     groupId: number,
-    payload: { homePlayerIds: number[]; awayPlayerIds: number[]; teamSize?: number; raceComposition?: string }
+    payload: {
+      homePlayerIds: number[]
+      awayPlayerIds: number[]
+      teamSize?: number
+      raceComposition?: string
+      // The result is entered right after: the match was never open for predictions, so none are announced.
+      resultFollows?: boolean
+    }
   ) =>
     apiRequest<CreateGroupMatchResponse>(
       `/api/groups/${groupId}/matches`,

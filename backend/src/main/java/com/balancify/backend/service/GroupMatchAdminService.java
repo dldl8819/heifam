@@ -74,7 +74,9 @@ public class GroupMatchAdminService {
             null,
             request.raceComposition(),
             DuplicateHandling.REUSE_ACTIVE_REJECT_COMPLETED,
-            null
+            null,
+            // A match saved only to take its result at once was never open for predictions.
+            !Boolean.TRUE.equals(request.resultFollows())
         );
 
         if (outcome.duplicateRejected()) {
@@ -119,7 +121,8 @@ public class GroupMatchAdminService {
             note,
             raceComposition,
             DuplicateHandling.REJECT,
-            null
+            null,
+            true
         ).match();
     }
 
@@ -145,7 +148,8 @@ public class GroupMatchAdminService {
             null,
             raceComposition,
             DuplicateHandling.NONE,
-            new SeriesLink(seriesId, null, seriesGameNumber)
+            new SeriesLink(seriesId, null, seriesGameNumber),
+            true
         ).match();
     }
 
@@ -172,7 +176,8 @@ public class GroupMatchAdminService {
             null,
             raceComposition,
             DuplicateHandling.NONE,
-            new SeriesLink(null, balanceSeriesId, seriesGameNumber)
+            new SeriesLink(null, balanceSeriesId, seriesGameNumber),
+            true
         ).match();
     }
 
@@ -222,7 +227,8 @@ public class GroupMatchAdminService {
         String note,
         String rawRaceComposition,
         DuplicateHandling duplicateHandling,
-        SeriesLink seriesLink
+        SeriesLink seriesLink,
+        boolean announcePredictions
     ) {
         int normalizedTeamSize = normalizeRequestedTeamSize(requestedTeamSize);
         String normalizedRaceComposition = RaceCompositionPolicy.normalizeForTeamSize(
@@ -357,8 +363,9 @@ public class GroupMatchAdminService {
         }
 
         matchParticipantRepository.saveAll(participants);
-        // A balanced match opens for predictions as it is created; a manual entry comes with its result.
-        if (normalizedSource == MatchSource.BALANCED) {
+        // A balanced match opens for predictions as it is created. A manual entry comes with its
+        // result, and so does a balanced one saved at the moment its result is entered.
+        if (normalizedSource == MatchSource.BALANCED && announcePredictions) {
             notificationService.publishPredictionsOpen(group.getId(), savedMatch.getId(), normalizedTeamSize);
         }
         return new MatchCreationOutcome(savedMatch, false, false);
