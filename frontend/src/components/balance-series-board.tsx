@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { apiClient, isApiConflictError, isApiForbiddenError } from '@/lib/api'
 import { SeriesGameView, type GameDraft } from '@/components/series-game-view'
+import { useAdminAuth } from '@/lib/admin-auth'
 import { Alert, AlertContent, AlertDescription, AlertIcon } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { BALANCE_SERIES_POLL_MS, orderBoardSeries, seriesTeamNumber, teamLine } from '@/lib/balance-series'
@@ -38,6 +39,8 @@ function describeError(error: unknown, fallback: string): string {
 
 /** The series started from multi-balance results: score, games and a result form for the game in play. */
 export function BalanceSeriesBoard({ groupId, refreshSignal }: BalanceSeriesBoardProps) {
+  // Members run series; cancelling one stays with admins, as the backend enforces.
+  const { isAdmin } = useAdminAuth()
   const [seriesList, setSeriesList] = useState<BalanceSeries[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
@@ -223,7 +226,7 @@ export function BalanceSeriesBoard({ groupId, refreshSignal }: BalanceSeriesBoar
                         ? t('balanceSeries.board.winner', { team: sideLabel(series, series.winnerTeam) })
                         : t(`balanceSeries.board.status.${series.status}`)}
                     </p>
-                    {running && (
+                    {running && isAdmin && (
                       <button
                         type="button"
                         onClick={() => void handleCancel(series)}
