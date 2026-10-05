@@ -122,6 +122,10 @@ public class AccountPersonalDataRepository {
             identityParameters
         );
         jdbcTemplate.update(
+            "UPDATE matches SET created_by_email = NULL WHERE LOWER(BTRIM(created_by_email)) = :email",
+            identityParameters
+        );
+        jdbcTemplate.update(
             """
             UPDATE operation_audit_logs
             SET actor_email = NULL,
@@ -153,6 +157,11 @@ public class AccountPersonalDataRepository {
                 WHERE group_id = :groupId
                   AND LOWER(BTRIM(result_recorded_by_email)) = :email
                 """,
+                identityParameters
+            );
+            jdbcTemplate.update(
+                "UPDATE matches SET created_by_email = NULL "
+                    + "WHERE group_id = :groupId AND LOWER(BTRIM(created_by_email)) = :email",
                 identityParameters
             );
             jdbcTemplate.update(

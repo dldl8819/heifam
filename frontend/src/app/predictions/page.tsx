@@ -35,6 +35,12 @@ function MatchTitle({ match }: { match: PredictionMatch }) {
     <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">
       {match.seriesGameNumber !== null ? `${t('predictions.tournamentGame', { number: match.seriesGameNumber })} · ` : ''}
       {match.raceComposition ?? ''}
+      {/* Whom the match is waiting on for its result. */}
+      {match.createdByNickname && (
+        <span className="ml-2 font-normal text-slate-500 dark:text-slate-400">
+          {t('predictions.createdBy', { nickname: match.createdByNickname })}
+        </span>
+      )}
     </p>
   )
 }

@@ -1169,7 +1169,7 @@ class AdminKeyFilterTest {
 
     @Test
     void allowsGroupMatchCreateWithAllowedEmail() throws Exception {
-        when(groupMatchAdminService.createMatch(eq(1L), any()))
+        when(groupMatchAdminService.createMatch(eq(1L), any(), eq("member@hei.gg")))
             .thenReturn(new CreateGroupMatchResponse(100L, "CREATED", "ok"));
 
         mockMvc

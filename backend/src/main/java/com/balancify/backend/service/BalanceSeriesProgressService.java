@@ -77,6 +77,15 @@ public class BalanceSeriesProgressService {
     /** Recounts the series of a recorded, corrected or deleted game and sets up its next game. */
     @Transactional(propagation = Propagation.MANDATORY)
     public void sync(Long balanceSeriesId) {
+        sync(balanceSeriesId, null);
+    }
+
+    /**
+     * As {@link #sync(Long)}, for a result just entered: whoever entered it set the next game up.
+     * Without one, the next game keeps whoever set up the game before it.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void sync(Long balanceSeriesId, String actorEmail) {
         if (balanceSeriesId == null) {
             return;
         }
@@ -84,13 +93,13 @@ public class BalanceSeriesProgressService {
         if (series == null || series.getStatus() == BalanceSeriesStatus.CANCELLED) {
             return;
         }
-        syncSeries(series, matchRepository.findByBalanceSeriesIdOrderBySeriesGameNumberAsc(series.getId()));
+        syncSeries(series, matchRepository.findByBalanceSeriesIdOrderBySeriesGameNumberAsc(series.getId()), actorEmail);
     }
 
-    /** Sets up the first game of a series just saved. */
+    /** Sets up the first game of a series just saved, by the member who started it. */
     @Transactional(propagation = Propagation.MANDATORY)
-    public void open(BalanceSeries series) {
-        syncSeries(series, List.of());
+    public void open(BalanceSeries series, String actorEmail) {
+        syncSeries(series, List.of(), actorEmail);
     }
 
     /** Removes the games of a cancelled series that were set up but never played. */
@@ -101,7 +110,7 @@ public class BalanceSeriesProgressService {
             .toList());
     }
 
-    private void syncSeries(BalanceSeries series, List<Match> games) {
+    private void syncSeries(BalanceSeries series, List<Match> games, String actorEmail) {
         List<Match> recorded = games.stream().filter(this::hasResult).toList();
         int homeWins = (int) recorded.stream().filter(game -> TEAM_HOME.equals(game.getWinningTeam())).count();
         int awayWins = recorded.size() - homeWins;
@@ -127,11 +136,19 @@ public class BalanceSeriesProgressService {
         deleteUnplayed(unplayed.stream().filter(game -> gameNumber(game) != nextNumber).toList());
         boolean nextReady = unplayed.stream().anyMatch(game -> gameNumber(game) == nextNumber);
         if (!nextReady && nextNumber <= series.plannedCompositions().size()) {
-            createGame(series, nextNumber);
+            createGame(series, nextNumber, actorEmail != null && !actorEmail.isBlank() ? actorEmail : lastCreator(games));
         }
     }
 
-    private void createGame(BalanceSeries series, int gameNumber) {
+    private String lastCreator(List<Match> games) {
+        return games.stream()
+            .filter(game -> game.getCreatedByEmail() != null)
+            .max(java.util.Comparator.comparingInt(this::gameNumber))
+            .map(Match::getCreatedByEmail)
+            .orElse(null);
+    }
+
+    private void createGame(BalanceSeries series, int gameNumber, String createdByEmail) {
         List<Long> homeIds = series.homePlayerIds();
         List<Long> awayIds = series.awayPlayerIds();
         Map<Long, Player> players = new HashMap<>();
@@ -154,7 +171,8 @@ public class BalanceSeriesProgressService {
             series.getTeamSize(),
             composition,
             series.getId(),
-            gameNumber
+            gameNumber,
+            createdByEmail
         );
     }
 

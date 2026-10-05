@@ -155,7 +155,7 @@ class BalanceSeriesServiceTest {
         doAnswer(invocation -> storedGames.remove(invocation.<Match>getArgument(0)))
             .when(matchRepository).delete(any(Match.class));
         when(matchParticipantRepository.findByMatchIdInWithPlayerAndMatch(anyList())).thenReturn(List.of());
-        when(groupMatchAdminService.createBalanceSeriesGameMatch(eq(7L), anyList(), anyList(), anyInt(), any(), any(), anyInt()))
+        when(groupMatchAdminService.createBalanceSeriesGameMatch(eq(7L), anyList(), anyList(), anyInt(), any(), any(), anyInt(), any()))
             .thenAnswer(invocation -> {
                 Match game = new Match();
                 game.setId(nextMatchId++);
@@ -164,6 +164,7 @@ class BalanceSeriesServiceTest {
                 game.setRaceComposition(invocation.getArgument(4));
                 game.setBalanceSeriesId(invocation.getArgument(5));
                 game.setSeriesGameNumber(invocation.getArgument(6));
+                game.setCreatedByEmail(invocation.getArgument(7));
                 storedGames.add(game);
                 return game;
             });
@@ -183,8 +184,8 @@ class BalanceSeriesServiceTest {
             .containsExactly(MatchSeriesFormat.BEST_OF_THREE, MatchSeriesFormat.MIXED_THREE);
         assertThat(storedSeries).extracting(BalanceSeries::getGameCompositions)
             .containsExactly("PPP,PPP,PPP", "PPP,PPT,PPZ");
-        verify(groupMatchAdminService).createBalanceSeriesGameMatch(7L, List.of(11L, 12L, 13L), List.of(14L, 15L, 16L), 3, "PPP", 100L, 1);
-        verify(groupMatchAdminService).createBalanceSeriesGameMatch(7L, List.of(21L, 22L, 23L), List.of(24L, 25L, 26L), 3, "PPP", 101L, 1);
+        verify(groupMatchAdminService).createBalanceSeriesGameMatch(7L, List.of(11L, 12L, 13L), List.of(14L, 15L, 16L), 3, "PPP", 100L, 1, ADMIN);
+        verify(groupMatchAdminService).createBalanceSeriesGameMatch(7L, List.of(21L, 22L, 23L), List.of(24L, 25L, 26L), 3, "PPP", 101L, 1, ADMIN);
         verify(operationAuditLogService).recordBalanceSeriesStarted(ADMIN, "Ops", 7L, 2);
         assertThat(response.series()).hasSize(2);
         assertThat(storedSeries).extracting(BalanceSeries::getMatchNumber).containsExactly(1, 2);
@@ -214,6 +215,23 @@ class BalanceSeriesServiceTest {
         assertThat(series.getAwayWins()).isEqualTo(2);
         assertThat(series.getFinishedAt()).isNotNull();
         assertThat(game(series, 3)).isNull();
+    }
+
+    @Test
+    void namesWhoeverEnteredTheLastResultAsTheNextGamesCreator() {
+        service.start(7L, List.of(lineup(1, "P", "P", "P", "P", "P", "P")), ADMIN, null, false);
+        BalanceSeries series = storedSeries.getFirst();
+        assertThat(game(series, 1).getCreatedByEmail()).isEqualTo(ADMIN);
+
+        // Someone else enters game 1: game 2 is theirs to see through.
+        record(game(series, 1), "HOME");
+        progress.sync(series.getId(), "member@example.com");
+        assertThat(game(series, 2).getCreatedByEmail()).isEqualTo("member@example.com");
+
+        // A sync without anyone (a deleted game set up again) keeps the last one named.
+        storedGames.remove(game(series, 2));
+        progress.sync(series.getId());
+        assertThat(game(series, 2).getCreatedByEmail()).isEqualTo(ADMIN);
     }
 
     @Test
@@ -292,7 +310,7 @@ class BalanceSeriesServiceTest {
 
         assertThat(series.getTeamSize()).isEqualTo(2);
         assertThat(series.getGameCompositions()).isEqualTo("PP,PT,PZ");
-        verify(groupMatchAdminService).createBalanceSeriesGameMatch(7L, List.of(11L, 12L), List.of(13L, 14L), 2, "PP", 100L, 1);
+        verify(groupMatchAdminService).createBalanceSeriesGameMatch(7L, List.of(11L, 12L), List.of(13L, 14L), 2, "PP", 100L, 1, ADMIN);
     }
 
     @Test

@@ -25,6 +25,8 @@ public record PredictionMatchResponse(
     List<String> awayPickers,
     String winnerTeam,
     Boolean hit,
-    boolean pointsExcluded
+    boolean pointsExcluded,
+    // The nickname of whoever set the match up; null when unknown.
+    String createdByNickname
 ) {
 }

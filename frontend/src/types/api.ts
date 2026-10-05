@@ -1067,6 +1067,8 @@ export type PredictionMatch = {
   winnerTeam: TeamSide | null
   hit: boolean | null
   pointsExcluded: boolean
+  // The nickname of whoever set the match up; null when unknown.
+  createdByNickname: string | null
 }
 
 // A balanced 3v3 match the player played, whose result they confirm for a point.
