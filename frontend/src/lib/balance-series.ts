@@ -81,13 +81,35 @@ export function offRaceAssignments(
   })
 }
 
-/** Running series first; each group in the order started, so match 1 comes before match 2. */
+// Series started by one multi-balance are saved together, moments apart.
+const SAME_MULTI_BALANCE_MS = 60_000
+
+/**
+ * The series of one multi-balance stay together in match order, so match 1 is left of match 2
+ * whichever of them is over. Multi-balances with a series still running come first, then the
+ * newest. Series of one multi-balance have rising ids and match numbers and start together.
+ */
 export function orderBoardSeries(series: BalanceSeries[]): BalanceSeries[] {
-  return [...series].sort((left, right) => {
-    const leftRunning = left.status === 'IN_PROGRESS' ? 0 : 1
-    const rightRunning = right.status === 'IN_PROGRESS' ? 0 : 1
-    return leftRunning - rightRunning || left.seriesId - right.seriesId
-  })
+  const groups: BalanceSeries[][] = []
+  for (const item of [...series].sort((left, right) => left.seriesId - right.seriesId)) {
+    const group = groups[groups.length - 1]
+    const previous = group?.[group.length - 1]
+    const sameMultiBalance =
+      previous !== undefined &&
+      item.matchNumber !== null &&
+      previous.matchNumber !== null &&
+      item.matchNumber > previous.matchNumber &&
+      Math.abs(Date.parse(item.createdAt) - Date.parse(group[0].createdAt)) <= SAME_MULTI_BALANCE_MS
+    if (sameMultiBalance) {
+      group.push(item)
+    } else {
+      groups.push([item])
+    }
+  }
+  const running = (group: BalanceSeries[]) => (group.some((item) => item.status === 'IN_PROGRESS') ? 0 : 1)
+  return groups
+    .sort((left, right) => running(left) - running(right) || right[0].seriesId - left[0].seriesId)
+    .flat()
 }
 
 /** The team numbers the multi-balance showed (match n is teams 2n-1 and 2n); 1 and 2 for older series. */

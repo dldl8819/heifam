@@ -116,14 +116,52 @@ describe('series format choice', () => {
 })
 
 describe('orderBoardSeries', () => {
-  it('puts running series first, each group in the order started', () => {
+  const started = (seriesId: number, status: BalanceSeries['status'], matchNumber: number, createdAt: string) => ({
+    ...series(seriesId, status),
+    matchNumber,
+    createdAt,
+  })
+
+  it('keeps match 1 left of match 2 when match 1 is over and match 2 still runs', () => {
+    const ordered = orderBoardSeries([
+      started(12, 'IN_PROGRESS', 2, '2026-10-05T10:00:00.200Z'),
+      started(11, 'COMPLETED', 1, '2026-10-05T10:00:00.100Z'),
+    ])
+
+    expect(ordered.map((item) => item.matchNumber)).toEqual([1, 2])
+  })
+
+  it('shows multi-balances with a running series first, then the newest, each in match order', () => {
+    const ordered = orderBoardSeries([
+      started(31, 'COMPLETED', 1, '2026-10-05T12:00:00Z'),
+      started(32, 'COMPLETED', 2, '2026-10-05T12:00:00Z'),
+      started(21, 'COMPLETED', 1, '2026-10-05T11:00:00Z'),
+      started(22, 'IN_PROGRESS', 2, '2026-10-05T11:00:00Z'),
+      started(11, 'COMPLETED', 1, '2026-10-05T10:00:00Z'),
+    ])
+
+    expect(ordered.map((item) => item.seriesId)).toEqual([21, 22, 31, 32, 11])
+  })
+
+  it('does not join series of different multi-balances by their numbers alone', () => {
+    // Match 1 of the later multi-balance was cancelled and is not listed.
+    const ordered = orderBoardSeries([
+      started(11, 'COMPLETED', 1, '2026-10-05T10:00:00Z'),
+      started(22, 'IN_PROGRESS', 2, '2026-10-05T11:00:00Z'),
+    ])
+
+    expect(ordered.map((item) => item.seriesId)).toEqual([22, 11])
+  })
+
+  it('treats series without a match number as their own, running ones first', () => {
     const ordered = orderBoardSeries([
       series(2, 'IN_PROGRESS'),
       series(4, 'COMPLETED'),
       series(1, 'IN_PROGRESS'),
       series(3, 'COMPLETED'),
     ])
-    expect(ordered.map((item) => item.seriesId)).toEqual([1, 2, 3, 4])
+
+    expect(ordered.map((item) => item.seriesId)).toEqual([2, 1, 4, 3])
   })
 })
 
