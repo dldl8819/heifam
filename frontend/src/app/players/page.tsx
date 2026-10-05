@@ -775,6 +775,9 @@ export default function PlayersPage() {
         setPlayerActionError(t('common.permissionDenied'))
       } else if (isApiNotFoundError(actionError)) {
         setPlayerActionError(t('players.actions.updateNotFound'))
+      } else if (isApiConflictError(actionError) && actionError instanceof Error && actionError.message.trim()) {
+        // The server says what blocks it, e.g. an account still listed in the access env vars.
+        setPlayerActionError(actionError.message)
       } else {
         setPlayerActionError(
           nextActive ? t('players.actions.reactivateFailure') : t('players.actions.deactivateFailure')

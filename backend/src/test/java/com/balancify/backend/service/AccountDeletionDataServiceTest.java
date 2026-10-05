@@ -647,7 +647,8 @@ class AccountDeletionDataServiceTest {
             accountDeletionDataService.retainInactivePlayer(player)
         )
             .isInstanceOf(com.balancify.backend.service.exception.AccountDeletionException.class)
-            .hasMessage("Account deactivation requires a verified account email");
+            .hasMessage("Account deactivation requires a verified account email")
+            .hasFieldOrPropertyWithValue("reason", com.balancify.backend.service.exception.AccountDeletionException.Reason.LINKED_ACCOUNT_WITHOUT_EMAIL);
 
         assertThat(player.isActive()).isTrue();
         assertThat(player.getAuthUserId()).isEqualTo(PLACEHOLDER_AUTH_USER_ID);
@@ -745,7 +746,8 @@ class AccountDeletionDataServiceTest {
             accountDeletionDataService.retainInactivePlayer(player)
         )
             .isInstanceOf(com.balancify.backend.service.exception.AccountDeletionException.class)
-            .hasMessage("Account deactivation identity ownership could not be resolved");
+            .hasMessage("Account deactivation identity ownership could not be resolved")
+            .hasFieldOrPropertyWithValue("reason", com.balancify.backend.service.exception.AccountDeletionException.Reason.NICKNAME_SHARED_BY_PLAYERS);
     }
 
     @Test
@@ -772,7 +774,8 @@ class AccountDeletionDataServiceTest {
             accountDeletionDataService.retainInactivePlayer(player)
         )
             .isInstanceOf(com.balancify.backend.service.exception.AccountDeletionException.class)
-            .hasMessage("Account deactivation identity ownership could not be resolved");
+            .hasMessage("Account deactivation identity ownership could not be resolved")
+            .hasFieldOrPropertyWithValue("reason", com.balancify.backend.service.exception.AccountDeletionException.Reason.NICKNAME_SHARED_BY_ACCOUNTS);
 
         assertThat(player.isActive()).isTrue();
         verify(playerRepository, never()).saveAndFlush(player);

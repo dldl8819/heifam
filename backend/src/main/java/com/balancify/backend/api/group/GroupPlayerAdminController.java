@@ -6,6 +6,7 @@ import com.balancify.backend.security.AuthenticatedRequestResolver;
 import com.balancify.backend.security.MmrAccessRequestResolver;
 import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.PlayerAdminService;
+import com.balancify.backend.service.exception.AccountDeletionException;
 import com.balancify.backend.service.exception.PlayerEditForbiddenException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.NoSuchElementException;
@@ -82,7 +83,32 @@ public class GroupPlayerAdminController {
                 noSuchElementException.getMessage(),
                 noSuchElementException
             );
+        } catch (AccountDeletionException accountDeletionException) {
+            // Deactivating also closes the player's login account; say what stands in the way.
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                deactivationBlockedMessage(accountDeletionException.getReason()),
+                accountDeletionException
+            );
         }
+    }
+
+    static String deactivationBlockedMessage(AccountDeletionException.Reason reason) {
+        return switch (reason) {
+            case CONFIGURED_ACCESS_LIST ->
+                "서버 환경변수(ADMIN_EMAILS·SUPER_ADMIN_EMAILS·ALLOWED_USER_EMAILS)에 등록된 계정이라 비활성화할 수 없습니다. 환경변수에서 먼저 빼 주세요.";
+            case IDENTITY_UNRESOLVED ->
+                "이 선수와 연결된 로그인 계정을 하나로 확인할 수 없어 비활성화하지 못했습니다.";
+            case LINKED_ACCOUNT_WITHOUT_EMAIL ->
+                "이 선수와 연결된 로그인 계정에 이메일 정보가 없어 비활성화하지 못했습니다.";
+            case NICKNAME_SHARED_BY_PLAYERS ->
+                "같은 닉네임을 쓰는 다른 선수 기록(비활성 선수 포함)이 있어 어느 계정인지 확인할 수 없습니다. 한쪽 닉네임을 바꾼 뒤 다시 시도해 주세요.";
+            case NICKNAME_SHARED_BY_ACCOUNTS ->
+                "권한 관리 목록에 이 닉네임을 쓰는 이메일이 여러 개라 어느 계정인지 확인할 수 없습니다. 권한 관리에서 중복을 정리한 뒤 다시 시도해 주세요.";
+            case AUTH_UNAVAILABLE ->
+                "로그인 계정 서비스에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+            case OTHER -> "연결된 계정 정보 때문에 비활성화하지 못했습니다.";
+        };
     }
 
     @PatchMapping("/{groupId}/players/{playerId}/mmr")

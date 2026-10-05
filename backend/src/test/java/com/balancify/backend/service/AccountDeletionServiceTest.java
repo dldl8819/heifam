@@ -154,17 +154,36 @@ class AccountDeletionServiceTest {
                 PLACEHOLDER_AUTH_USER_ID,
                 true
             ));
-        org.mockito.Mockito.doThrow(new AccountDeletionException("placeholder failure"))
+        org.mockito.Mockito.doThrow(new AccountDeletionException(
+                AccountDeletionException.Reason.AUTH_UNAVAILABLE,
+                "placeholder failure"
+            ))
             .when(supabaseAuthAdminClient)
             .deleteUser(PLACEHOLDER_AUTH_USER_ID);
 
-        assertThatThrownBy(() ->
-            accountDeletionService.deactivatePlayer(303L, INACTIVE_AT, INACTIVE_REASON)
-        )
-            .isInstanceOf(AccountDeletionException.class);
+        // The player is deactivated already; the queued deletion is retried by the worker.
+        accountDeletionService.deactivatePlayer(303L, INACTIVE_AT, INACTIVE_REASON);
 
         verify(accountDeletionDataService, never())
             .completePendingAuthDeletion(PLACEHOLDER_AUTH_USER_ID);
+        verify(supabaseJwtVerifier).invalidateUser(PLACEHOLDER_AUTH_USER_ID.toString());
+    }
+
+    @Test
+    void stillReportsOtherAccountFailuresAfterDeactivation() {
+        when(accountDeletionDataService.retainInactivePlayer(304L, INACTIVE_AT, INACTIVE_REASON))
+            .thenReturn(new AccountDeletionDataService.InactivePlayerCleanupOutcome(
+                PLACEHOLDER_AUTH_USER_ID,
+                true
+            ));
+        org.mockito.Mockito.doThrow(new AccountDeletionException("placeholder failure"))
+            .when(accountDeletionDataService)
+            .completePendingAuthDeletion(PLACEHOLDER_AUTH_USER_ID);
+
+        assertThatThrownBy(() ->
+            accountDeletionService.deactivatePlayer(304L, INACTIVE_AT, INACTIVE_REASON)
+        )
+            .isInstanceOf(AccountDeletionException.class);
         verify(supabaseJwtVerifier).invalidateUser(PLACEHOLDER_AUTH_USER_ID.toString());
     }
 

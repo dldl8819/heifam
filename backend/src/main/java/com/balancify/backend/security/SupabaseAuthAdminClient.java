@@ -37,13 +37,13 @@ public class SupabaseAuthAdminClient {
 
     public void ensureConfigured() {
         if (resolveAuthBaseUrl().isEmpty() || properties.getServiceRoleKey().isEmpty()) {
-            throw new AccountDeletionException(UNAVAILABLE_MESSAGE);
+            throw new AccountDeletionException(AccountDeletionException.Reason.AUTH_UNAVAILABLE, UNAVAILABLE_MESSAGE);
         }
     }
 
     public void deleteUser(UUID userId) {
         if (userId == null) {
-            throw new AccountDeletionException(UNAVAILABLE_MESSAGE);
+            throw new AccountDeletionException(AccountDeletionException.Reason.AUTH_UNAVAILABLE, UNAVAILABLE_MESSAGE);
         }
         ensureConfigured();
 
@@ -61,12 +61,12 @@ public class SupabaseAuthAdminClient {
             if ((response.statusCode() >= 200 && response.statusCode() < 300) || response.statusCode() == 404) {
                 return;
             }
-            throw new AccountDeletionException(UNAVAILABLE_MESSAGE);
+            throw new AccountDeletionException(AccountDeletionException.Reason.AUTH_UNAVAILABLE, UNAVAILABLE_MESSAGE);
         } catch (InterruptedException interruptedException) {
             Thread.currentThread().interrupt();
-            throw new AccountDeletionException(UNAVAILABLE_MESSAGE);
+            throw new AccountDeletionException(AccountDeletionException.Reason.AUTH_UNAVAILABLE, UNAVAILABLE_MESSAGE);
         } catch (IOException | IllegalArgumentException exception) {
-            throw new AccountDeletionException(UNAVAILABLE_MESSAGE);
+            throw new AccountDeletionException(AccountDeletionException.Reason.AUTH_UNAVAILABLE, UNAVAILABLE_MESSAGE);
         }
     }
 

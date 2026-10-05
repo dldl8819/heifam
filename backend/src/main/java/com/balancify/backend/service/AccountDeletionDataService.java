@@ -232,6 +232,7 @@ public class AccountDeletionDataService {
 
         if (requiresAccountCleanup && accessControlService.hasConfiguredAccessGrant(accountEmail)) {
             throw new AccountDeletionException(
+                AccountDeletionException.Reason.CONFIGURED_ACCESS_LIST,
                 "Account deactivation requires removal from the configured access list"
             );
         }
@@ -340,6 +341,7 @@ public class AccountDeletionDataService {
                 .orElse("");
             if (linkedEmail.isEmpty()) {
                 throw new AccountDeletionException(
+                    AccountDeletionException.Reason.LINKED_ACCOUNT_WITHOUT_EMAIL,
                     "Account deactivation requires a verified account email"
                 );
             }
@@ -351,6 +353,7 @@ public class AccountDeletionDataService {
         if (nicknameMatches.size() != 1
             || !player.getId().equals(nicknameMatches.get(0).getId())) {
             throw new AccountDeletionException(
+                AccountDeletionException.Reason.NICKNAME_SHARED_BY_PLAYERS,
                 "Account deactivation identity ownership could not be resolved"
             );
         }
@@ -374,6 +377,7 @@ public class AccountDeletionDataService {
         }
         if (emails.size() != 1 || authUserIds.size() > 1) {
             throw new AccountDeletionException(
+                AccountDeletionException.Reason.NICKNAME_SHARED_BY_ACCOUNTS,
                 "Account deactivation identity ownership could not be resolved"
             );
         }

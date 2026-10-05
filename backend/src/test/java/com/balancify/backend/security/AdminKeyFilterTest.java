@@ -1210,6 +1210,26 @@ class AdminKeyFilterTest {
     }
 
     @Test
+    void explainsAPlayerDeactivationTheLoginAccountBlocks() throws Exception {
+        org.mockito.Mockito.doThrow(new com.balancify.backend.service.exception.AccountDeletionException(
+                com.balancify.backend.service.exception.AccountDeletionException.Reason.CONFIGURED_ACCESS_LIST,
+                "placeholder"
+            ))
+            .when(playerAdminService)
+            .updatePlayer(eq(1L), eq(10L), any(), eq("admin@hei.gg"), any(), any());
+
+        mockMvc
+            .perform(
+                patch("/api/groups/1/players/10")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"active\":false,\"chatLeftAt\":\"2026-10-01T00:00:00Z\",\"chatLeftReason\":\"YOUR_REASON\"}")
+            )
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("ALLOWED_USER_EMAILS")));
+    }
+
+    @Test
     void allowsPlayerTierUpdateWithAdminEmailWithoutMmrAccess() throws Exception {
         mockMvc
             .perform(
