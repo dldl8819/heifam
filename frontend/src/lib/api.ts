@@ -1622,6 +1622,13 @@ export const apiClient = {
       { method: 'POST' },
       { requireUserEmail: true, includeUserEmail: true }
     ),
+  // Calls off a match that was set up but not played; one with a result answers 409.
+  cancelMatch: (matchId: number) =>
+    apiRequest<void>(
+      `/api/matches/${matchId}/cancel`,
+      { method: 'POST' },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
   getMatchConfirmations: (groupId: number) =>
     apiRequest<MatchConfirmationList>(`/api/groups/${groupId}/match-confirmations`, undefined, {
       requireUserEmail: true,

@@ -1295,6 +1295,49 @@ class MatchResultServiceTest {
     }
 
     @Test
+    void callsOffAMatchThatWasSetUpButNotPlayed() {
+        Match match = new Match();
+        match.setId(99L);
+        match.setStatus(MatchStatus.CONFIRMED);
+        when(matchRepository.findByIdForUpdate(99L)).thenReturn(Optional.of(match));
+
+        MatchResultService.DeletedMatchAuditSnapshot snapshot = matchResultService.cancelUnplayedMatch(99L);
+
+        assertThat(snapshot.matchId()).isEqualTo(99L);
+        assertThat(snapshot.hadResult()).isFalse();
+        verify(matchParticipantRepository).deleteByMatch_Id(99L);
+        verify(matchRepository).delete(match);
+        verify(predictionService).revoke(99L);
+    }
+
+    @Test
+    void refusesToCallOffAMatchWithAResultOrASeriesGame() {
+        Match played = new Match();
+        played.setId(98L);
+        played.setStatus(MatchStatus.COMPLETED);
+        played.setWinningTeam("HOME");
+        when(matchRepository.findByIdForUpdate(98L)).thenReturn(Optional.of(played));
+        Match seriesGame = new Match();
+        seriesGame.setId(97L);
+        seriesGame.setStatus(MatchStatus.CONFIRMED);
+        seriesGame.setBalanceSeriesId(5L);
+        seriesGame.setSeriesGameNumber(1);
+        when(matchRepository.findByIdForUpdate(97L)).thenReturn(Optional.of(seriesGame));
+        Match tournamentGame = new Match();
+        tournamentGame.setId(96L);
+        tournamentGame.setStatus(MatchStatus.CONFIRMED);
+        tournamentGame.setSeriesId(70L);
+        when(matchRepository.findByIdForUpdate(96L)).thenReturn(Optional.of(tournamentGame));
+        when(matchRepository.findByIdForUpdate(95L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> matchResultService.cancelUnplayedMatch(98L)).isInstanceOf(MatchConflictException.class);
+        assertThatThrownBy(() -> matchResultService.cancelUnplayedMatch(97L)).isInstanceOf(MatchConflictException.class);
+        assertThatThrownBy(() -> matchResultService.cancelUnplayedMatch(96L)).isInstanceOf(MatchConflictException.class);
+        assertThatThrownBy(() -> matchResultService.cancelUnplayedMatch(95L)).isInstanceOf(java.util.NoSuchElementException.class);
+        verify(matchRepository, never()).delete(any(Match.class));
+    }
+
+    @Test
     void deletesMatchAndRollsBackPlayerMmr() {
         Match match = new Match();
         match.setId(99L);

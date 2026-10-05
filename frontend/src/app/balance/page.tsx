@@ -13,7 +13,13 @@ import {
 } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAdminAuth } from '@/lib/admin-auth'
-import { apiClient, isApiConflictError, isApiForbiddenError, isApiUnauthorizedError } from '@/lib/api'
+import {
+  apiClient,
+  isApiConflictError,
+  isApiForbiddenError,
+  isApiNotFoundError,
+  isApiUnauthorizedError,
+} from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
@@ -217,6 +223,7 @@ export default function BalancePage() {
   const [resultSubmitSuccess, setResultSubmitSuccess] = useState<MatchResultResponse | null>(null)
   const [matchCreateMessage, setMatchCreateMessage] = useState<string | null>(null)
   const [matchConfirming, setMatchConfirming] = useState<boolean>(false)
+  const [matchCancelling, setMatchCancelling] = useState<boolean>(false)
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle')
   const [persistedReady, setPersistedReady] = useState<boolean>(false)
   const slotInputRefs = useRef<Array<HTMLInputElement | null>>([])
@@ -669,6 +676,35 @@ export default function BalancePage() {
       await createMatchFromResult(result)
     } finally {
       setMatchConfirming(false)
+    }
+  }
+
+  // A player drops out after the match was set up: the match and its predictions are called off.
+  const handleCancelMatch = async () => {
+    const matchId = Number(resultMatchId)
+    if (!hasGeneratedMatchId || !window.confirm(t('balance.quickResult.cancelMatchConfirm'))) {
+      return
+    }
+    setMatchCancelling(true)
+    setResultSubmitError(null)
+    try {
+      await apiClient.cancelMatch(matchId)
+      setResultMatchId('')
+      setMatchCreateMessage(t('balance.quickResult.matchCancelled'))
+    } catch (error) {
+      if (isApiNotFoundError(error)) {
+        // Someone else called it off already; the balance can be set up again.
+        setResultMatchId('')
+        setMatchCreateMessage(t('balance.quickResult.matchCancelled'))
+      } else if (isApiConflictError(error)) {
+        setMatchCreateMessage(t('balance.quickResult.cancelMatchConflict'))
+      } else if (isApiForbiddenError(error)) {
+        setMatchCreateMessage(t('common.permissionDenied'))
+      } else {
+        setMatchCreateMessage(t('balance.quickResult.cancelMatchFailed'))
+      }
+    } finally {
+      setMatchCancelling(false)
     }
   }
 
@@ -1128,6 +1164,21 @@ export default function BalancePage() {
             </button>
             <span className="text-[11px] text-slate-500 dark:text-slate-400">
               {t('balance.quickResult.confirmMatchHint')}
+            </span>
+          </div>
+        )}
+        {hasGeneratedMatchId && !resultSubmitSuccess && (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void handleCancelMatch()}
+              disabled={matchCancelling || resultSubmitting}
+              className="rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/40"
+            >
+              {matchCancelling ? t('balance.quickResult.cancellingMatch') : t('balance.quickResult.cancelMatch')}
+            </button>
+            <span className="text-[11px] text-slate-500 dark:text-slate-400">
+              {t('balance.quickResult.cancelMatchHint')}
             </span>
           </div>
         )}

@@ -976,6 +976,24 @@ public class MatchResultService {
         return normalized;
     }
 
+    /**
+     * Calls off a match that was set up but not played, such as when a player drops out after
+     * "경기 확정". The match goes with its predictions; nothing else was touched by it yet. A match
+     * with a result is deleted by admins instead, and a series game is called off with its series.
+     */
+    @Transactional
+    public DeletedMatchAuditSnapshot cancelUnplayedMatch(Long matchId) {
+        Match match = matchRepository.findByIdForUpdate(matchId)
+            .orElseThrow(() -> new NoSuchElementException("Match not found: " + matchId));
+        if (hasProcessedResult(match.getWinningTeam())) {
+            throw new MatchConflictException("이미 결과가 입력된 경기는 취소할 수 없습니다.");
+        }
+        if (match.getSeriesId() != null || match.getBalanceSeriesId() != null) {
+            throw new MatchConflictException("시리즈 경기는 시리즈에서 취소해 주세요.");
+        }
+        return deleteMatch(matchId);
+    }
+
     @Transactional
     public DeletedMatchAuditSnapshot deleteMatch(Long matchId) {
         // Locked like a result entry, so a result confirmation either lands before the points are
