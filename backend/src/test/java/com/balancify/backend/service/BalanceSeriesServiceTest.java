@@ -76,6 +76,9 @@ class BalanceSeriesServiceTest {
     @Mock
     private OperationAuditLogService operationAuditLogService;
 
+    @Mock
+    private AccessControlService accessControlService;
+
     private BalanceSeriesProgressService progress;
     private BalanceSeriesService service;
     private final Map<Long, Player> players = new HashMap<>();
@@ -102,6 +105,7 @@ class BalanceSeriesServiceTest {
             matchParticipantRepository,
             progress,
             operationAuditLogService,
+            accessControlService,
             Clock.fixed(Instant.parse("2026-10-04T12:00:00Z"), ZoneOffset.UTC)
         );
         Group group = new Group();
@@ -215,6 +219,28 @@ class BalanceSeriesServiceTest {
         assertThat(series.getAwayWins()).isEqualTo(2);
         assertThat(series.getFinishedAt()).isNotNull();
         assertThat(game(series, 3)).isNull();
+    }
+
+    @Test
+    void showsWhomEachSeriesIsWaitingOnByNickname() {
+        when(accessControlService.resolveDisplayNicknames(any()))
+            .thenReturn(java.util.Map.of(ADMIN, "Ops", "member@example.com", "YOUR_USERNAME"));
+        service.start(7L, List.of(lineup(1, "P", "P", "P", "P", "P", "P")), ADMIN, null, false);
+        BalanceSeries series = storedSeries.getFirst();
+
+        assertThat(service.list(7L, false).series().getFirst().createdByNickname()).isEqualTo("Ops");
+
+        // Someone else enters game 1: the series now waits on them for game 2.
+        record(game(series, 1), "HOME");
+        progress.sync(series.getId(), "member@example.com");
+        assertThat(service.list(7L, false).series().getFirst().createdByNickname()).isEqualTo("YOUR_USERNAME");
+
+        // Over at 2:0, it keeps naming whoever set up its last game.
+        record(game(series, 2), "HOME");
+        progress.sync(series.getId(), ADMIN);
+        assertThat(series.getStatus()).isEqualTo(BalanceSeriesStatus.COMPLETED);
+        assertThat(service.list(7L, false).series().getFirst().createdByNickname()).isEqualTo("YOUR_USERNAME");
+        assertThat(service.list(7L, false).toString()).doesNotContain("@");
     }
 
     @Test
