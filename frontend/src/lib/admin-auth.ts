@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { useAuth } from '@/components/auth-session-provider'
 import { ApiRequestError, apiClient } from '@/lib/api'
+import { claimPageMemory } from '@/lib/page-memory'
 import type { AccessMeResponse, AccessRole, PlayerRace } from '@/types/api'
 
 let cachedAccessEmail: string | null = null
@@ -55,6 +56,11 @@ export function useAdminAuthState(): AdminAuthState {
   const [accessProfile, setAccessProfile] = useState<AccessMeResponse | null>(null)
   const [, setAccessLoading] = useState<boolean>(false)
   const [accessError, setAccessError] = useState<boolean>(false)
+
+  // What a page keeps between menus belongs to the account that left it.
+  useEffect(() => {
+    claimPageMemory(email)
+  }, [email])
 
   const refreshAccess = useCallback(async () => {
     if (!email) {

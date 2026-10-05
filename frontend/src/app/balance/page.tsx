@@ -19,6 +19,7 @@ import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
 import { formatPercent } from '@/lib/percent'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
+import { recallPageState, rememberPageState } from '@/lib/page-memory'
 import { findUniquePlayerByNicknamePrefix } from '@/lib/player-autocomplete'
 import { getRaceCompositionOptions, normalizeRaceComposition } from '@/lib/race-composition'
 import { ASSIGNED_RACES, composeTeamRaces, normalizeAssignedRace } from '@/lib/participant-races'
@@ -48,6 +49,20 @@ type SupportedTeamSize = 2 | 3
 type PersistedBalanceState = {
   teamSize: SupportedTeamSize
   raceComposition: RaceComposition | null
+}
+
+const BALANCE_MEMORY_KEY = 'balance'
+
+// What the page holds while the member visits another menu (lib/page-memory: in memory only).
+type BalancePageMemory = {
+  teamSize: SupportedTeamSize
+  raceComposition: RaceComposition | null
+  slots: Array<number | null>
+  slotInputs: string[]
+  result: BalanceResponse | null
+  actualTeamRaces: Record<TeamSide, Array<AssignedRace | null>>
+  resultMatchId: string
+  resultWinnerTeam: WinnerTeamSelection
 }
 
 function formatTeamLabel(team: TeamSide | string): string {
@@ -180,22 +195,23 @@ export default function BalancePage() {
   const { isSuperAdmin, isLoggedIn, canViewMmr } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
   const showMmr = canViewMmr && mmrVisible
+  // Coming back from another menu, the page picks up where it was left.
+  const [recalled] = useState<BalancePageMemory | null>(() => recallPageState<BalancePageMemory>(BALANCE_MEMORY_KEY))
   const [players, setPlayers] = useState<BalancePlayerOption[]>([])
-  const [teamSize, setTeamSize] = useState<SupportedTeamSize>(3)
-  const [raceComposition, setRaceComposition] = useState<RaceComposition | null>(null)
-  const [slots, setSlots] = useState<Array<number | null>>(createEmptySlots)
-  const [slotInputs, setSlotInputs] = useState<string[]>(createEmptySlotInputs)
+  const [teamSize, setTeamSize] = useState<SupportedTeamSize>(recalled?.teamSize ?? 3)
+  const [raceComposition, setRaceComposition] = useState<RaceComposition | null>(recalled?.raceComposition ?? null)
+  const [slots, setSlots] = useState<Array<number | null>>(() => recalled?.slots ?? createEmptySlots())
+  const [slotInputs, setSlotInputs] = useState<string[]>(() => recalled?.slotInputs ?? createEmptySlotInputs())
   const [playersLoading, setPlayersLoading] = useState<boolean>(true)
   const [playersError, setPlayersError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState<boolean>(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
-  const [result, setResult] = useState<BalanceResponse | null>(null)
-  const [actualTeamRaces, setActualTeamRaces] = useState<Record<TeamSide, Array<AssignedRace | null>>>({
-    HOME: [],
-    AWAY: [],
-  })
-  const [resultMatchId, setResultMatchId] = useState<string>('')
-  const [resultWinnerTeam, setResultWinnerTeam] = useState<WinnerTeamSelection>('')
+  const [result, setResult] = useState<BalanceResponse | null>(recalled?.result ?? null)
+  const [actualTeamRaces, setActualTeamRaces] = useState<Record<TeamSide, Array<AssignedRace | null>>>(
+    () => recalled?.actualTeamRaces ?? { HOME: [], AWAY: [] },
+  )
+  const [resultMatchId, setResultMatchId] = useState<string>(recalled?.resultMatchId ?? '')
+  const [resultWinnerTeam, setResultWinnerTeam] = useState<WinnerTeamSelection>(recalled?.resultWinnerTeam ?? '')
   const [resultSubmitting, setResultSubmitting] = useState<boolean>(false)
   const [resultSubmitError, setResultSubmitError] = useState<string | null>(null)
   const [resultSubmitSuccess, setResultSubmitSuccess] = useState<MatchResultResponse | null>(null)
@@ -276,13 +292,27 @@ export default function BalancePage() {
   }, [players, playersLoading])
 
   useEffect(() => {
-    const persisted = readPersistedBalanceState()
+    // What the page was left with wins over the stored mode: the players and the balance go with it.
+    const persisted = recalled ? null : readPersistedBalanceState()
     if (persisted) {
       setTeamSize(persisted.teamSize)
       setRaceComposition(persisted.raceComposition)
     }
     setPersistedReady(true)
-  }, [])
+  }, [recalled])
+
+  useEffect(() => {
+    rememberPageState<BalancePageMemory>(BALANCE_MEMORY_KEY, {
+      teamSize,
+      raceComposition,
+      slots,
+      slotInputs,
+      result,
+      actualTeamRaces,
+      resultMatchId,
+      resultWinnerTeam,
+    })
+  }, [teamSize, raceComposition, slots, slotInputs, result, actualTeamRaces, resultMatchId, resultWinnerTeam])
 
   useEffect(() => {
     if (!persistedReady || typeof window === 'undefined') {
@@ -342,13 +372,6 @@ export default function BalancePage() {
     allSelected &&
     !hasDuplicates &&
     raceComposition !== null
-  useEffect(() => {
-    setActualTeamRaces({
-      HOME: result?.homeTeam.map((player) => normalizeAssignedRace(player.assignedRace)) ?? [],
-      AWAY: result?.awayTeam.map((player) => normalizeAssignedRace(player.assignedRace)) ?? [],
-    })
-  }, [result])
-
   const handleActualRaceChange = (team: TeamSide, index: number, value: string) => {
     setActualTeamRaces((previous) => {
       const nextTeam = [...previous[team]]
@@ -529,6 +552,12 @@ export default function BalancePage() {
         raceComposition,
       })
       setResult(response)
+      // The races actually played start from the ones assigned; set here, not in an effect, so a
+      // balance the page comes back to keeps the races already picked for it.
+      setActualTeamRaces({
+        HOME: response.homeTeam.map((player) => normalizeAssignedRace(player.assignedRace)),
+        AWAY: response.awayTeam.map((player) => normalizeAssignedRace(player.assignedRace)),
+      })
     } catch (error) {
       if (error instanceof Error && error.message.trim().length > 0) {
         setSubmitError(error.message)
@@ -702,6 +731,17 @@ export default function BalancePage() {
         participantRaces,
       })
       setResultSubmitSuccess(response)
+      // The match is done: coming back, the page keeps the players but not this balance.
+      rememberPageState<BalancePageMemory>(BALANCE_MEMORY_KEY, {
+        teamSize,
+        raceComposition,
+        slots,
+        slotInputs,
+        result: null,
+        actualTeamRaces: { HOME: [], AWAY: [] },
+        resultMatchId: '',
+        resultWinnerTeam: '',
+      })
       if (isSuperAdmin) {
         router.push(
           `/results?matchId=${response.matchId}&winnerTeam=${response.winnerTeam}&from=balance`
