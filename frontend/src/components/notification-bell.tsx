@@ -35,10 +35,10 @@ function timeLabel(createdAt: string): string {
   return relative.key === 'date' ? relative.date : t(`notifications.${relative.key}`, { count: relative.count })
 }
 
-/** The bell in the header, for admins while notifications are tried out; the backend enforces the same. */
+/** The bell in the header, for everyone with service access; the backend enforces the same. */
 export function NotificationBell() {
-  const { isLoading, isLoggedIn, canAccess, isAdmin } = useAdminAuth()
-  if (isLoading || !isLoggedIn || !canAccess || !isAdmin) {
+  const { isLoading, isLoggedIn, canAccess } = useAdminAuth()
+  if (isLoading || !isLoggedIn || !canAccess) {
     return null
   }
   return <NotificationCenter />

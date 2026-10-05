@@ -50,7 +50,7 @@ function formatMonthLabel(month: string): string {
 }
 
 export default function PointsPage() {
-  const { isSuperAdmin } = useAdminAuth()
+  const { isAdmin, isSuperAdmin } = useAdminAuth()
   const thisMonth = currentKstMonth()
 
   const [summary, setSummary] = useState<PointSummaryResponse | null>(null)
@@ -158,10 +158,6 @@ export default function PointsPage() {
         <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{t('points.title')}</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400">{t('points.description')}</p>
       </div>
-
-      <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-        {t('points.trialNotice')}
-      </p>
 
       <div className={`${CARD_CLASS} space-y-4`}>
         <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('points.summary.title')}</h2>
@@ -346,7 +342,8 @@ export default function PointsPage() {
         onClose={closeHistory}
       />
 
-      <PrizeEventsPanel groupId={TEMP_GROUP_ID} canManage={isSuperAdmin} />
+      {/* Prize events stay with admins; the backend enforces the same. */}
+      {isAdmin && <PrizeEventsPanel groupId={TEMP_GROUP_ID} canManage={isSuperAdmin} />}
 
     </section>
   )

@@ -32,7 +32,7 @@ describe('navigation items', () => {
     expect(items.map((item) => item.href)).toContain('/notices')
   })
 
-  it('shows points to admins only while they are being tried out', () => {
+  it('shows multi-balance, points and predictions to members', () => {
     const memberItems = getVisibleNavItems({
       isLoggedIn: true,
       canAccess: true,
@@ -46,10 +46,10 @@ describe('navigation items', () => {
       isSuperAdmin: false,
     })
 
-    expect(memberItems.map((item) => item.href)).not.toContain('/points')
-    expect(adminItems.map((item) => item.href)).toContain('/points')
-    expect(memberItems.map((item) => item.href)).not.toContain('/predictions')
-    expect(adminItems.map((item) => item.href)).toContain('/predictions')
+    for (const href of ['/balance/multi', '/points', '/predictions']) {
+      expect(memberItems.map((item) => item.href)).toContain(href)
+      expect(adminItems.map((item) => item.href)).toContain(href)
+    }
   })
 
   it('gives tournaments their own admin menu next to multi-balance', () => {

@@ -139,30 +139,19 @@ describe('route access', () => {
     })
   })
 
-  it('keeps points with admins until they open to members', () => {
+  it('opens multi-balance, points and predictions to members but not to visitors', () => {
     const member = { isLoggedIn: true, canAccess: true, isAdmin: false, isSuperAdmin: false }
-    const admin = { ...member, isAdmin: true }
+    const pending = { ...member, canAccess: false }
 
-    expect(getRouteAccessDecision('/points', member)).toEqual({
-      allowed: false,
-      redirectTo: '/players',
-      blocked: false,
-    })
-    expect(getRouteAccessDecision('/predictions', member)).toEqual({
-      allowed: false,
-      redirectTo: '/players',
-      blocked: false,
-    })
-    expect(getRouteAccessDecision('/predictions', admin)).toEqual({
-      allowed: true,
-      redirectTo: null,
-      blocked: false,
-    })
-    expect(getRouteAccessDecision('/points', admin)).toEqual({
-      allowed: true,
-      redirectTo: null,
-      blocked: false,
-    })
+    for (const path of ['/balance/multi', '/points', '/predictions']) {
+      expect(getRouteAccessDecision(path, member)).toEqual({
+        allowed: true,
+        redirectTo: null,
+        blocked: false,
+      })
+      expect(getRouteAccessDecision(path, pending).allowed).toBe(false)
+      expect(getRouteAccessDecision(path, { ...member, isLoggedIn: false, canAccess: false }).allowed).toBe(false)
+    }
   })
 
   it('keeps the tournament page with admins', () => {

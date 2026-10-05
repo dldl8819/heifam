@@ -70,22 +70,21 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             PathPatternParser.defaultInstance.parse("/api/matches/import"),
             AuthType.ADMIN_EMAIL
         ),
-        // Admins try points out first. Opening them to members takes these two routes as well as
-        // balancify.points.members-enabled; the flag alone only lets members earn points.
+        // Points are open to members (balancify.points.members-enabled); PointController checks the same.
         new ProtectedRoute(
             "GET",
             PathPatternParser.defaultInstance.parse("/api/points/me"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SERVICE_ACCESS
         ),
         new ProtectedRoute(
             "GET",
             PathPatternParser.defaultInstance.parse("/api/points/ranking"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SERVICE_ACCESS
         ),
         new ProtectedRoute(
             "GET",
             PathPatternParser.defaultInstance.parse("/api/points/ranking/{accountId}"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SERVICE_ACCESS
         ),
         // Captain drafts are run from an admin-only screen, and these calls change draft data.
         new ProtectedRoute(
@@ -134,58 +133,58 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/prize-events/{eventId}/cancel"),
             AuthType.SUPER_ADMIN_EMAIL
         ),
-        // Predictions are tried out by admins first; PredictionController checks the same.
+        // Members predict (balancify.predictions.members-enabled); closing a match early stays with admins.
         new ProtectedRoute(
             "GET",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/predictions"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SERVICE_ACCESS
         ),
         new ProtectedRoute(
             "PUT",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/predictions/{matchId}"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SERVICE_ACCESS
         ),
         new ProtectedRoute(
             "POST",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/predictions/{matchId}/close"),
             AuthType.ADMIN_EMAIL
         ),
-        // Notifications are tried out by admins first; NotificationController checks the same.
+        // Notifications reach every member (balancify.notifications.members-enabled); NotificationController checks the same.
         new ProtectedRoute(
             "GET",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/notifications"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SERVICE_ACCESS
         ),
         new ProtectedRoute(
             "POST",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/notifications/read"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SERVICE_ACCESS
         ),
         new ProtectedRoute(
             "GET",
             PathPatternParser.defaultInstance.parse("/api/notifications/push-config"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SERVICE_ACCESS
         ),
         new ProtectedRoute(
             "POST",
             PathPatternParser.defaultInstance.parse("/api/notifications/push-subscriptions"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SERVICE_ACCESS
         ),
         new ProtectedRoute(
             "POST",
             PathPatternParser.defaultInstance.parse("/api/notifications/push-subscriptions/remove"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SERVICE_ACCESS
         ),
-        // Series after a multi-balance belong to the admin-only multi-balance page; BalanceSeriesController checks the same.
+        // Members run multi-balance series; cancelling one stays with admins, as BalanceSeriesController checks.
         new ProtectedRoute(
             "GET",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/balance-series"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SERVICE_ACCESS
         ),
         new ProtectedRoute(
             "POST",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/balance-series"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SERVICE_ACCESS
         ),
         new ProtectedRoute(
             "POST",

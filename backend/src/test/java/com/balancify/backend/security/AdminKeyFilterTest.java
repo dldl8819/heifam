@@ -2212,16 +2212,21 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void keepsPointsAwayFromMembersWhileAdminsTryThemOut() throws Exception {
-        mockMvc
-            .perform(get("/api/points/me").header("X-USER-EMAIL", "member@hei.gg"))
-            .andExpect(status().isForbidden());
+    void opensPointsToMembersButNotToAccountsWithoutAccess() throws Exception {
+        when(pointService.canUsePoints("member@hei.gg")).thenReturn(true);
+        when(pointService.getMonthlyRanking(any()))
+            .thenReturn(new com.balancify.backend.api.points.dto.PointRankingResponse("2026-10", List.of()));
+
         mockMvc
             .perform(get("/api/points/ranking").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(get("/api/points/ranking").header("X-USER-EMAIL", "blocked@hei.gg"))
             .andExpect(status().isForbidden());
-
+        mockMvc
+            .perform(get("/api/points/me"))
+            .andExpect(status().isForbidden());
         verify(pointService, never()).getSummary(any());
-        verify(pointService, never()).getMonthlyRanking(any());
     }
 
     @Test
@@ -2307,10 +2312,9 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void keepsPredictionsAwayFromMembers() throws Exception {
-        mockMvc
-            .perform(get("/api/groups/1/predictions").header("X-USER-EMAIL", "member@hei.gg"))
-            .andExpect(status().isForbidden());
+    void letsMembersPredictButKeepsClosingEarlyToAdmins() throws Exception {
+        when(predictionService.canPredict("member@hei.gg")).thenReturn(true);
+
         mockMvc
             .perform(
                 put("/api/groups/1/predictions/5")
@@ -2318,9 +2322,16 @@ class AdminKeyFilterTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"team\":\"HOME\"}")
             )
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(post("/api/groups/1/predictions/5/close").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(get("/api/groups/1/predictions").header("X-USER-EMAIL", "blocked@hei.gg"))
             .andExpect(status().isForbidden());
 
-        verify(predictionService, never()).predict(any(), any(), any(), any(), any());
+        verify(predictionService).predict(eq(1L), eq(5L), eq("member@hei.gg"), any(), eq("HOME"));
+        verify(predictionService, never()).close(any(), any(), any(), any());
     }
 
     @Test
@@ -2382,7 +2393,7 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void opensAMonthlyPointHistoryFromTheRankingForAdminsOnly() throws Exception {
+    void opensAMonthlyPointHistoryFromTheRanking() throws Exception {
         when(pointService.canUsePoints("admin@hei.gg")).thenReturn(true);
         when(pointService.getMonthlyHistory(eq(21L), any(), eq("admin@hei.gg")))
             .thenReturn(new com.balancify.backend.api.points.dto.PointMonthlyHistoryResponse(
@@ -2392,7 +2403,7 @@ class AdminKeyFilterTest {
             .thenThrow(new java.util.NoSuchElementException("Point account not found"));
 
         mockMvc
-            .perform(get("/api/points/ranking/21").header("X-USER-EMAIL", "member@hei.gg"))
+            .perform(get("/api/points/ranking/21").header("X-USER-EMAIL", "blocked@hei.gg"))
             .andExpect(status().isForbidden());
         mockMvc
             .perform(get("/api/points/ranking/21").param("month", "2026-09").header("X-USER-EMAIL", "admin@hei.gg"))
@@ -2404,23 +2415,26 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void keepsNotificationsToAdminsWhileTheyAreTriedOut() throws Exception {
-        when(notificationService.canUseNotifications("admin@hei.gg")).thenReturn(true);
-        when(notificationService.list(1L, "admin@hei.gg")).thenReturn(new NotificationListResponse(List.of(), 0));
+    void sendsNotificationsToMembersWithAccess() throws Exception {
+        when(notificationService.canUseNotifications("member@hei.gg")).thenReturn(true);
+        when(notificationService.list(1L, "member@hei.gg")).thenReturn(new NotificationListResponse(List.of(), 0));
         String subscription = "{\"endpoint\":\"https://fcm.googleapis.com/fcm/send/x\"}";
 
         mockMvc
             .perform(get("/api/groups/1/notifications"))
             .andExpect(status().isForbidden());
         mockMvc
-            .perform(get("/api/groups/1/notifications").header("X-USER-EMAIL", "member@hei.gg"))
+            .perform(get("/api/groups/1/notifications").header("X-USER-EMAIL", "blocked@hei.gg"))
             .andExpect(status().isForbidden());
+        verify(notificationService, never()).list(any(), eq("blocked@hei.gg"));
+
+        mockMvc
+            .perform(get("/api/groups/1/notifications").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.unreadCount").value(0));
         mockMvc
             .perform(post("/api/groups/1/notifications/read").header("X-USER-EMAIL", "member@hei.gg"))
-            .andExpect(status().isForbidden());
-        mockMvc
-            .perform(get("/api/notifications/push-config").header("X-USER-EMAIL", "member@hei.gg"))
-            .andExpect(status().isForbidden());
+            .andExpect(status().isOk());
         mockMvc
             .perform(
                 post("/api/notifications/push-subscriptions")
@@ -2428,38 +2442,24 @@ class AdminKeyFilterTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(subscription)
             )
-            .andExpect(status().isForbidden());
-        verify(notificationService, never()).list(any(), any());
-
-        mockMvc
-            .perform(get("/api/groups/1/notifications").header("X-USER-EMAIL", "admin@hei.gg"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.unreadCount").value(0));
-        mockMvc
-            .perform(post("/api/groups/1/notifications/read").header("X-USER-EMAIL", "admin@hei.gg"))
             .andExpect(status().isOk());
-        mockMvc
-            .perform(
-                post("/api/notifications/push-subscriptions")
-                    .header("X-USER-EMAIL", "admin@hei.gg")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(subscription)
-            )
-            .andExpect(status().isOk());
-        verify(notificationService).markAllRead(1L, "admin@hei.gg");
-        verify(notificationService).subscribe(eq("admin@hei.gg"), any());
+        verify(notificationService).markAllRead(1L, "member@hei.gg");
+        verify(notificationService).subscribe(eq("member@hei.gg"), any());
     }
 
     @Test
-    void keepsMultiBalanceSeriesToAdmins() throws Exception {
+    void letsMembersRunMultiBalanceSeriesButOnlyAdminsCancelThem() throws Exception {
         when(balanceSeriesService.list(eq(1L), anyBoolean())).thenReturn(new BalanceSeriesListResponse(List.of()));
-        when(balanceSeriesService.start(eq(1L), any(), eq("admin@hei.gg"), any(), anyBoolean()))
+        when(balanceSeriesService.start(eq(1L), any(), eq("member@hei.gg"), any(), anyBoolean()))
+            .thenReturn(new BalanceSeriesListResponse(List.of()));
+        when(balanceSeriesService.cancel(eq(1L), eq(5L), eq("admin@hei.gg"), any(), anyBoolean()))
             .thenReturn(new BalanceSeriesListResponse(List.of()));
         String lineup = "{\"lineups\":[{\"homePlayerIds\":[1,2,3],\"awayPlayerIds\":[4,5,6]}]}";
 
         mockMvc
             .perform(get("/api/groups/1/balance-series").header("X-USER-EMAIL", "member@hei.gg"))
-            .andExpect(status().isForbidden());
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.series").isArray());
         mockMvc
             .perform(
                 post("/api/groups/1/balance-series")
@@ -2467,25 +2467,19 @@ class AdminKeyFilterTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(lineup)
             )
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(get("/api/groups/1/balance-series").header("X-USER-EMAIL", "blocked@hei.gg"))
             .andExpect(status().isForbidden());
         mockMvc
             .perform(post("/api/groups/1/balance-series/5/cancel").header("X-USER-EMAIL", "member@hei.gg"))
             .andExpect(status().isForbidden());
-        verify(balanceSeriesService, never()).start(any(), any(), any(), any(), anyBoolean());
-
         mockMvc
-            .perform(get("/api/groups/1/balance-series").header("X-USER-EMAIL", "admin@hei.gg"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.series").isArray());
-        mockMvc
-            .perform(
-                post("/api/groups/1/balance-series")
-                    .header("X-USER-EMAIL", "admin@hei.gg")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(lineup)
-            )
+            .perform(post("/api/groups/1/balance-series/5/cancel").header("X-USER-EMAIL", "admin@hei.gg"))
             .andExpect(status().isOk());
-        verify(balanceSeriesService).start(eq(1L), any(), eq("admin@hei.gg"), any(), anyBoolean());
+
+        verify(balanceSeriesService).start(eq(1L), any(), eq("member@hei.gg"), any(), anyBoolean());
+        verify(balanceSeriesService, never()).cancel(any(), any(), eq("member@hei.gg"), any(), anyBoolean());
     }
 
     @Test
