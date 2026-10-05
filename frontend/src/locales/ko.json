@@ -1690,6 +1690,28 @@
       "hit": "적중",
       "miss": "빗나감",
       "excluded": "결과 입력자라 포인트 제외"
+    },
+    "confirm": {
+      "title": "내가 뛴 경기",
+      "description": "내가 뛴 3:3 경기의 결과를 확인하면 1경기당 {points}p를 받습니다. 결과 입력 후 {hours}시간 안에 확인해 주세요.",
+      "notice": "결과가 틀렸다면 확인하지 말고 운영진에게 알려 주세요.",
+      "today": "오늘 확인 {count} / {cap}경기",
+      "empty": "확인할 경기가 없습니다.",
+      "seriesGame": "시리즈 {number}판",
+      "myTeamBadge": "내 팀",
+      "winnerBadge": "승리",
+      "result": "{winner} 승리 · 내 팀 {outcome}",
+      "won": "승리",
+      "lost": "패배",
+      "deadline": "{time}까지",
+      "confirm": "결과 확인하고 {points}p",
+      "confirming": "확인 중...",
+      "confirmed": "확인함 +{points}p",
+      "confirmAll": "모두 확인 ({count}경기)",
+      "capReached": "오늘 받을 수 있는 경기 확인 포인트({cap}경기)를 모두 받았습니다. 남은 경기는 내일 마감 전까지 확인할 수 있습니다.",
+      "expired": "확인 기한이 지났거나 확인할 수 없는 경기입니다.",
+      "notMine": "본인이 뛴 경기만 확인할 수 있습니다.",
+      "error": "결과를 확인하지 못했습니다."
     }
   },
   "points": {
@@ -1706,13 +1728,16 @@
       "matchResults": "오늘 결과 입력",
       "matchResultsValue": "{count} / {cap}경기",
       "predictions": "오늘 예측 적중",
-      "predictionsValue": "{points} / {cap}p"
+      "predictionsValue": "{points} / {cap}p",
+      "matchConfirms": "오늘 경기 확인",
+      "matchConfirmsValue": "{count} / {cap}경기"
     },
     "rules": {
       "title": "포인트 받는 법",
       "dailyLogin": "하루 첫 접속: {points}p",
       "matchResult": "밸런스 매치로 만든 3:3 경기의 결과를 처음 입력: 1경기당 {points}p, 하루 최대 {cap}경기",
       "prediction": "승부 예측 적중: 1경기당 {points}p, 하루 최대 {cap}p (그 경기 결과를 입력하거나 수정한 사람은 제외)",
+      "matchConfirm": "내가 뛴 3:3 경기의 결과 확인(승부 예측 화면): 1경기당 {points}p, 하루 최대 {cap}경기, 결과 입력 후 {hours}시간 안 (결과가 수정돼도 유지, 경기 삭제 시 회수)",
       "reversal": "경기 결과가 바뀌거나 경기가 삭제되면 그 경기로 받은 포인트도 바로잡힙니다."
     },
     "history": {
@@ -1731,7 +1756,9 @@
       "predictionHitReversed": "승부 예측 회수",
       "noticeRead": "공지 읽기",
       "noticeLike": "공지 좋아요",
-      "noticeComment": "공지 댓글"
+      "noticeComment": "공지 댓글",
+      "matchConfirm": "경기 결과 확인",
+      "matchConfirmReversed": "경기 삭제로 확인 회수"
     },
     "ranking": {
       "title": "월간 랭킹",

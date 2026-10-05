@@ -16,6 +16,12 @@ public interface PointTransactionRepository extends JpaRepository<PointTransacti
 
     List<PointTransaction> findByReasonAndReferenceKey(String reason, String referenceKey);
 
+    List<PointTransaction> findByAccount_IdAndReasonAndReferenceKeyIn(
+        Long accountId,
+        String reason,
+        Collection<String> referenceKeys
+    );
+
     List<PointTransaction> findTop20ByAccount_IdOrderByIdDesc(Long accountId);
 
     List<PointTransaction> findByAccount_IdAndKstDateBetweenOrderByIdDesc(Long accountId, LocalDate fromDate, LocalDate toDate);

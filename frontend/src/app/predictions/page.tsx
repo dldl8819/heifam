@@ -5,6 +5,7 @@ import { useAdminAuth } from '@/lib/admin-auth'
 import { apiClient, isApiConflictError } from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
+import { MatchConfirmationsPanel } from '@/components/match-confirmations-panel'
 import { t } from '@/lib/i18n'
 import {
   PREDICTION_POLL_MS,
@@ -267,6 +268,8 @@ export default function PredictionsPage() {
               )
             })}
           </div>
+
+          <MatchConfirmationsPanel groupId={TEMP_GROUP_ID} />
 
           <div className="space-y-3">
             <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('predictions.closed.title')}</h2>

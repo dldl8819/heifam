@@ -116,6 +116,11 @@ balancify:
     prediction-hit-daily-cap: ${POINTS_PREDICTION_HIT_DAILY_CAP:10}
     # Reading, liking and commenting on a notice each earn this once per notice (up to 3 a notice).
     notice-action: ${POINTS_NOTICE_ACTION:1}
+    # A player confirming the result of a balanced 3v3 match they played, within the window after
+    # the result came in.
+    match-confirm: ${POINTS_MATCH_CONFIRM:1}
+    match-confirm-daily-cap: ${POINTS_MATCH_CONFIRM_DAILY_CAP:10}
+    match-confirm-window-hours: ${POINTS_MATCH_CONFIRM_WINDOW_HOURS:48}
   tournament:
     # Admins try team tournaments out first. true lets members record tournament games; running
     # tournaments also needs the tournament routes in AdminKeyFilter and the screen opened to members.

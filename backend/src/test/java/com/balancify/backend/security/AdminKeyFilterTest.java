@@ -70,6 +70,7 @@ import com.balancify.backend.api.match.dto.MultiBalanceRaceSummaryResponse;
 import com.balancify.backend.api.match.dto.MultiBalanceResponse;
 import com.balancify.backend.api.match.dto.MultiBalanceWaitingPlayerResponse;
 import com.balancify.backend.api.points.PointController;
+import com.balancify.backend.api.points.MatchConfirmationController;
 import com.balancify.backend.api.points.PrizeEventController;
 import com.balancify.backend.api.points.dto.PrizeEventListResponse;
 import com.balancify.backend.api.points.dto.PrizeEventResponse;
@@ -85,6 +86,7 @@ import com.balancify.backend.api.tournament.TeamTournamentController;
 import com.balancify.backend.api.tournament.dto.TeamScoreBoardResponse;
 import com.balancify.backend.api.tournament.dto.TeamTournamentResponse;
 import com.balancify.backend.api.points.dto.PointSummaryResponse;
+import com.balancify.backend.api.points.dto.MatchConfirmationListResponse;
 import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.AccountDeletionService;
 import com.balancify.backend.service.CaptainDraftService;
@@ -112,6 +114,7 @@ import com.balancify.backend.service.PlayerRaceStatsQueryService;
 import com.balancify.backend.service.PlayerTeammateStatsQueryService;
 import com.balancify.backend.service.PlayerImportService;
 import com.balancify.backend.service.PointService;
+import com.balancify.backend.service.MatchConfirmationService;
 import com.balancify.backend.service.PredictionService;
 import com.balancify.backend.service.PrizeEventService;
 import com.balancify.backend.service.TeamScoreService;
@@ -120,6 +123,7 @@ import com.balancify.backend.service.BalanceSeriesService;
 import com.balancify.backend.service.NotificationService;
 import com.balancify.backend.service.TournamentProgressService;
 import com.balancify.backend.service.exception.MatchConflictException;
+import com.balancify.backend.service.exception.MatchConfirmationForbiddenException;
 import com.balancify.backend.service.exception.MatchEditForbiddenException;
 import com.balancify.backend.service.RankingService;
 import com.balancify.backend.service.RatingRecalculationService;
@@ -162,6 +166,7 @@ import org.springframework.test.web.servlet.MockMvc;
     GroupLedgerController.class,
     GroupLedgerAdminController.class,
     PointController.class,
+    MatchConfirmationController.class,
     TeamTournamentController.class,
     BalanceSeriesController.class,
     NotificationController.class,
@@ -283,6 +288,9 @@ class AdminKeyFilterTest {
 
     @MockitoBean
     private PointService pointService;
+
+    @MockitoBean
+    private MatchConfirmationService matchConfirmationService;
 
     @MockitoBean
     private TeamTournamentService teamTournamentService;
@@ -2249,7 +2257,7 @@ class AdminKeyFilterTest {
     void showsAdminsTheirPoints() throws Exception {
         when(pointService.canUsePoints("admin@hei.gg")).thenReturn(true);
         when(pointService.getSummary("admin@hei.gg"))
-            .thenReturn(new PointSummaryResponse(3L, true, 1, 2, 10, 1, 0, 10, 1, List.of()));
+            .thenReturn(new PointSummaryResponse(3L, true, 1, 2, 10, 1, 0, 10, 1, 0, 10, 1, 48, List.of()));
 
         mockMvc
             .perform(get("/api/points/me").header("X-USER-EMAIL", "admin@hei.gg"))
@@ -2390,6 +2398,62 @@ class AdminKeyFilterTest {
                     .content("{\"email\":\"member@hei.gg\",\"amount\":5}")
             )
             .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void letsMembersConfirmTheirMatchResultsButNotAccountsWithoutAccess() throws Exception {
+        when(pointService.canUsePoints("member@hei.gg")).thenReturn(true);
+        MatchConfirmationListResponse empty = new MatchConfirmationListResponse(List.of(), 0, 10, 1, 48);
+        when(matchConfirmationService.list(eq(1L), eq("member@hei.gg"), any())).thenReturn(empty);
+        when(matchConfirmationService.confirm(eq(1L), eq(5L), eq("member@hei.gg"), any())).thenReturn(empty);
+
+        mockMvc
+            .perform(get("/api/groups/1/match-confirmations").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.dailyCap").value(10));
+        mockMvc
+            .perform(post("/api/groups/1/match-confirmations/5").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(get("/api/groups/1/match-confirmations").header("X-USER-EMAIL", "blocked@hei.gg"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(post("/api/groups/1/match-confirmations/5").header("X-USER-EMAIL", "blocked@hei.gg"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(post("/api/groups/1/match-confirmations/5"))
+            .andExpect(status().isForbidden());
+
+        verify(matchConfirmationService).confirm(eq(1L), eq(5L), eq("member@hei.gg"), any());
+        verify(matchConfirmationService, never()).confirm(any(), any(), eq("blocked@hei.gg"), any());
+    }
+
+    @Test
+    void answersMatchConfirmationRefusalsWithTheirStatus() throws Exception {
+        when(pointService.canUsePoints("member@hei.gg")).thenReturn(true);
+        when(matchConfirmationService.confirm(eq(1L), eq(5L), eq("member@hei.gg"), any()))
+            .thenThrow(new MatchConfirmationForbiddenException("x"));
+        when(matchConfirmationService.confirm(eq(1L), eq(6L), eq("member@hei.gg"), any()))
+            .thenThrow(new IllegalArgumentException("x"));
+        when(matchConfirmationService.confirm(eq(1L), eq(7L), eq("member@hei.gg"), any()))
+            .thenThrow(new MatchConflictException("x"));
+        when(matchConfirmationService.confirm(eq(1L), eq(8L), eq("member@hei.gg"), any()))
+            .thenThrow(new java.util.NoSuchElementException("x"));
+
+        for (Object[] expected : new Object[][] { { 5, 403 }, { 6, 400 }, { 7, 409 }, { 8, 404 } }) {
+            mockMvc
+                .perform(post("/api/groups/1/match-confirmations/" + expected[0]).header("X-USER-EMAIL", "member@hei.gg"))
+                .andExpect(status().is((int) expected[1]));
+        }
+    }
+
+    @Test
+    void keepsMatchConfirmationsClosedWhilePointsAreClosedToTheAccount() throws Exception {
+        mockMvc
+            .perform(get("/api/groups/1/match-confirmations").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isForbidden());
+
+        verify(matchConfirmationService, never()).list(any(), any(), any());
     }
 
     @Test

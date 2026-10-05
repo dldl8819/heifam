@@ -86,6 +86,17 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             PathPatternParser.defaultInstance.parse("/api/points/ranking/{accountId}"),
             AuthType.SERVICE_ACCESS
         ),
+        // Players confirm the results of their matches for a point; MatchConfirmationController checks the points flag.
+        new ProtectedRoute(
+            "GET",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/match-confirmations"),
+            AuthType.SERVICE_ACCESS
+        ),
+        new ProtectedRoute(
+            "POST",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/match-confirmations/{matchId}"),
+            AuthType.SERVICE_ACCESS
+        ),
         // Captain drafts are run from an admin-only screen, and these calls change draft data.
         new ProtectedRoute(
             "POST",

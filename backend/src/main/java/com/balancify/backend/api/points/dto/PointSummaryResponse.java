@@ -12,6 +12,10 @@ public record PointSummaryResponse(
     int predictionPointsToday,
     int predictionHitDailyCap,
     int predictionHitPoints,
+    int matchConfirmsToday,
+    int matchConfirmDailyCap,
+    int matchConfirmPoints,
+    int matchConfirmWindowHours,
     List<PointHistoryItemResponse> recent
 ) {
 }
