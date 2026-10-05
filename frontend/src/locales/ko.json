@@ -1127,6 +1127,11 @@
     },
     "loadError": "선수 목록을 불러오지 못했습니다. 백엔드 상태를 확인해 주세요.",
     "generateError": "다중 밸런스 생성에 실패했습니다.",
+    "copy": {
+      "allButton": "전체 복사",
+      "allAriaLabel": "다중 밸런스 결과 전체를 채팅용으로 복사",
+      "matchAriaLabel": "경기 {number} 편성을 채팅용으로 복사"
+    },
     "selection": {
       "title": "참가자 선택",
       "helper": "닉네임을 입력하면 티어표에 바로 배치됩니다.",

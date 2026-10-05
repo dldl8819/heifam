@@ -22,6 +22,7 @@ import {
 } from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
+import { copyTextWithFallback } from '@/lib/clipboard'
 import { t } from '@/lib/i18n'
 import { formatPercent } from '@/lib/percent'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
@@ -99,36 +100,6 @@ function formatBalanceChatText(result: BalanceResponse): string {
       : '-'
 
   return `홈: ${homeTeam} / 어웨이: ${awayTeam} / 홈승률 ${homeWinRate}`
-}
-
-function copyTextWithFallback(text: string): Promise<void> {
-  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-    return navigator.clipboard.writeText(text)
-  }
-
-  if (typeof document === 'undefined') {
-    return Promise.reject(new Error('Clipboard is unavailable.'))
-  }
-
-  const textarea = document.createElement('textarea')
-  textarea.value = text
-  textarea.setAttribute('readonly', '')
-  textarea.style.position = 'fixed'
-  textarea.style.opacity = '0'
-  document.body.appendChild(textarea)
-  textarea.select()
-
-  try {
-    const copied = document.execCommand('copy')
-    if (!copied) {
-      throw new Error('Copy command failed.')
-    }
-    return Promise.resolve()
-  } catch (error) {
-    return Promise.reject(error)
-  } finally {
-    document.body.removeChild(textarea)
-  }
 }
 
 function resolveReadableApiErrorMessage(error: unknown): string | null {
