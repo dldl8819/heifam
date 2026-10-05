@@ -109,7 +109,8 @@ public class BalanceSeriesProgressService {
         series.setAwayWins(awayWins);
         List<Match> unplayed = games.stream().filter(game -> !hasResult(game)).toList();
 
-        if (TournamentSeriesPlanner.isDecided(series.getFormat(), homeWins, awayWins, recorded.size())) {
+        // The format only sets which races the games are played with; every series is best of three.
+        if (TournamentSeriesPlanner.isDecidedAtTwoWins(homeWins, awayWins, recorded.size())) {
             series.setStatus(BalanceSeriesStatus.COMPLETED);
             series.setWinnerTeam(homeWins > awayWins ? TEAM_HOME : TEAM_AWAY);
             if (series.getFinishedAt() == null) {
