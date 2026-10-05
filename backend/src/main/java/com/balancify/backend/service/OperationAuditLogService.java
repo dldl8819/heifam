@@ -373,7 +373,8 @@ public class OperationAuditLogService {
             snapshot.matchId() == null ? null : "#" + snapshot.matchId(),
             snapshot.groupId()
         );
-        log.setSummary("경기 삭제");
+        // A match that goes before it had a result was called off, not undone.
+        log.setSummary(snapshot.hadResult() ? "경기 삭제" : "경기 취소 (결과 입력 전)");
         log.setDetails("matchId=" + snapshot.matchId() + ", deletedAt=" + log.getCreatedAt());
         operationAuditLogRepository.save(log);
     }

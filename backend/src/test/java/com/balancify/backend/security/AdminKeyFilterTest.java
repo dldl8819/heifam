@@ -2457,6 +2457,38 @@ class AdminKeyFilterTest {
     }
 
     @Test
+    void letsMembersCallOffAMatchNobodyPlayedButKeepsDeletingToAdmins() throws Exception {
+        when(matchResultService.cancelUnplayedMatch(5L))
+            .thenReturn(new MatchResultService.DeletedMatchAuditSnapshot(5L, 1L, null, false));
+        when(matchResultService.cancelUnplayedMatch(6L)).thenThrow(new MatchConflictException("x"));
+        when(matchResultService.cancelUnplayedMatch(7L)).thenThrow(new java.util.NoSuchElementException("x"));
+
+        mockMvc
+            .perform(post("/api/matches/5/cancel").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(post("/api/matches/6/cancel").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isConflict());
+        mockMvc
+            .perform(post("/api/matches/7/cancel").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isNotFound());
+        mockMvc
+            .perform(post("/api/matches/5/cancel").header("X-USER-EMAIL", "blocked@hei.gg"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(post("/api/matches/5/cancel"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(delete("/api/matches/5").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isForbidden());
+
+        verify(matchResultService, org.mockito.Mockito.times(1)).cancelUnplayedMatch(5L);
+        verify(notificationService).removePredictionsOpen(5L);
+        verify(operationAuditLogService).recordMatchDeletion(eq("member@hei.gg"), any(), any());
+        verify(matchResultService, never()).deleteMatch(any());
+    }
+
+    @Test
     void opensAMonthlyPointHistoryFromTheRanking() throws Exception {
         when(pointService.canUsePoints("admin@hei.gg")).thenReturn(true);
         when(pointService.getMonthlyHistory(eq(21L), any(), eq("admin@hei.gg")))

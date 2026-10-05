@@ -9,6 +9,7 @@ import com.balancify.backend.security.AuthenticatedRequestResolver;
 import com.balancify.backend.security.MmrAccessRequestResolver;
 import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.ManualMatchService;
+import com.balancify.backend.service.NotificationService;
 import com.balancify.backend.service.MatchResultService;
 import com.balancify.backend.service.OperationAuditLogService;
 import com.balancify.backend.service.exception.MatchConflictException;
@@ -37,6 +38,7 @@ public class MatchResultController {
     private final AuthenticatedRequestResolver authenticatedRequestResolver;
     private final AccessControlService accessControlService;
     private final OperationAuditLogService operationAuditLogService;
+    private final NotificationService notificationService;
 
     public MatchResultController(
         MatchResultService matchResultService,
@@ -44,7 +46,8 @@ public class MatchResultController {
         MmrAccessRequestResolver mmrAccessRequestResolver,
         AuthenticatedRequestResolver authenticatedRequestResolver,
         AccessControlService accessControlService,
-        OperationAuditLogService operationAuditLogService
+        OperationAuditLogService operationAuditLogService,
+        NotificationService notificationService
     ) {
         this.matchResultService = matchResultService;
         this.manualMatchService = manualMatchService;
@@ -52,6 +55,7 @@ public class MatchResultController {
         this.authenticatedRequestResolver = authenticatedRequestResolver;
         this.accessControlService = accessControlService;
         this.operationAuditLogService = operationAuditLogService;
+        this.notificationService = notificationService;
     }
 
     @PostMapping("/manual")
@@ -137,6 +141,28 @@ public class MatchResultController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, exception.getMessage());
         } catch (IllegalArgumentException exception) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+        }
+    }
+
+    /** Members call off a match that was set up but not played; the service refuses anything else. */
+    @PostMapping("/{id}/cancel")
+    public void cancelMatch(
+        @PathVariable("id") Long matchId,
+        HttpServletRequest httpRequest
+    ) {
+        try {
+            MatchResultService.DeletedMatchAuditSnapshot snapshot = matchResultService.cancelUnplayedMatch(matchId);
+            // Nothing is left to predict, so the "predictions opened" notification goes too.
+            notificationService.removePredictionsOpen(matchId);
+            operationAuditLogService.recordMatchDeletion(
+                extractRequestEmail(httpRequest),
+                resolveRecordedByNickname(httpRequest),
+                snapshot
+            );
+        } catch (MatchConflictException exception) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, exception.getMessage());
+        } catch (NoSuchElementException exception) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, exception.getMessage());
         }
     }
 

@@ -180,6 +180,12 @@ public class NotificationService {
         );
     }
 
+    /** The match was called off before it was played: nothing is left to predict. */
+    @Transactional
+    public void removePredictionsOpen(Long matchId) {
+        notificationRepository.deleteByKindAndTargetId(KIND_PREDICTION, matchId);
+    }
+
     @Transactional(readOnly = true)
     public NotificationListResponse list(Long groupId, String email) {
         String reader = normalizeEmail(email);
