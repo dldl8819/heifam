@@ -110,6 +110,37 @@ class GroupMatchAdminServiceTest {
     }
 
     @Test
+    void keepsWhoSetTheMatchUp() {
+        Group group = new Group();
+        group.setId(1L);
+        when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
+        when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L, 5L, 6L))).thenReturn(List.of(
+            player(1L, group), player(2L, group), player(3L, group), player(4L, group), player(5L, group), player(6L, group)
+        ));
+        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any())).thenReturn(List.of());
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> {
+            Match match = invocation.getArgument(0);
+            match.setId(500L);
+            return match;
+        });
+
+        groupMatchAdminService.createMatch(
+            1L,
+            new CreateGroupMatchRequest(List.of(1L, 2L, 3L), List.of(4L, 5L, 6L)),
+            " Member@Example.com "
+        );
+        groupMatchAdminService.createMatch(
+            1L,
+            new CreateGroupMatchRequest(List.of(1L, 2L, 3L), List.of(4L, 5L, 6L)),
+            " "
+        );
+
+        org.mockito.ArgumentCaptor<Match> saved = org.mockito.ArgumentCaptor.forClass(Match.class);
+        verify(matchRepository, org.mockito.Mockito.times(2)).save(saved.capture());
+        assertThat(saved.getAllValues()).extracting(Match::getCreatedByEmail).containsExactly("member@example.com", null);
+    }
+
+    @Test
     void announcesNoPredictionsForAMatchSavedOnlyToTakeItsResult() {
         Group group = new Group();
         group.setId(1L);

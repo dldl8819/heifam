@@ -17,6 +17,7 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
@@ -61,6 +62,12 @@ public class GroupMatchAdminService {
 
     @Transactional
     public CreateGroupMatchResponse createMatch(Long groupId, CreateGroupMatchRequest request) {
+        return createMatch(groupId, request, null);
+    }
+
+    /** Sets a balanced match up; createdByEmail is kept as whom the match is waiting on for its result. */
+    @Transactional
+    public CreateGroupMatchResponse createMatch(Long groupId, CreateGroupMatchRequest request, String createdByEmail) {
         if (request == null) {
             throw new IllegalArgumentException("Request is required");
         }
@@ -76,7 +83,8 @@ public class GroupMatchAdminService {
             DuplicateHandling.REUSE_ACTIVE_REJECT_COMPLETED,
             null,
             // A match saved only to take its result at once was never open for predictions.
-            !Boolean.TRUE.equals(request.resultFollows())
+            !Boolean.TRUE.equals(request.resultFollows()),
+            createdByEmail
         );
 
         if (outcome.duplicateRejected()) {
@@ -122,7 +130,8 @@ public class GroupMatchAdminService {
             raceComposition,
             DuplicateHandling.REJECT,
             null,
-            true
+            true,
+            null
         ).match();
     }
 
@@ -149,7 +158,8 @@ public class GroupMatchAdminService {
             raceComposition,
             DuplicateHandling.NONE,
             new SeriesLink(seriesId, null, seriesGameNumber),
-            true
+            true,
+            null
         ).match();
     }
 
@@ -165,7 +175,8 @@ public class GroupMatchAdminService {
         int teamSize,
         String raceComposition,
         Long balanceSeriesId,
-        int seriesGameNumber
+        int seriesGameNumber,
+        String createdByEmail
     ) {
         return createMatchInternal(
             groupId,
@@ -177,8 +188,14 @@ public class GroupMatchAdminService {
             raceComposition,
             DuplicateHandling.NONE,
             new SeriesLink(null, balanceSeriesId, seriesGameNumber),
-            true
+            true,
+            createdByEmail
         ).match();
+    }
+
+    private static String normalizeCreatorEmail(String email) {
+        String normalized = email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
+        return normalized.isEmpty() ? null : normalized;
     }
 
     private MatchParticipant createParticipant(
@@ -228,7 +245,8 @@ public class GroupMatchAdminService {
         String rawRaceComposition,
         DuplicateHandling duplicateHandling,
         SeriesLink seriesLink,
-        boolean announcePredictions
+        boolean announcePredictions,
+        String createdByEmail
     ) {
         int normalizedTeamSize = normalizeRequestedTeamSize(requestedTeamSize);
         String normalizedRaceComposition = RaceCompositionPolicy.normalizeForTeamSize(
@@ -335,6 +353,7 @@ public class GroupMatchAdminService {
         match.setTeamSignature(requestedSignature.teamSignature());
         match.setNote(normalizeNote(note));
         match.setRaceComposition(normalizedRaceComposition);
+        match.setCreatedByEmail(normalizeCreatorEmail(createdByEmail));
         if (seriesLink != null) {
             match.setSeriesId(seriesLink.seriesId());
             match.setBalanceSeriesId(seriesLink.balanceSeriesId());

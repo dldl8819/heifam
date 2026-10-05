@@ -223,14 +223,15 @@ public class PredictionService {
             }
         }
 
-        // Who picked which side goes out by nickname, once picks are closed; emails stay on the server.
-        Map<String, String> nicknames = accessControlService.resolveDisplayNicknames(
-            predictionsByMatch.values().stream()
-                .flatMap(List::stream)
-                .map(MatchPrediction::getPredictorEmail)
-                .distinct()
-                .toList()
-        );
+        // Who picked which side (once picks are closed) and who set each match up go out by nickname;
+        // emails stay on the server.
+        Set<String> namedEmails = new LinkedHashSet<>();
+        predictionsByMatch.values().forEach(predictions ->
+            predictions.forEach(prediction -> namedEmails.add(normalizeEmail(prediction.getPredictorEmail()))));
+        awaiting.forEach(match -> namedEmails.add(normalizeEmail(match.getCreatedByEmail())));
+        historyMatches.forEach(match -> namedEmails.add(normalizeEmail(match.getCreatedByEmail())));
+        namedEmails.remove("");
+        Map<String, String> nicknames = accessControlService.resolveDisplayNicknames(List.copyOf(namedEmails));
 
         List<PredictionMatchResponse> open = new ArrayList<>();
         List<PredictionMatchResponse> closed = new ArrayList<>();
@@ -308,7 +309,8 @@ public class PredictionService {
             countsVisible ? pickers(predictions, TEAM_AWAY, nicknames) : null,
             winner,
             winner == null || myPick == null ? null : winner.equals(myPick),
-            winner != null && email.equals(normalizeEmail(match.getResultRecordedByEmail()))
+            winner != null && email.equals(normalizeEmail(match.getResultRecordedByEmail())),
+            nicknames.get(normalizeEmail(match.getCreatedByEmail()))
         );
     }
 

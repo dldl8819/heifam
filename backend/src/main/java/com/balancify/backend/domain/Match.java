@@ -94,6 +94,11 @@ public class Match {
     @Column(name = "predictions_closed_at")
     private OffsetDateTime predictionsClosedAt;
 
+    // Who set the match up, shown on the predictions page as whom it is waiting on. Null for matches
+    // from before it was kept and for accounts since deleted.
+    @Column(name = "created_by_email", length = 320)
+    private String createdByEmail;
+
     public Long getId() {
         return id;
     }
@@ -268,6 +273,14 @@ public class Match {
 
     public void setPredictionsClosedAt(OffsetDateTime predictionsClosedAt) {
         this.predictionsClosedAt = predictionsClosedAt;
+    }
+
+    public String getCreatedByEmail() {
+        return createdByEmail;
+    }
+
+    public void setCreatedByEmail(String createdByEmail) {
+        this.createdByEmail = createdByEmail;
     }
 
     @PrePersist

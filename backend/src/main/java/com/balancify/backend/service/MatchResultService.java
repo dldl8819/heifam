@@ -401,7 +401,7 @@ public class MatchResultService {
         }
         // So does a game of a series started after a multi-balance: the score and the next game.
         if (match.getBalanceSeriesId() != null) {
-            balanceSeriesProgressService.sync(match.getBalanceSeriesId());
+            balanceSeriesProgressService.sync(match.getBalanceSeriesId(), normalizedRecordedByEmail);
         }
         Long groupId = resolveGroupId(match, participants);
         TransactionAfterCommit.runAfterCommitAsync(groupStatsKey(groupId), () -> {

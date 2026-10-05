@@ -143,7 +143,7 @@ public class BalanceSeriesService {
             series.setPlayerIds(playerIds);
             series.setFormat(plan.format());
             series.setGameCompositions(String.join(",", plan.compositions()));
-            balanceSeriesProgressService.open(balanceSeriesRepository.save(series));
+            balanceSeriesProgressService.open(balanceSeriesRepository.save(series), actorEmail);
         }
 
         operationAuditLogService.recordBalanceSeriesStarted(actorEmail, actorNickname, groupId, normalized.size());
