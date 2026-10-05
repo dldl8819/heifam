@@ -130,16 +130,33 @@ public class NotificationService {
     /** A notice members can now read (or, kept to admins, admins can). Replaces an earlier one for it. */
     @Transactional
     public void publishNotice(Long groupId, Long noticeId, String noticeTitle, boolean adminOnly, String authorEmail) {
+        publishNotice(groupId, noticeId, "새 공지사항", noticeTitle, adminOnly, authorEmail);
+    }
+
+    /** An edited notice announced again to the people who can read it. Replaces the earlier one for it. */
+    @Transactional
+    public void publishNoticeRevised(Long groupId, Long noticeId, String noticeTitle, boolean adminOnly, String editorEmail) {
+        publishNotice(groupId, noticeId, "공지사항 수정", noticeTitle, adminOnly, editorEmail);
+    }
+
+    private void publishNotice(
+        Long groupId,
+        Long noticeId,
+        String heading,
+        String noticeTitle,
+        boolean adminOnly,
+        String excludedEmail
+    ) {
         notificationRepository.deleteByKindAndTargetId(KIND_NOTICE, noticeId);
         publish(
             groupId,
             KIND_NOTICE,
             noticeId,
             adminOnly ? AUDIENCE_ADMINS : AUDIENCE_MEMBERS,
-            "새 공지사항",
+            heading,
             noticeTitle,
             "/notices/" + noticeId,
-            authorEmail
+            excludedEmail
         );
     }
 

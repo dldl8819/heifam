@@ -426,7 +426,13 @@ public class OperationAuditLogService {
     }
 
     @Transactional
-    public void recordNoticeUpdated(String actorEmail, String actorNickname, Long groupId, Notice notice) {
+    public void recordNoticeUpdated(
+        String actorEmail,
+        String actorNickname,
+        Long groupId,
+        Notice notice,
+        boolean announcedAgain
+    ) {
         if (notice == null) {
             return;
         }
@@ -434,7 +440,7 @@ public class OperationAuditLogService {
         OperationAuditLog log = baseLog(
             actorEmail, actorNickname, ACTION_NOTICE_UPDATED, "NOTICE", notice.getId(), notice.getTitle(), groupId
         );
-        log.setSummary("공지 수정");
+        log.setSummary(announcedAgain ? "공지 수정 (다시 알림)" : "공지 수정");
         operationAuditLogRepository.save(log);
     }
 

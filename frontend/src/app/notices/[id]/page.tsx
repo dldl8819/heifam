@@ -36,6 +36,8 @@ export default function NoticeDetailPage() {
   const [title, setTitle] = useState<string>('')
   const [content, setContent] = useState<string>('')
   const [adminOnly, setAdminOnly] = useState<boolean>(false)
+  // Off for every edit: announcing again is a choice, not something a typo fix should do.
+  const [notifyAgain, setNotifyAgain] = useState<boolean>(false)
   const [saving, setSaving] = useState<boolean>(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -93,6 +95,7 @@ export default function NoticeDetailPage() {
           title: title.trim(),
           content: content.trim(),
           adminOnly,
+          notify: notifyAgain,
         })
         setNotice((prev) =>
           prev
@@ -106,13 +109,14 @@ export default function NoticeDetailPage() {
             : prev
         )
         setEditing(false)
+        setNotifyAgain(false)
       } catch {
         setFormError(t('notices.loadError'))
       } finally {
         setSaving(false)
       }
     },
-    [adminOnly, content, noticeId, title]
+    [adminOnly, content, noticeId, notifyAgain, title]
   )
 
   const handleDelete = useCallback(async () => {
@@ -361,6 +365,13 @@ export default function NoticeDetailPage() {
             <input type="checkbox" checked={adminOnly} onChange={(event) => setAdminOnly(event.target.checked)} />
             {t('notices.posts.adminOnlyLabel')}
           </label>
+          <div className="space-y-1">
+            <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200">
+              <input type="checkbox" checked={notifyAgain} onChange={(event) => setNotifyAgain(event.target.checked)} />
+              {t('notices.posts.notifyAgainLabel')}
+            </label>
+            <p className="pl-5 text-xs text-slate-500 dark:text-slate-400">{t('notices.posts.notifyAgainHint')}</p>
+          </div>
           <div className="flex gap-2">
             <button
               type="submit"
@@ -376,6 +387,7 @@ export default function NoticeDetailPage() {
                 setTitle(notice.title)
                 setContent(notice.content)
                 setAdminOnly(notice.adminOnly)
+                setNotifyAgain(false)
                 setFormError(null)
               }}
               className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"

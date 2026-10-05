@@ -2861,7 +2861,33 @@ class AdminKeyFilterTest {
             )
             .andExpect(status().isOk());
 
-        verify(noticeAdminService).updateNotice(eq(1L), eq(5L), any(), eq("admin@hei.gg"), eq("admin"));
+        verify(noticeAdminService).updateNotice(
+            eq(1L),
+            eq(5L),
+            argThat(request -> request != null && request.announceAgain() == null),
+            eq("admin@hei.gg"),
+            eq("admin")
+        );
+    }
+
+    @Test
+    void passesOnTheChoiceToAnnounceANoticeEditAgain() throws Exception {
+        mockMvc
+            .perform(
+                put("/api/groups/1/notices/5")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"title\":\"수정한 제목\",\"content\":\"내용\",\"notify\":true}")
+            )
+            .andExpect(status().isOk());
+
+        verify(noticeAdminService).updateNotice(
+            eq(1L),
+            eq(5L),
+            argThat(request -> request != null && Boolean.TRUE.equals(request.announceAgain())),
+            eq("admin@hei.gg"),
+            eq("admin")
+        );
     }
 
     @Test

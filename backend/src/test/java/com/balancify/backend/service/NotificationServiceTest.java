@@ -109,6 +109,33 @@ class NotificationServiceTest {
     }
 
     @Test
+    void announcesAnEditedNoticeAgainInPlaceOfItsEarlierNotification() {
+        service = createService(false, true);
+        service.publishNoticeRevised(1L, 9L, "YOUR_TITLE", false, ADMIN);
+
+        verify(notificationRepository).deleteByKindAndTargetId(NotificationService.KIND_NOTICE, 9L);
+        assertThat(saved).singleElement().satisfies(notification -> {
+            assertThat(notification.getAudience()).isEqualTo("MEMBERS");
+            assertThat(notification.getTitle()).isEqualTo("공지사항 수정");
+            assertThat(notification.getBody()).isEqualTo("YOUR_TITLE");
+            assertThat(notification.getLink()).isEqualTo("/notices/9");
+        });
+        ArgumentCaptor<PushSubscription> targets = ArgumentCaptor.forClass(PushSubscription.class);
+        verify(webPushService).send(targets.capture(), any());
+        assertThat(targets.getAllValues()).extracting(PushSubscription::getEmail).containsExactly(MEMBER);
+        // The same tag as the first announcement, so a phone shows the edit in its place.
+        assertThat(new String(pushed.getFirst(), StandardCharsets.UTF_8))
+            .isEqualTo("{\"title\":\"공지사항 수정\",\"body\":\"YOUR_TITLE\",\"link\":\"/notices/9\",\"tag\":\"notice-9\"}");
+    }
+
+    @Test
+    void announcesAnEditedAdminOnlyNoticeToAdmins() {
+        service.publishNoticeRevised(1L, 9L, "YOUR_TITLE", true, null);
+
+        assertThat(saved).singleElement().satisfies(notification -> assertThat(notification.getAudience()).isEqualTo("ADMINS"));
+    }
+
+    @Test
     void keepsAdminOnlyNoticesAndTrialPredictionsToAdmins() {
         service.publishNotice(1L, 9L, "YOUR_TITLE", true, MEMBER);
         service.publishPredictionsOpen(1L, 40L, 3);
