@@ -26,6 +26,9 @@ public record BalanceSeriesResponse(
     OffsetDateTime finishedAt,
     List<TournamentPlayerResponse> homePlayers,
     List<TournamentPlayerResponse> awayPlayers,
-    List<TournamentGameResponse> games
+    List<TournamentGameResponse> games,
+    // The nickname of whoever set up the game in play (the last game once the series is over), as
+    // the predictions page names them; null when unknown.
+    String createdByNickname
 ) {
 }

@@ -50,6 +50,7 @@ public class BalanceSeriesService {
     private final MatchParticipantRepository matchParticipantRepository;
     private final BalanceSeriesProgressService balanceSeriesProgressService;
     private final OperationAuditLogService operationAuditLogService;
+    private final AccessControlService accessControlService;
     private final Clock clock;
 
     @Autowired
@@ -60,7 +61,8 @@ public class BalanceSeriesService {
         MatchRepository matchRepository,
         MatchParticipantRepository matchParticipantRepository,
         BalanceSeriesProgressService balanceSeriesProgressService,
-        OperationAuditLogService operationAuditLogService
+        OperationAuditLogService operationAuditLogService,
+        AccessControlService accessControlService
     ) {
         this(
             groupRepository,
@@ -70,6 +72,7 @@ public class BalanceSeriesService {
             matchParticipantRepository,
             balanceSeriesProgressService,
             operationAuditLogService,
+            accessControlService,
             Clock.systemUTC()
         );
     }
@@ -82,6 +85,7 @@ public class BalanceSeriesService {
         MatchParticipantRepository matchParticipantRepository,
         BalanceSeriesProgressService balanceSeriesProgressService,
         OperationAuditLogService operationAuditLogService,
+        AccessControlService accessControlService,
         Clock clock
     ) {
         this.groupRepository = groupRepository;
@@ -91,6 +95,7 @@ public class BalanceSeriesService {
         this.matchParticipantRepository = matchParticipantRepository;
         this.balanceSeriesProgressService = balanceSeriesProgressService;
         this.operationAuditLogService = operationAuditLogService;
+        this.accessControlService = accessControlService;
         this.clock = clock;
     }
 
@@ -256,6 +261,17 @@ public class BalanceSeriesService {
         seriesList.forEach(series -> playerIds.addAll(series.getPlayerIds()));
         Map<Long, Player> players = new HashMap<>();
         playerRepository.findAllById(playerIds).forEach(player -> players.put(player.getId(), player));
+        // Whom each series is waiting on goes out by nickname; emails stay on the server.
+        Map<Long, String> creatorEmails = new HashMap<>();
+        gamesBySeries.forEach((seriesId, games) -> {
+            String email = currentCreatorEmail(games);
+            if (email != null) {
+                creatorEmails.put(seriesId, email);
+            }
+        });
+        Map<String, String> nicknames = creatorEmails.isEmpty()
+            ? Map.of()
+            : accessControlService.resolveDisplayNicknames(List.copyOf(new LinkedHashSet<>(creatorEmails.values())));
 
         return seriesList.stream()
             .map(series -> new BalanceSeriesResponse(
@@ -281,9 +297,22 @@ public class BalanceSeriesService {
                     series.getStatus() != BalanceSeriesStatus.IN_PROGRESS,
                     participantsByGame,
                     players
-                )
+                ),
+                nicknames.get(creatorEmails.get(series.getId()))
             ))
             .toList();
+    }
+
+    // The game still to be played says whom the series waits on; with none left, the last game does.
+    private String currentCreatorEmail(List<Match> games) {
+        Match current = games.stream()
+            .filter(game -> game.getWinningTeam() == null)
+            .findFirst()
+            .orElseGet(() -> games.isEmpty() ? null : games.getLast());
+        if (current == null || current.getCreatedByEmail() == null || current.getCreatedByEmail().isBlank()) {
+            return null;
+        }
+        return current.getCreatedByEmail().trim().toLowerCase(Locale.ROOT);
     }
 
     private List<String> capabilities(List<Long> playerIds, Map<Long, Player> players) {

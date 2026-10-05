@@ -964,6 +964,8 @@ export type BalanceSeries = {
   homePlayers: TournamentPlayer[]
   awayPlayers: TournamentPlayer[]
   games: TournamentGame[]
+  // The nickname of whoever the series is waiting on for its next result; null when unknown.
+  createdByNickname: string | null
 }
 
 export type BalanceSeriesList = {

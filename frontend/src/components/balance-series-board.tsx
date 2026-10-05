@@ -209,6 +209,12 @@ export function BalanceSeriesBoard({ groupId, refreshSignal }: BalanceSeriesBoar
                     <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">
                       {seriesTitle(series)} ·{' '}
                       {t(`balanceSeries.formats.${series.format}`)}
+                      {/* Whom the series is waiting on for its next result. */}
+                      {series.createdByNickname && (
+                        <span className="ml-2 font-normal text-slate-500 dark:text-slate-400">
+                          {t('predictions.createdBy', { nickname: series.createdByNickname })}
+                        </span>
+                      )}
                     </p>
                     <p className="text-xs text-slate-700 dark:text-slate-200">
                       <span className="font-medium">{sideLabel(series, 'HOME')}</span> {teamLine(series.homePlayers)}

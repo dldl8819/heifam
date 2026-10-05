@@ -40,6 +40,7 @@ function series(seriesId: number, status: BalanceSeries['status']): BalanceSerie
     homePlayers: [],
     awayPlayers: [],
     games: [],
+    createdByNickname: null,
   }
 }
 
