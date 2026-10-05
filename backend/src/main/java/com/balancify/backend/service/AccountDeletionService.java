@@ -3,14 +3,19 @@ package com.balancify.backend.service;
 import com.balancify.backend.security.AuthenticatedRequestResolver.ResolvedRequestIdentity;
 import com.balancify.backend.security.SupabaseAuthAdminClient;
 import com.balancify.backend.security.SupabaseJwtVerifier;
+import com.balancify.backend.service.exception.AccountDeletionException;
 import java.util.UUID;
 import java.time.OffsetDateTime;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AccountDeletionService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(AccountDeletionService.class);
 
     private final AccountDeletionDataService accountDeletionDataService;
     private final SupabaseAuthAdminClient supabaseAuthAdminClient;
@@ -63,6 +68,13 @@ public class AccountDeletionService {
             supabaseAuthAdminClient.ensureConfigured();
             supabaseAuthAdminClient.deleteUser(authUserId);
             accountDeletionDataService.completePendingAuthDeletion(authUserId);
+        } catch (AccountDeletionException exception) {
+            if (exception.getReason() != AccountDeletionException.Reason.AUTH_UNAVAILABLE) {
+                throw exception;
+            }
+            // The player is already deactivated and the login account queued for deletion;
+            // PendingAuthDeletionWorker tries again, so the admin's request has succeeded.
+            LOGGER.warn("Login account deletion deferred to the pending deletion worker");
         } finally {
             supabaseJwtVerifier.invalidateUser(authUserId.toString());
         }
