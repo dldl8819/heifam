@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { apiClient } from '@/lib/api'
 import { t } from '@/lib/i18n'
+import { recallPageState, rememberPageState } from '@/lib/page-memory'
 import {
   autocompleteParticipantSlot,
   compactParticipantIds,
@@ -19,6 +20,8 @@ type ParticipantSelectionOptions = {
   minimumSlots: number
   // Called whenever the selection changes, so a page can clear results made from the old one.
   onSelectionChange?: () => void
+  // Given, the slots are kept while the member visits another menu (lib/page-memory: in memory only).
+  memoryKey?: string
 }
 
 /** The group's players and the tier-board slots picked from them, as the multi-balance and tournament pages use. */
@@ -27,13 +30,21 @@ export function useParticipantSelection({
   showMmr,
   minimumSlots,
   onSelectionChange,
+  memoryKey,
 }: ParticipantSelectionOptions) {
   const [players, setPlayers] = useState<BalancePlayerOption[]>([])
   const [playersLoading, setPlayersLoading] = useState<boolean>(true)
   const [playersError, setPlayersError] = useState<string | null>(null)
-  const [participantSlots, setParticipantSlots] = useState<ParticipantSlotState[]>(() =>
-    createParticipantSlots(minimumSlots),
+  const [participantSlots, setParticipantSlots] = useState<ParticipantSlotState[]>(
+    () =>
+      (memoryKey ? recallPageState<ParticipantSlotState[]>(memoryKey) : null) ?? createParticipantSlots(minimumSlots),
   )
+
+  useEffect(() => {
+    if (memoryKey) {
+      rememberPageState(memoryKey, participantSlots)
+    }
+  }, [memoryKey, participantSlots])
   const participantInputRefs = useRef<Array<HTMLInputElement | null>>([])
 
   useEffect(() => {

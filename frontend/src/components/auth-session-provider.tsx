@@ -6,6 +6,7 @@ import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { isPublicRoute } from '@/lib/route-access'
 import { apiClient, clearSessionIdentityCache } from '@/lib/api'
+import { forgetAllPageState } from '@/lib/page-memory'
 
 export type AuthUser = {
   email: string | null
@@ -228,6 +229,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const signOut = async () => {
     clearSessionIdentityCache()
     removeLegacyPersonalizedUiState()
+    forgetAllPageState()
     try {
       const { error } = await supabase.auth.signOut()
       if (error) {

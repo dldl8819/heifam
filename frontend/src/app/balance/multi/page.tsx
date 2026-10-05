@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAdminAuth } from '@/lib/admin-auth'
 import { apiClient } from '@/lib/api'
 import { BalanceSeriesBoard } from '@/components/balance-series-board'
@@ -16,6 +16,7 @@ import {
 import { formatPercent } from '@/lib/percent'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
+import { recallPageState, rememberPageState } from '@/lib/page-memory'
 import {
   buildMultiBalanceRequestPayload,
   DEFAULT_MULTI_BALANCE_MODE,
@@ -106,20 +107,46 @@ function buildDisplayTeams(result: MultiBalanceResponse): MultiBalanceDisplayTea
   ])
 }
 
+const MULTI_BALANCE_MEMORY_KEY = 'balance.multi'
+const MULTI_BALANCE_SLOTS_MEMORY_KEY = 'balance.multi.slots'
+
+// What the page holds while the member visits another menu (lib/page-memory: in memory only).
+type MultiBalancePageMemory = {
+  result: MultiBalanceResponse | null
+  balanceMode: MultiBalanceMode
+  seriesStarted: boolean
+  seriesFormats: Record<number, TournamentSeriesFormat>
+}
+
 export default function MultiBalancePage() {
   const { canViewMmr } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
   const showMmr = canViewMmr && mmrVisible
+  // Coming back from another menu, the page picks up where it was left.
+  const [recalled] = useState<MultiBalancePageMemory | null>(() =>
+    recallPageState<MultiBalancePageMemory>(MULTI_BALANCE_MEMORY_KEY),
+  )
   const [submitting, setSubmitting] = useState<boolean>(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
-  const [result, setResult] = useState<MultiBalanceResponse | null>(null)
-  const [balanceMode, setBalanceMode] = useState<MultiBalanceMode>(DEFAULT_MULTI_BALANCE_MODE)
+  const [result, setResult] = useState<MultiBalanceResponse | null>(recalled?.result ?? null)
+  const [balanceMode, setBalanceMode] = useState<MultiBalanceMode>(recalled?.balanceMode ?? DEFAULT_MULTI_BALANCE_MODE)
   const [startingSeries, setStartingSeries] = useState<boolean>(false)
-  const [seriesStarted, setSeriesStarted] = useState<boolean>(false)
+  const [seriesStarted, setSeriesStarted] = useState<boolean>(recalled?.seriesStarted ?? false)
   const [seriesError, setSeriesError] = useState<string | null>(null)
   const [seriesRefreshSignal, setSeriesRefreshSignal] = useState<number>(0)
   // The format picked per match number; a match left out plays its plan.
-  const [seriesFormats, setSeriesFormats] = useState<Record<number, TournamentSeriesFormat>>({})
+  const [seriesFormats, setSeriesFormats] = useState<Record<number, TournamentSeriesFormat>>(
+    () => recalled?.seriesFormats ?? {},
+  )
+
+  useEffect(() => {
+    rememberPageState<MultiBalancePageMemory>(MULTI_BALANCE_MEMORY_KEY, {
+      result,
+      balanceMode,
+      seriesStarted,
+      seriesFormats,
+    })
+  }, [result, balanceMode, seriesStarted, seriesFormats])
   const clearResult = () => {
     setSubmitError(null)
     setResult(null)
@@ -142,6 +169,7 @@ export default function MultiBalancePage() {
     showMmr,
     minimumSlots: MINIMUM_SELECTION_SLOTS,
     onSelectionChange: clearResult,
+    memoryKey: MULTI_BALANCE_SLOTS_MEMORY_KEY,
   })
 
   const selectedPlayers = useMemo(
