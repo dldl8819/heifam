@@ -245,6 +245,12 @@ class PredictionServiceTest {
             prediction(12L, ADMIN, "HOME")
         ));
         when(matchPredictionRepository.summarizeResolved(ADMIN)).thenReturn(record(4, 3));
+        java.util.Map<String, String> nicknames = new java.util.HashMap<>();
+        nicknames.put(ADMIN, "Ops");
+        nicknames.put("b@example.com", "bravo");
+        nicknames.put("c@example.com", "Charlie");
+        nicknames.put("d@example.com", null);
+        when(accessControlService.resolveDisplayNicknames(any())).thenReturn(nicknames);
 
         PredictionBoardResponse board = service.board(1L, ADMIN, null);
 
@@ -253,18 +259,27 @@ class PredictionServiceTest {
             assertThat(response.matchId()).isEqualTo(10L);
             assertThat(response.myPick()).isEqualTo("AWAY");
             assertThat(response.homePicks()).isNull();
+            // Nobody sees who picked what while picks are still taken.
+            assertThat(response.homePickers()).isNull();
+            assertThat(response.awayPickers()).isNull();
             assertThat(response.homePlayers()).hasSize(3);
         });
         assertThat(board.closed()).singleElement().satisfies(response -> {
             assertThat(response.state()).isEqualTo("CLOSED");
             assertThat(response.homePicks()).isEqualTo(2);
             assertThat(response.awayPicks()).isEqualTo(1);
+            // By nickname, an account without one last; never by email.
+            assertThat(response.homePickers()).containsExactly("bravo", null);
+            assertThat(response.awayPickers()).containsExactly("Charlie");
         });
         assertThat(board.history()).singleElement().satisfies(response -> {
             assertThat(response.state()).isEqualTo("RESOLVED");
             assertThat(response.hit()).isTrue();
             assertThat(response.pointsExcluded()).isTrue();
+            assertThat(response.homePickers()).containsExactly("Ops");
+            assertThat(response.awayPickers()).isEmpty();
         });
+        assertThat(board.toString()).doesNotContain("@");
         assertThat(board.stats().resolved()).isEqualTo(4);
         assertThat(board.stats().hits()).isEqualTo(3);
     }

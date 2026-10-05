@@ -16,6 +16,7 @@ import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -145,7 +146,7 @@ public class PredictionService {
             });
         prediction.setPredictedTeam(pickedTeam);
         matchPredictionRepository.save(prediction);
-        return matchResponse(match, participants, List.of(prediction), normalizedEmail, false, now);
+        return matchResponse(match, participants, List.of(prediction), normalizedEmail, false, now, Map.of());
     }
 
     /** Closes picks for a match ahead of time; once its result is in they are closed anyway. */
@@ -222,6 +223,15 @@ public class PredictionService {
             }
         }
 
+        // Who picked which side goes out by nickname, once picks are closed; emails stay on the server.
+        Map<String, String> nicknames = accessControlService.resolveDisplayNicknames(
+            predictionsByMatch.values().stream()
+                .flatMap(List::stream)
+                .map(MatchPrediction::getPredictorEmail)
+                .distinct()
+                .toList()
+        );
+
         List<PredictionMatchResponse> open = new ArrayList<>();
         List<PredictionMatchResponse> closed = new ArrayList<>();
         for (Match match : awaiting) {
@@ -231,7 +241,8 @@ public class PredictionService {
                 predictionsByMatch.getOrDefault(match.getId(), List.of()),
                 normalizedEmail,
                 ownMatch(participantsByMatch.getOrDefault(match.getId(), List.of()), normalizedEmail, userId),
-                now
+                now,
+                nicknames
             );
             (STATE_OPEN.equals(response.state()) ? open : closed).add(response);
         }
@@ -242,7 +253,8 @@ public class PredictionService {
                 predictionsByMatch.getOrDefault(match.getId(), List.of()),
                 normalizedEmail,
                 false,
-                now
+                now,
+                nicknames
             ))
             .toList();
 
@@ -266,7 +278,8 @@ public class PredictionService {
         List<MatchPrediction> predictions,
         String email,
         boolean ownMatch,
-        OffsetDateTime now
+        OffsetDateTime now,
+        Map<String, String> nicknames
     ) {
         String winner = normalizeTeam(match.getWinningTeam());
         String state = winner != null ? STATE_RESOLVED : isOpen(match, now) ? STATE_OPEN : STATE_CLOSED;
@@ -291,10 +304,21 @@ public class PredictionService {
             ownMatch,
             countsVisible ? homePicks : null,
             countsVisible ? awayPicks : null,
+            countsVisible ? pickers(predictions, TEAM_HOME, nicknames) : null,
+            countsVisible ? pickers(predictions, TEAM_AWAY, nicknames) : null,
             winner,
             winner == null || myPick == null ? null : winner.equals(myPick),
             winner != null && email.equals(normalizeEmail(match.getResultRecordedByEmail()))
         );
+    }
+
+    // Nicknames in order, those without one (null) last, so the list reads the same on every load.
+    private List<String> pickers(List<MatchPrediction> predictions, String team, Map<String, String> nicknames) {
+        return predictions.stream()
+            .filter(prediction -> team.equals(prediction.getPredictedTeam()))
+            .map(prediction -> nicknames.get(normalizeEmail(prediction.getPredictorEmail())))
+            .sorted(Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
+            .toList();
     }
 
     private List<PredictionPlayerResponse> players(List<MatchParticipant> participants, String team) {

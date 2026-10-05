@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   formatCountdown,
+  formatPickers,
   formatPredictionPlayers,
   hitRate,
   remainingSeconds,
@@ -27,6 +28,13 @@ describe('prediction helpers', () => {
   it('rounds the hit rate to one decimal and skips it with no results', () => {
     expect(hitRate({ resolved: 3, hits: 2 })).toBe(66.7)
     expect(hitRate({ resolved: 0, hits: 0 })).toBeNull()
+  })
+
+  it('lists who picked a side', () => {
+    expect(formatPickers(['YOUR_USERNAME_1', 'YOUR_USERNAME_2', null], '?')).toBe('YOUR_USERNAME_1, YOUR_USERNAME_2, ?')
+    expect(formatPickers([], '?')).toBe('')
+    expect(formatPickers(null, '?')).toBe('')
+    expect(formatPickers(undefined, '?')).toBe('')
   })
 
   it('marks who takes Terran or Zerg', () => {

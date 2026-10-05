@@ -28,6 +28,11 @@ export function hitRate(stats: PredictionBoard['stats']): number | null {
   return stats.resolved > 0 ? Math.round((stats.hits * 1000) / stats.resolved) / 10 : null
 }
 
+/** The people who picked a side, as shown once picks are closed. */
+export function formatPickers(pickers: (string | null)[] | null | undefined, unknownLabel: string): string {
+  return (pickers ?? []).map((nickname) => nickname ?? unknownLabel).join(', ')
+}
+
 // Protoss needs no marker; who takes Terran or Zerg is worth knowing before picking.
 export function formatPredictionPlayers(players: PredictionPlayer[]): string {
   return players

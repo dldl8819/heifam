@@ -10,6 +10,7 @@ import { t } from '@/lib/i18n'
 import {
   PREDICTION_POLL_MS,
   formatCountdown,
+  formatPickers,
   formatPredictionPlayers,
   hitRate,
   remainingSeconds,
@@ -54,18 +55,31 @@ function Lineups({ match }: { match: PredictionMatch }) {
 }
 
 function PickCounts({ match }: { match: PredictionMatch }) {
-  if (match.homePicks === null || match.awayPicks === null) {
+  const { homePicks, awayPicks } = match
+  if (homePicks === null || awayPicks === null) {
     return null
   }
+  // Counts and names come only once picks are closed, so nobody follows the crowd.
   return (
-    <p className="text-xs text-slate-600 dark:text-slate-300">
-      {t('predictions.picks', {
-        home: t('predictions.home'),
-        homeCount: match.homePicks,
-        away: t('predictions.away'),
-        awayCount: match.awayPicks,
+    <div className="space-y-0.5 text-xs text-slate-600 dark:text-slate-300">
+      {(['HOME', 'AWAY'] as TeamSide[]).map((side) => {
+        const names = formatPickers(
+          side === 'HOME' ? match.homePickers : match.awayPickers,
+          t('predictions.unknownPicker'),
+        )
+        return (
+          <p key={side}>
+            <span className="font-medium">
+              {t('predictions.pickCount', {
+                team: teamName(side),
+                count: side === 'HOME' ? homePicks : awayPicks,
+              })}
+            </span>
+            {names && `: ${names}`}
+          </p>
+        )
       })}
-    </p>
+    </div>
   )
 }
 
