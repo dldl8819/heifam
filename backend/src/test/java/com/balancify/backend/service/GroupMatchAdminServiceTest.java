@@ -3,6 +3,7 @@ package com.balancify.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -104,6 +105,31 @@ class GroupMatchAdminServiceTest {
             any()
         );
         verify(matchParticipantRepository).saveAll(any());
+        // Set up before it is played, the match opens for predictions.
+        verify(notificationService).publishPredictionsOpen(1L, 500L, 3);
+    }
+
+    @Test
+    void announcesNoPredictionsForAMatchSavedOnlyToTakeItsResult() {
+        Group group = new Group();
+        group.setId(1L);
+        Match savedMatch = new Match();
+        savedMatch.setId(500L);
+        savedMatch.setGroup(group);
+        when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
+        when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L, 5L, 6L))).thenReturn(List.of(
+            player(1L, group), player(2L, group), player(3L, group), player(4L, group), player(5L, group), player(6L, group)
+        ));
+        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any())).thenReturn(List.of());
+        when(matchRepository.save(any(Match.class))).thenReturn(savedMatch);
+
+        CreateGroupMatchResponse response = groupMatchAdminService.createMatch(
+            1L,
+            new CreateGroupMatchRequest(List.of(1L, 2L, 3L), List.of(4L, 5L, 6L), 3, null, true)
+        );
+
+        assertThat(response.confirmationStatus()).isEqualTo("CREATED");
+        verify(notificationService, never()).publishPredictionsOpen(any(), any(), anyInt());
     }
 
     @Test
