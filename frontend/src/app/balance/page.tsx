@@ -977,6 +977,42 @@ export default function BalancePage() {
             {submitting ? t('balance.summary.submitting') : t('balance.summary.submit')}
           </button>
 
+          {/* Right under the balance button, so setting the match up needs no scrolling. */}
+          {canCreateMatchFromResult && !hasGeneratedMatchId && (
+            <div className="mt-2 space-y-1">
+              <button
+                type="button"
+                onClick={() => void handleConfirmMatch()}
+                disabled={matchConfirming || resultSubmitting}
+                className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {matchConfirming ? t('balance.quickResult.confirmingMatch') : t('balance.quickResult.confirmMatch')}
+              </button>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">{t('balance.quickResult.confirmMatchHint')}</p>
+            </div>
+          )}
+          {hasGeneratedMatchId && !resultSubmitSuccess && (
+            <div className="mt-2 space-y-1">
+              <p className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-900 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
+                {t('balance.quickResult.matchConfirmed')}
+              </p>
+              <button
+                type="button"
+                onClick={() => void handleCancelMatch()}
+                disabled={matchCancelling || resultSubmitting}
+                className="w-full rounded-lg border border-rose-300 px-4 py-2 text-sm font-medium text-rose-700 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/40"
+              >
+                {matchCancelling ? t('balance.quickResult.cancellingMatch') : t('balance.quickResult.cancelMatch')}
+              </button>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">{t('balance.quickResult.cancelMatchHint')}</p>
+            </div>
+          )}
+          {matchCreateMessage && (
+            <p className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+              {matchCreateMessage}
+            </p>
+          )}
+
           {!allSelected && !playersLoading && (
             <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
               {t('balance.validation.needExact', { count: requiredPlayerCount })}
@@ -1152,36 +1188,6 @@ export default function BalancePage() {
               ? t('balance.quickResult.matchWillBeCreatedOnSubmit')
               : t('balance.quickResult.matchNotReady')}
         </p>
-        {canCreateMatchFromResult && !hasGeneratedMatchId && (
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void handleConfirmMatch()}
-              disabled={matchConfirming || resultSubmitting}
-              className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {matchConfirming ? t('balance.quickResult.confirmingMatch') : t('balance.quickResult.confirmMatch')}
-            </button>
-            <span className="text-[11px] text-slate-500 dark:text-slate-400">
-              {t('balance.quickResult.confirmMatchHint')}
-            </span>
-          </div>
-        )}
-        {hasGeneratedMatchId && !resultSubmitSuccess && (
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void handleCancelMatch()}
-              disabled={matchCancelling || resultSubmitting}
-              className="rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/40"
-            >
-              {matchCancelling ? t('balance.quickResult.cancellingMatch') : t('balance.quickResult.cancelMatch')}
-            </button>
-            <span className="text-[11px] text-slate-500 dark:text-slate-400">
-              {t('balance.quickResult.cancelMatchHint')}
-            </span>
-          </div>
-        )}
         {result && (
           <div className="mt-3 space-y-2">
             <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
@@ -1266,12 +1272,6 @@ export default function BalancePage() {
             {resultSubmitting ? t('balance.quickResult.submitting') : t('balance.quickResult.submit')}
           </button>
         </div>
-
-        {matchCreateMessage && (
-          <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
-            {matchCreateMessage}
-          </p>
-        )}
 
         {resultSubmitError && (
           <Alert variant="destructive" appearance="light" size="sm" className="mt-3">
