@@ -36,6 +36,9 @@ public class GroupMatchAdminService {
     private static final int TEAM_SIZE_3V3 = 3;
     private static final List<MatchStatus> DUPLICATE_BLOCKING_STATUSES =
         List.of(MatchStatus.DRAFT, MatchStatus.CONFIRMED);
+    // A match set up before play waits this long at most for its result. A result entered for the
+    // same match in that time belongs to the one already waiting, not to a new one.
+    private static final long AWAITING_MATCH_LOOKBACK_MINUTES = 180;
 
     private final GroupRepository groupRepository;
     private final PlayerRepository playerRepository;
@@ -82,8 +85,7 @@ public class GroupMatchAdminService {
             request.raceComposition(),
             DuplicateHandling.REUSE_ACTIVE_REJECT_COMPLETED,
             null,
-            // A match saved only to take its result at once was never open for predictions.
-            !Boolean.TRUE.equals(request.resultFollows()),
+            Boolean.TRUE.equals(request.resultFollows()),
             createdByEmail
         );
 
@@ -91,7 +93,7 @@ public class GroupMatchAdminService {
             return new CreateGroupMatchResponse(
                 null,
                 "DUPLICATE_REJECTED",
-                duplicateConflictMessage()
+                outcome.rejectionMessage() == null ? duplicateConflictMessage() : outcome.rejectionMessage()
             );
         }
 
@@ -130,7 +132,8 @@ public class GroupMatchAdminService {
             raceComposition,
             DuplicateHandling.REJECT,
             null,
-            true,
+            // Entered with its result; the result entry that follows refuses a result entered twice.
+            false,
             null
         ).match();
     }
@@ -158,7 +161,7 @@ public class GroupMatchAdminService {
             raceComposition,
             DuplicateHandling.NONE,
             new SeriesLink(seriesId, null, seriesGameNumber),
-            true,
+            false,
             null
         ).match();
     }
@@ -188,7 +191,7 @@ public class GroupMatchAdminService {
             raceComposition,
             DuplicateHandling.NONE,
             new SeriesLink(null, balanceSeriesId, seriesGameNumber),
-            true,
+            false,
             createdByEmail
         ).match();
     }
@@ -245,7 +248,8 @@ public class GroupMatchAdminService {
         String rawRaceComposition,
         DuplicateHandling duplicateHandling,
         SeriesLink seriesLink,
-        boolean announcePredictions,
+        // The balance page saves the match only to enter its result at once.
+        boolean resultFollows,
         String createdByEmail
     ) {
         int normalizedTeamSize = normalizeRequestedTeamSize(requestedTeamSize);
@@ -300,12 +304,19 @@ public class GroupMatchAdminService {
         );
         if (duplicateHandling != DuplicateHandling.NONE) {
             OffsetDateTime duplicateCheckStartAt = OffsetDateTime.now().minusMinutes(duplicateWindowMinutes);
+            // A member entering a result also finds the same match set up longer ago and still
+            // waiting: the result is that match's. Setting a match up again later starts a new one.
+            boolean entersResultOfAwaitingMatch = resultFollows
+                && duplicateHandling == DuplicateHandling.REUSE_ACTIVE_REJECT_COMPLETED;
+            OffsetDateTime candidatesSince = entersResultOfAwaitingMatch
+                ? OffsetDateTime.now().minusMinutes(Math.max(duplicateWindowMinutes, AWAITING_MATCH_LOOKBACK_MINUTES))
+                : duplicateCheckStartAt;
             List<Match> duplicateCandidates = matchRepository.findRecentDuplicateCandidates(
                 groupId,
                 normalizedTeamSize,
                 requestedSignature.participantSignature(),
                 normalizedRaceComposition,
-                duplicateCheckStartAt
+                candidatesSince
             );
 
             for (Match duplicateCandidate : duplicateCandidates) {
@@ -333,13 +344,39 @@ public class GroupMatchAdminService {
                 if (status == MatchStatus.CANCELLED) {
                     continue;
                 }
+                boolean awaitingResult = DUPLICATE_BLOCKING_STATUSES.contains(status)
+                    && duplicateCandidate.getWinningTeam() == null;
+                boolean createdInWindow = duplicateCandidate.getCreatedAt() != null
+                    && !duplicateCandidate.getCreatedAt().isBefore(duplicateCheckStartAt);
+                // Older than the window, only a match still waiting for its result counts.
+                if (!awaitingResult && !createdInWindow) {
+                    continue;
+                }
                 if (duplicateHandling == DuplicateHandling.REJECT) {
                     throw new MatchConflictException(duplicateConflictMessage());
                 }
                 if (DUPLICATE_BLOCKING_STATUSES.contains(status)) {
-                    return new MatchCreationOutcome(duplicateCandidate, true, false);
+                    return new MatchCreationOutcome(duplicateCandidate, true, false, null);
                 }
-                return new MatchCreationOutcome(duplicateCandidate, false, true);
+                return new MatchCreationOutcome(duplicateCandidate, false, true, duplicateConflictMessage());
+            }
+
+            // A result for the same two teams moments ago: a match saved to take its result now is
+            // that game entered twice. Refused here, before the match is saved, so none is left behind.
+            if (resultFollows && duplicateHandling == DuplicateHandling.REUSE_ACTIVE_REJECT_COMPLETED) {
+                Match recent = RecentResultDuplicates.find(
+                    matchRepository,
+                    matchParticipantRepository,
+                    groupId,
+                    normalizedTeamSize,
+                    requestedSignature,
+                    duplicateWindowMinutes
+                ).orElse(null);
+                if (recent != null) {
+                    return new MatchCreationOutcome(
+                        recent, false, true, RecentResultDuplicates.conflictMessage(duplicateWindowMinutes)
+                    );
+                }
             }
         }
 
@@ -384,10 +421,10 @@ public class GroupMatchAdminService {
         matchParticipantRepository.saveAll(participants);
         // A balanced match opens for predictions as it is created. A manual entry comes with its
         // result, and so does a balanced one saved at the moment its result is entered.
-        if (normalizedSource == MatchSource.BALANCED && announcePredictions) {
+        if (normalizedSource == MatchSource.BALANCED && !resultFollows) {
             notificationService.publishPredictionsOpen(group.getId(), savedMatch.getId(), normalizedTeamSize);
         }
-        return new MatchCreationOutcome(savedMatch, false, false);
+        return new MatchCreationOutcome(savedMatch, false, false, null);
     }
 
     private MatchRaceAssignments assignRaceComposition(
@@ -460,7 +497,7 @@ public class GroupMatchAdminService {
     }
 
     static String duplicateConflictMessage() {
-        return "The same teams and race composition were already entered within the last 5 minutes.";
+        return "같은 팀·같은 종족 조합의 경기가 최근 5분 안에 이미 입력되었습니다.";
     }
 
     private enum DuplicateHandling {
@@ -472,7 +509,8 @@ public class GroupMatchAdminService {
     private record MatchCreationOutcome(
         Match match,
         boolean reusedExisting,
-        boolean duplicateRejected
+        boolean duplicateRejected,
+        String rejectionMessage
     ) {
     }
 

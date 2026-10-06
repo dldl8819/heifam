@@ -290,6 +290,9 @@ public class MatchResultService {
         }
 
         ValidatedParticipants validatedParticipants = loadValidatedParticipants(matchId, match);
+        if (!alreadyProcessed) {
+            rejectResultEnteredTwice(match, validatedParticipants);
+        }
         applyParticipantRaces(
             match,
             validatedParticipants,
@@ -656,6 +659,32 @@ public class MatchResultService {
             return RaceCompositionPolicy.normalizeForTeamSize(value, teamSize);
         } catch (IllegalArgumentException exception) {
             return null;
+        }
+    }
+
+    /**
+     * A first result is refused while another match of the same two teams got its result within
+     * the duplicate window: two people entering the same game a minute apart. Games of a series
+     * repeat their teams on purpose and are numbered, so they are let through.
+     */
+    private void rejectResultEnteredTwice(Match match, ValidatedParticipants participants) {
+        if (match.getSeriesId() != null || match.getBalanceSeriesId() != null) {
+            return;
+        }
+        MatchSignaturePolicy.Signature signature = MatchSignaturePolicy.fromParticipants(participants.all());
+        if (signature == null) {
+            signature = MatchSignaturePolicy.fromStored(match);
+        }
+        boolean enteredTwice = RecentResultDuplicates.find(
+            matchRepository,
+            matchParticipantRepository,
+            resolveGroupId(match, participants.all()),
+            participants.teamSize(),
+            signature,
+            duplicateWindowMinutes
+        ).isPresent();
+        if (enteredTwice) {
+            throw new MatchConflictException(RecentResultDuplicates.conflictMessage(duplicateWindowMinutes));
         }
     }
 

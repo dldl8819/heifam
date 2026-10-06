@@ -758,7 +758,12 @@ export default function BalancePage() {
       }
     } catch (error) {
       if (isApiConflictError(error)) {
-        setResultSubmitError(t('balance.quickResult.submitConflict'))
+        // The backend says which conflict it is: a result already entered, or the same game entered twice.
+        setResultSubmitError(
+          error instanceof Error && /[가-힣]/.test(error.message)
+            ? error.message
+            : t('balance.quickResult.submitConflict'),
+        )
       } else if (isApiUnauthorizedError(error)) {
         setResultSubmitError(t('common.adminLoginRequired'))
       } else if (isApiForbiddenError(error)) {
