@@ -7,6 +7,7 @@ import { Alert, AlertContent, AlertDescription, AlertIcon } from '@/components/u
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { MatchConfirmationsPanel } from '@/components/match-confirmations-panel'
 import { t } from '@/lib/i18n'
+import { formatKstDateTime } from '@/lib/kst-time'
 import {
   PREDICTION_POLL_MS,
   formatCountdown,
@@ -31,16 +32,20 @@ function describeError(error: unknown, fallback: string): string {
 }
 
 function MatchTitle({ match }: { match: PredictionMatch }) {
+  const setUpAt = formatKstDateTime(match.createdAt)
   return (
     <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">
       {match.seriesGameNumber !== null ? `${t('predictions.tournamentGame', { number: match.seriesGameNumber })} · ` : ''}
       {match.raceComposition ?? ''}
-      {/* Whom the match is waiting on for its result. */}
-      {match.createdByNickname && (
-        <span className="ml-2 font-normal text-slate-500 dark:text-slate-400">
-          {t('predictions.createdBy', { nickname: match.createdByNickname })}
-        </span>
-      )}
+      {/* Whom the match is waiting on for its result, and since when. */}
+      <span className="ml-2 font-normal text-slate-500 dark:text-slate-400">
+        {[
+          match.createdByNickname ? t('predictions.createdBy', { nickname: match.createdByNickname }) : '',
+          setUpAt ? t('predictions.createdAt', { time: setUpAt }) : '',
+        ]
+          .filter((part) => part.length > 0)
+          .join(' · ')}
+      </span>
     </p>
   )
 }

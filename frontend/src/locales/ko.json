@@ -1686,6 +1686,7 @@
     "ownMatch": "본인이 뛰는 경기라 예측할 수 없습니다.",
     "tournamentGame": "시리즈 {number}판",
     "createdBy": "입력자 {nickname}",
+    "createdAt": "{time} 입력",
     "timeLeft": "남은 시간 {time}",
     "close": "예측 마감",
     "closeConfirm": "이 경기의 승부 예측을 지금 마감할까요?",
