@@ -1,4 +1,4 @@
-import type { PredictionBoard, PredictionPlayer } from '@/types/api'
+import type { PredictionBoard, PredictionMatch, PredictionPlayer } from '@/types/api'
 
 export const PREDICTION_POLL_MS = 15000
 
@@ -26,6 +26,14 @@ export function formatCountdown(seconds: number): string {
 
 export function hitRate(stats: PredictionBoard['stats']): number | null {
   return stats.resolved > 0 ? Math.round((stats.hits * 1000) / stats.resolved) / 10 : null
+}
+
+/**
+ * A match set up but not played can be called off from the board by whoever set it up and by
+ * admins. A series game is called off with its series, and a match with a result is past it.
+ */
+export function canCallOffMatch(match: PredictionMatch, isAdmin: boolean): boolean {
+  return match.state !== 'RESOLVED' && match.seriesGameNumber === null && (isAdmin || match.createdByMe)
 }
 
 /** The people who picked a side, as shown once picks are closed. */

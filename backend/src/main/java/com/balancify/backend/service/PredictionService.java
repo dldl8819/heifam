@@ -310,7 +310,8 @@ public class PredictionService {
             winner,
             winner == null || myPick == null ? null : winner.equals(myPick),
             winner != null && email.equals(normalizeEmail(match.getResultRecordedByEmail())),
-            nicknames.get(normalizeEmail(match.getCreatedByEmail()))
+            nicknames.get(normalizeEmail(match.getCreatedByEmail())),
+            !email.isEmpty() && email.equals(normalizeEmail(match.getCreatedByEmail()))
         );
     }
 

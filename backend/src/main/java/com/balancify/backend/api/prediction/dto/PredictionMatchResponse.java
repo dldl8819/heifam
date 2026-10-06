@@ -27,6 +27,8 @@ public record PredictionMatchResponse(
     Boolean hit,
     boolean pointsExcluded,
     // The nickname of whoever set the match up; null when unknown.
-    String createdByNickname
+    String createdByNickname,
+    // The viewer set it up: the page offers them to call it off while it waits for its result.
+    boolean createdByMe
 ) {
 }
