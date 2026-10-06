@@ -885,6 +885,11 @@ class MatchResultServiceTest {
         assertThat(outcome.auditSnapshot().previousRaceComposition()).isEqualTo("PPT");
         assertThat(outcome.auditSnapshot().nextRaceComposition()).isEqualTo("PPT");
         assertThat(outcome.auditSnapshot().participantRacesChanged()).isTrue();
+        // What changed is kept by team and race, without the players.
+        assertThat(outcome.auditSnapshot().participantRaceChanges())
+            .allSatisfy(change -> assertThat(change.previousRace()).isNotEqualTo(change.nextRace()))
+            .extracting(MatchResultService.ParticipantRaceChange::team)
+            .isSubsetOf("HOME", "AWAY");
         assertThat(match.isRacesRecorded()).isTrue();
         assertThat(participants.stream().map(MatchParticipant::getMmrDelta).toList())
             .containsOnly(10);
