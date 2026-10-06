@@ -110,6 +110,105 @@ class GroupMatchAdminServiceTest {
     }
 
     @Test
+    void refusesAMatchSavedWithItsResultWhenTheSameTeamsJustGotOne() {
+        Group group = stubSixPlayers();
+        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any())).thenReturn(List.of());
+        // Set up half an hour ago and given its result a minute ago, by someone else.
+        Match recorded = new Match();
+        recorded.setId(900L);
+        recorded.setGroup(group);
+        recorded.setCreatedAt(OffsetDateTime.now().minusMinutes(30));
+        recorded.setStatus(MatchStatus.COMPLETED);
+        recorded.setWinningTeam("HOME");
+        recorded.setResultRecordedAt(OffsetDateTime.now().minusMinutes(1));
+        recorded.setTeamSize(3);
+        recorded.setRaceComposition("PPT");
+        recorded.setParticipantSignature("1-2-3-4-5-6");
+        recorded.setTeamSignature("TEAM1:1-2-3|TEAM2:4-5-6");
+        when(matchRepository.findRecentResultsOfSamePlayers(eq(1L), eq(3), eq("1-2-3-4-5-6"), any()))
+            .thenReturn(List.of(recorded));
+
+        // The same teams in another order and on the other sides, with another composition.
+        CreateGroupMatchResponse response = groupMatchAdminService.createMatch(
+            1L,
+            new CreateGroupMatchRequest(List.of(6L, 4L, 5L), List.of(3L, 1L, 2L), 3, "PPP", true)
+        );
+
+        assertThat(response.confirmationStatus()).isEqualTo("DUPLICATE_REJECTED");
+        assertThat(response.matchId()).isNull();
+        assertThat(response.message()).contains("5분 안에 이미 입력");
+        verify(matchRepository, never()).save(any(Match.class));
+    }
+
+    @Test
+    void setsTheSameTeamsUpAgainRightAfterTheirResultAndLetsOtherTeamsEnterTheirs() {
+        Group group = stubSixPlayers();
+        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any())).thenReturn(List.of());
+        Match recorded = new Match();
+        recorded.setId(900L);
+        recorded.setGroup(group);
+        recorded.setStatus(MatchStatus.COMPLETED);
+        recorded.setWinningTeam("HOME");
+        recorded.setResultRecordedAt(OffsetDateTime.now().minusMinutes(1));
+        recorded.setTeamSize(3);
+        recorded.setParticipantSignature("1-2-3-4-5-6");
+        recorded.setTeamSignature("TEAM1:1-2-3|TEAM2:4-5-6");
+        when(matchRepository.findRecentResultsOfSamePlayers(any(), any(), any(), any())).thenReturn(List.of(recorded));
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> {
+            Match match = invocation.getArgument(0);
+            match.setId(901L);
+            return match;
+        });
+
+        // A rematch set up before it is played is a new game, not a second entry of the last one.
+        assertThat(groupMatchAdminService.createMatch(
+            1L,
+            new CreateGroupMatchRequest(List.of(1L, 2L, 3L), List.of(4L, 5L, 6L))
+        ).confirmationStatus()).isEqualTo("CREATED");
+        // The same six players in other teams played another game.
+        assertThat(groupMatchAdminService.createMatch(
+            1L,
+            new CreateGroupMatchRequest(List.of(1L, 2L, 4L), List.of(3L, 5L, 6L), 3, null, true)
+        ).confirmationStatus()).isEqualTo("CREATED");
+    }
+
+    @Test
+    void entersTheResultOnTheMatchAlreadyWaitingForItHoweverLongAgoItWasSetUp() {
+        Group group = stubSixPlayers();
+        Match waiting = new Match();
+        waiting.setId(900L);
+        waiting.setGroup(group);
+        waiting.setCreatedAt(OffsetDateTime.now().minusMinutes(30));
+        waiting.setStatus(MatchStatus.CONFIRMED);
+        waiting.setTeamSize(3);
+        waiting.setParticipantSignature("1-2-3-4-5-6");
+        waiting.setTeamSignature("TEAM1:1-2-3|TEAM2:4-5-6");
+        when(matchRepository.findRecentDuplicateCandidates(any(), any(), any(), any(), any())).thenAnswer(invocation -> {
+            OffsetDateTime fromInclusive = invocation.getArgument(4);
+            return waiting.getCreatedAt().isBefore(fromInclusive) ? List.of() : List.of(waiting);
+        });
+
+        CreateGroupMatchResponse response = groupMatchAdminService.createMatch(
+            1L,
+            new CreateGroupMatchRequest(List.of(4L, 5L, 6L), List.of(1L, 2L, 3L), 3, null, true)
+        );
+
+        assertThat(response.confirmationStatus()).isEqualTo("REUSED_EXISTING");
+        assertThat(response.matchId()).isEqualTo(900L);
+        verify(matchRepository, never()).save(any(Match.class));
+    }
+
+    private Group stubSixPlayers() {
+        Group group = new Group();
+        group.setId(1L);
+        when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
+        when(playerRepository.findByGroup_IdAndIdIn(eq(1L), any())).thenReturn(List.of(
+            player(1L, group), player(2L, group), player(3L, group), player(4L, group), player(5L, group), player(6L, group)
+        ));
+        return group;
+    }
+
+    @Test
     void keepsWhoSetTheMatchUp() {
         Group group = new Group();
         group.setId(1L);
@@ -941,7 +1040,7 @@ class GroupMatchAdminServiceTest {
                 MatchSource.MANUAL, null, "PPT"
             ))
                 .isInstanceOf(MatchConflictException.class)
-                .hasMessageContaining("last 5 minutes");
+                .hasMessageContaining("5분 안에 이미 입력");
         }
     }
 

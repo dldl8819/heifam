@@ -51,6 +51,25 @@ public interface MatchRepository extends JpaRepository<Match, Long>, JpaSpecific
     @Query("select m from Match m where m.id = :matchId")
     Optional<Match> findByIdForUpdate(@Param("matchId") Long matchId);
 
+    /** Matches of the same players whose result came in since the given time, newest first. */
+    @Query("""
+        select m
+        from Match m
+        where m.group.id = :groupId
+          and m.teamSize = :teamSize
+          and m.participantSignature = :participantSignature
+          and m.winningTeam is not null
+          and m.status <> com.balancify.backend.domain.MatchStatus.CANCELLED
+          and m.resultRecordedAt >= :fromInclusive
+        order by m.resultRecordedAt desc, m.id desc
+        """)
+    List<Match> findRecentResultsOfSamePlayers(
+        @Param("groupId") Long groupId,
+        @Param("teamSize") Integer teamSize,
+        @Param("participantSignature") String participantSignature,
+        @Param("fromInclusive") OffsetDateTime fromInclusive
+    );
+
     @Query("""
         select m
         from Match m

@@ -220,6 +220,77 @@ class MatchResultServiceTest {
     }
 
     @Test
+    void refusesAResultWhenTheSameTeamsGotOneMomentsAgo() {
+        Match match = new Match();
+        match.setId(1L);
+        match.setStatus(MatchStatus.CONFIRMED);
+        List<MatchParticipant> participants = buildParticipants(match);
+        when(matchRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(1L)).thenReturn(participants);
+        when(matchRepository.findRecentResultsOfSamePlayers(eq(7L), eq(3), eq("1-2-3-4-5-6"), any()))
+            .thenReturn(List.of(recordedMatch(2L, "TEAM1:1-2-3|TEAM2:4-5-6")));
+
+        assertThatThrownBy(() -> matchResultService.processMatchResult(1L, new MatchResultRequest("HOME")))
+            .isInstanceOf(MatchConflictException.class)
+            .hasMessageContaining("5분 안에 이미 입력");
+
+        assertThat(match.getWinningTeam()).isNull();
+        verify(matchRepository, never()).save(any(Match.class));
+        verify(mmrHistoryRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void takesAResultWhenTheSamePlayersJustPlayedInOtherTeams() {
+        Match match = new Match();
+        match.setId(1L);
+        match.setStatus(MatchStatus.CONFIRMED);
+        List<MatchParticipant> participants = buildParticipants(match);
+        when(matchRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(1L)).thenReturn(participants);
+        when(matchRepository.findRecentResultsOfSamePlayers(any(), any(), any(), any()))
+            .thenReturn(List.of(recordedMatch(2L, "TEAM1:1-2-4|TEAM2:3-5-6")));
+        when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(playerRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(mmrHistoryRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThat(matchResultService.processMatchResult(1L, new MatchResultRequest("HOME")).winnerTeam()).isEqualTo("HOME");
+    }
+
+    @Test
+    void neverTakesSeriesGamesForAResultEnteredTwice() {
+        Match match = new Match();
+        match.setId(1L);
+        match.setStatus(MatchStatus.CONFIRMED);
+        match.setBalanceSeriesId(5L);
+        match.setSeriesGameNumber(2);
+        List<MatchParticipant> participants = buildParticipants(match);
+        when(matchRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(match));
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(1L)).thenReturn(participants);
+        when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(playerRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(mmrHistoryRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Game 2 of a series follows game 1 with the same teams, sometimes entered a minute apart.
+        matchResultService.processMatchResult(1L, new MatchResultRequest("HOME"));
+
+        verify(matchRepository, never()).findRecentResultsOfSamePlayers(any(), any(), any(), any());
+    }
+
+    private Match recordedMatch(Long id, String teamSignature) {
+        Match recorded = new Match();
+        recorded.setId(id);
+        recorded.setStatus(MatchStatus.COMPLETED);
+        recorded.setWinningTeam("AWAY");
+        recorded.setResultRecordedAt(OffsetDateTime.now().minusMinutes(1));
+        recorded.setTeamSize(3);
+        recorded.setParticipantSignature("1-2-3-4-5-6");
+        recorded.setTeamSignature(teamSignature);
+        return recorded;
+    }
+
+    @Test
     void processesResultAndUpdatesMmrForAllParticipants() {
         Match match = new Match();
         match.setId(1L);
