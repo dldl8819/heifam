@@ -1071,6 +1071,8 @@ export type PredictionMatch = {
   pointsExcluded: boolean
   // The nickname of whoever set the match up; null when unknown.
   createdByNickname: string | null
+  // The viewer set it up, so they may call it off while it waits for its result.
+  createdByMe: boolean
 }
 
 // A balanced 3v3 match the player played, whose result they confirm for a point.

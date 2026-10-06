@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useAdminAuth } from '@/lib/admin-auth'
-import { apiClient, isApiConflictError } from '@/lib/api'
+import { apiClient, isApiConflictError, isApiNotFoundError } from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { MatchConfirmationsPanel } from '@/components/match-confirmations-panel'
@@ -10,6 +10,7 @@ import { t } from '@/lib/i18n'
 import { formatKstDateTime } from '@/lib/kst-time'
 import {
   PREDICTION_POLL_MS,
+  canCallOffMatch,
   formatCountdown,
   formatPickers,
   formatPredictionPlayers,
@@ -200,6 +201,43 @@ export default function PredictionsPage() {
     }
   }
 
+  // The game is not being played after all: the match and the picks on it go.
+  const handleCallOff = async (match: PredictionMatch) => {
+    if (!window.confirm(t('predictions.callOffConfirm'))) {
+      return
+    }
+    setBusyMatchId(match.matchId)
+    setMatchError(match.matchId, null)
+    try {
+      await apiClient.cancelMatch(match.matchId)
+      await loadBoard(true)
+    } catch (callOffError) {
+      if (isApiNotFoundError(callOffError)) {
+        // Someone else called it off already.
+        await loadBoard(true)
+      } else if (isApiConflictError(callOffError)) {
+        setMatchError(match.matchId, t('predictions.callOffConflict'))
+        await loadBoard(true)
+      } else {
+        setMatchError(match.matchId, describeError(callOffError, t('predictions.callOffError')))
+      }
+    } finally {
+      setBusyMatchId(null)
+    }
+  }
+
+  const callOffButton = (match: PredictionMatch) =>
+    canCallOffMatch(match, isAdmin) ? (
+      <button
+        type="button"
+        disabled={busyMatchId === match.matchId}
+        onClick={() => void handleCallOff(match)}
+        className="rounded-lg border border-rose-300 px-3 py-1 text-xs text-rose-700 hover:bg-rose-50 disabled:opacity-60 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/40"
+      >
+        {t('predictions.callOff')}
+      </button>
+    ) : null
+
   const rate = board ? hitRate(board.stats) : null
 
   return (
@@ -275,16 +313,19 @@ export default function PredictionsPage() {
                         {t('predictions.myPick', { team: teamName(match.myPick) })}
                       </p>
                     )}
-                    {isAdmin && (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => void handleClose(match)}
-                        className="rounded-lg border border-slate-300 px-3 py-1 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
-                      >
-                        {t('predictions.close')}
-                      </button>
-                    )}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void handleClose(match)}
+                          className="rounded-lg border border-slate-300 px-3 py-1 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                        >
+                          {t('predictions.close')}
+                        </button>
+                      )}
+                      {callOffButton(match)}
+                    </div>
                   </div>
                   {matchErrors[match.matchId] && (
                     <p className="text-xs text-rose-600 dark:text-rose-300">{matchErrors[match.matchId]}</p>
@@ -306,10 +347,18 @@ export default function PredictionsPage() {
                 <MatchTitle match={match} />
                 <Lineups match={match} />
                 <PickCounts match={match} />
-                {match.myPick && (
-                  <p className="text-xs text-indigo-700 dark:text-indigo-300">
-                    {t('predictions.myPick', { team: teamName(match.myPick) })}
-                  </p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  {match.myPick ? (
+                    <p className="text-xs text-indigo-700 dark:text-indigo-300">
+                      {t('predictions.myPick', { team: teamName(match.myPick) })}
+                    </p>
+                  ) : (
+                    <span />
+                  )}
+                  {callOffButton(match)}
+                </div>
+                {matchErrors[match.matchId] && (
+                  <p className="text-xs text-rose-600 dark:text-rose-300">{matchErrors[match.matchId]}</p>
                 )}
               </article>
             ))}

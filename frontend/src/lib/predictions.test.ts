@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  canCallOffMatch,
   formatCountdown,
   formatPickers,
   formatPredictionPlayers,
@@ -7,6 +8,7 @@ import {
   remainingSeconds,
   serverOffsetMs,
 } from '@/lib/predictions'
+import type { PredictionMatch } from '@/types/api'
 
 describe('prediction helpers', () => {
   it('counts down by the server clock', () => {
@@ -28,6 +30,22 @@ describe('prediction helpers', () => {
   it('rounds the hit rate to one decimal and skips it with no results', () => {
     expect(hitRate({ resolved: 3, hits: 2 })).toBe(66.7)
     expect(hitRate({ resolved: 0, hits: 0 })).toBeNull()
+  })
+
+  it('lets whoever set a waiting match up, and admins, call it off', () => {
+    const waiting = { state: 'CLOSED', seriesGameNumber: null, createdByMe: false } as PredictionMatch
+
+    expect(canCallOffMatch(waiting, false)).toBe(false)
+    expect(canCallOffMatch(waiting, true)).toBe(true)
+    expect(canCallOffMatch({ ...waiting, createdByMe: true }, false)).toBe(true)
+    expect(canCallOffMatch({ ...waiting, state: 'OPEN', createdByMe: true }, false)).toBe(true)
+  })
+
+  it('offers no calling off for a series game or a match with a result', () => {
+    const mine = { state: 'CLOSED', seriesGameNumber: null, createdByMe: true } as PredictionMatch
+
+    expect(canCallOffMatch({ ...mine, seriesGameNumber: 2 }, true)).toBe(false)
+    expect(canCallOffMatch({ ...mine, state: 'RESOLVED' }, true)).toBe(false)
   })
 
   it('lists who picked a side', () => {

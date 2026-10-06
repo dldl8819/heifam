@@ -267,6 +267,7 @@ class PredictionServiceTest {
             assertThat(response.homePlayers()).hasSize(3);
             // Whom the match is waiting on shows from the start, by nickname.
             assertThat(response.createdByNickname()).isEqualTo("bravo");
+            assertThat(response.createdByMe()).isFalse();
         });
         assertThat(board.closed()).singleElement().satisfies(response -> {
             assertThat(response.state()).isEqualTo("CLOSED");
@@ -275,8 +276,9 @@ class PredictionServiceTest {
             // By nickname, an account without one last; never by email.
             assertThat(response.homePickers()).containsExactly("bravo", null);
             assertThat(response.awayPickers()).containsExactly("Charlie");
-            // A match from before creators were kept names nobody.
+            // A match from before creators were kept names nobody, and is nobody's own.
             assertThat(response.createdByNickname()).isNull();
+            assertThat(response.createdByMe()).isFalse();
         });
         assertThat(board.history()).singleElement().satisfies(response -> {
             assertThat(response.state()).isEqualTo("RESOLVED");
@@ -285,6 +287,7 @@ class PredictionServiceTest {
             assertThat(response.homePickers()).containsExactly("Ops");
             assertThat(response.awayPickers()).isEmpty();
             assertThat(response.createdByNickname()).isEqualTo("Ops");
+            assertThat(response.createdByMe()).isTrue();
         });
         assertThat(board.toString()).doesNotContain("@");
         assertThat(board.stats().resolved()).isEqualTo(4);
