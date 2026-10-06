@@ -222,7 +222,7 @@ public class MatchResultService {
                     winnerTeam,
                     raceCompositionUpdate.previousRaceComposition(),
                     raceCompositionUpdate.nextRaceComposition(),
-                    raceCompositionUpdate.participantRacesChanged()
+                    raceCompositionUpdate.participantRaceChanges()
                 )
             );
         } else {
@@ -243,7 +243,7 @@ public class MatchResultService {
                     winnerAudit.nextWinnerTeam(),
                     raceCompositionUpdate.previousRaceComposition(),
                     raceCompositionUpdate.nextRaceComposition(),
-                    raceCompositionUpdate.participantRacesChanged()
+                    raceCompositionUpdate.participantRaceChanges()
                 )
             );
         }
@@ -479,7 +479,7 @@ public class MatchResultService {
                 previousRaceComposition,
                 previousRaceComposition,
                 false,
-                false
+                List.of()
             );
         }
         if (requestedRaceComposition != null && requestedRaceComposition.isBlank()) {
@@ -497,7 +497,7 @@ public class MatchResultService {
             );
         }
         if (hasParticipantRaces) {
-            boolean participantRacesChanged = applyParticipantRaces(
+            List<ParticipantRaceChange> participantRaceChanges = applyParticipantRaces(
                 match,
                 participants,
                 nextRaceComposition,
@@ -508,8 +508,8 @@ public class MatchResultService {
             return new RaceCompositionUpdate(
                 previousRaceComposition,
                 nextRaceComposition,
-                storedCompositionChanged || participantRacesChanged,
-                participantRacesChanged
+                storedCompositionChanged || !participantRaceChanges.isEmpty(),
+                participantRaceChanges
             );
         }
         boolean matchAlreadyCanonical = Objects.equals(
@@ -528,7 +528,7 @@ public class MatchResultService {
                 previousRaceComposition,
                 nextRaceComposition,
                 false,
-                false
+                List.of()
             );
         }
 
@@ -540,20 +540,21 @@ public class MatchResultService {
             previousRaceComposition,
             nextRaceComposition,
             true,
-            false
+            List.of()
         );
     }
 
     // The recorder's account of who actually played which race; it replaces the automatic
     // assignment, so each team must still add up to the match's race composition.
-    private boolean applyParticipantRaces(
+    /** Sets each player's race as asked and returns what changed, by team and race only. */
+    private List<ParticipantRaceChange> applyParticipantRaces(
         Match match,
         ValidatedParticipants participants,
         String raceComposition,
         List<ParticipantRaceRequest> requestedParticipantRaces
     ) {
         if (requestedParticipantRaces == null || requestedParticipantRaces.isEmpty()) {
-            return false;
+            return List.of();
         }
         if (raceComposition == null) {
             throw new IllegalArgumentException("raceComposition is required");
@@ -568,7 +569,7 @@ public class MatchResultService {
         }
 
         Set<Long> seenPlayerIds = new HashSet<>();
-        boolean changed = false;
+        List<ParticipantRaceChange> changes = new ArrayList<>();
         for (ParticipantRaceRequest requested : requestedParticipantRaces) {
             Long playerId = requested == null ? null : requested.playerId();
             MatchParticipant participant = playerId == null ? null : participantsByPlayerId.get(playerId);
@@ -584,7 +585,7 @@ public class MatchResultService {
                 : participant.getAssignedRace().trim().toUpperCase(Locale.ROOT);
             if (!race.equals(currentRace)) {
                 participant.setAssignedRace(race);
-                changed = true;
+                changes.add(new ParticipantRaceChange(participant.getTeam(), currentRace, race));
             }
         }
 
@@ -595,7 +596,7 @@ public class MatchResultService {
             );
         }
         match.setRacesRecorded(true);
-        return changed;
+        return changes;
     }
 
     private void assignRaceComposition(
@@ -1088,6 +1089,13 @@ public class MatchResultService {
     ) {
     }
 
+    /**
+     * One player's race changed by an edit: the team and the races, never who. The audit log keeps
+     * match entries after an account is deleted, so it must not hold a player's name.
+     */
+    public record ParticipantRaceChange(String team, String previousRace, String nextRace) {
+    }
+
     public record MatchResultUpdateAuditSnapshot(
         Long matchId,
         Long groupId,
@@ -1095,8 +1103,12 @@ public class MatchResultService {
         String nextWinnerTeam,
         String previousRaceComposition,
         String nextRaceComposition,
-        boolean participantRacesChanged
+        List<ParticipantRaceChange> participantRaceChanges
     ) {
+        public MatchResultUpdateAuditSnapshot {
+            participantRaceChanges = participantRaceChanges == null ? List.of() : List.copyOf(participantRaceChanges);
+        }
+
         public MatchResultUpdateAuditSnapshot(
             Long matchId,
             Long groupId,
@@ -1112,7 +1124,7 @@ public class MatchResultService {
                 nextWinnerTeam,
                 previousRaceComposition,
                 nextRaceComposition,
-                false
+                List.of()
             );
         }
 
@@ -1122,7 +1134,11 @@ public class MatchResultService {
             String previousWinnerTeam,
             String nextWinnerTeam
         ) {
-            this(matchId, groupId, previousWinnerTeam, nextWinnerTeam, null, null, false);
+            this(matchId, groupId, previousWinnerTeam, nextWinnerTeam, null, null, List.of());
+        }
+
+        public boolean participantRacesChanged() {
+            return !participantRaceChanges.isEmpty();
         }
     }
 
@@ -1144,7 +1160,7 @@ public class MatchResultService {
         String previousRaceComposition,
         String nextRaceComposition,
         boolean changed,
-        boolean participantRacesChanged
+        List<ParticipantRaceChange> participantRaceChanges
     ) {
     }
 

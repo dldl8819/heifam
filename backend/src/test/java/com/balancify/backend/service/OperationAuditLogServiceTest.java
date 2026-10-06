@@ -193,9 +193,7 @@ class OperationAuditLogServiceTest {
         assertThat(log.getTargetLabel()).isEqualTo("#99");
         assertThat(log.getGroupId()).isEqualTo(1L);
         assertThat(log.getSummary()).isEqualTo("경기 결과 수정");
-        assertThat(log.getDetails()).isEqualTo(
-            "winner=HOME -> AWAY, raceComposition=PPP -> PPT"
-        );
+        assertThat(log.getDetails()).isEqualTo("승리 팀: 홈 → 어웨이 / 종족 조합: PPP → PPT");
     }
 
     @Test
@@ -210,16 +208,61 @@ class OperationAuditLogServiceTest {
                 "HOME",
                 "PPT",
                 "PPT",
-                true
+                List.of(
+                    new MatchResultService.ParticipantRaceChange("HOME", "P", "T"),
+                    new MatchResultService.ParticipantRaceChange("HOME", "T", "P"),
+                    new MatchResultService.ParticipantRaceChange("AWAY", "p", "t"),
+                    new MatchResultService.ParticipantRaceChange("away", "P", "T")
+                )
             )
         );
 
         ArgumentCaptor<OperationAuditLog> logCaptor = ArgumentCaptor.forClass(OperationAuditLog.class);
         verify(operationAuditLogRepository).save(logCaptor.capture());
 
-        assertThat(logCaptor.getValue().getDetails()).isEqualTo(
-            "winner=HOME -> HOME, raceComposition=PPT -> PPT, participantRaces=updated"
+        // The winner and the composition stayed, so the entry says only whose races moved, by team.
+        assertThat(logCaptor.getValue().getSummary()).isEqualTo("경기 종족 수정");
+        assertThat(logCaptor.getValue().getDetails())
+            .isEqualTo("선수 종족 (PPT): 홈 P→T 1명, T→P 1명; 어웨이 P→T 2명");
+    }
+
+    @Test
+    void saysTheRacesWereSetAgainWhenNothingElseChanged() {
+        operationAuditLogService.recordMatchResultUpdate(
+            "ops@example.com",
+            "OpsUser",
+            new MatchResultService.MatchResultUpdateAuditSnapshot(99L, 1L, "HOME", "HOME", "PPT", "PPT")
         );
+
+        ArgumentCaptor<OperationAuditLog> logCaptor = ArgumentCaptor.forClass(OperationAuditLog.class);
+        verify(operationAuditLogRepository).save(logCaptor.capture());
+
+        assertThat(logCaptor.getValue().getSummary()).isEqualTo("경기 종족 수정");
+        assertThat(logCaptor.getValue().getDetails()).isEqualTo("선수 종족을 종족 조합에 맞게 다시 배정");
+    }
+
+    @Test
+    void describesAWinnerFlipWithAChangedCompositionAndRacesInOneEntry() {
+        operationAuditLogService.recordMatchResultUpdate(
+            "ops@example.com",
+            "OpsUser",
+            new MatchResultService.MatchResultUpdateAuditSnapshot(
+                99L,
+                1L,
+                "HOME",
+                "AWAY",
+                "PPP",
+                "PPZ",
+                List.of(new MatchResultService.ParticipantRaceChange("AWAY", "P", "Z"))
+            )
+        );
+
+        ArgumentCaptor<OperationAuditLog> logCaptor = ArgumentCaptor.forClass(OperationAuditLog.class);
+        verify(operationAuditLogRepository).save(logCaptor.capture());
+
+        assertThat(logCaptor.getValue().getSummary()).isEqualTo("경기 결과 수정");
+        assertThat(logCaptor.getValue().getDetails())
+            .isEqualTo("승리 팀: 홈 → 어웨이 / 종족 조합: PPP → PPZ / 선수 종족: 어웨이 P→Z 1명");
     }
 
     @Test

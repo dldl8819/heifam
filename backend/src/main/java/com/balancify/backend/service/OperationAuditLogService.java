@@ -15,8 +15,11 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -398,19 +401,68 @@ public class OperationAuditLogService {
             snapshot.matchId() == null ? null : "#" + snapshot.matchId(),
             snapshot.groupId()
         );
-        log.setSummary("경기 결과 수정");
-        log.setDetails(
-            "winner="
-                + formatTeamForAudit(snapshot.previousWinnerTeam())
-                + " -> "
-                + formatTeamForAudit(snapshot.nextWinnerTeam())
-                + ", raceComposition="
-                + formatRaceCompositionForAudit(snapshot.previousRaceComposition())
-                + " -> "
-                + formatRaceCompositionForAudit(snapshot.nextRaceComposition())
-                + (snapshot.participantRacesChanged() ? ", participantRaces=updated" : "")
-        );
+        boolean winnerChanged = !formatTeamForAudit(snapshot.previousWinnerTeam())
+            .equals(formatTeamForAudit(snapshot.nextWinnerTeam()));
+        // An edit that keeps the winner only corrects the races played.
+        log.setSummary(winnerChanged ? "경기 결과 수정" : "경기 종족 수정");
+        log.setDetails(describeMatchResultUpdate(snapshot, winnerChanged));
         operationAuditLogRepository.save(log);
+    }
+
+    // Only what changed, in words an admin reads: the winner, the race composition, and how many
+    // players of each team moved from which race to which. No player is named (see ParticipantRaceChange).
+    private String describeMatchResultUpdate(
+        MatchResultService.MatchResultUpdateAuditSnapshot snapshot,
+        boolean winnerChanged
+    ) {
+        List<String> parts = new ArrayList<>();
+        if (winnerChanged) {
+            parts.add("승리 팀: " + teamLabelForAudit(snapshot.previousWinnerTeam())
+                + " → " + teamLabelForAudit(snapshot.nextWinnerTeam()));
+        }
+        String previousComposition = formatRaceCompositionForAudit(snapshot.previousRaceComposition());
+        String nextComposition = formatRaceCompositionForAudit(snapshot.nextRaceComposition());
+        boolean compositionChanged = !previousComposition.equals(nextComposition);
+        if (compositionChanged) {
+            parts.add("종족 조합: " + previousComposition + " → " + nextComposition);
+        }
+        if (snapshot.participantRacesChanged()) {
+            String composition = compositionChanged || "-".equals(nextComposition) ? "" : " (" + nextComposition + ")";
+            parts.add("선수 종족" + composition + ": " + describeRaceChanges(snapshot.participantRaceChanges()));
+        }
+        // Nothing above moved, yet the edit was saved: the races were set again to fit the composition.
+        return parts.isEmpty() ? "선수 종족을 종족 조합에 맞게 다시 배정" : String.join(" / ", parts);
+    }
+
+    private String describeRaceChanges(List<MatchResultService.ParticipantRaceChange> changes) {
+        List<String> teams = new ArrayList<>();
+        for (String team : List.of("HOME", "AWAY")) {
+            Map<String, Integer> moves = new LinkedHashMap<>();
+            for (MatchResultService.ParticipantRaceChange change : changes) {
+                if (team.equals(formatTeamForAudit(change.team()))) {
+                    moves.merge(raceForAudit(change.previousRace()) + "→" + raceForAudit(change.nextRace()), 1, Integer::sum);
+                }
+            }
+            if (!moves.isEmpty()) {
+                teams.add(teamLabelForAudit(team) + " " + moves.entrySet().stream()
+                    .map(move -> move.getKey() + " " + move.getValue() + "명")
+                    .collect(Collectors.joining(", ")));
+            }
+        }
+        return teams.isEmpty() ? changes.size() + "명" : String.join("; ", teams);
+    }
+
+    private String teamLabelForAudit(String team) {
+        return switch (formatTeamForAudit(team)) {
+            case "HOME" -> "홈";
+            case "AWAY" -> "어웨이";
+            default -> "-";
+        };
+    }
+
+    private String raceForAudit(String race) {
+        String normalized = trimToNull(race);
+        return normalized == null ? "-" : normalized.toUpperCase(Locale.ROOT);
     }
 
     @Transactional
