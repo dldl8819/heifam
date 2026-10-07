@@ -16,6 +16,7 @@ import org.springframework.stereotype.Repository;
  * Reads and likes are one row per person and notice; an insert that finds the row already there
  * does nothing, so double clicks and parallel tabs never fail. A read counts while it is not older
  * than the notice's latest revision (notices.revised_at), so a re-announced notice turns unread.
+ * Likes on comments are kept the same way, one row per person and comment.
  */
 @Repository
 public class NoticeEngagementRepository {
@@ -93,6 +94,57 @@ public class NoticeEngagementRepository {
             }
         );
         return counts;
+    }
+
+    /** Returns whether this call added the like; false when the person liked the comment already. */
+    public boolean likeComment(Long commentId, String email) {
+        return jdbcTemplate.update(
+            "INSERT INTO notice_comment_likes (comment_id, liker_email) VALUES (:commentId, :email) "
+                + "ON CONFLICT (comment_id, liker_email) DO NOTHING",
+            commentParams(commentId, email)
+        ) > 0;
+    }
+
+    public void unlikeComment(Long commentId, String email) {
+        jdbcTemplate.update(
+            "DELETE FROM notice_comment_likes WHERE comment_id = :commentId AND liker_email = :email",
+            commentParams(commentId, email)
+        );
+    }
+
+    public void clearCommentLikes(Long commentId) {
+        jdbcTemplate.update(
+            "DELETE FROM notice_comment_likes WHERE comment_id = :commentId",
+            new MapSqlParameterSource("commentId", commentId)
+        );
+    }
+
+    /** Likes per comment of one notice; a comment nobody liked is left out. */
+    public Map<Long, Long> countCommentLikes(Long noticeId) {
+        Map<Long, Long> counts = new HashMap<>();
+        jdbcTemplate.query(
+            "SELECT l.comment_id, count(*) AS total FROM notice_comment_likes l "
+                + "JOIN notice_comments c ON c.id = l.comment_id WHERE c.notice_id = :noticeId GROUP BY l.comment_id",
+            new MapSqlParameterSource("noticeId", noticeId),
+            row -> {
+                counts.put(row.getLong("comment_id"), row.getLong("total"));
+            }
+        );
+        return counts;
+    }
+
+    public Set<Long> findLikedCommentIds(Long noticeId, String email) {
+        List<Long> ids = jdbcTemplate.queryForList(
+            "SELECT l.comment_id FROM notice_comment_likes l JOIN notice_comments c ON c.id = l.comment_id "
+                + "WHERE c.notice_id = :noticeId AND l.liker_email = :email",
+            new MapSqlParameterSource().addValue("noticeId", noticeId).addValue("email", email),
+            Long.class
+        );
+        return new HashSet<>(ids);
+    }
+
+    private MapSqlParameterSource commentParams(Long commentId, String email) {
+        return new MapSqlParameterSource().addValue("commentId", commentId).addValue("email", email);
     }
 
     private MapSqlParameterSource params(Long noticeId, String email) {

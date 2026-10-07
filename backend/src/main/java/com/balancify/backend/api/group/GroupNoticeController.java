@@ -70,6 +70,25 @@ public class GroupNoticeController {
             groupId,
             noticeId,
             requestEmail,
+            requestBody == null ? null : requestBody.content(),
+            requestBody == null ? null : requestBody.parentId()
+        ));
+    }
+
+    @PutMapping("/{groupId}/notices/{noticeId}/comments/{commentId}")
+    public NoticeDetailResponse editComment(
+        @PathVariable Long groupId,
+        @PathVariable Long noticeId,
+        @PathVariable Long commentId,
+        @RequestBody NoticeCommentRequest requestBody,
+        HttpServletRequest request
+    ) {
+        String requestEmail = requireRequestEmail(request);
+        return handle(() -> noticeService.editComment(
+            groupId,
+            noticeId,
+            commentId,
+            requestEmail,
             requestBody == null ? null : requestBody.content()
         ));
     }
@@ -83,6 +102,28 @@ public class GroupNoticeController {
     ) {
         String requestEmail = requireRequestEmail(request);
         return handle(() -> noticeService.deleteComment(groupId, noticeId, commentId, requestEmail));
+    }
+
+    @PutMapping("/{groupId}/notices/{noticeId}/comments/{commentId}/like")
+    public NoticeDetailResponse likeComment(
+        @PathVariable Long groupId,
+        @PathVariable Long noticeId,
+        @PathVariable Long commentId,
+        HttpServletRequest request
+    ) {
+        String requestEmail = requireRequestEmail(request);
+        return handle(() -> noticeService.setCommentLike(groupId, noticeId, commentId, requestEmail, true));
+    }
+
+    @DeleteMapping("/{groupId}/notices/{noticeId}/comments/{commentId}/like")
+    public NoticeDetailResponse unlikeComment(
+        @PathVariable Long groupId,
+        @PathVariable Long noticeId,
+        @PathVariable Long commentId,
+        HttpServletRequest request
+    ) {
+        String requestEmail = requireRequestEmail(request);
+        return handle(() -> noticeService.setCommentLike(groupId, noticeId, commentId, requestEmail, false));
     }
 
     @PutMapping("/{groupId}/notices/{noticeId}/like")

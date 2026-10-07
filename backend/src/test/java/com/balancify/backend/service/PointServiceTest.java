@@ -345,6 +345,59 @@ class PointServiceTest {
     }
 
     @Test
+    void paysALikeOnACommentOncePerComment() {
+        stubAccount(ADMIN_EMAIL, 7L);
+        lenient().when(pointTransactionRepository.existsByAccount_IdAndReasonAndReferenceKey(
+            7L, PointService.REASON_NOTICE_COMMENT_LIKE, "notice-comment:31"
+        )).thenReturn(true);
+
+        pointService.grantNoticeCommentLikePoint(ADMIN_EMAIL, 30L);
+        // Liked, taken back and liked again: paid the first time only.
+        pointService.grantNoticeCommentLikePoint(ADMIN_EMAIL, 31L);
+        pointService.grantNoticeCommentLikePoint(ADMIN_EMAIL, null);
+
+        PointTransaction saved = captureSavedTransaction();
+        assertThat(saved.getReason()).isEqualTo(PointService.REASON_NOTICE_COMMENT_LIKE);
+        assertThat(saved.getAmount()).isEqualTo(1);
+        assertThat(saved.getReferenceKey()).isEqualTo("notice-comment:30");
+        assertThat(saved.getKstDate()).isEqualTo(TODAY);
+    }
+
+    @Test
+    void stopsPayingCommentLikesAtTheDailyCap() {
+        stubAccount(ADMIN_EMAIL, 7L);
+        lenient().when(pointTransactionRepository.countByAccount_IdAndReasonAndKstDate(7L, PointService.REASON_NOTICE_COMMENT_LIKE, TODAY))
+            .thenReturn(9L, 10L);
+
+        pointService.grantNoticeCommentLikePoint(ADMIN_EMAIL, 40L);
+        pointService.grantNoticeCommentLikePoint(ADMIN_EMAIL, 41L);
+
+        assertThat(captureSavedTransaction().getReferenceKey()).isEqualTo("notice-comment:40");
+    }
+
+    @Test
+    void paysNoCommentLikeWhilePointsAreClosedToTheAccountOrTurnedOff() {
+        pointService.grantNoticeCommentLikePoint(MEMBER_EMAIL, 30L);
+        pointProperties.setNoticeCommentLike(0);
+        pointService.grantNoticeCommentLikePoint(ADMIN_EMAIL, 30L);
+
+        verifyNoInteractions(pointAccountRepository, pointTransactionRepository);
+    }
+
+    @Test
+    void summarizesTodaysCommentLikes() {
+        existingAccount(ADMIN_EMAIL, 7L);
+        lenient().when(pointTransactionRepository.countByAccount_IdAndReasonAndKstDate(7L, PointService.REASON_NOTICE_COMMENT_LIKE, TODAY))
+            .thenReturn(4L);
+
+        PointSummaryResponse summary = pointService.getSummary(ADMIN_EMAIL);
+
+        assertThat(summary.noticeCommentLikesToday()).isEqualTo(4);
+        assertThat(summary.noticeCommentLikeDailyCap()).isEqualTo(10);
+        assertThat(summary.noticeCommentLikePoints()).isEqualTo(1);
+    }
+
+    @Test
     void paysNoNoticePointsWhilePointsAreClosedToTheAccount() {
         pointService.grantNoticeReadPoint(MEMBER_EMAIL, 5L, 1);
         pointService.grantNoticePoint(MEMBER_EMAIL, 5L, PointService.REASON_NOTICE_LIKE);
@@ -494,6 +547,9 @@ class PointServiceTest {
         assertThat(summary.matchConfirmDailyCap()).isEqualTo(10);
         assertThat(summary.matchConfirmPoints()).isEqualTo(1);
         assertThat(summary.matchConfirmWindowHours()).isEqualTo(48);
+        assertThat(summary.noticeCommentLikesToday()).isZero();
+        assertThat(summary.noticeCommentLikeDailyCap()).isEqualTo(10);
+        assertThat(summary.noticeCommentLikePoints()).isEqualTo(1);
         assertThat(summary.recent()).isEmpty();
     }
 

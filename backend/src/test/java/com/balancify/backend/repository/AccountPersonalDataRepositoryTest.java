@@ -54,6 +54,22 @@ class AccountPersonalDataRepositoryTest {
     }
 
     @Test
+    void removesWhatTheAccountLeftOnNotices() {
+        AccountPersonalDataRepository repository = new AccountPersonalDataRepository(jdbcTemplate);
+
+        repository.deleteAccountIdentity(UUID.randomUUID(), "your_username@example.com");
+
+        ArgumentCaptor<String> statements = ArgumentCaptor.forClass(String.class);
+        verify(jdbcTemplate, atLeastOnce()).update(statements.capture(), any(SqlParameterSource.class));
+        assertThat(statements.getAllValues()).contains(
+            "DELETE FROM notice_reads WHERE reader_email = :email",
+            "DELETE FROM notice_likes WHERE liker_email = :email",
+            "DELETE FROM notice_comment_likes WHERE liker_email = :email",
+            "DELETE FROM notice_comments WHERE author_email = :email"
+        );
+    }
+
+    @Test
     void removesNotificationStateWithTheAccount() {
         AccountPersonalDataRepository repository = new AccountPersonalDataRepository(jdbcTemplate);
 

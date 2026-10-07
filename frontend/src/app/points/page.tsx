@@ -221,6 +221,14 @@ export default function PointsPage() {
                     hours: summary.matchConfirmWindowHours,
                   })}
                 </li>
+                {typeof summary.noticeCommentLikeDailyCap === 'number' && (
+                  <li>
+                    {t('points.rules.noticeCommentLike', {
+                      points: summary.noticeCommentLikePoints ?? 1,
+                      cap: summary.noticeCommentLikeDailyCap,
+                    })}
+                  </li>
+                )}
                 <li>{t('points.rules.reversal')}</li>
               </ul>
             </div>

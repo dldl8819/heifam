@@ -16,6 +16,9 @@ public record PointSummaryResponse(
     int matchConfirmDailyCap,
     int matchConfirmPoints,
     int matchConfirmWindowHours,
+    int noticeCommentLikesToday,
+    int noticeCommentLikeDailyCap,
+    int noticeCommentLikePoints,
     List<PointHistoryItemResponse> recent
 ) {
 }

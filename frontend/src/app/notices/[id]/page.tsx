@@ -8,9 +8,9 @@ import { ApiRequestError, apiClient } from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { NoticeBody } from '@/components/notice-body'
+import { NoticeComments } from '@/components/notice-comments'
 import { NoticeContentEditor } from '@/components/notice-content-editor'
 import { NOTICE_IMAGE_MAX_COUNT, noticeImageIds } from '@/lib/notice-images'
-import { NOTICE_COMMENT_MAX_LENGTH, validateNoticeComment } from '@/lib/notice-list'
 import { t } from '@/lib/i18n'
 import type { NoticeDetail } from '@/types/api'
 
@@ -45,8 +45,6 @@ export default function NoticeDetailPage() {
   const [imageUploading, setImageUploading] = useState<boolean>(false)
   const [formError, setFormError] = useState<string | null>(null)
 
-  const [commentDraft, setCommentDraft] = useState<string>('')
-  const [commentBusy, setCommentBusy] = useState<boolean>(false)
   const [likeBusy, setLikeBusy] = useState<boolean>(false)
   const [engagementError, setEngagementError] = useState<string | null>(null)
 
@@ -162,46 +160,6 @@ export default function NoticeDetailPage() {
     }
   }, [likeBusy, notice, noticeId])
 
-  const handleComment = useCallback(
-    async (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault()
-      const problem = validateNoticeComment(commentDraft)
-      if (problem) {
-        setEngagementError(t(`notices.posts.${problem}`, { max: NOTICE_COMMENT_MAX_LENGTH }))
-        return
-      }
-      setCommentBusy(true)
-      setEngagementError(null)
-      try {
-        setNotice(await apiClient.addNoticeComment(TEMP_GROUP_ID, noticeId, commentDraft.trim()))
-        setCommentDraft('')
-      } catch {
-        setEngagementError(t('notices.loadError'))
-      } finally {
-        setCommentBusy(false)
-      }
-    },
-    [commentDraft, noticeId]
-  )
-
-  const handleDeleteComment = useCallback(
-    async (commentId: number) => {
-      if (!window.confirm(t('notices.posts.commentDeleteConfirm'))) {
-        return
-      }
-      setCommentBusy(true)
-      setEngagementError(null)
-      try {
-        setNotice(await apiClient.deleteNoticeComment(TEMP_GROUP_ID, noticeId, commentId))
-      } catch {
-        setEngagementError(t('notices.loadError'))
-      } finally {
-        setCommentBusy(false)
-      }
-    },
-    [noticeId]
-  )
-
   return (
     <section className="space-y-6">
       <Link href="/notices" className="text-sm text-slate-500 hover:underline dark:text-slate-400">
@@ -278,72 +236,19 @@ export default function NoticeDetailPage() {
                 </>
               )}
             </div>
-          </article>
-
-          <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              {t('notices.posts.commentCount', { count: notice.comments.length })}
-            </h2>
-
             {engagementError && (
               <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300">
                 {engagementError}
               </p>
             )}
+          </article>
 
-            {notice.comments.length === 0 ? (
-              <p className="text-xs text-slate-500 dark:text-slate-400">{t('notices.posts.commentEmpty')}</p>
-            ) : (
-              <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-                {notice.comments.map((comment) => (
-                  <li key={comment.id} className="space-y-1 py-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        <span className="font-medium text-slate-700 dark:text-slate-200">
-                          {comment.authorNickname ?? '-'}
-                        </span>
-                        {` · ${formatDate(comment.createdAt)}`}
-                      </p>
-                      {comment.canDelete && (
-                        <button
-                          type="button"
-                          onClick={() => void handleDeleteComment(comment.id)}
-                          disabled={commentBusy}
-                          className="text-xs text-rose-600 hover:underline disabled:opacity-60 dark:text-rose-400"
-                        >
-                          {t('notices.posts.commentDelete')}
-                        </button>
-                      )}
-                    </div>
-                    <p className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-200">{comment.content}</p>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            <form onSubmit={handleComment} className="space-y-2">
-              <textarea
-                value={commentDraft}
-                onChange={(event) => setCommentDraft(event.target.value)}
-                placeholder={t('notices.posts.commentPlaceholder')}
-                maxLength={NOTICE_COMMENT_MAX_LENGTH}
-                rows={3}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900"
-              />
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-slate-400 dark:text-slate-500">
-                  {commentDraft.length}/{NOTICE_COMMENT_MAX_LENGTH}
-                </span>
-                <button
-                  type="submit"
-                  disabled={commentBusy}
-                  className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-                >
-                  {commentBusy ? t('notices.posts.commentSubmitting') : t('notices.posts.commentSubmit')}
-                </button>
-              </div>
-            </form>
-          </div>
+          <NoticeComments
+            groupId={TEMP_GROUP_ID}
+            noticeId={noticeId}
+            comments={notice.comments}
+            onChange={setNotice}
+          />
         </>
       )}
 

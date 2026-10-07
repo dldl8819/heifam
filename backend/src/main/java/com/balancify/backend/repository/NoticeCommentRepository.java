@@ -14,10 +14,12 @@ public interface NoticeCommentRepository extends JpaRepository<NoticeComment, Lo
 
     Optional<NoticeComment> findByIdAndNoticeId(Long id, Long noticeId);
 
+    boolean existsByParentId(Long parentId);
+
     @Query("""
         select comment.noticeId as noticeId, count(comment) as total
         from NoticeComment comment
-        where comment.noticeId in :noticeIds
+        where comment.noticeId in :noticeIds and comment.deletedAt is null
         group by comment.noticeId
         """)
     List<NoticeCount> countByNotice(@Param("noticeIds") Collection<Long> noticeIds);

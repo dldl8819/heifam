@@ -52,6 +52,7 @@ public class PointService {
     public static final String REASON_NOTICE_READ = "NOTICE_READ";
     public static final String REASON_NOTICE_LIKE = "NOTICE_LIKE";
     public static final String REASON_NOTICE_COMMENT = "NOTICE_COMMENT";
+    public static final String REASON_NOTICE_COMMENT_LIKE = "NOTICE_COMMENT_LIKE";
     public static final String REASON_MATCH_CONFIRM = "MATCH_CONFIRM";
     public static final String REASON_MATCH_CONFIRM_REVERSED = "MATCH_CONFIRM_REVERSED";
     private static final List<String> NOTICE_REASONS = List.of(REASON_NOTICE_READ, REASON_NOTICE_LIKE, REASON_NOTICE_COMMENT);
@@ -289,6 +290,36 @@ public class PointService {
         grantNoticePoint(email, REASON_NOTICE_READ, noticeReadReference(noticeId, revision));
     }
 
+    /**
+     * Liking a comment on a notice earns a point once per comment, up to a daily cap. NoticeService
+     * leaves out a person's own comments. Taking the like back, or the comment being deleted, keeps
+     * the point, and liking the same comment again earns no second one.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void grantNoticeCommentLikePoint(String email, Long commentId) {
+        String normalizedEmail = normalizeEmail(email);
+        int amount = pointProperties.getNoticeCommentLike();
+        if (commentId == null || amount <= 0 || !canUsePoints(normalizedEmail)) {
+            return;
+        }
+
+        PointAccount account = lockAccount(normalizedEmail);
+        String referenceKey = "notice-comment:" + commentId;
+        if (pointTransactionRepository.existsByAccount_IdAndReasonAndReferenceKey(
+            account.getId(), REASON_NOTICE_COMMENT_LIKE, referenceKey
+        )) {
+            return;
+        }
+        LocalDate today = today();
+        long likedToday = pointTransactionRepository.countByAccount_IdAndReasonAndKstDate(
+            account.getId(), REASON_NOTICE_COMMENT_LIKE, today
+        );
+        if (likedToday >= pointProperties.getNoticeCommentLikeDailyCap()) {
+            return;
+        }
+        record(account, REASON_NOTICE_COMMENT_LIKE, amount, referenceKey, today, null, null);
+    }
+
     private void grantNoticePoint(String email, String reason, String referenceKey) {
         String normalizedEmail = normalizeEmail(email);
         int amount = pointProperties.getNoticeAction();
@@ -357,6 +388,9 @@ public class PointService {
                 pointProperties.getMatchConfirmDailyCap(),
                 pointProperties.getMatchConfirm(),
                 pointProperties.getMatchConfirmWindowHours(),
+                0,
+                pointProperties.getNoticeCommentLikeDailyCap(),
+                pointProperties.getNoticeCommentLike(),
                 List.of()
             );
         }
@@ -388,6 +422,11 @@ public class PointService {
             pointProperties.getMatchConfirmDailyCap(),
             pointProperties.getMatchConfirm(),
             pointProperties.getMatchConfirmWindowHours(),
+            (int) pointTransactionRepository.countByAccount_IdAndReasonAndKstDate(
+                accountId, REASON_NOTICE_COMMENT_LIKE, today
+            ),
+            pointProperties.getNoticeCommentLikeDailyCap(),
+            pointProperties.getNoticeCommentLike(),
             recent
         );
     }

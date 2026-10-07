@@ -610,9 +610,16 @@ export type NoticeList = {
 
 export type NoticeComment = {
   id: number
+  // The comment this one answers; a comment on the notice itself has none.
+  parentId?: number | null
   authorNickname?: string
   content: string
   createdAt: string
+  edited?: boolean
+  // Deleted while it had replies: an emptied place that only holds its replies together.
+  deleted?: boolean
+  likeCount?: number
+  likedByMe?: boolean
   mine: boolean
   canDelete: boolean
 }
@@ -805,6 +812,7 @@ export type PointReason =
   | 'NOTICE_READ'
   | 'NOTICE_LIKE'
   | 'NOTICE_COMMENT'
+  | 'NOTICE_COMMENT_LIKE'
   | 'MATCH_CONFIRM'
   | 'MATCH_CONFIRM_REVERSED'
 
@@ -831,6 +839,10 @@ export type PointSummaryResponse = {
   matchConfirmDailyCap: number
   matchConfirmPoints: number
   matchConfirmWindowHours: number
+  // Missing while a backend from before comment likes is still answering.
+  noticeCommentLikesToday?: number
+  noticeCommentLikeDailyCap?: number
+  noticeCommentLikePoints?: number
   recent: PointHistoryItem[]
 }
 

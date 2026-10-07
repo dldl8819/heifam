@@ -28,6 +28,18 @@ public class NoticeComment {
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
+    // The comment this one answers. Replies are one level deep: a reply to a reply answers the
+    // same comment.
+    @Column(name = "parent_id")
+    private Long parentId;
+
+    @Column(name = "edited_at")
+    private OffsetDateTime editedAt;
+
+    // Deleted while it had replies: kept with its text and writer cleared, so they keep their thread.
+    @Column(name = "deleted_at")
+    private OffsetDateTime deletedAt;
+
     public Long getId() {
         return id;
     }
@@ -58,5 +70,33 @@ public class NoticeComment {
 
     public OffsetDateTime getCreatedAt() {
         return createdAt;
+    }
+
+    public Long getParentId() {
+        return parentId;
+    }
+
+    public void setParentId(Long parentId) {
+        this.parentId = parentId;
+    }
+
+    public OffsetDateTime getEditedAt() {
+        return editedAt;
+    }
+
+    public void setEditedAt(OffsetDateTime editedAt) {
+        this.editedAt = editedAt;
+    }
+
+    public OffsetDateTime getDeletedAt() {
+        return deletedAt;
+    }
+
+    public void setDeletedAt(OffsetDateTime deletedAt) {
+        this.deletedAt = deletedAt;
+    }
+
+    public boolean isDeleted() {
+        return deletedAt != null;
     }
 }
