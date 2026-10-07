@@ -144,14 +144,20 @@ public class MatchResultController {
         }
     }
 
-    /** Members call off a match that was set up but not played; the service refuses anything else. */
+    /**
+     * Whoever set a match up, or an admin, calls it off before it is played; the service refuses
+     * anyone else and any other match.
+     */
     @PostMapping("/{id}/cancel")
     public void cancelMatch(
         @PathVariable("id") Long matchId,
         HttpServletRequest httpRequest
     ) {
         try {
-            MatchResultService.DeletedMatchAuditSnapshot snapshot = matchResultService.cancelUnplayedMatch(matchId);
+            MatchResultService.DeletedMatchAuditSnapshot snapshot = matchResultService.cancelUnplayedMatch(
+                matchId,
+                extractRequestEmail(httpRequest)
+            );
             // Nothing is left to predict, so the "predictions opened" notification goes too.
             notificationService.removePredictionsOpen(matchId);
             operationAuditLogService.recordMatchDeletion(
@@ -159,6 +165,8 @@ public class MatchResultController {
                 resolveRecordedByNickname(httpRequest),
                 snapshot
             );
+        } catch (MatchEditForbiddenException exception) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, exception.getMessage());
         } catch (MatchConflictException exception) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, exception.getMessage());
         } catch (NoSuchElementException exception) {

@@ -243,7 +243,8 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             PathPatternParser.defaultInstance.parse("/api/matches/{id}/result"),
             AuthType.SERVICE_ACCESS
         ),
-        // Calling off a match nobody played yet is open to members, like setting one up; deleting stays with admins.
+        // A member calls off a match they set up before it is played (MatchResultService checks
+        // whose it is); deleting stays with admins.
         new ProtectedRoute(
             "POST",
             PathPatternParser.defaultInstance.parse("/api/matches/{id}/cancel"),

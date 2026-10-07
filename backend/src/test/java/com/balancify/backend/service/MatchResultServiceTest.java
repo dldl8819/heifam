@@ -1375,15 +1375,70 @@ class MatchResultServiceTest {
         Match match = new Match();
         match.setId(99L);
         match.setStatus(MatchStatus.CONFIRMED);
+        // Whoever set it up calls it off, however the email was written down.
+        match.setCreatedByEmail(" Member@Hei.gg ");
         when(matchRepository.findByIdForUpdate(99L)).thenReturn(Optional.of(match));
+        when(accessControlService.isAdminEmail("member@hei.gg")).thenReturn(false);
 
-        MatchResultService.DeletedMatchAuditSnapshot snapshot = matchResultService.cancelUnplayedMatch(99L);
+        MatchResultService.DeletedMatchAuditSnapshot snapshot =
+            matchResultService.cancelUnplayedMatch(99L, "member@hei.gg");
 
         assertThat(snapshot.matchId()).isEqualTo(99L);
         assertThat(snapshot.hadResult()).isFalse();
         verify(matchParticipantRepository).deleteByMatch_Id(99L);
         verify(matchRepository).delete(match);
         verify(predictionService).revoke(99L);
+    }
+
+    @Test
+    void letsOnlyWhoeverSetAMatchUpOrAnAdminCallItOff() {
+        Match match = new Match();
+        match.setId(94L);
+        match.setStatus(MatchStatus.CONFIRMED);
+        match.setCreatedByEmail("member@hei.gg");
+        when(matchRepository.findByIdForUpdate(94L)).thenReturn(Optional.of(match));
+        // Set up before creators were kept: it is nobody's.
+        Match withoutCreator = new Match();
+        withoutCreator.setId(93L);
+        withoutCreator.setStatus(MatchStatus.CONFIRMED);
+        when(matchRepository.findByIdForUpdate(93L)).thenReturn(Optional.of(withoutCreator));
+        when(accessControlService.isAdminEmail("member@hei.gg")).thenReturn(false);
+        when(accessControlService.isAdminEmail("other@hei.gg")).thenReturn(false);
+        when(accessControlService.isAdminEmail(null)).thenReturn(false);
+
+        assertThatThrownBy(() -> matchResultService.cancelUnplayedMatch(94L, "other@hei.gg"))
+            .isInstanceOf(MatchEditForbiddenException.class);
+        assertThatThrownBy(() -> matchResultService.cancelUnplayedMatch(94L, null))
+            .isInstanceOf(MatchEditForbiddenException.class);
+        assertThatThrownBy(() -> matchResultService.cancelUnplayedMatch(93L, "member@hei.gg"))
+            .isInstanceOf(MatchEditForbiddenException.class);
+        verify(matchRepository, never()).delete(any(Match.class));
+        verify(predictionService, never()).revoke(any());
+
+        matchResultService.cancelUnplayedMatch(94L, "admin@hei.gg");
+        matchResultService.cancelUnplayedMatch(93L, "admin@hei.gg");
+
+        verify(matchRepository).delete(match);
+        verify(matchRepository).delete(withoutCreator);
+    }
+
+    @Test
+    void tellsSomeoneElseOnlyThatTheMatchIsNotTheirsToCallOff() {
+        Match played = new Match();
+        played.setId(92L);
+        played.setStatus(MatchStatus.COMPLETED);
+        played.setWinningTeam("HOME");
+        played.setCreatedByEmail("member@hei.gg");
+        when(matchRepository.findByIdForUpdate(92L)).thenReturn(Optional.of(played));
+        when(accessControlService.isAdminEmail("member@hei.gg")).thenReturn(false);
+        when(accessControlService.isAdminEmail("other@hei.gg")).thenReturn(false);
+
+        assertThatThrownBy(() -> matchResultService.cancelUnplayedMatch(92L, "other@hei.gg"))
+            .isInstanceOf(MatchEditForbiddenException.class);
+        // Whoever set it up hears why it cannot be called off any more.
+        assertThatThrownBy(() -> matchResultService.cancelUnplayedMatch(92L, "member@hei.gg"))
+            .isInstanceOf(MatchConflictException.class);
+        verify(matchRepository, never()).delete(any(Match.class));
     }
 
     @Test
@@ -1406,10 +1461,14 @@ class MatchResultServiceTest {
         when(matchRepository.findByIdForUpdate(96L)).thenReturn(Optional.of(tournamentGame));
         when(matchRepository.findByIdForUpdate(95L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> matchResultService.cancelUnplayedMatch(98L)).isInstanceOf(MatchConflictException.class);
-        assertThatThrownBy(() -> matchResultService.cancelUnplayedMatch(97L)).isInstanceOf(MatchConflictException.class);
-        assertThatThrownBy(() -> matchResultService.cancelUnplayedMatch(96L)).isInstanceOf(MatchConflictException.class);
-        assertThatThrownBy(() -> matchResultService.cancelUnplayedMatch(95L)).isInstanceOf(java.util.NoSuchElementException.class);
+        assertThatThrownBy(() -> matchResultService.cancelUnplayedMatch(98L, "admin@hei.gg"))
+            .isInstanceOf(MatchConflictException.class);
+        assertThatThrownBy(() -> matchResultService.cancelUnplayedMatch(97L, "admin@hei.gg"))
+            .isInstanceOf(MatchConflictException.class);
+        assertThatThrownBy(() -> matchResultService.cancelUnplayedMatch(96L, "admin@hei.gg"))
+            .isInstanceOf(MatchConflictException.class);
+        assertThatThrownBy(() -> matchResultService.cancelUnplayedMatch(95L, "admin@hei.gg"))
+            .isInstanceOf(java.util.NoSuchElementException.class);
         verify(matchRepository, never()).delete(any(Match.class));
     }
 
