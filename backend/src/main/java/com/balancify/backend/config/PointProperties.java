@@ -16,6 +16,9 @@ public class PointProperties {
     private int predictionHitDailyCap = 10;
     // Reading, liking and commenting on a notice each earn this once per notice.
     private int noticeAction = 1;
+    // Liking someone else's comment on a notice, once per comment.
+    private int noticeCommentLike = 1;
+    private int noticeCommentLikeDailyCap = 10;
     // A player confirming the result of a match they played, once per match.
     private int matchConfirm = 1;
     private int matchConfirmDailyCap = 10;
@@ -75,6 +78,22 @@ public class PointProperties {
 
     public void setNoticeAction(int noticeAction) {
         this.noticeAction = Math.max(0, noticeAction);
+    }
+
+    public int getNoticeCommentLike() {
+        return noticeCommentLike;
+    }
+
+    public void setNoticeCommentLike(int noticeCommentLike) {
+        this.noticeCommentLike = Math.max(0, noticeCommentLike);
+    }
+
+    public int getNoticeCommentLikeDailyCap() {
+        return noticeCommentLikeDailyCap;
+    }
+
+    public void setNoticeCommentLikeDailyCap(int noticeCommentLikeDailyCap) {
+        this.noticeCommentLikeDailyCap = Math.max(0, noticeCommentLikeDailyCap);
     }
 
     public int getMatchConfirm() {

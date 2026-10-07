@@ -2,15 +2,18 @@ package com.balancify.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.balancify.backend.api.group.dto.NoticeCommentResponse;
 import com.balancify.backend.api.group.dto.NoticeDetailResponse;
 import com.balancify.backend.api.group.dto.NoticeListItemResponse;
 import com.balancify.backend.api.group.dto.NoticeListResponse;
@@ -43,6 +46,7 @@ class NoticeServiceTest {
 
     private static final String ADMIN = "ops@hei.gg";
     private static final String MEMBER = "member@hei.gg";
+    private static final String OTHER = "other@hei.gg";
 
     @Mock
     private NoticeRepository noticeRepository;
@@ -72,7 +76,7 @@ class NoticeServiceTest {
         );
         when(accessControlService.isAdminEmail(ADMIN)).thenReturn(true);
         when(accessControlService.resolveDisplayNicknames(anyCollection()))
-            .thenReturn(Map.of(ADMIN, "OpsUser", MEMBER, "YOUR_USERNAME"));
+            .thenReturn(Map.of(ADMIN, "OpsUser", MEMBER, "YOUR_USERNAME", OTHER, "OtherUser"));
         when(noticeRepository.findByGroupIdOrderByCreatedAtDescIdDesc(1L)).thenReturn(List.of(
             notice(3L, "admins only", true),
             notice(2L, "second", false),
@@ -150,7 +154,7 @@ class NoticeServiceTest {
         stubNotice(3L, true);
 
         assertThatThrownBy(() -> noticeService.open(1L, 3L, MEMBER)).isInstanceOf(NoSuchElementException.class);
-        assertThatThrownBy(() -> noticeService.addComment(1L, 3L, MEMBER, "hi")).isInstanceOf(NoSuchElementException.class);
+        assertThatThrownBy(() -> noticeService.addComment(1L, 3L, MEMBER, "hi", null)).isInstanceOf(NoSuchElementException.class);
         verify(noticeEngagementRepository, never()).markRead(any(), any(), any(), any());
         assertThat(noticeService.open(1L, 3L, ADMIN).adminOnly()).isTrue();
     }
@@ -159,14 +163,14 @@ class NoticeServiceTest {
     void savesTrimmedCommentsWithinTheLimit() {
         stubNotice(2L, false);
 
-        noticeService.addComment(1L, 2L, MEMBER, "  좋아요  ");
+        noticeService.addComment(1L, 2L, MEMBER, "  좋아요  ", null);
 
         ArgumentCaptor<NoticeComment> saved = ArgumentCaptor.forClass(NoticeComment.class);
         verify(noticeCommentRepository).save(saved.capture());
         assertThat(saved.getValue().getContent()).isEqualTo("좋아요");
         assertThat(saved.getValue().getAuthorEmail()).isEqualTo(MEMBER);
-        assertThatThrownBy(() -> noticeService.addComment(1L, 2L, MEMBER, " ")).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> noticeService.addComment(1L, 2L, MEMBER, "x".repeat(501)))
+        assertThatThrownBy(() -> noticeService.addComment(1L, 2L, MEMBER, " ", null)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> noticeService.addComment(1L, 2L, MEMBER, "x".repeat(501), null))
             .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -195,7 +199,7 @@ class NoticeServiceTest {
         noticeService.open(1L, 2L, MEMBER);
         noticeService.setLike(1L, 2L, MEMBER, true);
         noticeService.setLike(1L, 2L, MEMBER, false);
-        noticeService.addComment(1L, 2L, MEMBER, "YOUR_COMMENT");
+        noticeService.addComment(1L, 2L, MEMBER, "YOUR_COMMENT", null);
 
         verify(pointService).grantNoticeReadPoint(MEMBER, 2L, 0);
         verify(pointService).grantNoticePoint(MEMBER, 2L, PointService.REASON_NOTICE_LIKE);
@@ -251,7 +255,7 @@ class NoticeServiceTest {
         notice.setRevisedAt(OffsetDateTime.parse("2026-10-05T03:00:00Z"));
 
         noticeService.setLike(1L, 2L, MEMBER, true);
-        noticeService.addComment(1L, 2L, MEMBER, "YOUR_COMMENT");
+        noticeService.addComment(1L, 2L, MEMBER, "YOUR_COMMENT", null);
 
         verify(pointService).grantNoticePoint(MEMBER, 2L, PointService.REASON_NOTICE_LIKE);
         verify(pointService).grantNoticePoint(MEMBER, 2L, PointService.REASON_NOTICE_COMMENT);
@@ -268,6 +272,231 @@ class NoticeServiceTest {
         noticeService.open(1L, 2L, MEMBER);
 
         verify(noticeEngagementRepository).markRead(2L, MEMBER, revisedAt, revisedAt);
+    }
+
+    @Test
+    void filesAReplyUnderTheCommentItAnswers() {
+        stubNotice(2L, false);
+        NoticeComment first = comment(9L, 2L, MEMBER);
+        NoticeComment reply = comment(10L, 2L, ADMIN);
+        reply.setParentId(9L);
+        when(noticeCommentRepository.findByIdAndNoticeId(9L, 2L)).thenReturn(Optional.of(first));
+        when(noticeCommentRepository.findByIdAndNoticeId(10L, 2L)).thenReturn(Optional.of(reply));
+
+        noticeService.addComment(1L, 2L, OTHER, "to the comment", 9L);
+        // Answering a reply joins the same thread: it is filed under the comment that reply answers.
+        noticeService.addComment(1L, 2L, OTHER, "to the reply", 10L);
+        noticeService.addComment(1L, 2L, OTHER, "to the notice", null);
+
+        ArgumentCaptor<NoticeComment> saved = ArgumentCaptor.forClass(NoticeComment.class);
+        verify(noticeCommentRepository, times(3)).save(saved.capture());
+        assertThat(saved.getAllValues()).extracting(NoticeComment::getParentId).containsExactly(9L, 9L, null);
+        // A reply is a comment: the same point, once per notice.
+        verify(pointService, times(3)).grantNoticePoint(OTHER, 2L, PointService.REASON_NOTICE_COMMENT);
+    }
+
+    @Test
+    void refusesAReplyToACommentThatIsNotOnTheNotice() {
+        stubNotice(2L, false);
+        when(noticeCommentRepository.findByIdAndNoticeId(77L, 2L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> noticeService.addComment(1L, 2L, MEMBER, "hello", 77L))
+            .isInstanceOf(NoSuchElementException.class);
+        verify(noticeCommentRepository, never()).save(any());
+        verify(pointService, never()).grantNoticePoint(any(), any(), any());
+    }
+
+    @Test
+    void letsOnlyTheWriterEditACommentAndMarksItEdited() {
+        stubNotice(2L, false);
+        NoticeComment comment = comment(9L, 2L, MEMBER);
+        when(noticeCommentRepository.findByIdAndNoticeId(9L, 2L)).thenReturn(Optional.of(comment));
+        when(noticeCommentRepository.findByNoticeIdOrderByIdAsc(2L)).thenReturn(List.of(comment));
+
+        // Admins may remove a comment but not put words in its writer's mouth.
+        assertThatThrownBy(() -> noticeService.editComment(1L, 2L, 9L, ADMIN, "reworded"))
+            .isInstanceOf(NoticeForbiddenException.class);
+        assertThatThrownBy(() -> noticeService.editComment(1L, 2L, 9L, MEMBER, " "))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> noticeService.editComment(1L, 2L, 9L, MEMBER, "x".repeat(501)))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThat(comment.getContent()).isEqualTo("hello");
+
+        // Saved as it was, it is not an edit.
+        assertThat(noticeService.editComment(1L, 2L, 9L, MEMBER, " hello ").comments().getFirst().edited()).isFalse();
+        verify(noticeCommentRepository, never()).save(any());
+
+        NoticeDetailResponse edited = noticeService.editComment(1L, 2L, 9L, MEMBER, "  hello again ");
+        assertThat(comment.getContent()).isEqualTo("hello again");
+        assertThat(comment.getEditedAt()).isNotNull();
+        assertThat(edited.comments().getFirst().edited()).isTrue();
+        assertThat(edited.comments().getFirst().content()).isEqualTo("hello again");
+        verify(pointService, never()).grantNoticePoint(any(), any(), any());
+    }
+
+    @Test
+    void emptiesACommentThatHasRepliesInsteadOfRemovingIt() {
+        stubNotice(2L, false);
+        NoticeComment comment = comment(9L, 2L, MEMBER);
+        comment.setEditedAt(OffsetDateTime.now());
+        NoticeComment reply = comment(10L, 2L, OTHER);
+        reply.setParentId(9L);
+        when(noticeCommentRepository.findByIdAndNoticeId(9L, 2L)).thenReturn(Optional.of(comment));
+        when(noticeCommentRepository.existsByParentId(9L)).thenReturn(true);
+        when(noticeCommentRepository.findByNoticeIdOrderByIdAsc(2L)).thenReturn(List.of(comment, reply));
+        when(noticeEngagementRepository.countCommentLikes(2L)).thenReturn(Map.of(9L, 4L, 10L, 1L));
+
+        NoticeDetailResponse detail = noticeService.deleteComment(1L, 2L, 9L, MEMBER);
+
+        verify(noticeCommentRepository, never()).delete(any(NoticeComment.class));
+        verify(noticeCommentRepository).save(comment);
+        verify(noticeEngagementRepository).clearCommentLikes(9L);
+        // Nothing of the writer is left on it.
+        assertThat(comment.isDeleted()).isTrue();
+        assertThat(comment.getContent()).isEmpty();
+        assertThat(comment.getAuthorEmail()).isEmpty();
+        assertThat(comment.getEditedAt()).isNull();
+        assertThat(detail.comments())
+            .extracting(
+                NoticeCommentResponse::id, NoticeCommentResponse::parentId, NoticeCommentResponse::deleted,
+                NoticeCommentResponse::authorNickname, NoticeCommentResponse::content, NoticeCommentResponse::likeCount,
+                NoticeCommentResponse::mine, NoticeCommentResponse::canDelete
+            )
+            .containsExactly(
+                tuple(9L, null, true, null, "", 0L, false, false),
+                tuple(10L, 9L, false, "OtherUser", "hello", 1L, false, false)
+            );
+
+        // What is left can be answered, but not edited, removed or liked.
+        assertThatThrownBy(() -> noticeService.editComment(1L, 2L, 9L, MEMBER, "back"))
+            .isInstanceOf(NoSuchElementException.class);
+        assertThatThrownBy(() -> noticeService.deleteComment(1L, 2L, 9L, ADMIN))
+            .isInstanceOf(NoSuchElementException.class);
+        assertThatThrownBy(() -> noticeService.setCommentLike(1L, 2L, 9L, OTHER, true))
+            .isInstanceOf(NoSuchElementException.class);
+        noticeService.addComment(1L, 2L, OTHER, "still talking", 9L);
+        ArgumentCaptor<NoticeComment> saved = ArgumentCaptor.forClass(NoticeComment.class);
+        verify(noticeCommentRepository, times(2)).save(saved.capture());
+        assertThat(saved.getValue().getParentId()).isEqualTo(9L);
+    }
+
+    @Test
+    void removesAnEmptiedCommentWithItsLastReply() {
+        stubNotice(2L, false);
+        NoticeComment emptied = comment(9L, 2L, "");
+        emptied.setContent("");
+        emptied.setDeletedAt(OffsetDateTime.now());
+        NoticeComment reply = comment(10L, 2L, OTHER);
+        reply.setParentId(9L);
+        NoticeComment lastReply = comment(11L, 2L, OTHER);
+        lastReply.setParentId(9L);
+        when(noticeCommentRepository.findByIdAndNoticeId(9L, 2L)).thenReturn(Optional.of(emptied));
+        when(noticeCommentRepository.findByIdAndNoticeId(10L, 2L)).thenReturn(Optional.of(reply));
+        when(noticeCommentRepository.findByIdAndNoticeId(11L, 2L)).thenReturn(Optional.of(lastReply));
+        // The emptied comment still has a reply after the first removal, none after the second.
+        when(noticeCommentRepository.existsByParentId(9L)).thenReturn(true, false);
+
+        noticeService.deleteComment(1L, 2L, 10L, OTHER);
+        verify(noticeCommentRepository).delete(reply);
+        verify(noticeCommentRepository, never()).delete(emptied);
+
+        noticeService.deleteComment(1L, 2L, 11L, OTHER);
+        verify(noticeCommentRepository).delete(lastReply);
+        verify(noticeCommentRepository).delete(emptied);
+    }
+
+    @Test
+    void keepsACommentThatIsNotEmptiedWhenItsLastReplyGoes() {
+        stubNotice(2L, false);
+        NoticeComment comment = comment(9L, 2L, MEMBER);
+        NoticeComment reply = comment(10L, 2L, OTHER);
+        reply.setParentId(9L);
+        when(noticeCommentRepository.findByIdAndNoticeId(9L, 2L)).thenReturn(Optional.of(comment));
+        when(noticeCommentRepository.findByIdAndNoticeId(10L, 2L)).thenReturn(Optional.of(reply));
+
+        noticeService.deleteComment(1L, 2L, 10L, OTHER);
+
+        verify(noticeCommentRepository).delete(reply);
+        verify(noticeCommentRepository, never()).delete(comment);
+    }
+
+    @Test
+    void showsNothingOfAnEmptiedCommentOnceItHasNoReplies() {
+        stubNotice(2L, false);
+        NoticeComment emptied = comment(9L, 2L, "");
+        emptied.setDeletedAt(OffsetDateTime.now());
+        NoticeComment other = comment(12L, 2L, MEMBER);
+        when(noticeCommentRepository.findByNoticeIdOrderByIdAsc(2L)).thenReturn(List.of(emptied, other));
+
+        assertThat(noticeService.open(1L, 2L, MEMBER).comments())
+            .extracting(NoticeCommentResponse::id)
+            .containsExactly(12L);
+    }
+
+    @Test
+    void likesSomeoneElsesCommentAndPaysThePointForIt() {
+        stubNotice(2L, false);
+        NoticeComment comment = comment(9L, 2L, MEMBER);
+        NoticeComment reply = comment(10L, 2L, ADMIN);
+        reply.setParentId(9L);
+        when(noticeCommentRepository.findByIdAndNoticeId(9L, 2L)).thenReturn(Optional.of(comment));
+        when(noticeCommentRepository.findByIdAndNoticeId(10L, 2L)).thenReturn(Optional.of(reply));
+        when(noticeCommentRepository.findByNoticeIdOrderByIdAsc(2L)).thenReturn(List.of(comment, reply));
+        when(noticeEngagementRepository.countCommentLikes(2L)).thenReturn(Map.of(9L, 2L));
+        when(noticeEngagementRepository.findLikedCommentIds(2L, OTHER)).thenReturn(Set.of(9L));
+
+        NoticeDetailResponse detail = noticeService.setCommentLike(1L, 2L, 9L, OTHER, true);
+        noticeService.setCommentLike(1L, 2L, 10L, OTHER, true);
+
+        verify(noticeEngagementRepository).likeComment(9L, OTHER);
+        verify(noticeEngagementRepository).likeComment(10L, OTHER);
+        verify(pointService).grantNoticeCommentLikePoint(OTHER, 9L);
+        verify(pointService).grantNoticeCommentLikePoint(OTHER, 10L);
+        assertThat(detail.comments())
+            .extracting(NoticeCommentResponse::id, NoticeCommentResponse::likeCount, NoticeCommentResponse::likedByMe)
+            .containsExactly(tuple(9L, 2L, true), tuple(10L, 0L, false));
+    }
+
+    @Test
+    void refusesALikeOnOnesOwnComment() {
+        stubNotice(2L, false);
+        NoticeComment comment = comment(9L, 2L, MEMBER);
+        when(noticeCommentRepository.findByIdAndNoticeId(9L, 2L)).thenReturn(Optional.of(comment));
+
+        assertThatThrownBy(() -> noticeService.setCommentLike(1L, 2L, 9L, MEMBER, true))
+            .isInstanceOf(NoticeForbiddenException.class);
+
+        verify(noticeEngagementRepository, never()).likeComment(any(), any());
+        verify(pointService, never()).grantNoticeCommentLikePoint(any(), any());
+    }
+
+    @Test
+    void takesALikeBackWithoutTouchingPoints() {
+        stubNotice(2L, false);
+        NoticeComment comment = comment(9L, 2L, MEMBER);
+        when(noticeCommentRepository.findByIdAndNoticeId(9L, 2L)).thenReturn(Optional.of(comment));
+
+        noticeService.setCommentLike(1L, 2L, 9L, OTHER, false);
+
+        verify(noticeEngagementRepository).unlikeComment(9L, OTHER);
+        verify(noticeEngagementRepository, never()).likeComment(any(), any());
+        verify(pointService, never()).grantNoticeCommentLikePoint(any(), any());
+    }
+
+    @Test
+    void keepsCommentsOfAnAdminOnlyNoticeFromMembers() {
+        stubNotice(3L, true);
+        NoticeComment comment = comment(9L, 3L, ADMIN);
+        when(noticeCommentRepository.findByIdAndNoticeId(9L, 3L)).thenReturn(Optional.of(comment));
+
+        assertThatThrownBy(() -> noticeService.addComment(1L, 3L, MEMBER, "reply", 9L))
+            .isInstanceOf(NoSuchElementException.class);
+        assertThatThrownBy(() -> noticeService.editComment(1L, 3L, 9L, MEMBER, "edit"))
+            .isInstanceOf(NoSuchElementException.class);
+        assertThatThrownBy(() -> noticeService.setCommentLike(1L, 3L, 9L, MEMBER, true))
+            .isInstanceOf(NoSuchElementException.class);
+        verify(noticeEngagementRepository, never()).likeComment(any(), any());
+        verify(pointService, never()).grantNoticeCommentLikePoint(any(), any());
     }
 
     @Test

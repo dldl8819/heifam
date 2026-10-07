@@ -13,6 +13,7 @@ const REASON_KEYS: Record<PointReason, string> = {
   NOTICE_READ: 'points.reasons.noticeRead',
   NOTICE_LIKE: 'points.reasons.noticeLike',
   NOTICE_COMMENT: 'points.reasons.noticeComment',
+  NOTICE_COMMENT_LIKE: 'points.reasons.noticeCommentLike',
   MATCH_CONFIRM: 'points.reasons.matchConfirm',
   MATCH_CONFIRM_REVERSED: 'points.reasons.matchConfirmReversed',
 }

@@ -11,6 +11,7 @@ import com.balancify.backend.repository.NoticeCommentRepository;
 import com.balancify.backend.repository.NoticeEngagementRepository;
 import com.balancify.backend.repository.NoticeRepository;
 import com.balancify.backend.service.exception.NoticeForbiddenException;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -28,6 +29,9 @@ import org.springframework.transaction.annotation.Transactional;
  * Notices as members see them. Visitors get the titles only; members open notices, which marks
  * them read, and like and comment on them. A notice kept to admins is invisible to everyone else.
  * An edit announced again (NoticeAdminService) turns the notice unread for everyone.
+ *
+ * <p>Comments can be answered, one level deep, edited by their writer and liked by others. A
+ * comment deleted while it has replies stays as an emptied place until its last reply is gone.
  */
 @Service
 public class NoticeService {
@@ -118,35 +122,102 @@ public class NoticeService {
         return detail(notice, reader);
     }
 
+    /**
+     * A comment on the notice, or with parentId a reply. A reply to a reply is filed under the
+     * comment that one answers, so a thread never goes deeper than one level. Replies earn the
+     * same once-per-notice commenting point as comments.
+     */
     @Transactional
-    public NoticeDetailResponse addComment(Long groupId, Long noticeId, String email, String content) {
+    public NoticeDetailResponse addComment(Long groupId, Long noticeId, String email, String content, Long parentId) {
         String author = normalizeEmail(email);
         Notice notice = requireVisible(groupId, noticeId, author);
-        String text = content == null ? "" : content.trim();
-        if (text.isEmpty() || text.length() > MAX_COMMENT_LENGTH) {
-            throw new IllegalArgumentException("댓글은 1~" + MAX_COMMENT_LENGTH + "자로 입력해 주세요.");
-        }
+        String text = requireCommentText(content);
         NoticeComment comment = new NoticeComment();
         comment.setNoticeId(notice.getId());
         comment.setAuthorEmail(author);
         comment.setContent(text);
+        if (parentId != null) {
+            NoticeComment answered = noticeCommentRepository.findByIdAndNoticeId(parentId, notice.getId())
+                .orElseThrow(() -> new NoSuchElementException("Comment not found"));
+            comment.setParentId(answered.getParentId() != null ? answered.getParentId() : answered.getId());
+        }
         noticeCommentRepository.save(comment);
         pointService.grantNoticePoint(author, notice.getId(), PointService.REASON_NOTICE_COMMENT);
         return detail(notice, author);
     }
 
-    /** Writers remove their own comments; admins can remove any. */
+    /** Only the writer changes a comment's text; admins can remove a comment but not reword it. */
+    @Transactional
+    public NoticeDetailResponse editComment(Long groupId, Long noticeId, Long commentId, String email, String content) {
+        String actor = normalizeEmail(email);
+        Notice notice = requireVisible(groupId, noticeId, actor);
+        NoticeComment comment = requireComment(notice, commentId);
+        if (!actor.equals(normalizeEmail(comment.getAuthorEmail()))) {
+            throw new NoticeForbiddenException("본인 댓글만 수정할 수 있습니다.");
+        }
+        String text = requireCommentText(content);
+        if (!text.equals(comment.getContent())) {
+            comment.setContent(text);
+            comment.setEditedAt(OffsetDateTime.now());
+            noticeCommentRepository.save(comment);
+        }
+        return detail(notice, actor);
+    }
+
+    /**
+     * Writers remove their own comments; admins can remove any. A comment that has replies is
+     * emptied instead of removed, so the replies stay where they are; it goes for good with its
+     * last reply.
+     */
     @Transactional
     public NoticeDetailResponse deleteComment(Long groupId, Long noticeId, Long commentId, String email) {
         String actor = normalizeEmail(email);
         Notice notice = requireVisible(groupId, noticeId, actor);
-        NoticeComment comment = noticeCommentRepository.findByIdAndNoticeId(commentId, notice.getId())
-            .orElseThrow(() -> new NoSuchElementException("Comment not found"));
+        NoticeComment comment = requireComment(notice, commentId);
         if (!actor.equals(normalizeEmail(comment.getAuthorEmail())) && !accessControlService.isAdminEmail(actor)) {
             throw new NoticeForbiddenException("본인 댓글만 지울 수 있습니다.");
         }
+        if (noticeCommentRepository.existsByParentId(comment.getId())) {
+            comment.setContent("");
+            comment.setAuthorEmail("");
+            comment.setEditedAt(null);
+            comment.setDeletedAt(OffsetDateTime.now());
+            noticeCommentRepository.save(comment);
+            noticeEngagementRepository.clearCommentLikes(comment.getId());
+            return detail(notice, actor);
+        }
+        Long answeredId = comment.getParentId();
         noticeCommentRepository.delete(comment);
+        if (answeredId != null) {
+            // Flushed first, so the reply just removed is not counted as still being there.
+            noticeCommentRepository.flush();
+            noticeCommentRepository.findByIdAndNoticeId(answeredId, notice.getId())
+                .filter(NoticeComment::isDeleted)
+                .filter(answered -> !noticeCommentRepository.existsByParentId(answered.getId()))
+                .ifPresent(noticeCommentRepository::delete);
+        }
         return detail(notice, actor);
+    }
+
+    /**
+     * A like on someone else's comment. The first like of a comment earns the liker a point, up
+     * to PointService's daily cap; taking the like back keeps the point.
+     */
+    @Transactional
+    public NoticeDetailResponse setCommentLike(Long groupId, Long noticeId, Long commentId, String email, boolean liked) {
+        String member = normalizeEmail(email);
+        Notice notice = requireVisible(groupId, noticeId, member);
+        NoticeComment comment = requireComment(notice, commentId);
+        if (liked) {
+            if (member.equals(normalizeEmail(comment.getAuthorEmail()))) {
+                throw new NoticeForbiddenException("내 댓글에는 좋아요를 누를 수 없습니다.");
+            }
+            noticeEngagementRepository.likeComment(comment.getId(), member);
+            pointService.grantNoticeCommentLikePoint(member, comment.getId());
+        } else {
+            noticeEngagementRepository.unlikeComment(comment.getId(), member);
+        }
+        return detail(notice, member);
     }
 
     @Transactional
@@ -164,7 +235,19 @@ public class NoticeService {
 
     private NoticeDetailResponse detail(Notice notice, String reader) {
         boolean admin = accessControlService.isAdminEmail(reader);
-        List<NoticeComment> comments = noticeCommentRepository.findByNoticeIdOrderByIdAsc(notice.getId());
+        List<NoticeComment> stored = noticeCommentRepository.findByNoticeIdOrderByIdAsc(notice.getId());
+        Set<Long> answeredIds = new LinkedHashSet<>();
+        stored.forEach(comment -> {
+            if (comment.getParentId() != null) {
+                answeredIds.add(comment.getParentId());
+            }
+        });
+        // An emptied place whose replies are all gone has nothing left to hold together.
+        List<NoticeComment> comments = stored.stream()
+            .filter(comment -> !comment.isDeleted() || answeredIds.contains(comment.getId()))
+            .toList();
+        Map<Long, Long> commentLikes = noticeEngagementRepository.countCommentLikes(notice.getId());
+        Set<Long> likedCommentIds = noticeEngagementRepository.findLikedCommentIds(notice.getId(), reader);
         List<String> emails = new ArrayList<>();
         emails.add(notice.getAuthorEmail());
         comments.forEach(comment -> emails.add(comment.getAuthorEmail()));
@@ -181,18 +264,39 @@ public class NoticeService {
             noticeEngagementRepository.hasLiked(notice.getId(), reader),
             comments.stream()
                 .map(comment -> {
-                    boolean mine = reader.equals(normalizeEmail(comment.getAuthorEmail()));
+                    boolean deleted = comment.isDeleted();
+                    boolean mine = !deleted && reader.equals(normalizeEmail(comment.getAuthorEmail()));
                     return new NoticeCommentResponse(
                         comment.getId(),
+                        comment.getParentId(),
                         nicknames.get(normalizeEmail(comment.getAuthorEmail())),
                         comment.getContent(),
                         comment.getCreatedAt(),
+                        comment.getEditedAt() != null,
+                        deleted,
+                        deleted ? 0L : commentLikes.getOrDefault(comment.getId(), 0L),
+                        !deleted && likedCommentIds.contains(comment.getId()),
                         mine,
-                        mine || admin
+                        !deleted && (mine || admin)
                     );
                 })
                 .toList()
         );
+    }
+
+    /** A comment that is still there: an emptied place can be neither edited, removed nor liked. */
+    private NoticeComment requireComment(Notice notice, Long commentId) {
+        return noticeCommentRepository.findByIdAndNoticeId(commentId, notice.getId())
+            .filter(comment -> !comment.isDeleted())
+            .orElseThrow(() -> new NoSuchElementException("Comment not found"));
+    }
+
+    private static String requireCommentText(String content) {
+        String text = content == null ? "" : content.trim();
+        if (text.isEmpty() || text.length() > MAX_COMMENT_LENGTH) {
+            throw new IllegalArgumentException("댓글은 1~" + MAX_COMMENT_LENGTH + "자로 입력해 주세요.");
+        }
+        return text;
     }
 
     private Notice requireVisible(Long groupId, Long noticeId, String email) {

@@ -133,6 +133,7 @@ import com.balancify.backend.service.RankingService;
 import com.balancify.backend.service.RatingRecalculationService;
 import com.balancify.backend.service.TeamBalancingService;
 import com.balancify.backend.service.exception.MatchEditQuotaExceededException;
+import com.balancify.backend.service.exception.NoticeForbiddenException;
 import com.balancify.backend.service.exception.NoticeImageException;
 import com.balancify.backend.repository.NoticeImageRepository;
 import java.net.URI;
@@ -2297,7 +2298,7 @@ class AdminKeyFilterTest {
     void showsAdminsTheirPoints() throws Exception {
         when(pointService.canUsePoints("admin@hei.gg")).thenReturn(true);
         when(pointService.getSummary("admin@hei.gg"))
-            .thenReturn(new PointSummaryResponse(3L, true, 1, 2, 10, 1, 0, 10, 1, 0, 10, 1, 48, List.of()));
+            .thenReturn(new PointSummaryResponse(3L, true, 1, 2, 10, 1, 0, 10, 1, 0, 10, 1, 48, 0, 10, 1, List.of()));
 
         mockMvc
             .perform(get("/api/points/me").header("X-USER-EMAIL", "admin@hei.gg"))
@@ -2819,6 +2820,85 @@ class AdminKeyFilterTest {
     }
 
     @Test
+    void letsMembersAnswerEditAndLikeComments() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/groups/1/notices/5/comments")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"content\":\"a reply\",\"parentId\":9}")
+            )
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(
+                put("/api/groups/1/notices/5/comments/9")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"content\":\"reworded\"}")
+            )
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(put("/api/groups/1/notices/5/comments/9/like").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(delete("/api/groups/1/notices/5/comments/9/like").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk());
+
+        verify(noticeService).addComment(1L, 5L, "member@hei.gg", "a reply", 9L);
+        verify(noticeService).editComment(1L, 5L, 9L, "member@hei.gg", "reworded");
+        verify(noticeService).setCommentLike(1L, 5L, 9L, "member@hei.gg", true);
+        verify(noticeService).setCommentLike(1L, 5L, 9L, "member@hei.gg", false);
+    }
+
+    @Test
+    void keepsVisitorsAndBlockedAccountsOffComments() throws Exception {
+        mockMvc
+            .perform(
+                put("/api/groups/1/notices/5/comments/9")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"content\":\"reworded\"}")
+            )
+            .andExpect(status().isUnauthorized());
+        mockMvc
+            .perform(put("/api/groups/1/notices/5/comments/9/like"))
+            .andExpect(status().isUnauthorized());
+        mockMvc
+            .perform(put("/api/groups/1/notices/5/comments/9/like").header("X-USER-EMAIL", "blocked@hei.gg"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(delete("/api/groups/1/notices/5/comments/9/like").header("X-USER-EMAIL", "blocked@hei.gg"))
+            .andExpect(status().isForbidden());
+
+        verify(noticeService, never()).editComment(any(), any(), any(), any(), any());
+        verify(noticeService, never()).setCommentLike(any(), any(), any(), any(), anyBoolean());
+    }
+
+    @Test
+    void tellsWhyACommentCouldNotBeChangedOrLiked() throws Exception {
+        when(noticeService.editComment(any(), any(), any(), any(), any()))
+            .thenThrow(new NoticeForbiddenException("not yours"));
+        when(noticeService.setCommentLike(1L, 5L, 9L, "member@hei.gg", true))
+            .thenThrow(new NoticeForbiddenException("your own"));
+        when(noticeService.setCommentLike(1L, 5L, 10L, "member@hei.gg", true))
+            .thenThrow(new NoSuchElementException("Comment not found"));
+
+        mockMvc
+            .perform(
+                put("/api/groups/1/notices/5/comments/9")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"content\":\"reworded\"}")
+            )
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(put("/api/groups/1/notices/5/comments/9/like").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(put("/api/groups/1/notices/5/comments/10/like").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
     void letsMembersReadLikeAndCommentOnNotices() throws Exception {
         when(noticeService.list(1L, "member@hei.gg")).thenReturn(new NoticeListResponse(List.of(), 0, 0));
 
@@ -2846,7 +2926,7 @@ class AdminKeyFilterTest {
             )
             .andExpect(status().isForbidden());
 
-        verify(noticeService).addComment(1L, 5L, "member@hei.gg", "hello");
+        verify(noticeService).addComment(1L, 5L, "member@hei.gg", "hello", null);
         verify(noticeService).setLike(1L, 5L, "member@hei.gg", true);
     }
 

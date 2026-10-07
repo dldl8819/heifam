@@ -123,6 +123,9 @@ balancify:
     prediction-hit-daily-cap: ${POINTS_PREDICTION_HIT_DAILY_CAP:10}
     # Reading, liking and commenting on a notice each earn this once per notice (up to 3 a notice).
     notice-action: ${POINTS_NOTICE_ACTION:1}
+    # Liking someone else's comment on a notice: once per comment, up to the cap a day.
+    notice-comment-like: ${POINTS_NOTICE_COMMENT_LIKE:1}
+    notice-comment-like-daily-cap: ${POINTS_NOTICE_COMMENT_LIKE_DAILY_CAP:10}
     # A player confirming the result of a balanced 3v3 match they played, within the window after
     # the result came in.
     match-confirm: ${POINTS_MATCH_CONFIRM:1}

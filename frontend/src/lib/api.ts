@@ -1387,13 +1387,29 @@ export const apiClient = {
     apiRequest<NoticeDetail>(`/api/groups/${groupId}/notices/${noticeId}`, undefined, {
       includeUserEmail: true,
     }),
-  addNoticeComment: (groupId: number, noticeId: number, content: string) =>
+  // With parentId the comment is a reply to that comment.
+  addNoticeComment: (groupId: number, noticeId: number, content: string, parentId?: number) =>
     apiRequest<NoticeDetail>(
       `/api/groups/${groupId}/notices/${noticeId}/comments`,
       {
         method: 'POST',
+        body: JSON.stringify(parentId === undefined ? { content } : { content, parentId }),
+      },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  updateNoticeComment: (groupId: number, noticeId: number, commentId: number, content: string) =>
+    apiRequest<NoticeDetail>(
+      `/api/groups/${groupId}/notices/${noticeId}/comments/${commentId}`,
+      {
+        method: 'PUT',
         body: JSON.stringify({ content }),
       },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  setNoticeCommentLike: (groupId: number, noticeId: number, commentId: number, liked: boolean) =>
+    apiRequest<NoticeDetail>(
+      `/api/groups/${groupId}/notices/${noticeId}/comments/${commentId}/like`,
+      { method: liked ? 'PUT' : 'DELETE' },
       { requireUserEmail: true, includeUserEmail: true }
     ),
   deleteNoticeComment: (groupId: number, noticeId: number, commentId: number) =>
