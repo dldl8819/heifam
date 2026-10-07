@@ -27,6 +27,7 @@ import java.util.Date;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -283,6 +284,42 @@ class SupabaseJwtVerifierTest {
         assertThat(verifiedUser.orElseThrow().email()).isEqualTo("player@example.test");
         assertThat(verifiedUser.orElseThrow().nickname()).isEqualTo("PlayerAlpha");
         assertThat(authUserRequestCount.get()).isEqualTo(1);
+    }
+
+    @Test
+    void verifiesNobodyWhenTheAuthUserAnswerCannotBeRead() throws Exception {
+        String baseUrl = startJwksServer(new JWKSet().toString());
+        AtomicReference<String> answer = new AtomicReference<>("");
+        jwksServer.createContext("/auth/v1/user", exchange -> {
+            authUserRequestCount.incrementAndGet();
+            byte[] bytes = answer.get().getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, bytes.length == 0 ? -1 : bytes.length);
+            if (bytes.length > 0) {
+                try (OutputStream outputStream = exchange.getResponseBody()) {
+                    outputStream.write(bytes);
+                }
+            }
+            exchange.close();
+        });
+
+        SupabaseAuthProperties properties = new SupabaseAuthProperties();
+        properties.setSupabaseUrl(baseUrl);
+        properties.setApiKey(PLACEHOLDER_API_KEY);
+        properties.setVerifyTimeoutMs(1000);
+        properties.setVerificationCacheTtlSeconds(60);
+
+        SupabaseJwtVerifier verifier = new SupabaseJwtVerifier(properties);
+
+        // Jackson 3 reports these with unchecked exceptions; to the filters they must read as
+        // "not signed in", never as a failure of the request.
+        String[] unreadable = {"{\"id\": \"" + PLACEHOLDER_USER_ID + "\", \"email\":", "[]", "\"text\"", "", "<html>"};
+        for (int index = 0; index < unreadable.length; index++) {
+            answer.set(unreadable[index]);
+
+            assertThat(verifier.verify("opaque-token-" + index)).as(unreadable[index]).isEmpty();
+        }
+        assertThat(authUserRequestCount.get()).isEqualTo(unreadable.length);
     }
 
     @Test

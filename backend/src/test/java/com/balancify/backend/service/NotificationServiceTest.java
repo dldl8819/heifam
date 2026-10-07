@@ -17,7 +17,6 @@ import com.balancify.backend.domain.PushSubscription;
 import com.balancify.backend.repository.NotificationCursorRepository;
 import com.balancify.backend.repository.NotificationRepository;
 import com.balancify.backend.repository.PushSubscriptionRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
@@ -34,6 +33,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.test.util.ReflectionTestUtils;
+import tools.jackson.databind.json.JsonMapper;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -298,7 +298,7 @@ class NotificationServiceTest {
             pushSubscriptionRepository,
             accessControlService,
             webPushService,
-            new ObjectMapper(),
+            JsonMapper.builder().build(),
             predictionsForMembers,
             membersEnabled,
             Runnable::run,

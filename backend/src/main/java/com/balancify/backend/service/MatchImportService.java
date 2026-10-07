@@ -263,7 +263,7 @@ public class MatchImportService {
         return groupCache.computeIfAbsent(groupId, id ->
             groupRepository.findById(id).orElseGet(() -> {
                 // The database assigns the id. A preset id made save() merge a row that does not
-                // exist, which Hibernate 6.6 rejects instead of inserting a new group.
+                // exist, which Hibernate has rejected since 6.6 instead of inserting a new group.
                 Group group = new Group();
                 group.setName("Group " + id);
                 return groupRepository.save(group);

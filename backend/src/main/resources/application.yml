@@ -1,13 +1,20 @@
 server:
   port: ${PORT:${SERVER_PORT:8080}}
   forward-headers-strategy: framework
-  error:
-    include-message: never
-    include-binding-errors: never
-    include-stacktrace: never
-    include-exception: false
 
 spring:
+  web:
+    # Spring Boot 4 moved these from server.error; the old keys are ignored.
+    error:
+      include-message: never
+      include-binding-errors: never
+      include-stacktrace: never
+      include-exception: false
+  jackson:
+    # Keeps the JSON rules the API had under Jackson 2: a missing or null boolean reads as false,
+    # text after the JSON value is ignored, and error timestamps end in +00:00. Jackson 3's own
+    # defaults are stricter; moving to them changes what the API accepts, so do it on purpose.
+    use-jackson2-defaults: true
   config:
     import: optional:file:../.env[.properties],optional:file:../.env.local[.properties],optional:file:.env[.properties],optional:file:.env.local[.properties]
   datasource:

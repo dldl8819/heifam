@@ -165,7 +165,7 @@ class PlayerImportServiceTest {
 
         ArgumentCaptor<Group> groupCaptor = ArgumentCaptor.forClass(Group.class);
         verify(groupRepository).save(groupCaptor.capture());
-        // A preset id would make save() merge a missing row, which Hibernate 6.6 rejects.
+        // A preset id would make save() merge a missing row, which Hibernate has rejected since 6.6.
         assertThat(groupCaptor.getValue().getId()).isNull();
         assertThat(groupCaptor.getValue().getName()).isEqualTo("Group 5");
     }

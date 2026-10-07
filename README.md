@@ -3,7 +3,7 @@ Automatic team balancing and ELO-based league management system for game communi
 
 ## Monorepo Structure
 - `frontend`: Next.js + TypeScript + Tailwind CSS
-- `backend`: Spring Boot 3.x + Gradle + Java 21
+- `backend`: Spring Boot 4.x + Gradle + Java 21
 - `docs`: Architecture and project docs
 - `docker-compose.yml`: PostgreSQL for local development
 

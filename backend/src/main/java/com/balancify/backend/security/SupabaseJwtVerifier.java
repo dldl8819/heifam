@@ -1,7 +1,5 @@
 package com.balancify.backend.security;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.jwk.source.RemoteJWKSet;
@@ -37,6 +35,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 @Component
 public class SupabaseJwtVerifier {
@@ -47,7 +49,7 @@ public class SupabaseJwtVerifier {
     private final ConcurrentMap<String, CachedVerification> verificationCache = new ConcurrentHashMap<>();
     private final ConfigurableJWTProcessor<SecurityContext> jwtProcessor;
     private final HttpClient authHttpClient;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = JsonMapper.builder().build();
     private final String expectedIssuer;
     private final Clock clock;
 
@@ -193,7 +195,8 @@ public class SupabaseJwtVerifier {
         } catch (InterruptedException interruptedException) {
             Thread.currentThread().interrupt();
             return Optional.empty();
-        } catch (IOException | IllegalArgumentException runtimeException) {
+        } catch (IOException | JacksonException | IllegalArgumentException runtimeException) {
+            // An answer that cannot be read verifies nobody; Jackson 3 reports it unchecked.
             return Optional.empty();
         }
     }

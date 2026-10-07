@@ -78,4 +78,27 @@ class SupabaseAuthAdminClientUserEmailTest {
             .isInstanceOf(AccountDeletionException.class)
             .hasFieldOrPropertyWithValue("reason", AccountDeletionException.Reason.AUTH_UNAVAILABLE);
     }
+
+    @Test
+    void findsNothingWhenTheAnswerNamesNoEmail() {
+        body.set("{\"id\":\"" + USER_ID + "\"}");
+        assertThat(client.findUserEmail(USER_ID)).isEmpty();
+
+        // A null email is no email, not the text "null".
+        body.set("{\"id\":\"" + USER_ID + "\",\"email\":null}");
+        assertThat(client.findUserEmail(USER_ID)).isEmpty();
+    }
+
+    @Test
+    void reportsTheServiceUnavailableWhenTheAnswerCannotBeRead() {
+        // Jackson 3 reports broken JSON with an unchecked exception; it must not leave as one.
+        for (String unreadable : new String[] {"{\"id\":\"" + USER_ID + "\",\"email\":", "{\"email\" \"x\"}", "<html>"}) {
+            body.set(unreadable);
+
+            assertThatThrownBy(() -> client.findUserEmail(USER_ID))
+                .as(unreadable)
+                .isInstanceOf(AccountDeletionException.class)
+                .hasFieldOrPropertyWithValue("reason", AccountDeletionException.Reason.AUTH_UNAVAILABLE);
+        }
+    }
 }

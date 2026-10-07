@@ -1,8 +1,6 @@
 package com.balancify.backend.security;
 
 import com.balancify.backend.service.exception.AccountDeletionException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -14,12 +12,16 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 @Component
 public class SupabaseAuthAdminClient {
 
     private static final String UNAVAILABLE_MESSAGE = "Account deletion is temporarily unavailable";
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder().build();
 
     private final SupabaseAuthProperties properties;
     private final HttpClient httpClient;
@@ -104,12 +106,13 @@ public class SupabaseAuthAdminClient {
                 throw unavailable();
             }
             JsonNode user = OBJECT_MAPPER.readTree(response.body());
-            String email = user.path("email").asText("").trim().toLowerCase(Locale.ROOT);
+            String email = user.path("email").asString("").trim().toLowerCase(Locale.ROOT);
             return email.isEmpty() ? Optional.empty() : Optional.of(email);
         } catch (InterruptedException interruptedException) {
             Thread.currentThread().interrupt();
             throw unavailable();
-        } catch (IOException | IllegalArgumentException exception) {
+        } catch (IOException | JacksonException | IllegalArgumentException exception) {
+            // Jackson 3 reports an unreadable answer with an unchecked exception.
             throw unavailable();
         }
     }

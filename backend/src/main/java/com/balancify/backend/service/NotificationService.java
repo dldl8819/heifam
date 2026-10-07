@@ -10,8 +10,6 @@ import com.balancify.backend.domain.PushSubscription;
 import com.balancify.backend.repository.NotificationCursorRepository;
 import com.balancify.backend.repository.NotificationRepository;
 import com.balancify.backend.repository.PushSubscriptionRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.OffsetDateTime;
@@ -29,6 +27,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Notifications in the site and, for those who turned it on, Web Push to their browsers and
@@ -57,7 +57,7 @@ public class NotificationService {
     private final PushSubscriptionRepository pushSubscriptionRepository;
     private final AccessControlService accessControlService;
     private final WebPushService webPushService;
-    private final ObjectMapper objectMapper;
+    private final JsonMapper jsonMapper;
     private final boolean predictionsForMembers;
     private final boolean membersEnabled;
     private final Executor pushExecutor;
@@ -70,7 +70,7 @@ public class NotificationService {
         PushSubscriptionRepository pushSubscriptionRepository,
         AccessControlService accessControlService,
         WebPushService webPushService,
-        ObjectMapper objectMapper,
+        JsonMapper jsonMapper,
         @Value("${balancify.predictions.members-enabled:false}") boolean predictionsForMembers,
         @Value("${balancify.notifications.members-enabled:false}") boolean membersEnabled
     ) {
@@ -80,7 +80,7 @@ public class NotificationService {
             pushSubscriptionRepository,
             accessControlService,
             webPushService,
-            objectMapper,
+            jsonMapper,
             predictionsForMembers,
             membersEnabled,
             PUSH_EXECUTOR,
@@ -94,7 +94,7 @@ public class NotificationService {
         PushSubscriptionRepository pushSubscriptionRepository,
         AccessControlService accessControlService,
         WebPushService webPushService,
-        ObjectMapper objectMapper,
+        JsonMapper jsonMapper,
         boolean predictionsForMembers,
         boolean membersEnabled,
         Executor pushExecutor,
@@ -105,7 +105,7 @@ public class NotificationService {
         this.pushSubscriptionRepository = pushSubscriptionRepository;
         this.accessControlService = accessControlService;
         this.webPushService = webPushService;
-        this.objectMapper = objectMapper;
+        this.jsonMapper = jsonMapper;
         this.predictionsForMembers = predictionsForMembers;
         this.membersEnabled = membersEnabled;
         this.pushExecutor = pushExecutor;
@@ -283,8 +283,8 @@ public class NotificationService {
         message.put("tag", kind.toLowerCase(Locale.ROOT) + "-" + targetId);
         byte[] payload;
         try {
-            payload = objectMapper.writeValueAsBytes(message);
-        } catch (JsonProcessingException exception) {
+            payload = jsonMapper.writeValueAsBytes(message);
+        } catch (JacksonException exception) {
             throw new IllegalStateException("Push message could not be written", exception);
         }
         String excluded = normalizeEmail(excludedEmail);
