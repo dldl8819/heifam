@@ -46,13 +46,11 @@ public class GroupPlayerImportController {
         );
     }
 
+    // The name the audit log shows for the actor. It comes from access control, where admins set
+    // it, never from the token: an account holder can put any nickname in their own token.
     private String resolveActorNickname(AuthenticatedRequestResolver.ResolvedRequestIdentity identity) {
         if (identity == null || identity.email().isBlank()) {
             return null;
-        }
-
-        if (identity.nickname() != null && !identity.nickname().isBlank()) {
-            return identity.nickname().trim();
         }
 
         String nickname = accessControlService.resolveAccessProfile(identity.email()).nickname();

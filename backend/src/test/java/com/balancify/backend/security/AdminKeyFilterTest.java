@@ -931,6 +931,35 @@ class AdminKeyFilterTest {
     }
 
     @Test
+    void namesWhoChangedOrImportedPlayersFromAccessControlNotFromTheToken() throws Exception {
+        when(playerImportService.importPlayers(eq(1L), any(), eq("ops@hei.gg"), any()))
+            .thenReturn(new GroupPlayerImportResponse(1, 1, 0, 0, List.of()));
+
+        // The nickname header stands for the token's nickname, which its holder can set to anything.
+        mockMvc
+            .perform(
+                post("/api/groups/1/players/import")
+                    .header("X-USER-EMAIL", "ops@hei.gg")
+                    .header("X-USER-NICKNAME", "superadmin")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"players\":[]}")
+            )
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(
+                patch("/api/groups/1/players/10")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .header("X-USER-NICKNAME", "superadmin")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"tier\":\"B+\"}")
+            )
+            .andExpect(status().isOk());
+
+        verify(playerImportService).importPlayers(eq(1L), any(), eq("ops@hei.gg"), eq("ops"));
+        verify(playerAdminService).updatePlayer(eq(1L), eq(10L), any(), eq("admin@hei.gg"), eq("admin"), isNull());
+    }
+
+    @Test
     void showsAdminOnlyTheMatchResultEditorsLogs() throws Exception {
         when(operationAuditLogService.getResultEditorLogs(anyInt(), anyInt(), any()))
             .thenReturn(new OperationAuditLogPageResponse(List.of(), 0, 20, 0, 0, true, true));

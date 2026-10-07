@@ -23,7 +23,7 @@ import org.springframework.web.server.ResponseStatusException;
 class GroupPlayerAdminControllerTest {
 
     @Test
-    void fallsBackToAccessProfileNicknameWhenIdentityNicknameIsMissing() {
+    void namesTheActorFromAccessControlNotFromTheToken() {
         PlayerAdminService playerAdminService = mock(PlayerAdminService.class);
         MmrAccessRequestResolver mmrAccessRequestResolver = mock(MmrAccessRequestResolver.class);
         AuthenticatedRequestResolver authenticatedRequestResolver = mock(AuthenticatedRequestResolver.class);
@@ -45,8 +45,9 @@ class GroupPlayerAdminControllerTest {
             null
         );
 
+        // The token's nickname is whatever the account holder wrote into it.
         when(authenticatedRequestResolver.resolve(httpRequest))
-            .thenReturn(new AuthenticatedRequestResolver.ResolvedRequestIdentity("operator@example.test", "", true));
+            .thenReturn(new AuthenticatedRequestResolver.ResolvedRequestIdentity("operator@example.test", "SomeoneElse", true));
         when(accessControlService.resolveAccessProfile("operator@example.test"))
             .thenReturn(new AccessControlService.AccessProfile(
                 "operator@example.test",
@@ -102,6 +103,7 @@ class GroupPlayerAdminControllerTest {
                 true,
                 authUserId.toString()
             ));
+        when(accessControlService.resolveAccessProfile("member@example.test")).thenReturn(memberProfile());
 
         controller.updatePlayer(1L, 10L, request, httpRequest);
 
@@ -145,6 +147,7 @@ class GroupPlayerAdminControllerTest {
                 false,
                 UUID.randomUUID().toString()
             ));
+        when(accessControlService.resolveAccessProfile("member@example.test")).thenReturn(memberProfile());
 
         controller.updatePlayer(1L, 10L, request, httpRequest);
 
@@ -188,6 +191,7 @@ class GroupPlayerAdminControllerTest {
                 true,
                 UUID.randomUUID().toString()
             ));
+        when(accessControlService.resolveAccessProfile("member@example.test")).thenReturn(memberProfile());
         doThrow(new PlayerEditForbiddenException("본인 선수 정보만 수정할 수 있습니다."))
             .when(playerAdminService)
             .updatePlayer(eq(1L), eq(10L), eq(request), eq("member@example.test"), eq("MemberUser"), any());
@@ -195,5 +199,18 @@ class GroupPlayerAdminControllerTest {
         assertThatThrownBy(() -> controller.updatePlayer(1L, 10L, request, httpRequest))
             .isInstanceOf(ResponseStatusException.class)
             .hasMessageContaining("403 FORBIDDEN");
+    }
+
+    private static AccessControlService.AccessProfile memberProfile() {
+        return new AccessControlService.AccessProfile(
+            "member@example.test",
+            "MemberUser",
+            "MEMBER",
+            false,
+            false,
+            true,
+            false,
+            null
+        );
     }
 }
