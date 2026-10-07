@@ -98,6 +98,7 @@ public class NoticeAdminService {
         }
         // A notice opened up to members reaches them as a new one; they have no reads to turn back.
         boolean openedToMembers = wasAdminOnly && !notice.isAdminOnly();
+        boolean closedToMembers = !wasAdminOnly && notice.isAdminOnly();
         boolean announcedAgain = request != null && Boolean.TRUE.equals(request.announceAgain()) && !openedToMembers;
         if (announcedAgain) {
             notice.setRevision(notice.getRevision() + 1);
@@ -119,6 +120,9 @@ public class NoticeAdminService {
             notificationService.publishNoticeRevised(
                 groupId, notice.getId(), notice.getTitle(), notice.isAdminOnly(), actorEmail
             );
+        } else if (closedToMembers) {
+            // Members can no longer open it, so its notification stops showing them its title.
+            notificationService.removeNotice(notice.getId());
         }
 
         String authorNickname = safeTrim(

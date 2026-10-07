@@ -172,6 +172,35 @@ class NoticeAdminServiceTest {
     }
 
     @Test
+    void aNoticeKeptToAdminsLeavesMembersNoNotificationOfIt() {
+        Notice notice = existingNotice(5L, false);
+
+        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("t", "c", true, null), "ops@hei.gg", "OpsUser");
+
+        assertThat(notice.isAdminOnly()).isTrue();
+        verify(notificationService).removeNotice(5L);
+        verify(notificationService, never()).publishNotice(any(), any(), any(), anyBoolean(), any());
+        verify(notificationService, never()).publishNoticeRevised(any(), any(), any(), anyBoolean(), any());
+
+        // Announced again while being kept to admins, it is told to admins only, in place of the old one.
+        Notice announced = existingNotice(6L, false);
+        noticeAdminService.updateNotice(1L, 6L, new NoticeUpdateRequest("t", "c", true, true), "ops@hei.gg", "OpsUser");
+
+        assertThat(announced.isAdminOnly()).isTrue();
+        verify(notificationService).publishNoticeRevised(1L, 6L, "t", true, "ops@hei.gg");
+        verify(notificationService, never()).removeNotice(6L);
+
+        // An edit that leaves who may read it alone keeps its notification.
+        existingNotice(7L, false);
+        noticeAdminService.updateNotice(1L, 7L, new NoticeUpdateRequest("t", "c", false, null), "ops@hei.gg", "OpsUser");
+        existingNotice(8L, true);
+        noticeAdminService.updateNotice(1L, 8L, new NoticeUpdateRequest("t", "c", true, null), "ops@hei.gg", "OpsUser");
+
+        verify(notificationService, never()).removeNotice(7L);
+        verify(notificationService, never()).removeNotice(8L);
+    }
+
+    @Test
     void aNoticeOpenedToMembersIsNewToThemEvenWhenAnnouncedAgain() {
         Notice notice = existingNotice(5L, true);
 
