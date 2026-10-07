@@ -164,8 +164,9 @@ public class PredictionService {
     }
 
     /**
-     * Brings every pick on a match in line with its current result. Whoever recorded or last
-     * changed the result gets nothing for their own pick on it.
+     * Brings every pick on a match in line with its current result. Whoever set the match up, and
+     * whoever recorded or last changed its result, get nothing for their own pick on it: both
+     * choose when they act, and can do so knowing how the game went.
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public void settle(Match match) {
@@ -174,11 +175,15 @@ public class PredictionService {
         }
         String winner = normalizeTeam(match.getWinningTeam());
         String recorder = normalizeEmail(match.getResultRecordedByEmail());
+        // Empty for a match from before creators were kept: nobody is left out for it.
+        String creator = normalizeEmail(match.getCreatedByEmail());
         for (MatchPrediction prediction : matchPredictionRepository.findByMatchIdOrderByPredictorEmailAsc(match.getId())) {
+            String predictor = prediction.getPredictorEmail();
             boolean hit = winner != null
                 && winner.equals(prediction.getPredictedTeam())
-                && !prediction.getPredictorEmail().equals(recorder);
-            pointService.syncPredictionPoint(prediction.getPredictorEmail(), match.getId(), hit);
+                && !predictor.equals(recorder)
+                && !predictor.equals(creator);
+            pointService.syncPredictionPoint(predictor, match.getId(), hit);
         }
     }
 
@@ -290,6 +295,7 @@ public class PredictionService {
             .findFirst()
             .orElse(null);
         boolean countsVisible = !STATE_OPEN.equals(state);
+        boolean createdByMe = !email.isEmpty() && email.equals(normalizeEmail(match.getCreatedByEmail()));
         int homePicks = (int) predictions.stream().filter(prediction -> TEAM_HOME.equals(prediction.getPredictedTeam())).count();
         int awayPicks = predictions.size() - homePicks;
         return new PredictionMatchResponse(
@@ -309,9 +315,9 @@ public class PredictionService {
             countsVisible ? pickers(predictions, TEAM_AWAY, nicknames) : null,
             winner,
             winner == null || myPick == null ? null : winner.equals(myPick),
-            winner != null && email.equals(normalizeEmail(match.getResultRecordedByEmail())),
+            winner != null && (createdByMe || email.equals(normalizeEmail(match.getResultRecordedByEmail()))),
             nicknames.get(normalizeEmail(match.getCreatedByEmail())),
-            !email.isEmpty() && email.equals(normalizeEmail(match.getCreatedByEmail()))
+            createdByMe
         );
     }
 

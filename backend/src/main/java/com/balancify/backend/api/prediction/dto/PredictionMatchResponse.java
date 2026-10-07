@@ -25,10 +25,13 @@ public record PredictionMatchResponse(
     List<String> awayPickers,
     String winnerTeam,
     Boolean hit,
+    // Once the result is in: the viewer's pick earns nothing, because they set the match up or
+    // recorded its result.
     boolean pointsExcluded,
     // The nickname of whoever set the match up; null when unknown.
     String createdByNickname,
-    // The viewer set it up: the page offers them to call it off while it waits for its result.
+    // The viewer set it up: the page offers them to call it off while it waits for its result,
+    // and tells them their pick on it earns nothing.
     boolean createdByMe
 ) {
 }
