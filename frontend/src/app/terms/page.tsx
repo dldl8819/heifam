@@ -66,7 +66,7 @@ export default function TermsPage() {
           {t('legal.terms.description')}
         </p>
         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-          {t('legal.common.updatedAt', { date: '2026-10-04' })}
+          {t('legal.common.updatedAt', { date: '2026-10-08' })}
         </p>
       </header>
 

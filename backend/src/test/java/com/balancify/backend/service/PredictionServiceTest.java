@@ -2,6 +2,7 @@ package com.balancify.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
@@ -207,6 +208,61 @@ class PredictionServiceTest {
     }
 
     @Test
+    void paysNothingToWhoeverSetTheMatchUp() {
+        Match match = match(10L, NOW.minusMinutes(20));
+        match.setWinningTeam("AWAY");
+        match.setStatus(MatchStatus.COMPLETED);
+        // Kept as written at the time; the pick's email is compared however this one is cased.
+        match.setCreatedByEmail(" Creator@Example.com ");
+        match.setResultRecordedByEmail("recorder@example.com");
+        when(matchPredictionRepository.findByMatchIdOrderByPredictorEmailAsc(10L)).thenReturn(List.of(
+            prediction(10L, "a@example.com", "AWAY"),
+            prediction(10L, "creator@example.com", "AWAY"),
+            prediction(10L, "recorder@example.com", "AWAY")
+        ));
+
+        service.settle(match);
+
+        verify(pointService).syncPredictionPoint("a@example.com", 10L, true);
+        verify(pointService).syncPredictionPoint("creator@example.com", 10L, false);
+        verify(pointService).syncPredictionPoint("recorder@example.com", 10L, false);
+    }
+
+    @Test
+    void leavesNobodyOutForAMatchThatNamesNoCreator() {
+        Match match = match(10L, NOW.minusMinutes(20));
+        match.setWinningTeam("HOME");
+        match.setStatus(MatchStatus.COMPLETED);
+        when(matchPredictionRepository.findByMatchIdOrderByPredictorEmailAsc(10L)).thenReturn(List.of(
+            prediction(10L, "a@example.com", "HOME"),
+            prediction(10L, "b@example.com", "HOME")
+        ));
+
+        service.settle(match);
+
+        verify(pointService).syncPredictionPoint("a@example.com", 10L, true);
+        verify(pointService).syncPredictionPoint("b@example.com", 10L, true);
+    }
+
+    @Test
+    void takesTheCreatorsPointBackWhenTheResultIsSettledAgain() {
+        // A result corrected later is settled by the rule of the day: a creator paid before the
+        // rule came in is brought to nothing, like any other change of what a pick is worth.
+        Match match = match(10L, NOW.minusMinutes(20));
+        match.setWinningTeam("HOME");
+        match.setStatus(MatchStatus.COMPLETED);
+        match.setCreatedByEmail("creator@example.com");
+        match.setResultRecordedByEmail(ADMIN);
+        when(matchPredictionRepository.findByMatchIdOrderByPredictorEmailAsc(10L)).thenReturn(List.of(
+            prediction(10L, "creator@example.com", "HOME")
+        ));
+
+        service.settle(match);
+
+        verify(pointService).syncPredictionPoint("creator@example.com", 10L, false);
+    }
+
+    @Test
     void takesEveryPredictionPointBackWhenTheMatchGoes() {
         when(matchPredictionRepository.findByMatchIdOrderByPredictorEmailAsc(10L)).thenReturn(List.of(
             prediction(10L, "a@example.com", "AWAY"),
@@ -292,6 +348,40 @@ class PredictionServiceTest {
         assertThat(board.toString()).doesNotContain("@");
         assertThat(board.stats().resolved()).isEqualTo(4);
         assertThat(board.stats().hits()).isEqualTo(3);
+    }
+
+    @Test
+    void tellsWhoeverSetAMatchUpThatTheirPickOnItEarnedNothing() {
+        Match mine = match(12L, NOW.minusMinutes(40));
+        mine.setWinningTeam("HOME");
+        mine.setStatus(MatchStatus.COMPLETED);
+        mine.setCreatedByEmail(ADMIN);
+        mine.setResultRecordedByEmail("b@example.com");
+        Match someoneElses = match(13L, NOW.minusMinutes(50));
+        someoneElses.setWinningTeam("HOME");
+        someoneElses.setStatus(MatchStatus.COMPLETED);
+        someoneElses.setCreatedByEmail("b@example.com");
+        someoneElses.setResultRecordedByEmail("c@example.com");
+        when(matchRepository.findAwaitingResultSince(eq(1L), any())).thenReturn(List.of());
+        when(matchPredictionRepository.findResolvedByPredictor(eq(ADMIN), any()))
+            .thenReturn(List.of(prediction(13L, ADMIN, "HOME"), prediction(12L, ADMIN, "HOME")));
+        when(matchRepository.findAllById(List.of(13L, 12L))).thenReturn(List.of(someoneElses, mine));
+        List<MatchParticipant> participants = new ArrayList<>();
+        participants.addAll(participants(mine));
+        participants.addAll(participants(someoneElses));
+        when(matchParticipantRepository.findByMatchIdInWithPlayerAndMatch(anyList())).thenReturn(participants);
+        when(matchPredictionRepository.findByMatchIdIn(anyList()))
+            .thenReturn(List.of(prediction(12L, ADMIN, "HOME"), prediction(13L, ADMIN, "HOME")));
+        when(matchPredictionRepository.summarizeResolved(ADMIN)).thenReturn(record(2, 2));
+        when(accessControlService.resolveDisplayNicknames(any())).thenReturn(new java.util.HashMap<>());
+
+        PredictionBoardResponse board = service.board(1L, ADMIN, null);
+
+        // Both picks were right; only the one on the match the viewer set up is marked as unpaid.
+        assertThat(board.history())
+            .extracting(PredictionMatchResponse::matchId, PredictionMatchResponse::hit,
+                PredictionMatchResponse::pointsExcluded, PredictionMatchResponse::createdByMe)
+            .containsExactly(tuple(13L, true, false, false), tuple(12L, true, true, true));
     }
 
     private void stubMatch(Match match, List<MatchParticipant> participants) {

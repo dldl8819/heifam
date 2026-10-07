@@ -287,6 +287,9 @@ export default function PredictionsPage() {
                     </span>
                   </div>
                   <Lineups match={match} />
+                  {match.createdByMe && !match.ownMatch && (
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{t('predictions.createdByMe')}</p>
+                  )}
                   {match.ownMatch ? (
                     <p className="text-xs text-slate-500 dark:text-slate-400">{t('predictions.ownMatch')}</p>
                   ) : (
@@ -355,6 +358,9 @@ export default function PredictionsPage() {
                   {match.myPick ? (
                     <p className="text-xs text-indigo-700 dark:text-indigo-300">
                       {t('predictions.myPick', { team: teamName(match.myPick) })}
+                      {match.createdByMe && (
+                        <span className="ml-2 text-slate-500 dark:text-slate-400">{t('predictions.createdByMe')}</span>
+                      )}
                     </p>
                   ) : (
                     <span />
@@ -393,7 +399,8 @@ export default function PredictionsPage() {
                     <p className="text-xs text-slate-500 dark:text-slate-400">
                       {match.myPick && t('predictions.myPick', { team: teamName(match.myPick) })}
                       {match.winnerTeam && ` · ${t('predictions.history.winner', { team: teamName(match.winnerTeam) })}`}
-                      {match.pointsExcluded && ` · ${t('predictions.history.excluded')}`}
+                      {match.pointsExcluded &&
+                        ` · ${t(match.createdByMe ? 'predictions.history.excludedCreator' : 'predictions.history.excluded')}`}
                     </p>
                     <PickCounts match={match} />
                   </li>
