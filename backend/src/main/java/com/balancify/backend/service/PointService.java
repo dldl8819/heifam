@@ -427,7 +427,8 @@ public class PointService {
 
     /**
      * How one account earned its points in a month, as opened from the ranking: totals per reason
-     * and the latest rows. Adjustment memos show only to the account itself and to super admins.
+     * and the latest rows. To anyone else a row is its day, reason and amount; adjustment memos and
+     * the time of day show only to the account itself and to super admins.
      */
     @Transactional(readOnly = true)
     public PointMonthlyHistoryResponse getMonthlyHistory(Long accountId, YearMonth month, String requesterEmail) {
@@ -442,7 +443,8 @@ public class PointService {
             targetMonth.atEndOfMonth()
         );
         String requester = normalizeEmail(requesterEmail);
-        boolean showMemos = requester.equals(account.getNormalizedEmail()) || accessControlService.isSuperAdminEmail(requester);
+        // The time of day would tell every member when this one signs in or reads a notice.
+        boolean showDetails = requester.equals(account.getNormalizedEmail()) || accessControlService.isSuperAdminEmail(requester);
 
         Map<String, long[]> byReason = new LinkedHashMap<>();
         long total = 0;
@@ -464,8 +466,8 @@ public class PointService {
                 row.getReason(),
                 row.getAmount(),
                 row.getKstDate(),
-                showMemos ? row.getMemo() : null,
-                row.getCreatedAt()
+                showDetails ? row.getMemo() : null,
+                showDetails ? row.getCreatedAt() : null
             ))
             .toList();
         String nickname = accessControlService.resolveDisplayNicknames(List.of(account.getNormalizedEmail()))
