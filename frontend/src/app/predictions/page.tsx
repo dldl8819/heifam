@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useAdminAuth } from '@/lib/admin-auth'
-import { apiClient, isApiConflictError, isApiNotFoundError } from '@/lib/api'
+import { apiClient, isApiConflictError, isApiForbiddenError, isApiNotFoundError } from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { MatchConfirmationsPanel } from '@/components/match-confirmations-panel'
@@ -217,6 +217,10 @@ export default function PredictionsPage() {
         await loadBoard(true)
       } else if (isApiConflictError(callOffError)) {
         setMatchError(match.matchId, t('predictions.callOffConflict'))
+        await loadBoard(true)
+      } else if (isApiForbiddenError(callOffError)) {
+        // The server decides whose match it is; the board is read again in case the button was stale.
+        setMatchError(match.matchId, t('predictions.callOffForbidden'))
         await loadBoard(true)
       } else {
         setMatchError(match.matchId, describeError(callOffError, t('predictions.callOffError')))

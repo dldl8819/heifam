@@ -174,7 +174,7 @@ public class MatchResultService {
         boolean admin = accessControlService.isAdminEmail(recordedByEmail);
         boolean resultEditor = !admin && accessControlService.isMatchResultEditor(recordedByEmail);
         if (!admin && !resultEditor) {
-            if (!isSameRecordedByEmail(match.getResultRecordedByEmail(), recordedByEmail)) {
+            if (!isSameEmail(match.getResultRecordedByEmail(), recordedByEmail)) {
                 throw new MatchEditForbiddenException("본인이 입력한 경기만 종족전을 수정할 수 있습니다.");
             }
             if (!Objects.equals(winnerTeam, previousWinnerTeam)) {
@@ -989,7 +989,7 @@ public class MatchResultService {
         return value.trim().toLowerCase(Locale.ROOT);
     }
 
-    private boolean isSameRecordedByEmail(String storedEmail, String actorEmail) {
+    private boolean isSameEmail(String storedEmail, String actorEmail) {
         String normalizedStoredEmail = normalizeRecordedByEmail(storedEmail);
         String normalizedActorEmail = normalizeRecordedByEmail(actorEmail);
         return normalizedStoredEmail != null && normalizedStoredEmail.equals(normalizedActorEmail);
@@ -1008,13 +1008,19 @@ public class MatchResultService {
 
     /**
      * Calls off a match that was set up but not played, such as when a player drops out after
-     * "경기 확정". The match goes with its predictions; nothing else was touched by it yet. A match
-     * with a result is deleted by admins instead, and a series game is called off with its series.
+     * "경기 확정". The match goes with everyone's predictions on it, so only whoever set it up, or
+     * an admin, may call it off; nothing else was touched by it yet. A match with a result is
+     * deleted by admins instead, and a series game is called off with its series.
      */
     @Transactional
-    public DeletedMatchAuditSnapshot cancelUnplayedMatch(Long matchId) {
+    public DeletedMatchAuditSnapshot cancelUnplayedMatch(Long matchId, String actorEmail) {
         Match match = matchRepository.findByIdForUpdate(matchId)
             .orElseThrow(() -> new NoSuchElementException("Match not found: " + matchId));
+        // A match from before creators were kept names nobody, so only admins call those off.
+        if (!accessControlService.isAdminEmail(actorEmail)
+            && !isSameEmail(match.getCreatedByEmail(), actorEmail)) {
+            throw new MatchEditForbiddenException("경기를 확정한 사람이나 운영진만 취소할 수 있습니다.");
+        }
         if (hasProcessedResult(match.getWinningTeam())) {
             throw new MatchConflictException("이미 결과가 입력된 경기는 취소할 수 없습니다.");
         }

@@ -2458,10 +2458,14 @@ class AdminKeyFilterTest {
 
     @Test
     void letsMembersCallOffAMatchNobodyPlayedButKeepsDeletingToAdmins() throws Exception {
-        when(matchResultService.cancelUnplayedMatch(5L))
+        when(matchResultService.cancelUnplayedMatch(5L, "member@hei.gg"))
             .thenReturn(new MatchResultService.DeletedMatchAuditSnapshot(5L, 1L, null, false));
-        when(matchResultService.cancelUnplayedMatch(6L)).thenThrow(new MatchConflictException("x"));
-        when(matchResultService.cancelUnplayedMatch(7L)).thenThrow(new java.util.NoSuchElementException("x"));
+        when(matchResultService.cancelUnplayedMatch(6L, "member@hei.gg")).thenThrow(new MatchConflictException("x"));
+        when(matchResultService.cancelUnplayedMatch(7L, "member@hei.gg"))
+            .thenThrow(new java.util.NoSuchElementException("x"));
+        // Someone else set this one up.
+        when(matchResultService.cancelUnplayedMatch(8L, "member@hei.gg"))
+            .thenThrow(new MatchEditForbiddenException("x"));
 
         mockMvc
             .perform(post("/api/matches/5/cancel").header("X-USER-EMAIL", "member@hei.gg"))
@@ -2473,6 +2477,9 @@ class AdminKeyFilterTest {
             .perform(post("/api/matches/7/cancel").header("X-USER-EMAIL", "member@hei.gg"))
             .andExpect(status().isNotFound());
         mockMvc
+            .perform(post("/api/matches/8/cancel").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isForbidden());
+        mockMvc
             .perform(post("/api/matches/5/cancel").header("X-USER-EMAIL", "blocked@hei.gg"))
             .andExpect(status().isForbidden());
         mockMvc
@@ -2482,9 +2489,12 @@ class AdminKeyFilterTest {
             .perform(delete("/api/matches/5").header("X-USER-EMAIL", "member@hei.gg"))
             .andExpect(status().isForbidden());
 
-        verify(matchResultService, org.mockito.Mockito.times(1)).cancelUnplayedMatch(5L);
+        // The service is told who asks, and decides whether the match is theirs to call off.
+        verify(matchResultService, org.mockito.Mockito.times(1)).cancelUnplayedMatch(5L, "member@hei.gg");
+        verify(matchResultService, never()).cancelUnplayedMatch(any(), eq("blocked@hei.gg"));
         verify(notificationService).removePredictionsOpen(5L);
-        verify(operationAuditLogService).recordMatchDeletion(eq("member@hei.gg"), any(), any());
+        verify(notificationService, never()).removePredictionsOpen(8L);
+        verify(operationAuditLogService, org.mockito.Mockito.times(1)).recordMatchDeletion(eq("member@hei.gg"), any(), any());
         verify(matchResultService, never()).deleteMatch(any());
     }
 

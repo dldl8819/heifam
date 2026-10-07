@@ -670,7 +670,8 @@ export default function BalancePage() {
       } else if (isApiConflictError(error)) {
         setMatchCreateMessage(t('balance.quickResult.cancelMatchConflict'))
       } else if (isApiForbiddenError(error)) {
-        setMatchCreateMessage(t('common.permissionDenied'))
+        // The same match had been set up by someone else, and confirming it here found theirs.
+        setMatchCreateMessage(t('balance.quickResult.cancelMatchNotYours'))
       } else {
         setMatchCreateMessage(t('balance.quickResult.cancelMatchFailed'))
       }
