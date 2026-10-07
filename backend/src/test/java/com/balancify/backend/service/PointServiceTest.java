@@ -408,10 +408,21 @@ class PointServiceTest {
                 tuple(PointService.REASON_PREDICTION_HIT_REVERSED, 1, -1L)
             );
         assertThat(history.entries()).hasSize(5);
+        // Someone else's rows come with their day, never the memo or the time of day.
         assertThat(history.entries()).extracting(PointHistoryItemResponse::memo).containsOnlyNulls();
-        assertThat(pointService.getMonthlyHistory(21L, YearMonth.of(2026, 9), " " + MEMBER_EMAIL.toUpperCase(java.util.Locale.ROOT) + " ").entries())
-            .extracting(PointHistoryItemResponse::memo)
-            .contains("YOUR_MEMO");
+        assertThat(history.entries()).extracting(PointHistoryItemResponse::createdAt).containsOnlyNulls();
+        assertThat(history.entries()).extracting(PointHistoryItemResponse::kstDate).containsOnly(LocalDate.of(2026, 9, 15));
+        List<PointHistoryItemResponse> own = pointService
+            .getMonthlyHistory(21L, YearMonth.of(2026, 9), " " + MEMBER_EMAIL.toUpperCase(java.util.Locale.ROOT) + " ")
+            .entries();
+        assertThat(own).extracting(PointHistoryItemResponse::memo).contains("YOUR_MEMO");
+        assertThat(own).extracting(PointHistoryItemResponse::createdAt).doesNotContainNull();
+        when(accessControlService.isSuperAdminEmail("super@example.com")).thenReturn(true);
+        List<PointHistoryItemResponse> forSuperAdmin = pointService
+            .getMonthlyHistory(21L, YearMonth.of(2026, 9), "super@example.com")
+            .entries();
+        assertThat(forSuperAdmin).extracting(PointHistoryItemResponse::memo).contains("YOUR_MEMO");
+        assertThat(forSuperAdmin).extracting(PointHistoryItemResponse::createdAt).doesNotContainNull();
         assertThatThrownBy(() -> pointService.getMonthlyHistory(99L, YearMonth.of(2026, 9), ADMIN_EMAIL))
             .isInstanceOf(java.util.NoSuchElementException.class);
     }

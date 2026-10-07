@@ -808,8 +808,9 @@ export type PointHistoryItem = {
   reason: PointReason | string
   amount: number
   kstDate: string
+  // Both are null on another member's row: they see the day, not the time.
   memo: string | null
-  createdAt: string
+  createdAt: string | null
 }
 
 export type PointSummaryResponse = {
