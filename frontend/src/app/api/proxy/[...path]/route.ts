@@ -7,10 +7,11 @@ import {
   resolveProxyCandidateLimit,
 } from '@/lib/proxy-timeout'
 
+// Used only when no upstream is configured. Every name here must be a backend we run: a hosting
+// name nobody holds any more can be taken by someone else, who would then be sent members'
+// requests, sign-in tokens included, whenever a read is retried against the next name.
 const FALLBACK_BACKEND_BASE_URLS = [
   'https://heifam.onrender.com',
-  'https://hei-backend.onrender.com',
-  'https://heifam-backend.onrender.com',
 ]
 
 const RETRYABLE_UPSTREAM_STATUSES = new Set([404, 502, 503, 504])
