@@ -3,10 +3,12 @@
 import Link from 'next/link'
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { useAdminAuth } from '@/lib/admin-auth'
-import { apiClient } from '@/lib/api'
+import { ApiRequestError, apiClient } from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { LedgerSection } from '@/components/ledger-section'
+import { NoticeContentEditor } from '@/components/notice-content-editor'
+import { NOTICE_IMAGE_MAX_COUNT, noticeImageIds } from '@/lib/notice-images'
 import { filterNotices, showsRevisedMark, type NoticeFilter } from '@/lib/notice-list'
 import { t } from '@/lib/i18n'
 import type { NoticeList, NoticeTitle } from '@/types/api'
@@ -123,6 +125,7 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
   const [content, setContent] = useState<string>('')
   const [adminOnly, setAdminOnly] = useState<boolean>(false)
   const [saving, setSaving] = useState<boolean>(false)
+  const [imageUploading, setImageUploading] = useState<boolean>(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
@@ -163,6 +166,10 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
         setFormError(t('notices.posts.contentTooLong', { max: NOTICE_CONTENT_MAX_LENGTH }))
         return
       }
+      if (noticeImageIds(content).length > NOTICE_IMAGE_MAX_COUNT) {
+        setFormError(t('notices.posts.imageTooMany', { max: NOTICE_IMAGE_MAX_COUNT }))
+        return
+      }
 
       setFormError(null)
       setSaving(true)
@@ -174,8 +181,13 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
         setComposing(false)
         setSuccessMessage(t('notices.posts.saveSuccess'))
         await loadNotices()
-      } catch {
-        setFormError(t('notices.loadError'))
+      } catch (error) {
+        // 409: the text names an image the notice cannot show; nothing was saved.
+        setFormError(
+          error instanceof ApiRequestError && error.status === 409
+            ? t('notices.posts.imageUnavailable')
+            : t('notices.loadError')
+        )
       } finally {
         setSaving(false)
       }
@@ -268,12 +280,12 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
                 placeholder={t('notices.posts.titlePlaceholder')}
                 className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900"
               />
-              <textarea
+              <NoticeContentEditor
+                groupId={TEMP_GROUP_ID}
                 value={content}
-                onChange={(event) => setContent(event.target.value)}
+                onChange={setContent}
                 placeholder={t('notices.posts.contentPlaceholder')}
-                rows={8}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900"
+                onUploadingChange={setImageUploading}
               />
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {t('notices.posts.contentLimitHint', { max: NOTICE_CONTENT_MAX_LENGTH })}
@@ -289,7 +301,7 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
               <div className="flex gap-2">
                 <button
                   type="submit"
-                  disabled={saving}
+                  disabled={saving || imageUploading}
                   className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
                 >
                   {saving ? t('notices.posts.saving') : t('notices.posts.save')}

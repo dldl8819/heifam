@@ -346,6 +346,18 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/notices/{noticeId}"),
             AuthType.SUPER_ADMIN_EMAIL
         ),
+        // Admins upload the images of a notice; a member reads those of a notice they may open,
+        // which the service decides per image.
+        new ProtectedRoute(
+            "POST",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/notice-images"),
+            AuthType.ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "GET",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/notice-images/{imageId}"),
+            AuthType.SERVICE_ACCESS
+        ),
         // Members read the donation ledger on the notices page; only super admins change it.
         new ProtectedRoute(
             "GET",

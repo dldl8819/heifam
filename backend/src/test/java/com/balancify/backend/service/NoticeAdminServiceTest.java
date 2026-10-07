@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -15,11 +17,13 @@ import com.balancify.backend.api.group.dto.NoticeUpdateRequest;
 import com.balancify.backend.domain.Notice;
 import com.balancify.backend.repository.NoticeEngagementRepository;
 import com.balancify.backend.repository.NoticeRepository;
+import com.balancify.backend.service.exception.NoticeImageException;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -44,6 +48,9 @@ class NoticeAdminServiceTest {
     @Mock
     private NotificationService notificationService;
 
+    @Mock
+    private NoticeImageService noticeImageService;
+
     private NoticeAdminService noticeAdminService;
 
     @BeforeEach
@@ -53,7 +60,8 @@ class NoticeAdminServiceTest {
             noticeEngagementRepository,
             accessControlService,
             operationAuditLogService,
-            notificationService
+            notificationService,
+            noticeImageService
         );
         when(accessControlService.isAdminEmail("ops@hei.gg")).thenReturn(true);
         when(accessControlService.isAdminEmail("member@hei.gg")).thenReturn(false);
@@ -212,6 +220,51 @@ class NoticeAdminServiceTest {
         verify(notificationService, never()).publishNoticeRevised(any(), any(), any(), anyBoolean(), any());
         verify(noticeEngagementRepository, never()).markRead(any(), any(), any(), any());
         verify(operationAuditLogService).recordNoticeUpdated(any(), any(), eq(1L), eq(notice), eq(false));
+    }
+
+    @Test
+    void placesTheImagesItsTextNamesOnceTheNoticeIsSavedAndBeforeAnyoneIsTold() {
+        noticeAdminService.createNotice(
+            1L,
+            new NoticeCreateRequest("YOUR_TITLE", "rules [[image:12]]", null),
+            "ops@hei.gg",
+            "OpsUser"
+        );
+        existingNotice(5L, false);
+        noticeAdminService.updateNotice(
+            1L, 5L, new NoticeUpdateRequest("YOUR_TITLE", "rules [[image:7]]", null, null), "ops@hei.gg", "OpsUser"
+        );
+
+        InOrder order = inOrder(noticeRepository, noticeImageService, operationAuditLogService, notificationService);
+        order.verify(noticeRepository).save(any(Notice.class));
+        order.verify(noticeImageService).placeInNotice(1L, 1L, "rules [[image:12]]");
+        order.verify(operationAuditLogService).recordNoticePosted(any(), any(), any(), any());
+        order.verify(notificationService).publishNotice(any(), any(), any(), anyBoolean(), any());
+        order.verify(noticeRepository).save(any(Notice.class));
+        order.verify(noticeImageService).placeInNotice(1L, 5L, "rules [[image:7]]");
+        order.verify(operationAuditLogService).recordNoticeUpdated(any(), any(), any(), any(), anyBoolean());
+    }
+
+    @Test
+    void aNoticeWhoseTextNamesAnImageItCannotShowIsNotPostedOrAnnounced() {
+        doThrow(new NoticeImageException(NoticeImageException.Reason.UNAVAILABLE, "unavailable"))
+            .when(noticeImageService).placeInNotice(any(), any(), any());
+        existingNotice(5L, false);
+
+        assertThatThrownBy(() -> noticeAdminService.createNotice(
+            1L,
+            new NoticeCreateRequest("YOUR_TITLE", "rules [[image:12]]", null),
+            "ops@hei.gg",
+            "OpsUser"
+        )).isInstanceOf(NoticeImageException.class);
+        assertThatThrownBy(() -> noticeAdminService.updateNotice(
+            1L, 5L, new NoticeUpdateRequest("YOUR_TITLE", "rules [[image:12]]", null, true), "ops@hei.gg", "OpsUser"
+        )).isInstanceOf(NoticeImageException.class);
+
+        verify(operationAuditLogService, never()).recordNoticePosted(any(), any(), any(), any());
+        verify(operationAuditLogService, never()).recordNoticeUpdated(any(), any(), any(), any(), anyBoolean());
+        verify(notificationService, never()).publishNotice(any(), any(), any(), anyBoolean(), any());
+        verify(notificationService, never()).publishNoticeRevised(any(), any(), any(), anyBoolean(), any());
     }
 
     @Test

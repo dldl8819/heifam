@@ -10,12 +10,14 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -32,6 +34,7 @@ import com.balancify.backend.api.group.GroupLedgerAdminController;
 import com.balancify.backend.api.group.GroupLedgerController;
 import com.balancify.backend.api.group.GroupNoticeAdminController;
 import com.balancify.backend.api.group.GroupNoticeController;
+import com.balancify.backend.api.group.GroupNoticeImageController;
 import com.balancify.backend.api.group.dto.NoticeListResponse;
 import com.balancify.backend.api.group.GroupDashboardController;
 import com.balancify.backend.api.group.GroupPlayerController;
@@ -105,6 +108,7 @@ import com.balancify.backend.service.MatchResultService;
 import com.balancify.backend.service.ManualMatchService;
 import com.balancify.backend.service.MultiMatchBalancingService;
 import com.balancify.backend.service.NoticeAdminService;
+import com.balancify.backend.service.NoticeImageService;
 import com.balancify.backend.service.NoticeService;
 import com.balancify.backend.service.OperationAuditLogService;
 import com.balancify.backend.service.PlayerActivityQueryService;
@@ -129,10 +133,13 @@ import com.balancify.backend.service.RankingService;
 import com.balancify.backend.service.RatingRecalculationService;
 import com.balancify.backend.service.TeamBalancingService;
 import com.balancify.backend.service.exception.MatchEditQuotaExceededException;
+import com.balancify.backend.service.exception.NoticeImageException;
+import com.balancify.backend.repository.NoticeImageRepository;
 import java.net.URI;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.NoSuchElementException;
 import java.util.Set;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
@@ -163,6 +170,7 @@ import org.springframework.test.web.servlet.MockMvc;
     OperationAuditLogController.class,
     GroupNoticeAdminController.class,
     GroupNoticeController.class,
+    GroupNoticeImageController.class,
     GroupLedgerController.class,
     GroupLedgerAdminController.class,
     PointController.class,
@@ -246,6 +254,9 @@ class AdminKeyFilterTest {
 
     @MockitoBean
     private NoticeService noticeService;
+
+    @MockitoBean
+    private NoticeImageService noticeImageService;
 
     @MockitoBean
     private LedgerIncomeService ledgerIncomeService;
@@ -2679,6 +2690,132 @@ class AdminKeyFilterTest {
             .perform(get("/api/groups/1/notices").header("X-USER-EMAIL", "blocked@hei.gg"))
             .andExpect(status().isForbidden());
         verify(noticeService, never()).list(any(), any());
+    }
+
+    @Test
+    void letsOnlyAdminsUploadNoticeImages() throws Exception {
+        byte[] image = {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'};
+        when(noticeImageService.upload(1L, image, "admin@hei.gg")).thenReturn(9L);
+
+        mockMvc
+            .perform(post("/api/groups/1/notice-images").contentType(MediaType.IMAGE_PNG).content(image))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(
+                post("/api/groups/1/notice-images")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.IMAGE_PNG)
+                    .content(image)
+            )
+            .andExpect(status().isForbidden());
+        verify(noticeImageService, never()).upload(any(), any(), any());
+
+        mockMvc
+            .perform(
+                post("/api/groups/1/notice-images")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.IMAGE_PNG)
+                    .content(image)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.id").value(9));
+    }
+
+    @Test
+    void refusesANoticeImageTheServiceWillNotKeep() throws Exception {
+        byte[] oversized = new byte[NoticeImageService.MAX_IMAGE_BYTES + 1];
+        when(noticeImageService.upload(any(), any(), any()))
+            .thenThrow(new NoticeImageException(NoticeImageException.Reason.UNSUPPORTED, "unsupported"))
+            .thenThrow(new NoticeImageException(NoticeImageException.Reason.TOO_MANY_WAITING, "waiting"));
+
+        mockMvc
+            .perform(
+                post("/api/groups/1/notice-images")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .content("not an image")
+            )
+            .andExpect(status().isUnsupportedMediaType());
+        mockMvc
+            .perform(
+                post("/api/groups/1/notice-images")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.IMAGE_PNG)
+                    .content(new byte[] {1})
+            )
+            .andExpect(status().isConflict());
+        // Refused by its declared length, before the body is read or the service is asked.
+        mockMvc
+            .perform(
+                post("/api/groups/1/notice-images")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.IMAGE_PNG)
+                    .content(oversized)
+            )
+            .andExpect(status().is(413));
+        verify(noticeImageService, times(2)).upload(any(), any(), any());
+    }
+
+    @Test
+    void servesANoticeImageToMembersAsTheKindItWasKeptAs() throws Exception {
+        byte[] image = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 1, 2, 3};
+        when(noticeImageService.read(1L, 9L, "member@hei.gg"))
+            .thenReturn(new NoticeImageRepository.StoredImage("image/jpeg", image));
+        when(noticeImageService.read(1L, 10L, "member@hei.gg"))
+            .thenThrow(new NoSuchElementException("Notice image not found"));
+
+        mockMvc
+            .perform(get("/api/groups/1/notice-images/9"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(get("/api/groups/1/notice-images/9").header("X-USER-EMAIL", "blocked@hei.gg"))
+            .andExpect(status().isForbidden());
+        verify(noticeImageService, never()).read(any(), any(), any());
+
+        mockMvc
+            .perform(get("/api/groups/1/notice-images/9").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk())
+            .andExpect(header().string("Content-Type", "image/jpeg"))
+            .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+            .andExpect(header().string("Cache-Control", "no-store, max-age=0"))
+            .andExpect(content().bytes(image));
+        // Asked for as JSON, it is still the image.
+        mockMvc
+            .perform(
+                get("/api/groups/1/notice-images/9")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .accept(MediaType.APPLICATION_JSON)
+            )
+            .andExpect(status().isOk())
+            .andExpect(content().bytes(image));
+        mockMvc
+            .perform(get("/api/groups/1/notice-images/10").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void tellsThePageWhenANoticeNamesAnImageItCannotShow() throws Exception {
+        when(noticeAdminService.createNotice(any(), any(), any(), any()))
+            .thenThrow(new NoticeImageException(NoticeImageException.Reason.UNAVAILABLE, "unavailable"));
+        when(noticeAdminService.updateNotice(any(), any(), any(), any(), any()))
+            .thenThrow(new NoticeImageException(NoticeImageException.Reason.TOO_MANY_IN_NOTICE, "too many"));
+
+        mockMvc
+            .perform(
+                post("/api/groups/1/notices")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"title\":\"t\",\"content\":\"[[image:12]]\"}")
+            )
+            .andExpect(status().isConflict());
+        mockMvc
+            .perform(
+                put("/api/groups/1/notices/5")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"title\":\"t\",\"content\":\"c\"}")
+            )
+            .andExpect(status().isBadRequest());
     }
 
     @Test

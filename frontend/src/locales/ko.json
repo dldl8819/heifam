@@ -386,7 +386,23 @@
       "commentSubmit": "등록",
       "commentSubmitting": "등록 중...",
       "commentDelete": "삭제",
-      "commentDeleteConfirm": "이 댓글을 삭제하시겠습니까?"
+      "commentDeleteConfirm": "이 댓글을 삭제하시겠습니까?",
+      "imageAdd": "이미지 추가",
+      "imageUploading": "이미지 올리는 중...",
+      "imageHint": "PNG·JPG·WebP 이미지를 공지 하나에 {max}장까지 넣을 수 있습니다. 큰 이미지는 알아서 줄여 올리고, 화면 캡처는 본문에 바로 붙여넣어도 됩니다.",
+      "imageMarkerHint": "본문의 [[image:번호]] 줄이 이미지가 들어가는 자리입니다. 줄을 옮기면 위치가 바뀌고, 지우면 이미지가 빠집니다.",
+      "imagePreview": "미리보기",
+      "imageUnsupported": "PNG, JPG, WebP 이미지만 올릴 수 있습니다.",
+      "imageUnreadable": "이미지를 읽지 못했습니다. 다른 파일로 시도해 주세요.",
+      "imageTooLarge": "이미지가 너무 큽니다. 줄여도 {max}MB를 넘습니다.",
+      "imageTooMany": "이미지는 공지 하나에 {max}장까지 넣을 수 있습니다.",
+      "imageTooManyWaiting": "공지에 쓰이지 않고 남은 이미지가 너무 많습니다. 하루가 지나면 정리되니 그 뒤에 다시 올려 주세요.",
+      "imageUploadFailed": "이미지를 올리지 못했습니다. 다시 시도해 주세요.",
+      "imageUnavailable": "본문에 쓸 수 없는 이미지가 있어 저장하지 못했습니다. 올린 지 하루가 지났거나 다른 공지의 이미지입니다. 그 줄을 지우고 이미지를 다시 올려 주세요.",
+      "imageLoading": "이미지 불러오는 중...",
+      "imageLoadError": "이미지를 불러오지 못했습니다.",
+      "imageRetry": "다시 시도",
+      "imageAlt": "공지 이미지"
     },
     "donations": {
       "subTabs": {
