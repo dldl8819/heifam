@@ -21,19 +21,22 @@ public class NoticeAdminService {
     private final AccessControlService accessControlService;
     private final OperationAuditLogService operationAuditLogService;
     private final NotificationService notificationService;
+    private final NoticeImageService noticeImageService;
 
     public NoticeAdminService(
         NoticeRepository noticeRepository,
         NoticeEngagementRepository noticeEngagementRepository,
         AccessControlService accessControlService,
         OperationAuditLogService operationAuditLogService,
-        NotificationService notificationService
+        NotificationService notificationService,
+        NoticeImageService noticeImageService
     ) {
         this.noticeRepository = noticeRepository;
         this.noticeEngagementRepository = noticeEngagementRepository;
         this.accessControlService = accessControlService;
         this.operationAuditLogService = operationAuditLogService;
         this.notificationService = notificationService;
+        this.noticeImageService = noticeImageService;
     }
 
     @Transactional
@@ -54,6 +57,8 @@ public class NoticeAdminService {
         notice.setAuthorEmail(safeTrim(actorEmail).toLowerCase(Locale.ROOT));
         notice.setAdminOnly(request != null && Boolean.TRUE.equals(request.adminOnly()));
         noticeRepository.save(notice);
+        // Fails the whole save when the text names an image this notice cannot show.
+        noticeImageService.placeInNotice(groupId, notice.getId(), content);
 
         operationAuditLogService.recordNoticePosted(actorEmail, actorNickname, groupId, notice);
         notificationService.publishNotice(groupId, notice.getId(), notice.getTitle(), notice.isAdminOnly(), actorEmail);
@@ -105,6 +110,7 @@ public class NoticeAdminService {
             notice.setRevisedAt(NoticeRevisions.now());
         }
         noticeRepository.save(notice);
+        noticeImageService.placeInNotice(groupId, notice.getId(), content);
 
         operationAuditLogService.recordNoticeUpdated(actorEmail, actorNickname, groupId, notice, announcedAgain);
         if (openedToMembers) {

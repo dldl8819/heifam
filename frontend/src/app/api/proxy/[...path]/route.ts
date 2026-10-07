@@ -161,8 +161,9 @@ async function buildProxyResponse(upstream: Response): Promise<NextResponse> {
   responseHeaders.delete('transfer-encoding')
   responseHeaders.set('Cache-Control', 'no-store, max-age=0')
 
-  const upstreamBodyText = upstream.status === 204 ? null : await upstream.text()
-  return new NextResponse(upstreamBodyText, {
+  // Passed on as the bytes they are: read as text, an image in a notice would arrive broken.
+  const upstreamBody = upstream.status === 204 ? null : await upstream.arrayBuffer()
+  return new NextResponse(upstreamBody, {
     status: upstream.status,
     headers: responseHeaders,
   })

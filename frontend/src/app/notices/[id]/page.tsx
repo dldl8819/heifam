@@ -4,9 +4,12 @@ import Link from 'next/link'
 import { useRouter, useParams } from 'next/navigation'
 import { FormEvent, useCallback, useEffect, useState } from 'react'
 import { useAdminAuth } from '@/lib/admin-auth'
-import { apiClient } from '@/lib/api'
+import { ApiRequestError, apiClient } from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
+import { NoticeBody } from '@/components/notice-body'
+import { NoticeContentEditor } from '@/components/notice-content-editor'
+import { NOTICE_IMAGE_MAX_COUNT, noticeImageIds } from '@/lib/notice-images'
 import { NOTICE_COMMENT_MAX_LENGTH, validateNoticeComment } from '@/lib/notice-list'
 import { t } from '@/lib/i18n'
 import type { NoticeDetail } from '@/types/api'
@@ -39,6 +42,7 @@ export default function NoticeDetailPage() {
   // Off for every edit: announcing again is a choice, not something a typo fix should do.
   const [notifyAgain, setNotifyAgain] = useState<boolean>(false)
   const [saving, setSaving] = useState<boolean>(false)
+  const [imageUploading, setImageUploading] = useState<boolean>(false)
   const [formError, setFormError] = useState<string | null>(null)
 
   const [commentDraft, setCommentDraft] = useState<string>('')
@@ -87,6 +91,10 @@ export default function NoticeDetailPage() {
         setFormError(t('notices.posts.contentTooLong', { max: NOTICE_CONTENT_MAX_LENGTH }))
         return
       }
+      if (noticeImageIds(content).length > NOTICE_IMAGE_MAX_COUNT) {
+        setFormError(t('notices.posts.imageTooMany', { max: NOTICE_IMAGE_MAX_COUNT }))
+        return
+      }
 
       setFormError(null)
       setSaving(true)
@@ -110,8 +118,13 @@ export default function NoticeDetailPage() {
         )
         setEditing(false)
         setNotifyAgain(false)
-      } catch {
-        setFormError(t('notices.loadError'))
+      } catch (error) {
+        // 409: the text names an image the notice cannot show; nothing was saved.
+        setFormError(
+          error instanceof ApiRequestError && error.status === 409
+            ? t('notices.posts.imageUnavailable')
+            : t('notices.loadError')
+        )
       } finally {
         setSaving(false)
       }
@@ -226,7 +239,7 @@ export default function NoticeDetailPage() {
                   : ''}
               </p>
             </div>
-            <p className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-200">{notice.content}</p>
+            <NoticeBody groupId={TEMP_GROUP_ID} content={notice.content} />
 
             <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
               <button
@@ -351,12 +364,12 @@ export default function NoticeDetailPage() {
             placeholder={t('notices.posts.titlePlaceholder')}
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900"
           />
-          <textarea
+          <NoticeContentEditor
+            groupId={TEMP_GROUP_ID}
             value={content}
-            onChange={(event) => setContent(event.target.value)}
+            onChange={setContent}
             placeholder={t('notices.posts.contentPlaceholder')}
-            rows={8}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900"
+            onUploadingChange={setImageUploading}
           />
           <p className="text-xs text-slate-500 dark:text-slate-400">
             {t('notices.posts.contentLimitHint', { max: NOTICE_CONTENT_MAX_LENGTH })}
@@ -375,7 +388,7 @@ export default function NoticeDetailPage() {
           <div className="flex gap-2">
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || imageUploading}
               className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
             >
               {saving ? t('notices.posts.saving') : t('notices.posts.save')}

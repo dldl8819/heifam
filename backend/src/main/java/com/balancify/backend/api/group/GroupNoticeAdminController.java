@@ -6,6 +6,7 @@ import com.balancify.backend.api.group.dto.NoticeUpdateRequest;
 import com.balancify.backend.security.AuthenticatedRequestResolver;
 import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.NoticeAdminService;
+import com.balancify.backend.service.exception.NoticeImageException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.NoSuchElementException;
 import org.springframework.http.HttpStatus;
@@ -52,6 +53,8 @@ public class GroupNoticeAdminController {
                 requestEmail,
                 resolveActorNickname(requestEmail)
             );
+        } catch (NoticeImageException noticeImageException) {
+            throw imageProblem(noticeImageException);
         } catch (IllegalArgumentException illegalArgumentException) {
             throw new ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
@@ -79,6 +82,8 @@ public class GroupNoticeAdminController {
                 requestEmail,
                 resolveActorNickname(requestEmail)
             );
+        } catch (NoticeImageException noticeImageException) {
+            throw imageProblem(noticeImageException);
         } catch (IllegalArgumentException illegalArgumentException) {
             throw new ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
@@ -118,6 +123,15 @@ public class GroupNoticeAdminController {
                 noSuchElementException
             );
         }
+    }
+
+    // The text names an image the notice cannot show: the page tells this apart by the status.
+    private ResponseStatusException imageProblem(NoticeImageException exception) {
+        return new ResponseStatusException(
+            GroupNoticeImageController.statusOf(exception),
+            exception.getMessage(),
+            exception
+        );
     }
 
     private void requireAdmin(String email) {

@@ -41,6 +41,7 @@ import type {
   ManualMatchCreateRequest,
   NoticeCreateRequest,
   NoticeDetail,
+  NoticeImageUpload,
   NoticeItem,
   NoticeList,
   NoticeTitle,
@@ -141,6 +142,10 @@ export type ApiRequestOptions = {
   accessToken?: string
   timeoutMs?: number
   baseUrlOverride?: string
+  // For a body that is not JSON, such as an image file.
+  contentType?: string
+  // The answer is a file: it is handed back as a Blob, not parsed.
+  responseType?: 'blob'
 }
 
 export class ApiRequestError extends Error {
@@ -246,7 +251,7 @@ function buildHeaders(
   accessToken: string
 ): HeadersInit {
   const headers = new Headers(init?.headers)
-  headers.set('Content-Type', 'application/json')
+  headers.set('Content-Type', options?.contentType ?? 'application/json')
 
   if (accessToken.length > 0) {
     headers.set('Authorization', `Bearer ${accessToken}`)
@@ -350,6 +355,10 @@ export async function apiRequest<T>(
 
     if (response.status === 204) {
       return undefined as T
+    }
+
+    if (options?.responseType === 'blob') {
+      return (await response.blob()) as T
     }
 
     const text = await response.text()
@@ -1422,6 +1431,21 @@ export const apiClient = {
       `/api/groups/${groupId}/notices/${noticeId}`,
       { method: 'DELETE' },
       { adminOnly: true }
+    ),
+  // The body is the image file itself. The id that comes back is what the notice's text names it by.
+  uploadNoticeImage: (groupId: number, image: Blob) =>
+    apiRequest<NoticeImageUpload>(
+      `/api/groups/${groupId}/notice-images`,
+      { method: 'POST', body: image },
+      { adminOnly: true, contentType: image.type }
+    ),
+  // Shown to whoever may open the notice the image is in; the token goes with the request, so an
+  // <img> cannot load it by address and the page draws the Blob instead.
+  getNoticeImage: (groupId: number, imageId: number, signal?: AbortSignal) =>
+    apiRequest<Blob>(
+      `/api/groups/${groupId}/notice-images/${imageId}`,
+      { signal },
+      { requireUserEmail: true, includeUserEmail: true, responseType: 'blob' }
     ),
   getLedgerIncome: (groupId: number) =>
     apiRequest<LedgerIncomeEntry[]>(`/api/groups/${groupId}/ledger/income`, undefined, {

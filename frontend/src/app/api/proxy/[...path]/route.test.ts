@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
-import { GET, PATCH, maxDuration } from '@/app/api/proxy/[...path]/route'
+import { GET, PATCH, POST, maxDuration } from '@/app/api/proxy/[...path]/route'
 import { PROXY_MAX_DURATION_MS } from '@/lib/proxy-timeout'
 
 const context = {
@@ -59,6 +59,51 @@ describe('API proxy fallback policy', () => {
     // A retryable answer is handed back, not passed on to host names kept from older setups.
     expect(response.status).toBe(503)
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('hands an image back byte for byte', async () => {
+    // Bytes that are not text: read as text they would come back as other bytes.
+    const image = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x80, 0xc3, 0x28, 0xfe, 0x0a])
+    const fetchMock = vi.fn().mockResolvedValue(new Response(image, {
+      status: 200,
+      headers: { 'content-type': 'image/jpeg', 'x-internal': 'kept back' },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const response = await GET(
+      new NextRequest('https://YOUR_CLIENT.invalid/api/proxy/api/groups/YOUR_GROUP_ID/notice-images/9'),
+      { params: Promise.resolve({ path: ['api', 'groups', 'YOUR_GROUP_ID', 'notice-images', '9'] }) }
+    )
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('content-type')).toBe('image/jpeg')
+    expect(response.headers.get('cache-control')).toBe('no-store, max-age=0')
+    expect(response.headers.get('x-internal')).toBeNull()
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(image)
+  })
+
+  it('sends an uploaded image on as it came, with its type', async () => {
+    const image = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff, 0x80])
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{"id":9}', {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const response = await POST(
+      new NextRequest('https://YOUR_CLIENT.invalid/api/proxy/api/groups/YOUR_GROUP_ID/notice-images', {
+        method: 'POST',
+        body: image,
+        headers: { 'content-type': 'image/png', 'x-user-email': 'YOUR_USERNAME' },
+      }),
+      { params: Promise.resolve({ path: ['api', 'groups', 'YOUR_GROUP_ID', 'notice-images'] }) }
+    )
+
+    expect(await response.json()).toEqual({ id: 9 })
+    const sent = fetchMock.mock.calls[0][1] as RequestInit
+    expect(new Uint8Array(sent.body as ArrayBuffer)).toEqual(image)
+    expect(new Headers(sent.headers).get('content-type')).toBe('image/png')
+    expect(new Headers(sent.headers).get('x-user-email')).toBeNull()
   })
 
   it('does not retry a mutation against another upstream', async () => {

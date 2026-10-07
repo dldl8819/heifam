@@ -644,6 +644,10 @@ export type NoticeUpdateRequest = {
   notify?: boolean
 }
 
+export type NoticeImageUpload = {
+  id: number
+}
+
 export type LedgerExpenseType = 'FIXED' | 'VARIABLE'
 
 export type LedgerIncomeEntry = {
