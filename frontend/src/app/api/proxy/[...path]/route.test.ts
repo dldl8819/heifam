@@ -46,6 +46,21 @@ describe('API proxy fallback policy', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
+  it('asks only the one built-in backend when no upstream is configured', async () => {
+    vi.stubEnv('BACKEND_API_BASE_URLS', '')
+    const fetchMock = vi.fn().mockResolvedValue(new Response('', { status: 503 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const response = await GET(
+      new NextRequest('https://app.invalid/api/proxy/api/groups/YOUR_GROUP_ID/matches/recent'),
+      context
+    )
+
+    // A retryable answer is handed back, not passed on to host names kept from older setups.
+    expect(response.status).toBe(503)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('does not retry a mutation against another upstream', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response('', { status: 503 }))
     vi.stubGlobal('fetch', fetchMock)
