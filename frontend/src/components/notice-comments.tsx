@@ -8,6 +8,7 @@ import {
   threadNoticeComments,
   validateNoticeComment,
 } from '@/lib/notice-list'
+import { formatKstFullDateTime } from '@/lib/kst-time'
 import { t } from '@/lib/i18n'
 import type { NoticeComment, NoticeDetail } from '@/types/api'
 
@@ -25,14 +26,6 @@ const primaryButtonClass =
 const plainButtonClass =
   'rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800'
 const textButtonClass = 'text-xs text-slate-500 hover:underline disabled:opacity-60 dark:text-slate-400'
-
-function formatDate(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return value
-  }
-  return date.toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
-}
 
 /** Comments on a notice: answering, editing and removing one's own, and liking other people's. */
 export function NoticeComments({ groupId, noticeId, comments, onChange }: NoticeCommentsProps) {
@@ -151,7 +144,8 @@ export function NoticeComments({ groupId, noticeId, comments, onChange }: Notice
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs text-slate-500 dark:text-slate-400">
             <span className="font-medium text-slate-700 dark:text-slate-200">{comment.authorNickname ?? '-'}</span>
-            {` · ${formatDate(comment.createdAt)}`}
+            {/* When it was written, to the minute: threads are read as a conversation. */}
+            {` · ${formatKstFullDateTime(comment.createdAt) || comment.createdAt}`}
             {comment.edited ? ` · ${t('notices.posts.commentEdited')}` : ''}
           </p>
           <div className="flex shrink-0 items-center gap-2">
