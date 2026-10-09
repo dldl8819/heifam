@@ -78,17 +78,28 @@ describe('threadNoticeComments', () => {
   const shape = (comments: NoticeComment[]) =>
     threadNoticeComments(comments).map((thread) => [thread.comment.id, thread.replies.map((reply) => reply.id)])
 
-  it('puts replies under the comment they answer, in the order written', () => {
+  it('lists the newest comment first, with replies under their comment in the order written', () => {
     expect(shape([comment(1), comment(2), comment(3, 1), comment(4, 2), comment(5, 1)])).toEqual([
-      [1, [3, 5]],
       [2, [4]],
+      [1, [3, 5]],
+    ])
+  })
+
+  it('does not move a comment up when it gets a new reply', () => {
+    expect(shape([comment(1), comment(2), comment(3), comment(9, 1)])).toEqual([[3, []], [2, []], [1, [9]]])
+  })
+
+  it('orders by when things were written, however the list arrives', () => {
+    expect(shape([comment(5, 1), comment(2), comment(3, 1), comment(1), comment(4, 2)])).toEqual([
+      [2, [4]],
+      [1, [3, 5]],
     ])
   })
 
   it('treats comments from before replies existed as comments on the notice', () => {
     const old = [{ id: 1, content: 'a', createdAt: '', mine: false, canDelete: false }, comment(2, null)]
 
-    expect(shape(old)).toEqual([[1, []], [2, []]])
+    expect(shape(old)).toEqual([[2, []], [1, []]])
   })
 
   it('keeps an emptied comment in place for its replies', () => {
@@ -100,7 +111,7 @@ describe('threadNoticeComments', () => {
   })
 
   it('still shows a reply whose comment is not in the list', () => {
-    expect(shape([comment(1), comment(7, 99), comment(8)])).toEqual([[1, []], [7, []], [8, []]])
+    expect(shape([comment(1), comment(7, 99), comment(8)])).toEqual([[8, []], [7, []], [1, []]])
   })
 
   it('has nothing to show for no comments', () => {

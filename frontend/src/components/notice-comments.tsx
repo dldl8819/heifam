@@ -229,6 +229,26 @@ export function NoticeComments({ groupId, noticeId, comments, onChange }: Notice
         </p>
       )}
 
+      {/* Above the list: the newest comment is drawn first, right under this box. */}
+      <form onSubmit={handleComment} className="space-y-2">
+        <textarea
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          placeholder={t('notices.posts.commentPlaceholder')}
+          maxLength={NOTICE_COMMENT_MAX_LENGTH}
+          rows={3}
+          className={fieldClass}
+        />
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs text-slate-400 dark:text-slate-500">
+            {draft.length}/{NOTICE_COMMENT_MAX_LENGTH}
+          </span>
+          <button type="submit" disabled={busy} className={primaryButtonClass}>
+            {busy ? t('notices.posts.commentSubmitting') : t('notices.posts.commentSubmit')}
+          </button>
+        </div>
+      </form>
+
       {threads.length === 0 ? (
         <p className="text-xs text-slate-500 dark:text-slate-400">{t('notices.posts.commentEmpty')}</p>
       ) : (
@@ -273,25 +293,6 @@ export function NoticeComments({ groupId, noticeId, comments, onChange }: Notice
           ))}
         </ul>
       )}
-
-      <form onSubmit={handleComment} className="space-y-2">
-        <textarea
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder={t('notices.posts.commentPlaceholder')}
-          maxLength={NOTICE_COMMENT_MAX_LENGTH}
-          rows={3}
-          className={fieldClass}
-        />
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-xs text-slate-400 dark:text-slate-500">
-            {draft.length}/{NOTICE_COMMENT_MAX_LENGTH}
-          </span>
-          <button type="submit" disabled={busy} className={primaryButtonClass}>
-            {busy ? t('notices.posts.commentSubmitting') : t('notices.posts.commentSubmit')}
-          </button>
-        </div>
-      </form>
     </div>
   )
 }
