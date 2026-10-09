@@ -9,6 +9,7 @@ public record NoticeResponse(
     String authorNickname,
     OffsetDateTime createdAt,
     OffsetDateTime updatedAt,
-    boolean adminOnly
+    boolean adminOnly,
+    String voteStatus
 ) {
 }

@@ -8,6 +8,8 @@ public record NoticeUpdateRequest(
     Boolean adminOnly,
     // Announce the edit again: members see the notice unread and are notified of it. Sent as
     // "notify", which a record component cannot be called.
-    @JsonProperty("notify") Boolean announceAgain
+    @JsonProperty("notify") Boolean announceAgain,
+    // NONE, OPEN or CLOSED; left out, the vote stays as it is.
+    String voteStatus
 ) {
 }

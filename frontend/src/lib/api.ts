@@ -46,6 +46,7 @@ import type {
   NoticeList,
   NoticeTitle,
   NoticeUpdateRequest,
+  NoticeVoteChoice,
   OperationAuditLogFilters,
   OperationAuditLogItem,
   OperationAuditLogPage,
@@ -1422,6 +1423,13 @@ export const apiClient = {
     apiRequest<NoticeDetail>(
       `/api/groups/${groupId}/notices/${noticeId}/like`,
       { method: liked ? 'PUT' : 'DELETE' },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  // A choice casts or changes the member's vote; null takes it back.
+  setNoticeVote: (groupId: number, noticeId: number, choice: NoticeVoteChoice | null) =>
+    apiRequest<NoticeDetail>(
+      `/api/groups/${groupId}/notices/${noticeId}/vote`,
+      choice === null ? { method: 'DELETE' } : { method: 'PUT', body: JSON.stringify({ choice }) },
       { requireUserEmail: true, includeUserEmail: true }
     ),
   createNotice: (groupId: number, payload: NoticeCreateRequest) =>

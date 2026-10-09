@@ -5,12 +5,14 @@ import com.balancify.backend.api.group.dto.NoticeDetailResponse;
 import com.balancify.backend.api.group.dto.NoticeListItemResponse;
 import com.balancify.backend.api.group.dto.NoticeListResponse;
 import com.balancify.backend.api.group.dto.NoticeTitleResponse;
+import com.balancify.backend.api.group.dto.NoticeVoteResponse;
 import com.balancify.backend.domain.Notice;
 import com.balancify.backend.domain.NoticeComment;
 import com.balancify.backend.repository.NoticeCommentRepository;
 import com.balancify.backend.repository.NoticeEngagementRepository;
 import com.balancify.backend.repository.NoticeRepository;
 import com.balancify.backend.service.exception.NoticeForbiddenException;
+import com.balancify.backend.service.exception.NoticeVoteClosedException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,6 +34,9 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Comments can be answered, one level deep, edited by their writer and liked by others. A
  * comment deleted while it has replies stays as an emptied place until its last reply is gone.
+ *
+ * <p>A notice can ask for a vote, for or against. Everyone who may open the notice sees how many
+ * chose each; who chose what is shown to nobody.
  */
 @Service
 public class NoticeService {
@@ -93,7 +98,8 @@ public class NoticeService {
                 readIds.contains(notice.getId()),
                 notice.getRevision() > 0,
                 likeCounts.getOrDefault(notice.getId(), 0L),
-                commentCounts.getOrDefault(notice.getId(), 0L)
+                commentCounts.getOrDefault(notice.getId(), 0L),
+                NoticeVotes.OPEN.equals(notice.getVoteStatus())
             ))
             .toList();
         int readCount = (int) items.stream().filter(NoticeListItemResponse::read).count();
@@ -233,6 +239,52 @@ public class NoticeService {
         return detail(notice, member);
     }
 
+    /**
+     * A member's vote for or against a notice that asks for one. Voting again changes the choice;
+     * once the vote is closed nothing changes any more. The notice is locked as for opening it,
+     * so a vote and the edit that closes voting never cross.
+     */
+    @Transactional
+    public NoticeDetailResponse castVote(Long groupId, Long noticeId, String email, String choice) {
+        String voter = normalizeEmail(email);
+        Notice notice = requireOpenVote(groupId, noticeId, voter);
+        noticeEngagementRepository.castVote(notice.getId(), voter, NoticeVotes.requireChoice(choice));
+        return detail(notice, voter);
+    }
+
+    @Transactional
+    public NoticeDetailResponse withdrawVote(Long groupId, Long noticeId, String email) {
+        String voter = normalizeEmail(email);
+        Notice notice = requireOpenVote(groupId, noticeId, voter);
+        noticeEngagementRepository.withdrawVote(notice.getId(), voter);
+        return detail(notice, voter);
+    }
+
+    private Notice requireOpenVote(Long groupId, Long noticeId, String voter) {
+        Notice notice = requireVisible(noticeRepository.findByIdAndGroupIdForShare(noticeId, groupId), voter);
+        if (NoticeVotes.CLOSED.equals(notice.getVoteStatus())) {
+            throw new NoticeVoteClosedException("투표가 마감되었습니다.");
+        }
+        if (!NoticeVotes.OPEN.equals(notice.getVoteStatus())) {
+            throw new NoSuchElementException("Vote not found");
+        }
+        return notice;
+    }
+
+    private NoticeVoteResponse vote(Notice notice, String reader) {
+        String status = notice.getVoteStatus();
+        if (!NoticeVotes.OPEN.equals(status) && !NoticeVotes.CLOSED.equals(status)) {
+            return null;
+        }
+        Map<String, Long> counts = noticeEngagementRepository.countVotes(notice.getId());
+        return new NoticeVoteResponse(
+            status,
+            counts.getOrDefault(NoticeVotes.AGREE, 0L),
+            counts.getOrDefault(NoticeVotes.DISAGREE, 0L),
+            noticeEngagementRepository.findVote(notice.getId(), reader)
+        );
+    }
+
     private NoticeDetailResponse detail(Notice notice, String reader) {
         boolean admin = accessControlService.isAdminEmail(reader);
         List<NoticeComment> stored = noticeCommentRepository.findByNoticeIdOrderByIdAsc(notice.getId());
@@ -280,7 +332,8 @@ public class NoticeService {
                         !deleted && (mine || admin)
                     );
                 })
-                .toList()
+                .toList(),
+            vote(notice, reader)
         );
     }
 

@@ -582,6 +582,20 @@ export type NoticeItem = {
   createdAt: string
   updatedAt: string
   adminOnly: boolean
+  voteStatus?: NoticeVoteStatus
+}
+
+// Whether a notice asks members to vote for or against it.
+export type NoticeVoteStatus = 'NONE' | 'OPEN' | 'CLOSED'
+
+export type NoticeVoteChoice = 'AGREE' | 'DISAGREE'
+
+/** The vote on a notice: how many are for and against, and the reader's own choice. */
+export type NoticeVote = {
+  status: 'OPEN' | 'CLOSED'
+  agreeCount: number
+  disagreeCount: number
+  myChoice?: NoticeVoteChoice | null
 }
 
 export type NoticeTitle = {
@@ -600,6 +614,8 @@ export type NoticeListItem = {
   revised: boolean
   likeCount: number
   commentCount: number
+  // Members are being asked to vote on this notice.
+  voteOpen?: boolean
 }
 
 export type NoticeList = {
@@ -635,12 +651,16 @@ export type NoticeDetail = {
   likeCount: number
   likedByMe: boolean
   comments: NoticeComment[]
+  // Missing or null for a notice that asks for no vote.
+  vote?: NoticeVote | null
 }
 
 export type NoticeCreateRequest = {
   title: string
   content: string
   adminOnly?: boolean
+  // 'OPEN' asks members to vote for or against the notice.
+  voteStatus?: NoticeVoteStatus
 }
 
 export type NoticeUpdateRequest = {
@@ -649,6 +669,8 @@ export type NoticeUpdateRequest = {
   adminOnly?: boolean
   // Announce the edit again: the notice turns unread for members and they are notified.
   notify?: boolean
+  // Left out, the vote stays as it is.
+  voteStatus?: NoticeVoteStatus
 }
 
 export type NoticeImageUpload = {

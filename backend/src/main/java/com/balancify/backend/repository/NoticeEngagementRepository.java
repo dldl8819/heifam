@@ -16,7 +16,8 @@ import org.springframework.stereotype.Repository;
  * Reads and likes are one row per person and notice; an insert that finds the row already there
  * does nothing, so double clicks and parallel tabs never fail. A read counts while it is not older
  * than the notice's latest revision (notices.revised_at), so a re-announced notice turns unread.
- * Likes on comments are kept the same way, one row per person and comment.
+ * Likes on comments are kept the same way, one row per person and comment, and so are votes: one
+ * row per person and notice, holding their current choice.
  */
 @Repository
 public class NoticeEngagementRepository {
@@ -141,6 +142,46 @@ public class NoticeEngagementRepository {
             Long.class
         );
         return new HashSet<>(ids);
+    }
+
+    /** One vote per person and notice: voting again replaces the earlier choice. */
+    public void castVote(Long noticeId, String email, String choice) {
+        jdbcTemplate.update(
+            "INSERT INTO notice_votes (notice_id, voter_email, choice) VALUES (:noticeId, :email, :choice) "
+                + "ON CONFLICT (notice_id, voter_email) DO UPDATE SET choice = EXCLUDED.choice, updated_at = now() "
+                + "WHERE notice_votes.choice <> EXCLUDED.choice",
+            params(noticeId, email).addValue("choice", choice)
+        );
+    }
+
+    public void withdrawVote(Long noticeId, String email) {
+        jdbcTemplate.update(
+            "DELETE FROM notice_votes WHERE notice_id = :noticeId AND voter_email = :email",
+            params(noticeId, email)
+        );
+    }
+
+    /** Votes per choice on one notice; a choice nobody made is left out. */
+    public Map<String, Long> countVotes(Long noticeId) {
+        Map<String, Long> counts = new HashMap<>();
+        jdbcTemplate.query(
+            "SELECT choice, count(*) AS total FROM notice_votes WHERE notice_id = :noticeId GROUP BY choice",
+            new MapSqlParameterSource("noticeId", noticeId),
+            row -> {
+                counts.put(row.getString("choice"), row.getLong("total"));
+            }
+        );
+        return counts;
+    }
+
+    /** The person's own choice on the notice, or null when they have not voted. */
+    public String findVote(Long noticeId, String email) {
+        List<String> found = jdbcTemplate.queryForList(
+            "SELECT choice FROM notice_votes WHERE notice_id = :noticeId AND voter_email = :email",
+            params(noticeId, email),
+            String.class
+        );
+        return found.isEmpty() ? null : found.getFirst();
     }
 
     private MapSqlParameterSource commentParams(Long commentId, String email) {

@@ -124,6 +124,7 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
   const [title, setTitle] = useState<string>('')
   const [content, setContent] = useState<string>('')
   const [adminOnly, setAdminOnly] = useState<boolean>(false)
+  const [withVote, setWithVote] = useState<boolean>(false)
   const [saving, setSaving] = useState<boolean>(false)
   const [imageUploading, setImageUploading] = useState<boolean>(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -174,10 +175,16 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
       setFormError(null)
       setSaving(true)
       try {
-        await apiClient.createNotice(TEMP_GROUP_ID, { title: title.trim(), content: content.trim(), adminOnly })
+        await apiClient.createNotice(TEMP_GROUP_ID, {
+          title: title.trim(),
+          content: content.trim(),
+          adminOnly,
+          voteStatus: withVote ? 'OPEN' : 'NONE',
+        })
         setTitle('')
         setContent('')
         setAdminOnly(false)
+        setWithVote(false)
         setComposing(false)
         setSuccessMessage(t('notices.posts.saveSuccess'))
         await loadNotices()
@@ -192,7 +199,7 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
         setSaving(false)
       }
     },
-    [adminOnly, content, loadNotices, title]
+    [adminOnly, content, loadNotices, title, withVote]
   )
 
   const filterButtonClass = (value: NoticeFilter) =>
@@ -298,6 +305,17 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
                 />
                 {t('notices.posts.adminOnlyLabel')}
               </label>
+              <div className="space-y-1">
+                <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={withVote}
+                    onChange={(event) => setWithVote(event.target.checked)}
+                  />
+                  {t('notices.posts.voteLabel')}
+                </label>
+                <p className="pl-5 text-xs text-slate-500 dark:text-slate-400">{t('notices.posts.voteHint')}</p>
+              </div>
               <div className="flex gap-2">
                 <button
                   type="submit"
@@ -373,6 +391,11 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
                           {notice.adminOnly && (
                             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
                               {t('notices.posts.adminOnlyBadge')}
+                            </span>
+                          )}
+                          {notice.voteOpen && (
+                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                              {t('notices.posts.voteOpenBadge')}
                             </span>
                           )}
                         </div>

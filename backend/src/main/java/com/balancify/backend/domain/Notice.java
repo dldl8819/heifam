@@ -47,6 +47,10 @@ public class Notice {
     @Column(name = "revised_at")
     private OffsetDateTime revisedAt;
 
+    // Whether members are asked to vote for or against this notice: NONE, OPEN or CLOSED.
+    @Column(name = "vote_status", nullable = false, length = 10)
+    private String voteStatus = "NONE";
+
     public boolean isAdminOnly() {
         return adminOnly;
     }
@@ -134,5 +138,13 @@ public class Notice {
 
     public void setRevisedAt(OffsetDateTime revisedAt) {
         this.revisedAt = revisedAt;
+    }
+
+    public String getVoteStatus() {
+        return voteStatus;
+    }
+
+    public void setVoteStatus(String voteStatus) {
+        this.voteStatus = voteStatus;
     }
 }

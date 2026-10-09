@@ -13,6 +13,8 @@ public record NoticeDetailResponse(
     boolean adminOnly,
     long likeCount,
     boolean likedByMe,
-    List<NoticeCommentResponse> comments
+    List<NoticeCommentResponse> comments,
+    // Null for a notice that asks for no vote.
+    NoticeVoteResponse vote
 ) {
 }
