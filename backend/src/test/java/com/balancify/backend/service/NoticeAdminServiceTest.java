@@ -9,6 +9,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.balancify.backend.api.group.dto.NoticeCreateRequest;
@@ -80,7 +81,7 @@ class NoticeAdminServiceTest {
     void createsNoticeForAdmin() {
         NoticeResponse response = noticeAdminService.createNotice(
             1L,
-            new NoticeCreateRequest("YOUR_TITLE", "YOUR_CONTENT", null),
+            new NoticeCreateRequest("YOUR_TITLE", "YOUR_CONTENT", null, null),
             "ops@hei.gg",
             "OpsUser"
         );
@@ -96,7 +97,7 @@ class NoticeAdminServiceTest {
     void keepsANoticeToAdminsWhenAsked() {
         NoticeResponse response = noticeAdminService.createNotice(
             1L,
-            new NoticeCreateRequest("YOUR_TITLE", "YOUR_CONTENT", true),
+            new NoticeCreateRequest("YOUR_TITLE", "YOUR_CONTENT", true, null),
             "ops@hei.gg",
             "OpsUser"
         );
@@ -109,7 +110,7 @@ class NoticeAdminServiceTest {
 
     @Test
     void tellsReadersOfANewNoticeAndOfOneOpenedToMembersLater() {
-        noticeAdminService.createNotice(1L, new NoticeCreateRequest("YOUR_TITLE", "YOUR_CONTENT", true), "ops@hei.gg", "OpsUser");
+        noticeAdminService.createNotice(1L, new NoticeCreateRequest("YOUR_TITLE", "YOUR_CONTENT", true, null), "ops@hei.gg", "OpsUser");
         verify(notificationService).publishNotice(1L, 1L, "YOUR_TITLE", true, "ops@hei.gg");
 
         Notice notice = new Notice();
@@ -125,9 +126,9 @@ class NoticeAdminServiceTest {
                 "ops@hei.gg", "OpsUser", "ADMIN", true, false, true, true, null
             ));
 
-        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("YOUR_TITLE", "edited", null, null), "ops@hei.gg", "OpsUser");
+        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("YOUR_TITLE", "edited", null, null, null), "ops@hei.gg", "OpsUser");
         verify(notificationService, never()).publishNotice(eq(1L), eq(5L), any(), eq(false), any());
-        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("YOUR_TITLE", "edited", false, null), "ops@hei.gg", "OpsUser");
+        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("YOUR_TITLE", "edited", false, null, null), "ops@hei.gg", "OpsUser");
         verify(notificationService).publishNotice(1L, 5L, "YOUR_TITLE", false, "ops@hei.gg");
     }
 
@@ -135,8 +136,8 @@ class NoticeAdminServiceTest {
     void anEditWithoutAnnouncingItChangesTheTextOnly() {
         Notice notice = existingNotice(5L, false);
 
-        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("new title", "new content", null, null), "ops@hei.gg", "OpsUser");
-        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("new title", "newer content", null, false), "ops@hei.gg", "OpsUser");
+        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("new title", "new content", null, null, null), "ops@hei.gg", "OpsUser");
+        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("new title", "newer content", null, false, null), "ops@hei.gg", "OpsUser");
 
         assertThat(notice.getContent()).isEqualTo("newer content");
         assertThat(notice.getRevision()).isZero();
@@ -153,7 +154,7 @@ class NoticeAdminServiceTest {
         Notice notice = existingNotice(5L, false);
         when(accessControlService.isAdminEmail(" Ops@hei.gg ")).thenReturn(true);
 
-        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("new title", "new content", null, true), " Ops@hei.gg ", "OpsUser");
+        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("new title", "new content", null, true, null), " Ops@hei.gg ", "OpsUser");
 
         assertThat(notice.getRevision()).isEqualTo(1);
         assertThat(notice.getRevisedAt()).isNotNull();
@@ -163,7 +164,7 @@ class NoticeAdminServiceTest {
         verify(notificationService, never()).publishNotice(any(), any(), any(), anyBoolean(), any());
         verify(operationAuditLogService).recordNoticeUpdated(eq(" Ops@hei.gg "), eq("OpsUser"), eq(1L), eq(notice), eq(true));
 
-        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("new title", "again", null, true), "ops@hei.gg", "OpsUser");
+        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("new title", "again", null, true, null), "ops@hei.gg", "OpsUser");
 
         assertThat(notice.getRevision()).isEqualTo(2);
         verify(notificationService, org.mockito.Mockito.times(2)).publishNoticeRevised(eq(1L), eq(5L), any(), eq(false), any());
@@ -173,7 +174,7 @@ class NoticeAdminServiceTest {
     void announcesAnAdminOnlyNoticeAgainToAdmins() {
         Notice notice = existingNotice(5L, true);
 
-        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("t", "c", null, true), "ops@hei.gg", "OpsUser");
+        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("t", "c", null, true, null), "ops@hei.gg", "OpsUser");
 
         assertThat(notice.getRevision()).isEqualTo(1);
         verify(notificationService).publishNoticeRevised(1L, 5L, "t", true, "ops@hei.gg");
@@ -183,7 +184,7 @@ class NoticeAdminServiceTest {
     void aNoticeKeptToAdminsLeavesMembersNoNotificationOfIt() {
         Notice notice = existingNotice(5L, false);
 
-        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("t", "c", true, null), "ops@hei.gg", "OpsUser");
+        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("t", "c", true, null, null), "ops@hei.gg", "OpsUser");
 
         assertThat(notice.isAdminOnly()).isTrue();
         verify(notificationService).removeNotice(5L);
@@ -192,7 +193,7 @@ class NoticeAdminServiceTest {
 
         // Announced again while being kept to admins, it is told to admins only, in place of the old one.
         Notice announced = existingNotice(6L, false);
-        noticeAdminService.updateNotice(1L, 6L, new NoticeUpdateRequest("t", "c", true, true), "ops@hei.gg", "OpsUser");
+        noticeAdminService.updateNotice(1L, 6L, new NoticeUpdateRequest("t", "c", true, true, null), "ops@hei.gg", "OpsUser");
 
         assertThat(announced.isAdminOnly()).isTrue();
         verify(notificationService).publishNoticeRevised(1L, 6L, "t", true, "ops@hei.gg");
@@ -200,9 +201,9 @@ class NoticeAdminServiceTest {
 
         // An edit that leaves who may read it alone keeps its notification.
         existingNotice(7L, false);
-        noticeAdminService.updateNotice(1L, 7L, new NoticeUpdateRequest("t", "c", false, null), "ops@hei.gg", "OpsUser");
+        noticeAdminService.updateNotice(1L, 7L, new NoticeUpdateRequest("t", "c", false, null, null), "ops@hei.gg", "OpsUser");
         existingNotice(8L, true);
-        noticeAdminService.updateNotice(1L, 8L, new NoticeUpdateRequest("t", "c", true, null), "ops@hei.gg", "OpsUser");
+        noticeAdminService.updateNotice(1L, 8L, new NoticeUpdateRequest("t", "c", true, null, null), "ops@hei.gg", "OpsUser");
 
         verify(notificationService, never()).removeNotice(7L);
         verify(notificationService, never()).removeNotice(8L);
@@ -212,7 +213,7 @@ class NoticeAdminServiceTest {
     void aNoticeOpenedToMembersIsNewToThemEvenWhenAnnouncedAgain() {
         Notice notice = existingNotice(5L, true);
 
-        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("t", "c", false, true), "ops@hei.gg", "OpsUser");
+        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("t", "c", false, true, null), "ops@hei.gg", "OpsUser");
 
         assertThat(notice.getRevision()).isZero();
         assertThat(notice.getRevisedAt()).isNull();
@@ -226,13 +227,13 @@ class NoticeAdminServiceTest {
     void placesTheImagesItsTextNamesOnceTheNoticeIsSavedAndBeforeAnyoneIsTold() {
         noticeAdminService.createNotice(
             1L,
-            new NoticeCreateRequest("YOUR_TITLE", "rules [[image:12]]", null),
+            new NoticeCreateRequest("YOUR_TITLE", "rules [[image:12]]", null, null),
             "ops@hei.gg",
             "OpsUser"
         );
         existingNotice(5L, false);
         noticeAdminService.updateNotice(
-            1L, 5L, new NoticeUpdateRequest("YOUR_TITLE", "rules [[image:7]]", null, null), "ops@hei.gg", "OpsUser"
+            1L, 5L, new NoticeUpdateRequest("YOUR_TITLE", "rules [[image:7]]", null, null, null), "ops@hei.gg", "OpsUser"
         );
 
         InOrder order = inOrder(noticeRepository, noticeImageService, operationAuditLogService, notificationService);
@@ -253,12 +254,12 @@ class NoticeAdminServiceTest {
 
         assertThatThrownBy(() -> noticeAdminService.createNotice(
             1L,
-            new NoticeCreateRequest("YOUR_TITLE", "rules [[image:12]]", null),
+            new NoticeCreateRequest("YOUR_TITLE", "rules [[image:12]]", null, null),
             "ops@hei.gg",
             "OpsUser"
         )).isInstanceOf(NoticeImageException.class);
         assertThatThrownBy(() -> noticeAdminService.updateNotice(
-            1L, 5L, new NoticeUpdateRequest("YOUR_TITLE", "rules [[image:12]]", null, true), "ops@hei.gg", "OpsUser"
+            1L, 5L, new NoticeUpdateRequest("YOUR_TITLE", "rules [[image:12]]", null, true, null), "ops@hei.gg", "OpsUser"
         )).isInstanceOf(NoticeImageException.class);
 
         verify(operationAuditLogService, never()).recordNoticePosted(any(), any(), any(), any());
@@ -268,9 +269,51 @@ class NoticeAdminServiceTest {
     }
 
     @Test
+    void aNoticeAsksForAVoteOnlyWhenToldTo() {
+        NoticeResponse plain = noticeAdminService.createNotice(
+            1L, new NoticeCreateRequest("YOUR_TITLE", "YOUR_CONTENT", null, null), "ops@hei.gg", "OpsUser"
+        );
+        NoticeResponse withVote = noticeAdminService.createNotice(
+            1L, new NoticeCreateRequest("YOUR_TITLE", "YOUR_CONTENT", null, " open "), "ops@hei.gg", "OpsUser"
+        );
+
+        assertThat(plain.voteStatus()).isEqualTo("NONE");
+        assertThat(withVote.voteStatus()).isEqualTo("OPEN");
+        assertThatThrownBy(() -> noticeAdminService.createNotice(
+            1L, new NoticeCreateRequest("YOUR_TITLE", "YOUR_CONTENT", null, "MAYBE"), "ops@hei.gg", "OpsUser"
+        )).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void anEditOpensClosesOrRemovesTheVoteAndOtherwiseLeavesItAlone() {
+        Notice notice = existingNotice(5L, false);
+
+        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("t", "c", null, null, "OPEN"), "ops@hei.gg", "OpsUser");
+        assertThat(notice.getVoteStatus()).isEqualTo("OPEN");
+        // A typo fix that says nothing about the vote keeps it open.
+        NoticeResponse edited = noticeAdminService.updateNotice(
+            1L, 5L, new NoticeUpdateRequest("t", "c2", null, null, null), "ops@hei.gg", "OpsUser"
+        );
+        assertThat(notice.getVoteStatus()).isEqualTo("OPEN");
+        assertThat(edited.voteStatus()).isEqualTo("OPEN");
+
+        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("t", "c2", null, null, "CLOSED"), "ops@hei.gg", "OpsUser");
+        assertThat(notice.getVoteStatus()).isEqualTo("CLOSED");
+        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("t", "c2", null, null, "NONE"), "ops@hei.gg", "OpsUser");
+        assertThat(notice.getVoteStatus()).isEqualTo("NONE");
+
+        assertThatThrownBy(() -> noticeAdminService.updateNotice(
+            1L, 5L, new NoticeUpdateRequest("t", "c2", null, null, "LATER"), "ops@hei.gg", "OpsUser"
+        )).isInstanceOf(IllegalArgumentException.class);
+        assertThat(notice.getVoteStatus()).isEqualTo("NONE");
+        // Votes already cast are not this service's to remove.
+        verifyNoInteractions(noticeEngagementRepository);
+    }
+
+    @Test
     void rejectsCreateWhenActorIsNotAdmin() {
         assertThatThrownBy(() ->
-            noticeAdminService.createNotice(1L, new NoticeCreateRequest("t", "c", null), "member@hei.gg", "Member")
+            noticeAdminService.createNotice(1L, new NoticeCreateRequest("t", "c", null, null), "member@hei.gg", "Member")
         )
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Only admins can manage notices");
@@ -281,7 +324,7 @@ class NoticeAdminServiceTest {
     @Test
     void rejectsCreateWithBlankTitle() {
         assertThatThrownBy(() ->
-            noticeAdminService.createNotice(1L, new NoticeCreateRequest("  ", "content", null), "ops@hei.gg", "OpsUser")
+            noticeAdminService.createNotice(1L, new NoticeCreateRequest("  ", "content", null, null), "ops@hei.gg", "OpsUser")
         )
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Title is required");
@@ -304,7 +347,7 @@ class NoticeAdminServiceTest {
         NoticeResponse response = noticeAdminService.updateNotice(
             1L,
             5L,
-            new NoticeUpdateRequest("new title", "new content", null, null),
+            new NoticeUpdateRequest("new title", "new content", null, null, null),
             "ops@hei.gg",
             "OpsUser"
         );
@@ -319,7 +362,7 @@ class NoticeAdminServiceTest {
         when(noticeRepository.findByIdAndGroupIdForUpdate(99L, 1L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() ->
-            noticeAdminService.updateNotice(1L, 99L, new NoticeUpdateRequest("t", "c", null, null), "ops@hei.gg", "OpsUser")
+            noticeAdminService.updateNotice(1L, 99L, new NoticeUpdateRequest("t", "c", null, null, null), "ops@hei.gg", "OpsUser")
         )
             .isInstanceOf(java.util.NoSuchElementException.class)
             .hasMessage("Notice not found");

@@ -135,6 +135,7 @@ import com.balancify.backend.service.TeamBalancingService;
 import com.balancify.backend.service.exception.MatchEditQuotaExceededException;
 import com.balancify.backend.service.exception.NoticeForbiddenException;
 import com.balancify.backend.service.exception.NoticeImageException;
+import com.balancify.backend.service.exception.NoticeVoteClosedException;
 import java.net.URI;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -2933,6 +2934,133 @@ class AdminKeyFilterTest {
         mockMvc
             .perform(put("/api/groups/1/notices/5/comments/10/like").header("X-USER-EMAIL", "member@hei.gg"))
             .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void letsMembersVoteOnANoticeAndTakeTheVoteBack() throws Exception {
+        mockMvc
+            .perform(
+                put("/api/groups/1/notices/5/vote")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"choice\":\"AGREE\"}")
+            )
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(delete("/api/groups/1/notices/5/vote").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk());
+
+        verify(noticeService).castVote(1L, 5L, "member@hei.gg", "AGREE");
+        verify(noticeService).withdrawVote(1L, 5L, "member@hei.gg");
+    }
+
+    @Test
+    void keepsVisitorsAndBlockedAccountsFromVoting() throws Exception {
+        mockMvc
+            .perform(
+                put("/api/groups/1/notices/5/vote")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"choice\":\"AGREE\"}")
+            )
+            .andExpect(status().isUnauthorized());
+        mockMvc
+            .perform(
+                put("/api/groups/1/notices/5/vote")
+                    .header("X-USER-EMAIL", "blocked@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"choice\":\"AGREE\"}")
+            )
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(delete("/api/groups/1/notices/5/vote").header("X-USER-EMAIL", "blocked@hei.gg"))
+            .andExpect(status().isForbidden());
+
+        verify(noticeService, never()).castVote(any(), any(), any(), any());
+        verify(noticeService, never()).withdrawVote(any(), any(), any());
+    }
+
+    @Test
+    void tellsWhyAVoteWasNotTaken() throws Exception {
+        when(noticeService.castVote(1L, 5L, "member@hei.gg", "AGREE"))
+            .thenThrow(new NoticeVoteClosedException("closed"));
+        when(noticeService.castVote(1L, 6L, "member@hei.gg", "AGREE"))
+            .thenThrow(new NoSuchElementException("Vote not found"));
+        when(noticeService.castVote(1L, 5L, "member@hei.gg", "MAYBE"))
+            .thenThrow(new IllegalArgumentException("neither"));
+
+        mockMvc
+            .perform(
+                put("/api/groups/1/notices/5/vote")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"choice\":\"AGREE\"}")
+            )
+            .andExpect(status().isConflict());
+        mockMvc
+            .perform(
+                put("/api/groups/1/notices/6/vote")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"choice\":\"AGREE\"}")
+            )
+            .andExpect(status().isNotFound());
+        mockMvc
+            .perform(
+                put("/api/groups/1/notices/5/vote")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"choice\":\"MAYBE\"}")
+            )
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void passesTheVoteSettingOfANoticeOnOnlyFromAdmins() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/groups/1/notices")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"title\":\"t\",\"content\":\"c\",\"voteStatus\":\"OPEN\"}")
+            )
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(
+                put("/api/groups/1/notices/5")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"title\":\"t\",\"content\":\"c\",\"voteStatus\":\"CLOSED\"}")
+            )
+            .andExpect(status().isOk());
+        // A request from before votes existed says nothing about one.
+        mockMvc
+            .perform(
+                put("/api/groups/1/notices/6")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"title\":\"t\",\"content\":\"c\"}")
+            )
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(
+                put("/api/groups/1/notices/5")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"title\":\"t\",\"content\":\"c\",\"voteStatus\":\"CLOSED\"}")
+            )
+            .andExpect(status().isForbidden());
+
+        verify(noticeAdminService).createNotice(
+            eq(1L), argThat(request -> request != null && "OPEN".equals(request.voteStatus())), eq("admin@hei.gg"), any()
+        );
+        verify(noticeAdminService).updateNotice(
+            eq(1L), eq(5L), argThat(request -> request != null && "CLOSED".equals(request.voteStatus())),
+            eq("admin@hei.gg"), any()
+        );
+        verify(noticeAdminService).updateNotice(
+            eq(1L), eq(6L), argThat(request -> request != null && request.voteStatus() == null),
+            eq("admin@hei.gg"), any()
+        );
     }
 
     @Test

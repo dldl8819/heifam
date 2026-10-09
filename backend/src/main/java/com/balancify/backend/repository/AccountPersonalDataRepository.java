@@ -228,11 +228,12 @@ public class AccountPersonalDataRepository {
                 "DELETE FROM match_result_editor_emails WHERE normalized_email = :email",
                 parameters
             );
-            // A member's notice reads, likes and comments go with the account, likes on comments
-            // included. Replies under one of their comments go with it (ON DELETE CASCADE).
+            // A member's notice reads, likes, votes and comments go with the account, likes on
+            // comments included. Replies under one of their comments go with it (ON DELETE CASCADE).
             jdbcTemplate.update("DELETE FROM notice_reads WHERE reader_email = :email", parameters);
             jdbcTemplate.update("DELETE FROM notice_likes WHERE liker_email = :email", parameters);
             jdbcTemplate.update("DELETE FROM notice_comment_likes WHERE liker_email = :email", parameters);
+            jdbcTemplate.update("DELETE FROM notice_votes WHERE voter_email = :email", parameters);
             jdbcTemplate.update("DELETE FROM notice_comments WHERE author_email = :email", parameters);
             // So do how far it read its notifications and the browsers it registered for push.
             jdbcTemplate.update("DELETE FROM notification_cursors WHERE email = :email", parameters);

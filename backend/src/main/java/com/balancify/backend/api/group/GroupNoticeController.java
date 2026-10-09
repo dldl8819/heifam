@@ -4,9 +4,11 @@ import com.balancify.backend.api.group.dto.NoticeCommentRequest;
 import com.balancify.backend.api.group.dto.NoticeDetailResponse;
 import com.balancify.backend.api.group.dto.NoticeListResponse;
 import com.balancify.backend.api.group.dto.NoticeTitleResponse;
+import com.balancify.backend.api.group.dto.NoticeVoteRequest;
 import com.balancify.backend.security.AuthenticatedRequestResolver;
 import com.balancify.backend.service.NoticeService;
 import com.balancify.backend.service.exception.NoticeForbiddenException;
+import com.balancify.backend.service.exception.NoticeVoteClosedException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -126,6 +128,32 @@ public class GroupNoticeController {
         return handle(() -> noticeService.setCommentLike(groupId, noticeId, commentId, requestEmail, false));
     }
 
+    @PutMapping("/{groupId}/notices/{noticeId}/vote")
+    public NoticeDetailResponse vote(
+        @PathVariable Long groupId,
+        @PathVariable Long noticeId,
+        @RequestBody NoticeVoteRequest requestBody,
+        HttpServletRequest request
+    ) {
+        String requestEmail = requireRequestEmail(request);
+        return handle(() -> noticeService.castVote(
+            groupId,
+            noticeId,
+            requestEmail,
+            requestBody == null ? null : requestBody.choice()
+        ));
+    }
+
+    @DeleteMapping("/{groupId}/notices/{noticeId}/vote")
+    public NoticeDetailResponse withdrawVote(
+        @PathVariable Long groupId,
+        @PathVariable Long noticeId,
+        HttpServletRequest request
+    ) {
+        String requestEmail = requireRequestEmail(request);
+        return handle(() -> noticeService.withdrawVote(groupId, noticeId, requestEmail));
+    }
+
     @PutMapping("/{groupId}/notices/{noticeId}/like")
     public NoticeDetailResponse like(
         @PathVariable Long groupId,
@@ -159,6 +187,8 @@ public class GroupNoticeController {
             return action.get();
         } catch (NoticeForbiddenException exception) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, exception.getMessage(), exception);
+        } catch (NoticeVoteClosedException exception) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, exception.getMessage(), exception);
         } catch (NoSuchElementException exception) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, exception.getMessage(), exception);
         } catch (IllegalArgumentException exception) {

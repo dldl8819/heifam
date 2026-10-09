@@ -18,12 +18,14 @@ import com.balancify.backend.api.group.dto.NoticeDetailResponse;
 import com.balancify.backend.api.group.dto.NoticeListItemResponse;
 import com.balancify.backend.api.group.dto.NoticeListResponse;
 import com.balancify.backend.api.group.dto.NoticeTitleResponse;
+import com.balancify.backend.api.group.dto.NoticeVoteResponse;
 import com.balancify.backend.domain.Notice;
 import com.balancify.backend.domain.NoticeComment;
 import com.balancify.backend.repository.NoticeCommentRepository;
 import com.balancify.backend.repository.NoticeEngagementRepository;
 import com.balancify.backend.repository.NoticeRepository;
 import com.balancify.backend.service.exception.NoticeForbiddenException;
+import com.balancify.backend.service.exception.NoticeVoteClosedException;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -497,6 +499,108 @@ class NoticeServiceTest {
             .isInstanceOf(NoSuchElementException.class);
         verify(noticeEngagementRepository, never()).likeComment(any(), any());
         verify(pointService, never()).grantNoticeCommentLikePoint(any(), any());
+    }
+
+    @Test
+    void showsNoVoteOnANoticeThatAsksForNone() {
+        stubNotice(2L, false);
+
+        assertThat(noticeService.open(1L, 2L, MEMBER).vote()).isNull();
+        assertThat(noticeService.list(1L, MEMBER).notices()).extracting(NoticeListItemResponse::voteOpen).containsOnly(false);
+        assertThatThrownBy(() -> noticeService.castVote(1L, 2L, MEMBER, "AGREE")).isInstanceOf(NoSuchElementException.class);
+        assertThatThrownBy(() -> noticeService.withdrawVote(1L, 2L, MEMBER)).isInstanceOf(NoSuchElementException.class);
+        verify(noticeEngagementRepository, never()).castVote(any(), any(), any());
+        verify(noticeEngagementRepository, never()).withdrawVote(any(), any());
+    }
+
+    @Test
+    void countsVotesAndTellsEachReaderOnlyTheirOwnChoice() {
+        Notice notice = stubNotice(2L, false);
+        notice.setVoteStatus("OPEN");
+        when(noticeEngagementRepository.countVotes(2L)).thenReturn(Map.of("AGREE", 7L, "DISAGREE", 2L));
+        when(noticeEngagementRepository.findVote(2L, MEMBER)).thenReturn("DISAGREE");
+
+        NoticeVoteResponse mine = noticeService.open(1L, 2L, MEMBER).vote();
+        NoticeVoteResponse others = noticeService.open(1L, 2L, OTHER).vote();
+
+        assertThat(mine).isEqualTo(new NoticeVoteResponse("OPEN", 7L, 2L, "DISAGREE"));
+        assertThat(others).isEqualTo(new NoticeVoteResponse("OPEN", 7L, 2L, null));
+    }
+
+    @Test
+    void castsChangesAndTakesBackAVoteWhileTheVoteIsOpen() {
+        Notice notice = stubNotice(2L, false);
+        notice.setVoteStatus("OPEN");
+
+        noticeService.castVote(1L, 2L, MEMBER, " agree ");
+        noticeService.castVote(1L, 2L, MEMBER, "DISAGREE");
+        noticeService.withdrawVote(1L, 2L, MEMBER);
+
+        verify(noticeEngagementRepository).castVote(2L, MEMBER, "AGREE");
+        verify(noticeEngagementRepository).castVote(2L, MEMBER, "DISAGREE");
+        verify(noticeEngagementRepository).withdrawVote(2L, MEMBER);
+        // Read with the lock an edit waits for, so closing the vote and a late vote never cross.
+        verify(noticeRepository, times(3)).findByIdAndGroupIdForShare(2L, 1L);
+        // Voting is not paid.
+        verify(pointService, never()).grantNoticePoint(any(), any(), any());
+    }
+
+    @Test
+    void refusesAChoiceThatIsNeitherForNorAgainst() {
+        Notice notice = stubNotice(2L, false);
+        notice.setVoteStatus("OPEN");
+
+        for (String choice : new String[] {null, "", "ABSTAIN", "yes"}) {
+            assertThatThrownBy(() -> noticeService.castVote(1L, 2L, MEMBER, choice))
+                .isInstanceOf(IllegalArgumentException.class);
+        }
+        verify(noticeEngagementRepository, never()).castVote(any(), any(), any());
+    }
+
+    @Test
+    void keepsTheResultButTakesNoMoreVotesOnceTheVoteIsClosed() {
+        Notice notice = stubNotice(2L, false);
+        notice.setVoteStatus("CLOSED");
+        when(noticeEngagementRepository.countVotes(2L)).thenReturn(Map.of("AGREE", 3L));
+        when(noticeEngagementRepository.findVote(2L, MEMBER)).thenReturn("AGREE");
+
+        assertThat(noticeService.open(1L, 2L, MEMBER).vote()).isEqualTo(new NoticeVoteResponse("CLOSED", 3L, 0L, "AGREE"));
+        assertThat(noticeService.list(1L, MEMBER).notices()).extracting(NoticeListItemResponse::voteOpen).containsOnly(false);
+        assertThatThrownBy(() -> noticeService.castVote(1L, 2L, MEMBER, "DISAGREE"))
+            .isInstanceOf(NoticeVoteClosedException.class);
+        assertThatThrownBy(() -> noticeService.withdrawVote(1L, 2L, MEMBER))
+            .isInstanceOf(NoticeVoteClosedException.class);
+        verify(noticeEngagementRepository, never()).castVote(any(), any(), any());
+        verify(noticeEngagementRepository, never()).withdrawVote(any(), any());
+    }
+
+    @Test
+    void keepsTheVoteOfANoticeForAdminsFromMembers() {
+        Notice notice = stubNotice(3L, true);
+        notice.setVoteStatus("OPEN");
+
+        assertThatThrownBy(() -> noticeService.castVote(1L, 3L, MEMBER, "AGREE")).isInstanceOf(NoSuchElementException.class);
+        assertThatThrownBy(() -> noticeService.withdrawVote(1L, 3L, MEMBER)).isInstanceOf(NoSuchElementException.class);
+        verify(noticeEngagementRepository, never()).castVote(any(), any(), any());
+
+        noticeService.castVote(1L, 3L, ADMIN, "AGREE");
+        verify(noticeEngagementRepository).castVote(3L, ADMIN, "AGREE");
+    }
+
+    @Test
+    void marksNoticesWithAnOpenVoteInTheList() {
+        // The list in setUp holds notices 3 (admins only), 2 and 1.
+        when(noticeRepository.findByGroupIdOrderByCreatedAtDescIdDesc(1L)).thenAnswer(invocation -> {
+            Notice open = notice(2L, "second", false);
+            open.setVoteStatus("OPEN");
+            Notice closed = notice(1L, "first", false);
+            closed.setVoteStatus("CLOSED");
+            return List.of(open, closed);
+        });
+
+        assertThat(noticeService.list(1L, MEMBER).notices())
+            .extracting(NoticeListItemResponse::id, NoticeListItemResponse::voteOpen)
+            .containsExactly(tuple(2L, true), tuple(1L, false));
     }
 
     @Test

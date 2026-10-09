@@ -12,6 +12,8 @@ public record NoticeListItemResponse(
     // An edit of this notice was announced again; with read false it explains why it is unread.
     boolean revised,
     long likeCount,
-    long commentCount
+    long commentCount,
+    // Members are being asked to vote on this notice.
+    boolean voteOpen
 ) {
 }

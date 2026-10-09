@@ -10,9 +10,10 @@ import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { NoticeBody } from '@/components/notice-body'
 import { NoticeComments } from '@/components/notice-comments'
 import { NoticeContentEditor } from '@/components/notice-content-editor'
+import { NoticeVotePanel } from '@/components/notice-vote'
 import { NOTICE_IMAGE_MAX_COUNT, noticeImageIds } from '@/lib/notice-images'
 import { t } from '@/lib/i18n'
-import type { NoticeDetail } from '@/types/api'
+import type { NoticeDetail, NoticeVoteStatus } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
 const NOTICE_CONTENT_MAX_LENGTH = 5000
@@ -39,6 +40,7 @@ export default function NoticeDetailPage() {
   const [title, setTitle] = useState<string>('')
   const [content, setContent] = useState<string>('')
   const [adminOnly, setAdminOnly] = useState<boolean>(false)
+  const [voteStatus, setVoteStatus] = useState<NoticeVoteStatus>('NONE')
   // Off for every edit: announcing again is a choice, not something a typo fix should do.
   const [notifyAgain, setNotifyAgain] = useState<boolean>(false)
   const [saving, setSaving] = useState<boolean>(false)
@@ -63,6 +65,7 @@ export default function NoticeDetailPage() {
       setTitle(response.title)
       setContent(response.content)
       setAdminOnly(response.adminOnly)
+      setVoteStatus(response.vote?.status ?? 'NONE')
     } catch {
       setError(t('notices.posts.notFound'))
     } finally {
@@ -73,6 +76,18 @@ export default function NoticeDetailPage() {
   useEffect(() => {
     void loadNotice()
   }, [loadNotice])
+
+  // The notice as it is now, without the loading state: after a save, or when a vote turned out
+  // to be closed. A failure leaves what is shown as it is.
+  const refreshNotice = useCallback(async () => {
+    try {
+      const response = await apiClient.getNotice(TEMP_GROUP_ID, noticeId)
+      setNotice(response)
+      setVoteStatus(response.vote?.status ?? 'NONE')
+    } catch {
+      // Nothing to do: the next visit reads it again.
+    }
+  }, [noticeId])
 
   const handleUpdate = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -102,6 +117,7 @@ export default function NoticeDetailPage() {
           content: content.trim(),
           adminOnly,
           notify: notifyAgain,
+          voteStatus,
         })
         setNotice((prev) =>
           prev
@@ -116,6 +132,8 @@ export default function NoticeDetailPage() {
         )
         setEditing(false)
         setNotifyAgain(false)
+        // The vote block (opened, closed or gone) comes with the notice itself.
+        void refreshNotice()
       } catch (error) {
         // 409: the text names an image the notice cannot show; nothing was saved.
         setFormError(
@@ -127,7 +145,7 @@ export default function NoticeDetailPage() {
         setSaving(false)
       }
     },
-    [adminOnly, content, noticeId, notifyAgain, title]
+    [adminOnly, content, noticeId, notifyAgain, refreshNotice, title, voteStatus]
   )
 
   const handleDelete = useCallback(async () => {
@@ -198,6 +216,16 @@ export default function NoticeDetailPage() {
               </p>
             </div>
             <NoticeBody groupId={TEMP_GROUP_ID} content={notice.content} />
+
+            {notice.vote && (
+              <NoticeVotePanel
+                groupId={TEMP_GROUP_ID}
+                noticeId={noticeId}
+                vote={notice.vote}
+                onChange={setNotice}
+                onClosed={() => void refreshNotice()}
+              />
+            )}
 
             <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
               <button
@@ -285,6 +313,21 @@ export default function NoticeDetailPage() {
           </label>
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200">
+              {t('notices.posts.voteSettingLabel')}
+              <select
+                value={voteStatus}
+                onChange={(event) => setVoteStatus(event.target.value as NoticeVoteStatus)}
+                className="rounded-md border border-slate-300 px-2 py-1 text-xs dark:border-slate-600 dark:bg-slate-900"
+              >
+                <option value="NONE">{t('notices.posts.voteSettingNone')}</option>
+                <option value="OPEN">{t('notices.posts.voteSettingOpen')}</option>
+                <option value="CLOSED">{t('notices.posts.voteSettingClosed')}</option>
+              </select>
+            </label>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{t('notices.posts.voteSettingHint')}</p>
+          </div>
+          <div className="space-y-1">
+            <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200">
               <input type="checkbox" checked={notifyAgain} onChange={(event) => setNotifyAgain(event.target.checked)} />
               {t('notices.posts.notifyAgainLabel')}
             </label>
@@ -305,6 +348,7 @@ export default function NoticeDetailPage() {
                 setTitle(notice.title)
                 setContent(notice.content)
                 setAdminOnly(notice.adminOnly)
+                setVoteStatus(notice.vote?.status ?? 'NONE')
                 setNotifyAgain(false)
                 setFormError(null)
               }}

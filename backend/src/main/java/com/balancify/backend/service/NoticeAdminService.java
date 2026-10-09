@@ -56,6 +56,9 @@ public class NoticeAdminService {
         notice.setContent(content);
         notice.setAuthorEmail(safeTrim(actorEmail).toLowerCase(Locale.ROOT));
         notice.setAdminOnly(request != null && Boolean.TRUE.equals(request.adminOnly()));
+        if (request != null && request.voteStatus() != null) {
+            notice.setVoteStatus(NoticeVotes.requireStatus(request.voteStatus()));
+        }
         noticeRepository.save(notice);
         // Fails the whole save when the text names an image this notice cannot show.
         noticeImageService.placeInNotice(groupId, notice.getId(), content);
@@ -70,7 +73,8 @@ public class NoticeAdminService {
             actorNickname,
             notice.getCreatedAt(),
             notice.getUpdatedAt(),
-            notice.isAdminOnly()
+            notice.isAdminOnly(),
+            notice.getVoteStatus()
         );
     }
 
@@ -100,6 +104,11 @@ public class NoticeAdminService {
         // Leaving the flag out of an update keeps it as it was.
         if (request != null && request.adminOnly() != null) {
             notice.setAdminOnly(request.adminOnly());
+        }
+        // The votes themselves are never touched here: closing keeps the result, and a vote taken
+        // off a notice comes back as it was if it is put on again.
+        if (request != null && request.voteStatus() != null) {
+            notice.setVoteStatus(NoticeVotes.requireStatus(request.voteStatus()));
         }
         // A notice opened up to members reaches them as a new one; they have no reads to turn back.
         boolean openedToMembers = wasAdminOnly && !notice.isAdminOnly();
@@ -141,7 +150,8 @@ public class NoticeAdminService {
             authorNickname.isEmpty() ? null : authorNickname,
             notice.getCreatedAt(),
             notice.getUpdatedAt(),
-            notice.isAdminOnly()
+            notice.isAdminOnly(),
+            notice.getVoteStatus()
         );
     }
 

@@ -65,6 +65,7 @@ class AccountPersonalDataRepositoryTest {
             "DELETE FROM notice_reads WHERE reader_email = :email",
             "DELETE FROM notice_likes WHERE liker_email = :email",
             "DELETE FROM notice_comment_likes WHERE liker_email = :email",
+            "DELETE FROM notice_votes WHERE voter_email = :email",
             "DELETE FROM notice_comments WHERE author_email = :email"
         );
     }
