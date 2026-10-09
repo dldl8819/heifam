@@ -5,14 +5,20 @@ import com.balancify.backend.api.group.dto.NoticeDetailResponse;
 import com.balancify.backend.api.group.dto.NoticeListItemResponse;
 import com.balancify.backend.api.group.dto.NoticeListResponse;
 import com.balancify.backend.api.group.dto.NoticeTitleResponse;
+import com.balancify.backend.api.group.dto.NoticeVoteKeptResponse;
+import com.balancify.backend.api.group.dto.NoticeVoteOptionResponse;
 import com.balancify.backend.api.group.dto.NoticeVoteResponse;
 import com.balancify.backend.domain.Notice;
 import com.balancify.backend.domain.NoticeComment;
 import com.balancify.backend.repository.NoticeCommentRepository;
 import com.balancify.backend.repository.NoticeEngagementRepository;
 import com.balancify.backend.repository.NoticeRepository;
+import com.balancify.backend.repository.NoticeVoteRepository;
+import com.balancify.backend.repository.NoticeVoteRepository.OptionRow;
+import com.balancify.backend.repository.NoticeVoteRepository.VoterRow;
 import com.balancify.backend.service.exception.NoticeForbiddenException;
 import com.balancify.backend.service.exception.NoticeVoteClosedException;
+import com.balancify.backend.service.exception.NoticeVoteConflictException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -24,6 +30,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,8 +42,10 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Comments can be answered, one level deep, edited by their writer and liked by others. A
  * comment deleted while it has replies stays as an emptied place until its last reply is gone.
  *
- * <p>A notice can ask for a vote, for or against. Everyone who may open the notice sees how many
- * chose each; who chose what is shown to nobody.
+ * <p>A notice can ask for a vote on a list of options: 찬성 and 반대, or whatever its writer named.
+ * Everyone who may open the notice sees how many chose each. An anonymous vote shows who chose
+ * what to nobody; a named one lists the voters under each option. When the vote allows it, voters
+ * add options of their own.
  */
 @Service
 public class NoticeService {
@@ -48,19 +57,25 @@ public class NoticeService {
     private final NoticeEngagementRepository noticeEngagementRepository;
     private final AccessControlService accessControlService;
     private final PointService pointService;
+    private final NoticeVoteRepository noticeVoteRepository;
+    private final OperationAuditLogService operationAuditLogService;
 
     public NoticeService(
         NoticeRepository noticeRepository,
         NoticeCommentRepository noticeCommentRepository,
         NoticeEngagementRepository noticeEngagementRepository,
         AccessControlService accessControlService,
-        PointService pointService
+        PointService pointService,
+        NoticeVoteRepository noticeVoteRepository,
+        OperationAuditLogService operationAuditLogService
     ) {
         this.noticeRepository = noticeRepository;
         this.noticeCommentRepository = noticeCommentRepository;
         this.noticeEngagementRepository = noticeEngagementRepository;
         this.accessControlService = accessControlService;
         this.pointService = pointService;
+        this.noticeVoteRepository = noticeVoteRepository;
+        this.operationAuditLogService = operationAuditLogService;
     }
 
     @Transactional(readOnly = true)
@@ -245,28 +260,95 @@ public class NoticeService {
     }
 
     /**
-     * A member's vote for or against a notice that asks for one. Voting again changes the choice;
+     * A member's vote on a notice that asks for one. Voting again moves the vote to another option;
      * once the vote is closed nothing changes any more. The notice is locked as for opening it,
-     * so a vote and the edit that closes voting never cross.
+     * so a vote and the edit that closes voting never cross. A page loaded before votes had
+     * options sends AGREE or DISAGREE instead of an option, meaning 찬성 or 반대.
      */
     @Transactional
-    public NoticeDetailResponse castVote(Long groupId, Long noticeId, String email, String choice) {
+    public NoticeDetailResponse castVote(Long groupId, Long noticeId, String email, Long optionId, String legacyChoice) {
         String voter = normalizeEmail(email);
-        Notice notice = requireOpenVote(groupId, noticeId, voter);
-        noticeEngagementRepository.castVote(notice.getId(), voter, NoticeVotes.requireChoice(choice));
+        Notice notice = requireOpenVote(noticeRepository.findByIdAndGroupIdForShare(noticeId, groupId), voter);
+        List<OptionRow> options = noticeVoteRepository.listOptions(notice.getId());
+        OptionRow chosen;
+        if (optionId != null) {
+            // Taken away since the page was drawn: the page reads the vote again.
+            chosen = options.stream().filter(option -> option.id().equals(optionId)).findFirst()
+                .orElseThrow(() -> new NoticeVoteConflictException("없어진 투표 항목입니다."));
+        } else {
+            String label = NoticeVotes.legacyLabel(legacyChoice);
+            chosen = options.stream().filter(option -> option.label().equals(label)).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("투표할 항목을 골라 주세요."));
+        }
+        noticeVoteRepository.castVote(notice.getId(), voter, chosen.id());
         return detail(notice, voter);
     }
 
     @Transactional
     public NoticeDetailResponse withdrawVote(Long groupId, Long noticeId, String email) {
         String voter = normalizeEmail(email);
-        Notice notice = requireOpenVote(groupId, noticeId, voter);
-        noticeEngagementRepository.withdrawVote(notice.getId(), voter);
+        Notice notice = requireOpenVote(noticeRepository.findByIdAndGroupIdForShare(noticeId, groupId), voter);
+        noticeVoteRepository.withdrawVote(notice.getId(), voter);
         return detail(notice, voter);
     }
 
-    private Notice requireOpenVote(Long groupId, Long noticeId, String voter) {
-        Notice notice = requireVisible(noticeRepository.findByIdAndGroupIdForShare(noticeId, groupId), voter);
+    /**
+     * Adds an option to an open vote: an admin always may, anyone else who may open the notice
+     * only when the vote allows additions. The notice is locked as for an edit, so two additions
+     * at once come one after the other and a vote never holds more options than it may, nor the
+     * same one twice.
+     */
+    @Transactional
+    public NoticeDetailResponse addVoteOption(Long groupId, Long noticeId, String email, String label) {
+        String actor = normalizeEmail(email);
+        Notice notice = requireOpenVote(noticeRepository.findByIdAndGroupIdForUpdate(noticeId, groupId), actor);
+        if (!notice.isVoteAllowAdditions() && !accessControlService.isAdminEmail(actor)) {
+            throw new NoticeForbiddenException("항목을 추가할 수 없는 투표입니다.");
+        }
+        String cleanLabel = NoticeVotes.requireOptionLabel(label);
+        List<OptionRow> options = noticeVoteRepository.listOptions(notice.getId());
+        if (options.size() >= NoticeVotes.MAX_OPTIONS) {
+            throw new NoticeVoteConflictException("투표 항목은 " + NoticeVotes.MAX_OPTIONS + "개까지 둘 수 있습니다.");
+        }
+        if (options.stream().anyMatch(option -> option.label().equalsIgnoreCase(cleanLabel))) {
+            throw new NoticeVoteConflictException("이미 있는 항목입니다.");
+        }
+        try {
+            noticeVoteRepository.addOption(notice.getId(), cleanLabel, actor);
+        } catch (DuplicateKeyException exception) {
+            // The same option as the database compares them, which the check above did not catch.
+            throw new NoticeVoteConflictException("이미 있는 항목입니다.");
+        }
+        return detail(notice, actor);
+    }
+
+    /**
+     * Takes an option off an open vote, with the votes on it: for admins, to clear away an option
+     * that should not be there. A vote keeps at least two options. Those who had chosen it are
+     * left without a vote and can vote again. The log says how many votes went, never whose.
+     */
+    @Transactional
+    public NoticeDetailResponse removeVoteOption(Long groupId, Long noticeId, Long optionId, String email) {
+        String actor = normalizeEmail(email);
+        if (!accessControlService.isAdminEmail(actor)) {
+            throw new NoticeForbiddenException("운영진만 투표 항목을 삭제할 수 있습니다.");
+        }
+        Notice notice = requireOpenVote(noticeRepository.findByIdAndGroupIdForUpdate(noticeId, groupId), actor);
+        List<OptionRow> options = noticeVoteRepository.listOptions(notice.getId());
+        OptionRow option = options.stream().filter(candidate -> candidate.id().equals(optionId)).findFirst()
+            .orElseThrow(() -> new NoticeVoteConflictException("없어진 투표 항목입니다."));
+        if (options.size() <= NoticeVotes.MIN_OPTIONS) {
+            throw new IllegalArgumentException("투표 항목은 " + NoticeVotes.MIN_OPTIONS + "개 이상이어야 합니다.");
+        }
+        noticeVoteRepository.removeOption(notice.getId(), option.id());
+        operationAuditLogService.recordNoticeVoteOptionRemoved(
+            actor, accessControlService.resolveDisplayNickname(actor), groupId, notice, option.label(), option.voteCount()
+        );
+        return detail(notice, actor);
+    }
+
+    private Notice requireOpenVote(Optional<Notice> found, String voter) {
+        Notice notice = requireVisible(found, voter);
         if (NoticeVotes.CLOSED.equals(notice.getVoteStatus())) {
             throw new NoticeVoteClosedException("투표가 마감되었습니다.");
         }
@@ -277,21 +359,81 @@ public class NoticeService {
     }
 
     private static boolean asksForVote(Notice notice) {
-        String status = notice.getVoteStatus();
-        return NoticeVotes.OPEN.equals(status) || NoticeVotes.CLOSED.equals(status);
+        return NoticeVotes.asksForVote(notice.getVoteStatus());
     }
 
-    private NoticeVoteResponse vote(Notice notice, String reader) {
+    private NoticeVoteResponse vote(Notice notice, String reader, boolean admin) {
         String status = notice.getVoteStatus();
         if (!asksForVote(notice)) {
             return null;
         }
-        Map<String, Long> counts = noticeEngagementRepository.countVotes(notice.getId());
+        List<OptionRow> options = noticeVoteRepository.listOptions(notice.getId());
+        Long myOptionId = noticeVoteRepository.findVotedOptionId(notice.getId(), reader).orElse(null);
+        // Looked up only for a named vote: an anonymous one never loads who voted for what.
+        Map<Long, List<String>> voters = notice.isVoteAnonymous() ? null : votersByOption(notice.getId());
+        boolean open = NoticeVotes.OPEN.equals(status);
+
+        long agreeCount = 0;
+        long disagreeCount = 0;
+        String myChoice = null;
+        for (OptionRow option : options) {
+            boolean mine = option.id().equals(myOptionId);
+            if (NoticeVotes.AGREE_LABEL.equals(option.label())) {
+                agreeCount = option.voteCount();
+                myChoice = mine ? NoticeVotes.AGREE : myChoice;
+            } else if (NoticeVotes.DISAGREE_LABEL.equals(option.label())) {
+                disagreeCount = option.voteCount();
+                myChoice = mine ? NoticeVotes.DISAGREE : myChoice;
+            }
+        }
         return new NoticeVoteResponse(
             status,
-            counts.getOrDefault(NoticeVotes.AGREE, 0L),
-            counts.getOrDefault(NoticeVotes.DISAGREE, 0L),
-            noticeEngagementRepository.findVote(notice.getId(), reader)
+            agreeCount,
+            disagreeCount,
+            myChoice,
+            notice.isVoteAnonymous(),
+            notice.isVoteAllowAdditions(),
+            open && options.size() < NoticeVotes.MAX_OPTIONS && (admin || notice.isVoteAllowAdditions()),
+            open && admin && options.size() > NoticeVotes.MIN_OPTIONS,
+            options.stream().mapToLong(OptionRow::voteCount).sum(),
+            myOptionId,
+            options.stream()
+                .map(option -> new NoticeVoteOptionResponse(
+                    option.id(),
+                    option.label(),
+                    option.voteCount(),
+                    option.id().equals(myOptionId),
+                    voters == null ? null : voters.getOrDefault(option.id(), List.of())
+                ))
+                .toList()
+        );
+    }
+
+    /** Nicknames of the voters under the option each chose; a voter without a nickname is a null entry. */
+    private Map<Long, List<String>> votersByOption(Long noticeId) {
+        List<VoterRow> rows = noticeVoteRepository.listVoters(noticeId);
+        Map<String, String> nicknames = nicknames(rows.stream().map(VoterRow::voterEmail).toList());
+        Map<Long, List<String>> byOption = new HashMap<>();
+        rows.forEach(row -> byOption
+            .computeIfAbsent(row.optionId(), id -> new ArrayList<>())
+            .add(nicknames.get(normalizeEmail(row.voterEmail()))));
+        return byOption;
+    }
+
+    /** A vote taken off the notice but kept, for the admin's edit form; nothing for anyone else. */
+    private NoticeVoteKeptResponse voteKept(Notice notice, boolean admin) {
+        if (!admin || asksForVote(notice)) {
+            return null;
+        }
+        List<OptionRow> options = noticeVoteRepository.listOptions(notice.getId());
+        if (options.isEmpty()) {
+            return null;
+        }
+        return new NoticeVoteKeptResponse(
+            options.stream().map(OptionRow::label).toList(),
+            options.stream().mapToLong(OptionRow::voteCount).sum(),
+            notice.isVoteAnonymous(),
+            notice.isVoteAllowAdditions()
         );
     }
 
@@ -343,8 +485,9 @@ public class NoticeService {
                     );
                 })
                 .toList(),
-            vote(notice, reader),
-            noticeEngagementRepository.countReads(List.of(notice.getId())).getOrDefault(notice.getId(), 0L)
+            vote(notice, reader, admin),
+            noticeEngagementRepository.countReads(List.of(notice.getId())).getOrDefault(notice.getId(), 0L),
+            voteKept(notice, admin)
         );
     }
 

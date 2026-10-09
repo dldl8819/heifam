@@ -17,6 +17,8 @@ public record NoticeDetailResponse(
     // Null for a notice that asks for no vote.
     NoticeVoteResponse vote,
     // People who have opened the notice, each counted once, this reader included.
-    long viewCount
+    long viewCount,
+    // A vote taken off the notice but kept; null unless the reader is an admin and there is one.
+    NoticeVoteKeptResponse voteKept
 ) {
 }

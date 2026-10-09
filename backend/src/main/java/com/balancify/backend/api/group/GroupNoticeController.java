@@ -4,11 +4,13 @@ import com.balancify.backend.api.group.dto.NoticeCommentRequest;
 import com.balancify.backend.api.group.dto.NoticeDetailResponse;
 import com.balancify.backend.api.group.dto.NoticeListResponse;
 import com.balancify.backend.api.group.dto.NoticeTitleResponse;
+import com.balancify.backend.api.group.dto.NoticeVoteOptionRequest;
 import com.balancify.backend.api.group.dto.NoticeVoteRequest;
 import com.balancify.backend.security.AuthenticatedRequestResolver;
 import com.balancify.backend.service.NoticeService;
 import com.balancify.backend.service.exception.NoticeForbiddenException;
 import com.balancify.backend.service.exception.NoticeVoteClosedException;
+import com.balancify.backend.service.exception.NoticeVoteConflictException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -140,8 +142,37 @@ public class GroupNoticeController {
             groupId,
             noticeId,
             requestEmail,
+            requestBody == null ? null : requestBody.optionId(),
             requestBody == null ? null : requestBody.choice()
         ));
+    }
+
+    @PostMapping("/{groupId}/notices/{noticeId}/vote/options")
+    public NoticeDetailResponse addVoteOption(
+        @PathVariable Long groupId,
+        @PathVariable Long noticeId,
+        @RequestBody NoticeVoteOptionRequest requestBody,
+        HttpServletRequest request
+    ) {
+        String requestEmail = requireRequestEmail(request);
+        return handle(() -> noticeService.addVoteOption(
+            groupId,
+            noticeId,
+            requestEmail,
+            requestBody == null ? null : requestBody.label()
+        ));
+    }
+
+    /** Admins only (AdminKeyFilter, and NoticeService checks again): the votes on the option go with it. */
+    @DeleteMapping("/{groupId}/notices/{noticeId}/vote/options/{optionId}")
+    public NoticeDetailResponse removeVoteOption(
+        @PathVariable Long groupId,
+        @PathVariable Long noticeId,
+        @PathVariable Long optionId,
+        HttpServletRequest request
+    ) {
+        String requestEmail = requireRequestEmail(request);
+        return handle(() -> noticeService.removeVoteOption(groupId, noticeId, optionId, requestEmail));
     }
 
     @DeleteMapping("/{groupId}/notices/{noticeId}/vote")
@@ -187,7 +218,7 @@ public class GroupNoticeController {
             return action.get();
         } catch (NoticeForbiddenException exception) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, exception.getMessage(), exception);
-        } catch (NoticeVoteClosedException exception) {
+        } catch (NoticeVoteClosedException | NoticeVoteConflictException exception) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, exception.getMessage(), exception);
         } catch (NoSuchElementException exception) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, exception.getMessage(), exception);

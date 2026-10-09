@@ -585,17 +585,41 @@ export type NoticeItem = {
   voteStatus?: NoticeVoteStatus
 }
 
-// Whether a notice asks members to vote for or against it.
+// Whether a notice asks members to vote on its options.
 export type NoticeVoteStatus = 'NONE' | 'OPEN' | 'CLOSED'
 
-export type NoticeVoteChoice = 'AGREE' | 'DISAGREE'
+export type NoticeVoteOption = {
+  id: number
+  label: string
+  count: number
+  // The reader's own vote is on this option.
+  mine: boolean
+  // Nicknames of those who chose it, in the order they voted; null for a voter without one.
+  // Missing or null altogether when the vote is anonymous.
+  voters?: (string | null)[] | null
+}
 
-/** The vote on a notice: how many are for and against, and the reader's own choice. */
+/** The vote on a notice: its options with how many chose each, and the reader's own choice. */
 export type NoticeVote = {
   status: 'OPEN' | 'CLOSED'
-  agreeCount: number
-  disagreeCount: number
-  myChoice?: NoticeVoteChoice | null
+  // An anonymous vote shows counts only; a named one lists the voters under each option.
+  anonymous: boolean
+  // Voters may add options of their own while the vote is open.
+  allowAdditions: boolean
+  // What this reader may do now.
+  canAddOption: boolean
+  canRemoveOptions: boolean
+  totalVoters: number
+  myOptionId?: number | null
+  options: NoticeVoteOption[]
+}
+
+/** A vote taken off its notice but kept; only admins are sent it, for the edit form. */
+export type NoticeVoteKept = {
+  options: string[]
+  totalVoters: number
+  anonymous: boolean
+  allowAdditions: boolean
 }
 
 export type NoticeTitle = {
@@ -659,14 +683,22 @@ export type NoticeDetail = {
   vote?: NoticeVote | null
   // People who have opened the notice, each counted once, this reader included.
   viewCount?: number
+  // Missing or null unless the reader is an admin and the notice keeps a vote that was taken off it.
+  voteKept?: NoticeVoteKept | null
 }
 
 export type NoticeCreateRequest = {
   title: string
   content: string
   adminOnly?: boolean
-  // 'OPEN' asks members to vote for or against the notice.
+  // 'OPEN' asks members to vote on the notice.
   voteStatus?: NoticeVoteStatus
+  // What can be voted for, in order; left out, the vote is 찬성 or 반대.
+  voteOptions?: string[]
+  // Left out, the vote is anonymous.
+  voteAnonymous?: boolean
+  // Voters may add options of their own; left out, they may not.
+  voteAllowAdditions?: boolean
 }
 
 export type NoticeUpdateRequest = {
@@ -677,6 +709,11 @@ export type NoticeUpdateRequest = {
   notify?: boolean
   // Left out, the vote stays as it is.
   voteStatus?: NoticeVoteStatus
+  // Left out, each stays as it is. The options can be changed only while nobody has voted, and an
+  // anonymous vote that has votes cannot be made a named one (422).
+  voteOptions?: string[]
+  voteAnonymous?: boolean
+  voteAllowAdditions?: boolean
 }
 
 export type NoticeImageUpload = {

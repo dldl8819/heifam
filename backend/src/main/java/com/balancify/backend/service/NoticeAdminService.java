@@ -6,6 +6,10 @@ import com.balancify.backend.api.group.dto.NoticeUpdateRequest;
 import com.balancify.backend.domain.Notice;
 import com.balancify.backend.repository.NoticeEngagementRepository;
 import com.balancify.backend.repository.NoticeRepository;
+import com.balancify.backend.repository.NoticeVoteRepository;
+import com.balancify.backend.repository.NoticeVoteRepository.OptionRow;
+import com.balancify.backend.service.exception.NoticeVoteConflictException;
+import java.util.List;
 import java.util.Locale;
 import java.util.NoSuchElementException;
 import org.springframework.stereotype.Service;
@@ -22,6 +26,7 @@ public class NoticeAdminService {
     private final OperationAuditLogService operationAuditLogService;
     private final NotificationService notificationService;
     private final NoticeImageService noticeImageService;
+    private final NoticeVoteRepository noticeVoteRepository;
 
     public NoticeAdminService(
         NoticeRepository noticeRepository,
@@ -29,7 +34,8 @@ public class NoticeAdminService {
         AccessControlService accessControlService,
         OperationAuditLogService operationAuditLogService,
         NotificationService notificationService,
-        NoticeImageService noticeImageService
+        NoticeImageService noticeImageService,
+        NoticeVoteRepository noticeVoteRepository
     ) {
         this.noticeRepository = noticeRepository;
         this.noticeEngagementRepository = noticeEngagementRepository;
@@ -37,6 +43,7 @@ public class NoticeAdminService {
         this.operationAuditLogService = operationAuditLogService;
         this.notificationService = notificationService;
         this.noticeImageService = noticeImageService;
+        this.noticeVoteRepository = noticeVoteRepository;
     }
 
     @Transactional
@@ -52,6 +59,10 @@ public class NoticeAdminService {
             ? NoticeVotes.requireStatus(request.voteStatus())
             : NoticeVotes.NONE;
         String content = requireContent(request == null ? null : request.content(), voteStatus);
+        // Checked before anything is saved: a vote without two things to choose between is no vote.
+        List<String> voteOptions = NoticeVotes.asksForVote(voteStatus)
+            ? NoticeVotes.requireOptions(request.voteOptions())
+            : List.of();
 
         Notice notice = new Notice();
         notice.setGroupId(groupId);
@@ -60,7 +71,13 @@ public class NoticeAdminService {
         notice.setAuthorEmail(safeTrim(actorEmail).toLowerCase(Locale.ROOT));
         notice.setAdminOnly(request != null && Boolean.TRUE.equals(request.adminOnly()));
         notice.setVoteStatus(voteStatus);
+        // Anonymous unless the writer says otherwise, as every vote was before there was a choice.
+        notice.setVoteAnonymous(request == null || !Boolean.FALSE.equals(request.voteAnonymous()));
+        notice.setVoteAllowAdditions(request != null && Boolean.TRUE.equals(request.voteAllowAdditions()));
         noticeRepository.save(notice);
+        if (!voteOptions.isEmpty()) {
+            noticeVoteRepository.replaceOptions(notice.getId(), voteOptions, notice.getAuthorEmail());
+        }
         // Fails the whole save when the text names an image this notice cannot show.
         noticeImageService.placeInNotice(groupId, notice.getId(), content);
 
@@ -113,6 +130,7 @@ public class NoticeAdminService {
             notice.setAdminOnly(request.adminOnly());
         }
         notice.setVoteStatus(voteStatus);
+        applyVoteSettings(notice, request, safeTrim(actorEmail).toLowerCase(Locale.ROOT));
         // A notice opened up to members reaches them as a new one; they have no reads to turn back.
         boolean openedToMembers = wasAdminOnly && !notice.isAdminOnly();
         boolean closedToMembers = !wasAdminOnly && notice.isAdminOnly();
@@ -169,6 +187,41 @@ public class NoticeAdminService {
         notificationService.removeNotice(notice.getId());
 
         operationAuditLogService.recordNoticeDeleted(actorEmail, actorNickname, groupId, notice.getId(), notice.getTitle());
+    }
+
+    /**
+     * What an edit may change about the vote besides opening and closing it. The options can be
+     * rewritten only while nobody has voted, since a vote is for an option as it read when it was
+     * cast. An anonymous vote that has votes stays anonymous: those who voted were told nobody
+     * would see what they chose. Whether voters may add options can change at any time.
+     */
+    private void applyVoteSettings(Notice notice, NoticeUpdateRequest request, String actor) {
+        List<OptionRow> current = noticeVoteRepository.listOptions(notice.getId());
+        long votes = current.stream().mapToLong(OptionRow::voteCount).sum();
+
+        if (NoticeVotes.asksForVote(notice.getVoteStatus())) {
+            if (request != null && request.voteOptions() != null) {
+                List<String> wanted = NoticeVotes.requireOptions(request.voteOptions());
+                if (!wanted.equals(current.stream().map(OptionRow::label).toList())) {
+                    if (votes > 0) {
+                        throw new NoticeVoteConflictException("이미 투표한 사람이 있어 항목을 바꿀 수 없습니다.");
+                    }
+                    noticeVoteRepository.replaceOptions(notice.getId(), wanted, actor);
+                }
+            } else if (current.isEmpty()) {
+                // A vote put on a notice that never had one, without naming options: for or against.
+                noticeVoteRepository.replaceOptions(notice.getId(), NoticeVotes.DEFAULT_OPTIONS, actor);
+            }
+        }
+        if (request != null && request.voteAnonymous() != null && request.voteAnonymous() != notice.isVoteAnonymous()) {
+            if (!request.voteAnonymous() && votes > 0) {
+                throw new NoticeVoteConflictException("익명으로 받은 투표는 기명 투표로 바꿀 수 없습니다.");
+            }
+            notice.setVoteAnonymous(request.voteAnonymous());
+        }
+        if (request != null && request.voteAllowAdditions() != null) {
+            notice.setVoteAllowAdditions(request.voteAllowAdditions());
+        }
     }
 
     private void requireAdmin(String actorEmail) {

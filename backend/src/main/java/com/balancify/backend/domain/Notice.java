@@ -47,9 +47,34 @@ public class Notice {
     @Column(name = "revised_at")
     private OffsetDateTime revisedAt;
 
-    // Whether members are asked to vote for or against this notice: NONE, OPEN or CLOSED.
+    // Whether members are asked to vote on this notice: NONE, OPEN or CLOSED. What they vote for
+    // is the notice's options (notice_vote_options).
     @Column(name = "vote_status", nullable = false, length = 10)
     private String voteStatus = "NONE";
+
+    // An anonymous vote shows how many chose each option and never who.
+    @Column(name = "vote_anonymous", nullable = false)
+    private boolean voteAnonymous = true;
+
+    // Voters may add options of their own while the vote is open.
+    @Column(name = "vote_allow_additions", nullable = false)
+    private boolean voteAllowAdditions;
+
+    public boolean isVoteAnonymous() {
+        return voteAnonymous;
+    }
+
+    public void setVoteAnonymous(boolean voteAnonymous) {
+        this.voteAnonymous = voteAnonymous;
+    }
+
+    public boolean isVoteAllowAdditions() {
+        return voteAllowAdditions;
+    }
+
+    public void setVoteAllowAdditions(boolean voteAllowAdditions) {
+        this.voteAllowAdditions = voteAllowAdditions;
+    }
 
     public boolean isAdminOnly() {
         return adminOnly;

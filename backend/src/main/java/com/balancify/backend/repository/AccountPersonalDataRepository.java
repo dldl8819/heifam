@@ -234,6 +234,11 @@ public class AccountPersonalDataRepository {
             jdbcTemplate.update("DELETE FROM notice_likes WHERE liker_email = :email", parameters);
             jdbcTemplate.update("DELETE FROM notice_comment_likes WHERE liker_email = :email", parameters);
             jdbcTemplate.update("DELETE FROM notice_votes WHERE voter_email = :email", parameters);
+            // An option they added to a vote stays, with the votes others gave it, but no longer theirs.
+            jdbcTemplate.update(
+                "UPDATE notice_vote_options SET created_by_email = NULL WHERE created_by_email = :email",
+                parameters
+            );
             jdbcTemplate.update("DELETE FROM notice_comments WHERE author_email = :email", parameters);
             // And what they left on the member boards: their likes, views and comments, then their
             // posts, with whatever others left on those posts (ON DELETE CASCADE).

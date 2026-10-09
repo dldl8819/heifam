@@ -10,8 +10,15 @@ import { BoardSearchBox } from '@/components/board-search-box'
 import { LedgerSection } from '@/components/ledger-section'
 import { NoticeContentEditor } from '@/components/notice-content-editor'
 import { NoticeVoteView } from '@/components/notice-vote'
+import { NoticeVoteSettings } from '@/components/notice-vote-settings'
 import { NOTICE_IMAGE_MAX_COUNT, noticeImageIds } from '@/lib/notice-images'
 import { filterNotices, showsRevisedMark, type NoticeFilter } from '@/lib/notice-list'
+import {
+  NOTICE_VOTE_DEFAULT_OPTIONS,
+  cleanNoticeVoteOptions,
+  previewNoticeVote,
+  validateNoticeVoteOptions,
+} from '@/lib/notice-vote'
 import { t } from '@/lib/i18n'
 import type { NoticeList, NoticeTitle } from '@/types/api'
 
@@ -127,6 +134,10 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
   const [content, setContent] = useState<string>('')
   const [adminOnly, setAdminOnly] = useState<boolean>(false)
   const [withVote, setWithVote] = useState<boolean>(false)
+  const [voteOptions, setVoteOptions] = useState<string[]>(NOTICE_VOTE_DEFAULT_OPTIONS)
+  // Anonymous unless the writer says otherwise, as every vote was before there was a choice.
+  const [voteAnonymous, setVoteAnonymous] = useState<boolean>(true)
+  const [voteAllowAdditions, setVoteAllowAdditions] = useState<boolean>(false)
   const [saving, setSaving] = useState<boolean>(false)
   const [imageUploading, setImageUploading] = useState<boolean>(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -174,6 +185,13 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
         setFormError(t('notices.posts.imageTooMany', { max: NOTICE_IMAGE_MAX_COUNT }))
         return
       }
+      const voteProblem = withVote ? validateNoticeVoteOptions(voteOptions) : null
+      if (voteProblem) {
+        setFormError(
+          t(`notices.posts.${voteProblem.key}`, { min: voteProblem.min, max: voteProblem.max, length: voteProblem.length })
+        )
+        return
+      }
 
       setFormError(null)
       setSaving(true)
@@ -183,11 +201,17 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
           content: content.trim(),
           adminOnly,
           voteStatus: withVote ? 'OPEN' : 'NONE',
+          ...(withVote
+            ? { voteOptions: cleanNoticeVoteOptions(voteOptions), voteAnonymous, voteAllowAdditions }
+            : {}),
         })
         setTitle('')
         setContent('')
         setAdminOnly(false)
         setWithVote(false)
+        setVoteOptions(NOTICE_VOTE_DEFAULT_OPTIONS)
+        setVoteAnonymous(true)
+        setVoteAllowAdditions(false)
         setComposing(false)
         setSuccessMessage(t('notices.posts.saveSuccess'))
         await loadNotices()
@@ -202,7 +226,7 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
         setSaving(false)
       }
     },
-    [adminOnly, content, loadNotices, title, withVote]
+    [adminOnly, content, loadNotices, title, voteAllowAdditions, voteAnonymous, voteOptions, withVote]
   )
 
   const filterButtonClassFor = (selected: boolean) =>
@@ -305,10 +329,19 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
               />
               {/* In the order the notice will show them: the question, the vote, then any text. */}
               {withVote && (
-                <div className="space-y-1">
-                  <NoticeVoteView vote={{ status: 'OPEN', agreeCount: 0, disagreeCount: 0 }} />
+                <div className="space-y-2">
+                  <NoticeVoteSettings
+                    options={voteOptions}
+                    onOptionsChange={setVoteOptions}
+                    anonymous={voteAnonymous}
+                    onAnonymousChange={setVoteAnonymous}
+                    allowAdditions={voteAllowAdditions}
+                    onAllowAdditionsChange={setVoteAllowAdditions}
+                  />
                   <p className="text-xs text-slate-500 dark:text-slate-400">{t('notices.posts.votePreview')}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{t('notices.posts.voteHint')}</p>
+                  <NoticeVoteView
+                    vote={previewNoticeVote(voteOptions, { anonymous: voteAnonymous, allowAdditions: voteAllowAdditions })}
+                  />
                 </div>
               )}
               <NoticeContentEditor

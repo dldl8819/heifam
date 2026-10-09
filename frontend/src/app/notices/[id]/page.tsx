@@ -11,8 +11,17 @@ import { NoticeBody } from '@/components/notice-body'
 import { NoticeComments } from '@/components/notice-comments'
 import { NoticeContentEditor } from '@/components/notice-content-editor'
 import { NoticeVotePanel, NoticeVoteView } from '@/components/notice-vote'
+import { NoticeVoteSettings } from '@/components/notice-vote-settings'
 import { NOTICE_IMAGE_MAX_COUNT, noticeImageIds } from '@/lib/notice-images'
 import { t } from '@/lib/i18n'
+import {
+  NOTICE_VOTE_DEFAULT_OPTIONS,
+  cleanNoticeVoteOptions,
+  editPreviewNoticeVote,
+  sameNoticeVoteOptions,
+  storedNoticeVote,
+  validateNoticeVoteOptions,
+} from '@/lib/notice-vote'
 import type { NoticeDetail, NoticeVoteStatus } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
@@ -41,6 +50,9 @@ export default function NoticeDetailPage() {
   const [content, setContent] = useState<string>('')
   const [adminOnly, setAdminOnly] = useState<boolean>(false)
   const [voteStatus, setVoteStatus] = useState<NoticeVoteStatus>('NONE')
+  const [voteOptions, setVoteOptions] = useState<string[]>(NOTICE_VOTE_DEFAULT_OPTIONS)
+  const [voteAnonymous, setVoteAnonymous] = useState<boolean>(true)
+  const [voteAllowAdditions, setVoteAllowAdditions] = useState<boolean>(false)
   // Off for every edit: announcing again is a choice, not something a typo fix should do.
   const [notifyAgain, setNotifyAgain] = useState<boolean>(false)
   const [saving, setSaving] = useState<boolean>(false)
@@ -49,6 +61,15 @@ export default function NoticeDetailPage() {
 
   const [likeBusy, setLikeBusy] = useState<boolean>(false)
   const [engagementError, setEngagementError] = useState<string | null>(null)
+
+  // The form's vote fields as the notice has them: its vote, or one taken off it but kept.
+  const syncVoteForm = useCallback((source: NoticeDetail) => {
+    const stored = storedNoticeVote(source)
+    setVoteStatus(source.vote?.status ?? 'NONE')
+    setVoteOptions(stored?.options ?? NOTICE_VOTE_DEFAULT_OPTIONS)
+    setVoteAnonymous(stored?.anonymous ?? true)
+    setVoteAllowAdditions(stored?.allowAdditions ?? false)
+  }, [])
 
   const loadNotice = useCallback(async () => {
     if (!Number.isFinite(noticeId)) {
@@ -65,13 +86,13 @@ export default function NoticeDetailPage() {
       setTitle(response.title)
       setContent(response.content)
       setAdminOnly(response.adminOnly)
-      setVoteStatus(response.vote?.status ?? 'NONE')
+      syncVoteForm(response)
     } catch {
       setError(t('notices.posts.notFound'))
     } finally {
       setLoading(false)
     }
-  }, [noticeId])
+  }, [noticeId, syncVoteForm])
 
   useEffect(() => {
     void loadNotice()
@@ -83,11 +104,17 @@ export default function NoticeDetailPage() {
     try {
       const response = await apiClient.getNotice(TEMP_GROUP_ID, noticeId)
       setNotice(response)
-      setVoteStatus(response.vote?.status ?? 'NONE')
+      syncVoteForm(response)
     } catch {
       // Nothing to do: the next visit reads it again.
     }
-  }, [noticeId])
+  }, [noticeId, syncVoteForm])
+
+  // What the notice has stored about its vote, and what of it the votes already cast pin down.
+  const storedVote = notice ? storedNoticeVote(notice) : null
+  const votesCast = storedVote?.totalVoters ?? 0
+  const voteOptionsLocked = votesCast > 0
+  const voteAnonymousLocked = votesCast > 0 && storedVote?.anonymous === true
 
   const handleUpdate = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -109,6 +136,19 @@ export default function NoticeDetailPage() {
         setFormError(t('notices.posts.imageTooMany', { max: NOTICE_IMAGE_MAX_COUNT }))
         return
       }
+      // The options are sent only when the form changed them (or the notice has none yet), so an
+      // option a voter added meanwhile is not undone by saving an edit of something else.
+      const sendVoteOptions =
+        voteStatus !== 'NONE' &&
+        !voteOptionsLocked &&
+        (!storedVote || !sameNoticeVoteOptions(voteOptions, storedVote.options))
+      const voteProblem = sendVoteOptions ? validateNoticeVoteOptions(voteOptions) : null
+      if (voteProblem) {
+        setFormError(
+          t(`notices.posts.${voteProblem.key}`, { min: voteProblem.min, max: voteProblem.max, length: voteProblem.length })
+        )
+        return
+      }
 
       setFormError(null)
       setSaving(true)
@@ -119,6 +159,8 @@ export default function NoticeDetailPage() {
           adminOnly,
           notify: notifyAgain,
           voteStatus,
+          ...(sendVoteOptions ? { voteOptions: cleanNoticeVoteOptions(voteOptions) } : {}),
+          ...(voteStatus !== 'NONE' ? { voteAnonymous, voteAllowAdditions } : {}),
         })
         setNotice((prev) =>
           prev
@@ -136,17 +178,33 @@ export default function NoticeDetailPage() {
         // The vote block (opened, closed or gone) comes with the notice itself.
         void refreshNotice()
       } catch (error) {
-        // 409: the text names an image the notice cannot show; nothing was saved.
-        setFormError(
-          error instanceof ApiRequestError && error.status === 409
-            ? t('notices.posts.imageUnavailable')
-            : t('notices.loadError')
-        )
+        const status = error instanceof ApiRequestError ? error.status : 0
+        if (status === 422) {
+          // Somebody voted since the form was opened, which pins the options and the anonymity down.
+          setFormError(t('notices.posts.voteEditConflict'))
+          void refreshNotice()
+        } else {
+          // 409: the text names an image the notice cannot show; nothing was saved.
+          setFormError(status === 409 ? t('notices.posts.imageUnavailable') : t('notices.loadError'))
+        }
       } finally {
         setSaving(false)
       }
     },
-    [adminOnly, content, noticeId, notifyAgain, refreshNotice, title, voteStatus]
+    [
+      adminOnly,
+      content,
+      noticeId,
+      notifyAgain,
+      refreshNotice,
+      storedVote,
+      title,
+      voteAllowAdditions,
+      voteAnonymous,
+      voteOptions,
+      voteOptionsLocked,
+      voteStatus,
+    ]
   )
 
   const handleDelete = useCallback(async () => {
@@ -317,16 +375,25 @@ export default function NoticeDetailPage() {
           />
           {/* In the order the notice shows them: the question, the vote, then any text. */}
           {voteStatus !== 'NONE' && (
-            <div className="space-y-1">
-              <NoticeVoteView
-                vote={{
-                  status: voteStatus,
-                  agreeCount: notice.vote?.agreeCount ?? 0,
-                  disagreeCount: notice.vote?.disagreeCount ?? 0,
-                  myChoice: notice.vote?.myChoice,
-                }}
+            <div className="space-y-2">
+              <NoticeVoteSettings
+                options={voteOptions}
+                onOptionsChange={setVoteOptions}
+                optionsLocked={voteOptionsLocked}
+                anonymous={voteAnonymous}
+                onAnonymousChange={setVoteAnonymous}
+                anonymousLocked={voteAnonymousLocked}
+                allowAdditions={voteAllowAdditions}
+                onAllowAdditionsChange={setVoteAllowAdditions}
               />
               <p className="text-xs text-slate-500 dark:text-slate-400">{t('notices.posts.votePreview')}</p>
+              <NoticeVoteView
+                vote={editPreviewNoticeVote(notice.vote, voteOptions, {
+                  status: voteStatus,
+                  anonymous: voteAnonymous,
+                  allowAdditions: voteAllowAdditions,
+                })}
+              />
             </div>
           )}
           <NoticeContentEditor
@@ -365,7 +432,7 @@ export default function NoticeDetailPage() {
                 setTitle(notice.title)
                 setContent(notice.content)
                 setAdminOnly(notice.adminOnly)
-                setVoteStatus(notice.vote?.status ?? 'NONE')
+                syncVoteForm(notice)
                 setNotifyAgain(false)
                 setFormError(null)
               }}
