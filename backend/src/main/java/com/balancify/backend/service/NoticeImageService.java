@@ -64,16 +64,25 @@ public class NoticeImageService {
         return noticeImageRepository.insert(groupId, format.contentType(), bytes);
     }
 
+    /**
+     * An image as it is served. openToMembers: it sits in a notice every member may open, which is
+     * when a reader's own browser may keep a copy. One kept to admins, or not placed yet, is
+     * checked on every request instead.
+     */
+    public record ReadableImage(String contentType, byte[] data, boolean openToMembers) {
+    }
+
     /** An image nobody may see answers like one that is not there, as notices do. */
     @Transactional(readOnly = true)
-    public StoredImage read(Long groupId, Long imageId, String readerEmail) {
+    public ReadableImage read(Long groupId, Long imageId, String readerEmail) {
         Placement placement = noticeImageRepository.findPlacement(groupId, imageId)
             .orElseThrow(NoticeImageService::notFound);
         boolean adminsOnly = placement.noticeId() == null || placement.noticeAdminOnly();
         if (adminsOnly && !accessControlService.isAdminEmail(readerEmail)) {
             throw notFound();
         }
-        return noticeImageRepository.findImage(imageId).orElseThrow(NoticeImageService::notFound);
+        StoredImage image = noticeImageRepository.findImage(imageId).orElseThrow(NoticeImageService::notFound);
+        return new ReadableImage(image.contentType(), image.data(), !adminsOnly);
     }
 
     /**

@@ -145,7 +145,31 @@ function buildForwardHeaders(request: NextRequest): Headers {
   return headers
 }
 
-async function buildProxyResponse(upstream: Response): Promise<NextResponse> {
+/** GET /api/groups/{id}/notice-images/{imageId}: the one answer a browser may be told to keep. */
+function isNoticeImageRead(method: string, path: string[]): boolean {
+  return method.toUpperCase() === 'GET'
+    && path.length === 5
+    && path[0] === 'api'
+    && path[1] === 'groups'
+    && path[3] === 'notice-images'
+}
+
+/**
+ * What the browser is told about keeping an answer. Everything is "no-store", except an image the
+ * backend itself marked as the reader's to keep ("private"): then its own words are passed on, so
+ * the image shows at once on the next visit. Anything a shared cache could keep is never passed on.
+ */
+function resolveCacheControl(upstream: Response, noticeImageRead: boolean): string {
+  const upstreamValue = upstream.headers.get('cache-control')?.trim() ?? ''
+  const directives = upstreamValue.toLowerCase().split(',').map((directive) => directive.trim())
+  const readerMayKeep = noticeImageRead
+    && upstream.status === 200
+    && directives.includes('private')
+    && !directives.some((directive) => directive === 'public' || directive.startsWith('s-maxage'))
+  return readerMayKeep ? upstreamValue : 'no-store, max-age=0'
+}
+
+async function buildProxyResponse(upstream: Response, noticeImageRead: boolean): Promise<NextResponse> {
   const responseHeaders = new Headers()
   upstream.headers.forEach((value, key) => {
     const normalizedKey = key.toLowerCase()
@@ -159,7 +183,7 @@ async function buildProxyResponse(upstream: Response): Promise<NextResponse> {
   responseHeaders.delete('content-encoding')
   responseHeaders.delete('content-length')
   responseHeaders.delete('transfer-encoding')
-  responseHeaders.set('Cache-Control', 'no-store, max-age=0')
+  responseHeaders.set('Cache-Control', resolveCacheControl(upstream, noticeImageRead))
 
   // Passed on as the bytes they are: read as text, an image in a notice would arrive broken.
   const upstreamBody = upstream.status === 204 ? null : await upstream.arrayBuffer()
@@ -260,7 +284,7 @@ async function proxyRequest(
           continue
         }
 
-        return await buildProxyResponse(upstream)
+        return await buildProxyResponse(upstream, isNoticeImageRead(request.method, path))
       } catch {
         if (clientAborted) {
           break
