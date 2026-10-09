@@ -106,6 +106,62 @@ describe('API proxy fallback policy', () => {
     expect(new Headers(sent.headers).get('x-user-email')).toBeNull()
   })
 
+  describe('what a browser is told about keeping an answer', () => {
+    const image = new Uint8Array([0xff, 0xd8, 0xff, 0xe0])
+    const imagePath = ['api', 'groups', 'YOUR_GROUP_ID', 'notice-images', '9']
+
+    async function answered(
+      path: string[],
+      upstream: { status?: number; cacheControl?: string },
+      method: 'GET' | 'POST' = 'GET'
+    ): Promise<string | null> {
+      // A new answer for every attempt: a read that is refused is tried against each backend in turn.
+      vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response(upstream.status ? '{}' : image, {
+        status: upstream.status ?? 200,
+        headers: upstream.cacheControl ? { 'cache-control': upstream.cacheControl } : {},
+      })))
+      const url = `https://YOUR_CLIENT.invalid/api/proxy/${path.join('/')}`
+      const request = method === 'GET'
+        ? new NextRequest(url)
+        : new NextRequest(url, { method, body: image, headers: { 'content-type': 'image/jpeg' } })
+      const response = await (method === 'GET' ? GET : POST)(request, { params: Promise.resolve({ path }) })
+      return response.headers.get('cache-control')
+    }
+
+    it('passes on that the reader may keep an image the backend marked so', async () => {
+      expect(await answered(imagePath, { cacheControl: 'private, max-age=2592000, immutable' }))
+        .toBe('private, max-age=2592000, immutable')
+    })
+
+    it('keeps an image the backend did not mark out of every cache', async () => {
+      expect(await answered(imagePath, { cacheControl: 'no-store, max-age=0' })).toBe('no-store, max-age=0')
+      expect(await answered(imagePath, {})).toBe('no-store, max-age=0')
+    })
+
+    it('never passes on what a shared cache could keep', async () => {
+      for (const cacheControl of ['public, max-age=2592000', 'private, s-maxage=60', 'max-age=2592000', 'private, public']) {
+        expect(await answered(imagePath, { cacheControl })).toBe('no-store, max-age=0')
+      }
+    })
+
+    it('keeps a refusal out of every cache, whatever it says', async () => {
+      for (const status of [401, 403, 404, 500]) {
+        expect(await answered(imagePath, { status, cacheControl: 'private, max-age=2592000, immutable' }))
+          .toBe('no-store, max-age=0')
+      }
+    })
+
+    it('lets nothing but reading a notice image be kept', async () => {
+      const marked = { cacheControl: 'private, max-age=2592000, immutable' }
+
+      expect(await answered(['api', 'groups', 'YOUR_GROUP_ID', 'notices', '5'], marked)).toBe('no-store, max-age=0')
+      expect(await answered(['api', 'groups', 'YOUR_GROUP_ID', 'notice-images'], marked)).toBe('no-store, max-age=0')
+      expect(await answered([...imagePath, 'extra'], marked)).toBe('no-store, max-age=0')
+      expect(await answered(['api', 'points', 'YOUR_GROUP_ID', 'notice-images', '9'], marked)).toBe('no-store, max-age=0')
+      expect(await answered(['api', 'groups', 'YOUR_GROUP_ID', 'notice-images'], marked, 'POST')).toBe('no-store, max-age=0')
+    })
+  })
+
   it('does not retry a mutation against another upstream', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response('', { status: 503 }))
     vi.stubGlobal('fetch', fetchMock)

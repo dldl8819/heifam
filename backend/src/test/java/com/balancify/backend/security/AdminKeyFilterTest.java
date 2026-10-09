@@ -135,7 +135,6 @@ import com.balancify.backend.service.TeamBalancingService;
 import com.balancify.backend.service.exception.MatchEditQuotaExceededException;
 import com.balancify.backend.service.exception.NoticeForbiddenException;
 import com.balancify.backend.service.exception.NoticeImageException;
-import com.balancify.backend.repository.NoticeImageRepository;
 import java.net.URI;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -2761,7 +2760,7 @@ class AdminKeyFilterTest {
     void servesANoticeImageToMembersAsTheKindItWasKeptAs() throws Exception {
         byte[] image = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 1, 2, 3};
         when(noticeImageService.read(1L, 9L, "member@hei.gg"))
-            .thenReturn(new NoticeImageRepository.StoredImage("image/jpeg", image));
+            .thenReturn(new NoticeImageService.ReadableImage("image/jpeg", image, false));
         when(noticeImageService.read(1L, 10L, "member@hei.gg"))
             .thenThrow(new NoSuchElementException("Notice image not found"));
 
@@ -2792,6 +2791,44 @@ class AdminKeyFilterTest {
         mockMvc
             .perform(get("/api/groups/1/notice-images/10").header("X-USER-EMAIL", "member@hei.gg"))
             .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void letsABrowserKeepAnImageEveryMemberMaySeeAndNothingElse() throws Exception {
+        byte[] image = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 1, 2, 3};
+        when(noticeImageService.read(1L, 9L, "member@hei.gg"))
+            .thenReturn(new NoticeImageService.ReadableImage("image/jpeg", image, true));
+        // In a notice kept to admins, or not placed in a notice yet.
+        when(noticeImageService.read(1L, 11L, "admin@hei.gg"))
+            .thenReturn(new NoticeImageService.ReadableImage("image/jpeg", image, false));
+        when(noticeImageService.read(1L, 10L, "member@hei.gg"))
+            .thenThrow(new NoSuchElementException("Notice image not found"));
+
+        mockMvc
+            .perform(get("/api/groups/1/notice-images/9").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk())
+            .andExpect(header().stringValues("Cache-Control", "private, max-age=2592000, immutable"))
+            .andExpect(header().stringValues("Pragma", ""))
+            .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+            .andExpect(content().bytes(image));
+        mockMvc
+            .perform(get("/api/groups/1/notice-images/11").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isOk())
+            .andExpect(header().stringValues("Cache-Control", "no-store, max-age=0"))
+            .andExpect(header().stringValues("Pragma", "no-cache"));
+        // A refusal is never kept, whoever asks.
+        mockMvc
+            .perform(get("/api/groups/1/notice-images/10").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isNotFound())
+            .andExpect(header().stringValues("Cache-Control", "no-store, max-age=0"));
+        mockMvc
+            .perform(get("/api/groups/1/notice-images/9").header("X-USER-EMAIL", "blocked@hei.gg"))
+            .andExpect(status().isForbidden())
+            .andExpect(header().stringValues("Cache-Control", "no-store, max-age=0"));
+        mockMvc
+            .perform(get("/api/groups/1/notice-images/9"))
+            .andExpect(status().isForbidden())
+            .andExpect(header().stringValues("Cache-Control", "no-store, max-age=0"));
     }
 
     @Test

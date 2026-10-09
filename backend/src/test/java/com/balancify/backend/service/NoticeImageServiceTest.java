@@ -120,10 +120,13 @@ class NoticeImageServiceTest {
     void showsAMemberTheImagesOfANoticeOpenToMembers() {
         when(noticeImageRepository.findPlacement(1L, 9L)).thenReturn(Optional.of(new Placement(5L, false)));
 
-        StoredImage image = noticeImageService.read(1L, 9L, "member@hei.gg");
+        NoticeImageService.ReadableImage image = noticeImageService.read(1L, 9L, "member@hei.gg");
 
         assertThat(image.contentType()).isEqualTo("image/png");
         assertThat(image.data()).isEqualTo(PNG);
+        // Every member may see it, admins included, so anyone's browser may keep its copy.
+        assertThat(image.openToMembers()).isTrue();
+        assertThat(noticeImageService.read(1L, 9L, "ops@hei.gg").openToMembers()).isTrue();
     }
 
     @Test
@@ -134,7 +137,10 @@ class NoticeImageServiceTest {
             .isInstanceOf(NoSuchElementException.class);
         verify(noticeImageRepository, never()).findImage(anyLong());
 
-        assertThat(noticeImageService.read(1L, 9L, "ops@hei.gg").data()).isEqualTo(PNG);
+        NoticeImageService.ReadableImage forAdmin = noticeImageService.read(1L, 9L, "ops@hei.gg");
+        assertThat(forAdmin.data()).isEqualTo(PNG);
+        // Checked on every request: who is an admin can change, and so can the notice.
+        assertThat(forAdmin.openToMembers()).isFalse();
     }
 
     @Test
@@ -145,7 +151,9 @@ class NoticeImageServiceTest {
             .isInstanceOf(NoSuchElementException.class);
         verify(noticeImageRepository, never()).findImage(anyLong());
 
-        assertThat(noticeImageService.read(1L, 9L, "ops@hei.gg").data()).isEqualTo(PNG);
+        NoticeImageService.ReadableImage forAdmin = noticeImageService.read(1L, 9L, "ops@hei.gg");
+        assertThat(forAdmin.data()).isEqualTo(PNG);
+        assertThat(forAdmin.openToMembers()).isFalse();
     }
 
     @Test

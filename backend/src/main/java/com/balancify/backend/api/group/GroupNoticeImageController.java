@@ -1,14 +1,16 @@
 package com.balancify.backend.api.group;
 
 import com.balancify.backend.api.group.dto.NoticeImageResponse;
-import com.balancify.backend.repository.NoticeImageRepository.StoredImage;
 import com.balancify.backend.security.AuthenticatedRequestResolver;
 import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.NoticeImageService;
+import com.balancify.backend.service.NoticeImageService.ReadableImage;
 import com.balancify.backend.service.exception.NoticeImageException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.NoSuchElementException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +28,11 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api/groups")
 public class GroupNoticeImageController {
+
+    // An image never changes once it is uploaded, so a reader's browser may keep its copy for a
+    // month and show it at once on the next visit. "private": the reader's browser only, never a
+    // cache shared between people.
+    static final String BROWSER_CACHE = "private, max-age=2592000, immutable";
 
     private final NoticeImageService noticeImageService;
     private final AccessControlService accessControlService;
@@ -66,11 +73,20 @@ public class GroupNoticeImageController {
     public ResponseEntity<byte[]> getImage(
         @PathVariable Long groupId,
         @PathVariable Long imageId,
-        HttpServletRequest httpRequest
+        HttpServletRequest httpRequest,
+        HttpServletResponse httpResponse
     ) {
         String requestEmail = requireRequestEmail(httpRequest);
         try {
-            StoredImage image = noticeImageService.read(groupId, imageId, requestEmail);
+            ReadableImage image = noticeImageService.read(groupId, imageId, requestEmail);
+            if (image.openToMembers()) {
+                // ApiNoStoreFilter has marked this answer, like every API answer, as not to be kept.
+                // That stays for refusals and for images only admins see; here it is replaced. The
+                // emptied Pragma matters when a browser asks the backend directly: browsers read
+                // "Pragma: no-cache" as never fresh whatever Cache-Control says.
+                httpResponse.setHeader(HttpHeaders.CACHE_CONTROL, BROWSER_CACHE);
+                httpResponse.setHeader(HttpHeaders.PRAGMA, "");
+            }
             return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(image.contentType()))
                 .header("X-Content-Type-Options", "nosniff")
