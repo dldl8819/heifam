@@ -18,15 +18,22 @@ import com.balancify.backend.api.group.dto.NoticeDetailResponse;
 import com.balancify.backend.api.group.dto.NoticeListItemResponse;
 import com.balancify.backend.api.group.dto.NoticeListResponse;
 import com.balancify.backend.api.group.dto.NoticeTitleResponse;
+import com.balancify.backend.api.group.dto.NoticeVoteKeptResponse;
+import com.balancify.backend.api.group.dto.NoticeVoteOptionResponse;
 import com.balancify.backend.api.group.dto.NoticeVoteResponse;
 import com.balancify.backend.domain.Notice;
 import com.balancify.backend.domain.NoticeComment;
 import com.balancify.backend.repository.NoticeCommentRepository;
 import com.balancify.backend.repository.NoticeEngagementRepository;
 import com.balancify.backend.repository.NoticeRepository;
+import com.balancify.backend.repository.NoticeVoteRepository;
+import com.balancify.backend.repository.NoticeVoteRepository.OptionRow;
+import com.balancify.backend.repository.NoticeVoteRepository.VoterRow;
 import com.balancify.backend.service.exception.NoticeForbiddenException;
 import com.balancify.backend.service.exception.NoticeVoteClosedException;
+import com.balancify.backend.service.exception.NoticeVoteConflictException;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -40,6 +47,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -49,6 +57,13 @@ class NoticeServiceTest {
     private static final String ADMIN = "ops@hei.gg";
     private static final String MEMBER = "member@hei.gg";
     private static final String OTHER = "other@hei.gg";
+    // A vote on how long a game may take, with five votes cast, and a vote for or against.
+    private static final List<OptionRow> MINUTES = List.of(
+        new OptionRow(21L, "30분", 0, 4), new OptionRow(22L, "25분", 1, 1), new OptionRow(23L, "24분", 2, 0)
+    );
+    private static final List<OptionRow> FOR_OR_AGAINST = List.of(
+        new OptionRow(11L, "찬성", 0, 7), new OptionRow(12L, "반대", 1, 2)
+    );
 
     @Mock
     private NoticeRepository noticeRepository;
@@ -65,6 +80,12 @@ class NoticeServiceTest {
     @Mock
     private PointService pointService;
 
+    @Mock
+    private NoticeVoteRepository noticeVoteRepository;
+
+    @Mock
+    private OperationAuditLogService operationAuditLogService;
+
     private NoticeService noticeService;
 
     @BeforeEach
@@ -74,9 +95,12 @@ class NoticeServiceTest {
             noticeCommentRepository,
             noticeEngagementRepository,
             accessControlService,
-            pointService
+            pointService,
+            noticeVoteRepository,
+            operationAuditLogService
         );
         when(accessControlService.isAdminEmail(ADMIN)).thenReturn(true);
+        when(accessControlService.resolveDisplayNickname(ADMIN)).thenReturn("OpsUser");
         when(accessControlService.resolveDisplayNicknames(anyCollection()))
             .thenReturn(Map.of(ADMIN, "OpsUser", MEMBER, "YOUR_USERNAME", OTHER, "OtherUser"));
         when(noticeRepository.findByGroupIdOrderByCreatedAtDescIdDesc(1L)).thenReturn(List.of(
@@ -507,38 +531,101 @@ class NoticeServiceTest {
 
         assertThat(noticeService.open(1L, 2L, MEMBER).vote()).isNull();
         assertThat(noticeService.list(1L, MEMBER).notices()).extracting(NoticeListItemResponse::voteOpen).containsOnly(false);
-        assertThatThrownBy(() -> noticeService.castVote(1L, 2L, MEMBER, "AGREE")).isInstanceOf(NoSuchElementException.class);
+        assertThatThrownBy(() -> noticeService.castVote(1L, 2L, MEMBER, 21L, null)).isInstanceOf(NoSuchElementException.class);
         assertThatThrownBy(() -> noticeService.withdrawVote(1L, 2L, MEMBER)).isInstanceOf(NoSuchElementException.class);
-        verify(noticeEngagementRepository, never()).castVote(any(), any(), any());
-        verify(noticeEngagementRepository, never()).withdrawVote(any(), any());
+        assertThatThrownBy(() -> noticeService.addVoteOption(1L, 2L, ADMIN, "26분")).isInstanceOf(NoSuchElementException.class);
+        verify(noticeVoteRepository, never()).castVote(any(), any(), any());
+        verify(noticeVoteRepository, never()).withdrawVote(any(), any());
+        verify(noticeVoteRepository, never()).addOption(any(), any(), any());
     }
 
     @Test
-    void countsVotesAndTellsEachReaderOnlyTheirOwnChoice() {
-        Notice notice = stubNotice(2L, false);
-        notice.setVoteStatus("OPEN");
-        when(noticeEngagementRepository.countVotes(2L)).thenReturn(Map.of("AGREE", 7L, "DISAGREE", 2L));
-        when(noticeEngagementRepository.findVote(2L, MEMBER)).thenReturn("DISAGREE");
+    void showsTheOptionsWithTheirCountsAndTellsEachReaderTheirOwnChoice() {
+        stubVote(2L, "OPEN", MINUTES);
+        when(noticeVoteRepository.findVotedOptionId(2L, MEMBER)).thenReturn(Optional.of(22L));
 
         NoticeVoteResponse mine = noticeService.open(1L, 2L, MEMBER).vote();
         NoticeVoteResponse others = noticeService.open(1L, 2L, OTHER).vote();
 
-        assertThat(mine).isEqualTo(new NoticeVoteResponse("OPEN", 7L, 2L, "DISAGREE"));
-        assertThat(others).isEqualTo(new NoticeVoteResponse("OPEN", 7L, 2L, null));
+        assertThat(mine.status()).isEqualTo("OPEN");
+        assertThat(mine.totalVoters()).isEqualTo(5L);
+        assertThat(mine.myOptionId()).isEqualTo(22L);
+        assertThat(mine.options())
+            .extracting(
+                NoticeVoteOptionResponse::id, NoticeVoteOptionResponse::label, NoticeVoteOptionResponse::count,
+                NoticeVoteOptionResponse::mine, NoticeVoteOptionResponse::voters
+            )
+            .containsExactly(
+                tuple(21L, "30분", 4L, false, null),
+                tuple(22L, "25분", 1L, true, null),
+                tuple(23L, "24분", 0L, false, null)
+            );
+        assertThat(others.myOptionId()).isNull();
+        assertThat(others.options()).extracting(NoticeVoteOptionResponse::mine).containsOnly(false);
+        // Anonymous unless its writer said otherwise, closed to additions, and a member changes no option.
+        assertThat(mine.anonymous()).isTrue();
+        assertThat(mine.allowAdditions()).isFalse();
+        assertThat(mine.canAddOption()).isFalse();
+        assertThat(mine.canRemoveOptions()).isFalse();
+        // Not a vote for or against: an older page reads nothing into it.
+        assertThat(mine.agreeCount()).isZero();
+        assertThat(mine.disagreeCount()).isZero();
+        assertThat(mine.myChoice()).isNull();
     }
 
     @Test
-    void castsChangesAndTakesBackAVoteWhileTheVoteIsOpen() {
-        Notice notice = stubNotice(2L, false);
-        notice.setVoteStatus("OPEN");
+    void readsAVoteForOrAgainstAsAnOlderPageDoes() {
+        stubVote(2L, "OPEN", FOR_OR_AGAINST);
+        when(noticeVoteRepository.findVotedOptionId(2L, MEMBER)).thenReturn(Optional.of(12L));
 
-        noticeService.castVote(1L, 2L, MEMBER, " agree ");
-        noticeService.castVote(1L, 2L, MEMBER, "DISAGREE");
+        NoticeVoteResponse mine = noticeService.open(1L, 2L, MEMBER).vote();
+        NoticeVoteResponse others = noticeService.open(1L, 2L, OTHER).vote();
+
+        assertThat(mine.agreeCount()).isEqualTo(7L);
+        assertThat(mine.disagreeCount()).isEqualTo(2L);
+        assertThat(mine.myChoice()).isEqualTo("DISAGREE");
+        assertThat(others.myChoice()).isNull();
+        assertThat(mine.options()).extracting(NoticeVoteOptionResponse::label).containsExactly("찬성", "반대");
+    }
+
+    @Test
+    void neverLooksUpWhoVotedOnAnAnonymousVote() {
+        stubVote(2L, "OPEN", MINUTES);
+
+        assertThat(noticeService.open(1L, 2L, ADMIN).vote().options())
+            .extracting(NoticeVoteOptionResponse::voters)
+            .containsOnlyNulls();
+
+        verify(noticeVoteRepository, never()).listVoters(any());
+    }
+
+    @Test
+    void listsTheVotersUnderEachOptionOfANamedVote() {
+        Notice notice = stubVote(2L, "OPEN", MINUTES);
+        notice.setVoteAnonymous(false);
+        when(noticeVoteRepository.listVoters(2L)).thenReturn(List.of(
+            new VoterRow(21L, MEMBER), new VoterRow(21L, "nameless@hei.gg"), new VoterRow(22L, " Other@Hei.gg ")
+        ));
+
+        NoticeVoteResponse vote = noticeService.open(1L, 2L, MEMBER).vote();
+
+        assertThat(vote.anonymous()).isFalse();
+        assertThat(vote.options().get(0).voters()).containsExactly("YOUR_USERNAME", null);
+        assertThat(vote.options().get(1).voters()).containsExactly("OtherUser");
+        assertThat(vote.options().get(2).voters()).isEmpty();
+    }
+
+    @Test
+    void castsMovesAndTakesBackAVoteWhileTheVoteIsOpen() {
+        stubVote(2L, "OPEN", MINUTES);
+
+        noticeService.castVote(1L, 2L, MEMBER, 21L, null);
+        noticeService.castVote(1L, 2L, MEMBER, 23L, null);
         noticeService.withdrawVote(1L, 2L, MEMBER);
 
-        verify(noticeEngagementRepository).castVote(2L, MEMBER, "AGREE");
-        verify(noticeEngagementRepository).castVote(2L, MEMBER, "DISAGREE");
-        verify(noticeEngagementRepository).withdrawVote(2L, MEMBER);
+        verify(noticeVoteRepository).castVote(2L, MEMBER, 21L);
+        verify(noticeVoteRepository).castVote(2L, MEMBER, 23L);
+        verify(noticeVoteRepository).withdrawVote(2L, MEMBER);
         // Read with the lock an edit waits for, so closing the vote and a late vote never cross.
         verify(noticeRepository, times(3)).findByIdAndGroupIdForShare(2L, 1L);
         // Voting is not paid.
@@ -546,45 +633,186 @@ class NoticeServiceTest {
     }
 
     @Test
-    void refusesAChoiceThatIsNeitherForNorAgainst() {
-        Notice notice = stubNotice(2L, false);
-        notice.setVoteStatus("OPEN");
+    void takesForOrAgainstFromAnOlderPage() {
+        stubVote(2L, "OPEN", FOR_OR_AGAINST);
 
-        for (String choice : new String[] {null, "", "ABSTAIN", "yes"}) {
-            assertThatThrownBy(() -> noticeService.castVote(1L, 2L, MEMBER, choice))
-                .isInstanceOf(IllegalArgumentException.class);
-        }
-        verify(noticeEngagementRepository, never()).castVote(any(), any(), any());
+        noticeService.castVote(1L, 2L, MEMBER, null, " agree ");
+        noticeService.castVote(1L, 2L, MEMBER, null, "DISAGREE");
+
+        verify(noticeVoteRepository).castVote(2L, MEMBER, 11L);
+        verify(noticeVoteRepository).castVote(2L, MEMBER, 12L);
     }
 
     @Test
-    void keepsTheResultButTakesNoMoreVotesOnceTheVoteIsClosed() {
-        Notice notice = stubNotice(2L, false);
-        notice.setVoteStatus("CLOSED");
-        when(noticeEngagementRepository.countVotes(2L)).thenReturn(Map.of("AGREE", 3L));
-        when(noticeEngagementRepository.findVote(2L, MEMBER)).thenReturn("AGREE");
+    void refusesAVoteThatNamesNoOptionOfTheNotice() {
+        stubVote(2L, "OPEN", MINUTES);
 
-        assertThat(noticeService.open(1L, 2L, MEMBER).vote()).isEqualTo(new NoticeVoteResponse("CLOSED", 3L, 0L, "AGREE"));
+        // Neither an option nor a word an older page sends.
+        for (String choice : new String[] {null, "", "ABSTAIN", "yes"}) {
+            assertThatThrownBy(() -> noticeService.castVote(1L, 2L, MEMBER, null, choice))
+                .isInstanceOf(IllegalArgumentException.class);
+        }
+        // For or against, on a vote that has no such options.
+        assertThatThrownBy(() -> noticeService.castVote(1L, 2L, MEMBER, null, "AGREE"))
+            .isInstanceOf(IllegalArgumentException.class);
+        // An option that was taken away, or is another notice's: the page is told to read the vote again.
+        assertThatThrownBy(() -> noticeService.castVote(1L, 2L, MEMBER, 99L, null))
+            .isInstanceOf(NoticeVoteConflictException.class);
+        verify(noticeVoteRepository, never()).castVote(any(), any(), any());
+    }
+
+    @Test
+    void keepsTheResultButChangesNothingOnceTheVoteIsClosed() {
+        Notice notice = stubVote(2L, "CLOSED", MINUTES);
+        notice.setVoteAllowAdditions(true);
+        when(noticeVoteRepository.findVotedOptionId(2L, MEMBER)).thenReturn(Optional.of(21L));
+
+        NoticeVoteResponse vote = noticeService.open(1L, 2L, ADMIN).vote();
+        assertThat(vote.status()).isEqualTo("CLOSED");
+        assertThat(vote.totalVoters()).isEqualTo(5L);
+        assertThat(vote.canAddOption()).isFalse();
+        assertThat(vote.canRemoveOptions()).isFalse();
+        assertThat(noticeService.open(1L, 2L, MEMBER).vote().myOptionId()).isEqualTo(21L);
         assertThat(noticeService.list(1L, MEMBER).notices()).extracting(NoticeListItemResponse::voteOpen).containsOnly(false);
-        assertThatThrownBy(() -> noticeService.castVote(1L, 2L, MEMBER, "DISAGREE"))
+
+        assertThatThrownBy(() -> noticeService.castVote(1L, 2L, MEMBER, 22L, null))
             .isInstanceOf(NoticeVoteClosedException.class);
         assertThatThrownBy(() -> noticeService.withdrawVote(1L, 2L, MEMBER))
             .isInstanceOf(NoticeVoteClosedException.class);
-        verify(noticeEngagementRepository, never()).castVote(any(), any(), any());
-        verify(noticeEngagementRepository, never()).withdrawVote(any(), any());
+        assertThatThrownBy(() -> noticeService.addVoteOption(1L, 2L, MEMBER, "26분"))
+            .isInstanceOf(NoticeVoteClosedException.class);
+        assertThatThrownBy(() -> noticeService.removeVoteOption(1L, 2L, 21L, ADMIN))
+            .isInstanceOf(NoticeVoteClosedException.class);
+        verify(noticeVoteRepository, never()).castVote(any(), any(), any());
+        verify(noticeVoteRepository, never()).withdrawVote(any(), any());
+        verify(noticeVoteRepository, never()).addOption(any(), any(), any());
+        verify(noticeVoteRepository, never()).removeOption(any(), any());
     }
 
     @Test
     void keepsTheVoteOfANoticeForAdminsFromMembers() {
         Notice notice = stubNotice(3L, true);
         notice.setVoteStatus("OPEN");
+        notice.setVoteAllowAdditions(true);
+        when(noticeVoteRepository.listOptions(3L)).thenReturn(MINUTES);
 
-        assertThatThrownBy(() -> noticeService.castVote(1L, 3L, MEMBER, "AGREE")).isInstanceOf(NoSuchElementException.class);
+        assertThatThrownBy(() -> noticeService.castVote(1L, 3L, MEMBER, 21L, null)).isInstanceOf(NoSuchElementException.class);
         assertThatThrownBy(() -> noticeService.withdrawVote(1L, 3L, MEMBER)).isInstanceOf(NoSuchElementException.class);
-        verify(noticeEngagementRepository, never()).castVote(any(), any(), any());
+        assertThatThrownBy(() -> noticeService.addVoteOption(1L, 3L, MEMBER, "26분")).isInstanceOf(NoSuchElementException.class);
+        verify(noticeVoteRepository, never()).castVote(any(), any(), any());
+        verify(noticeVoteRepository, never()).addOption(any(), any(), any());
 
-        noticeService.castVote(1L, 3L, ADMIN, "AGREE");
-        verify(noticeEngagementRepository).castVote(3L, ADMIN, "AGREE");
+        noticeService.castVote(1L, 3L, ADMIN, 21L, null);
+        verify(noticeVoteRepository).castVote(3L, ADMIN, 21L);
+    }
+
+    @Test
+    void letsVotersAddAnOptionOnlyWhenTheVoteAllowsItAndAdminsAlways() {
+        Notice notice = stubVote(2L, "OPEN", MINUTES);
+
+        assertThat(noticeService.open(1L, 2L, MEMBER).vote().canAddOption()).isFalse();
+        assertThat(noticeService.open(1L, 2L, ADMIN).vote().canAddOption()).isTrue();
+        assertThatThrownBy(() -> noticeService.addVoteOption(1L, 2L, MEMBER, "26분"))
+            .isInstanceOf(NoticeForbiddenException.class);
+        verify(noticeVoteRepository, never()).addOption(any(), any(), any());
+        noticeService.addVoteOption(1L, 2L, ADMIN, "26분");
+        verify(noticeVoteRepository).addOption(2L, "26분", ADMIN);
+
+        notice.setVoteAllowAdditions(true);
+        assertThat(noticeService.open(1L, 2L, MEMBER).vote().canAddOption()).isTrue();
+        assertThat(noticeService.open(1L, 2L, MEMBER).vote().allowAdditions()).isTrue();
+        noticeService.addVoteOption(1L, 2L, " Member@Hei.gg ", "  27분  ");
+        verify(noticeVoteRepository).addOption(2L, "27분", MEMBER);
+        // Locked as an edit locks it, so two additions at once come one after the other.
+        verify(noticeRepository, times(3)).findByIdAndGroupIdForUpdate(2L, 1L);
+    }
+
+    @Test
+    void refusesAnAddedOptionThatIsEmptyTooLongOrAlreadyThere() {
+        Notice notice = stubVote(2L, "OPEN", MINUTES);
+        notice.setVoteAllowAdditions(true);
+
+        for (String label : new String[] {null, "   ", "x".repeat(NoticeVotes.MAX_OPTION_LENGTH + 1)}) {
+            assertThatThrownBy(() -> noticeService.addVoteOption(1L, 2L, MEMBER, label))
+                .isInstanceOf(IllegalArgumentException.class);
+        }
+        assertThatThrownBy(() -> noticeService.addVoteOption(1L, 2L, MEMBER, " 30분 "))
+            .isInstanceOf(NoticeVoteConflictException.class);
+        when(noticeVoteRepository.listOptions(2L)).thenReturn(List.of(new OptionRow(31L, "Yes", 0, 0), new OptionRow(32L, "No", 1, 0)));
+        assertThatThrownBy(() -> noticeService.addVoteOption(1L, 2L, MEMBER, "yes"))
+            .isInstanceOf(NoticeVoteConflictException.class);
+        verify(noticeVoteRepository, never()).addOption(any(), any(), any());
+
+        // What the check above let through but the database holds to be the same option.
+        when(noticeVoteRepository.addOption(2L, "Maybe", MEMBER)).thenThrow(new DuplicateKeyException("uq_notice_vote_options_label"));
+        assertThatThrownBy(() -> noticeService.addVoteOption(1L, 2L, MEMBER, "Maybe"))
+            .isInstanceOf(NoticeVoteConflictException.class);
+    }
+
+    @Test
+    void holdsNoMoreOptionsThanAVoteMay() {
+        List<OptionRow> full = new ArrayList<>();
+        for (int index = 0; index < NoticeVotes.MAX_OPTIONS; index++) {
+            full.add(new OptionRow(100L + index, "option " + index, index, 0));
+        }
+        Notice notice = stubVote(2L, "OPEN", full);
+        notice.setVoteAllowAdditions(true);
+
+        assertThat(noticeService.open(1L, 2L, MEMBER).vote().canAddOption()).isFalse();
+        assertThat(noticeService.open(1L, 2L, ADMIN).vote().canAddOption()).isFalse();
+        assertThatThrownBy(() -> noticeService.addVoteOption(1L, 2L, ADMIN, "one more"))
+            .isInstanceOf(NoticeVoteConflictException.class);
+        verify(noticeVoteRepository, never()).addOption(any(), any(), any());
+    }
+
+    @Test
+    void letsOnlyAdminsTakeAnOptionAwayAndLogsHowManyVotesWentWithIt() {
+        Notice notice = stubVote(2L, "OPEN", MINUTES);
+
+        assertThat(noticeService.open(1L, 2L, MEMBER).vote().canRemoveOptions()).isFalse();
+        assertThat(noticeService.open(1L, 2L, ADMIN).vote().canRemoveOptions()).isTrue();
+        assertThatThrownBy(() -> noticeService.removeVoteOption(1L, 2L, 21L, MEMBER))
+            .isInstanceOf(NoticeForbiddenException.class);
+        assertThatThrownBy(() -> noticeService.removeVoteOption(1L, 2L, 99L, ADMIN))
+            .isInstanceOf(NoticeVoteConflictException.class);
+        verify(noticeVoteRepository, never()).removeOption(any(), any());
+
+        noticeService.removeVoteOption(1L, 2L, 21L, " Ops@Hei.gg ");
+
+        verify(noticeVoteRepository).removeOption(2L, 21L);
+        verify(operationAuditLogService).recordNoticeVoteOptionRemoved(ADMIN, "OpsUser", 1L, notice, "30분", 4L);
+    }
+
+    @Test
+    void keepsAtLeastTwoOptionsOnAVote() {
+        stubVote(2L, "OPEN", FOR_OR_AGAINST);
+
+        assertThat(noticeService.open(1L, 2L, ADMIN).vote().canRemoveOptions()).isFalse();
+        assertThatThrownBy(() -> noticeService.removeVoteOption(1L, 2L, 11L, ADMIN))
+            .isInstanceOf(IllegalArgumentException.class);
+        verify(noticeVoteRepository, never()).removeOption(any(), any());
+    }
+
+    @Test
+    void showsOnlyAdminsAVoteThatWasTakenOffTheNoticeAndIsKept() {
+        Notice notice = stubVote(2L, "NONE", MINUTES);
+        notice.setVoteAnonymous(false);
+        notice.setVoteAllowAdditions(true);
+
+        NoticeDetailResponse forAdmin = noticeService.open(1L, 2L, ADMIN);
+        NoticeDetailResponse forMember = noticeService.open(1L, 2L, MEMBER);
+
+        assertThat(forAdmin.vote()).isNull();
+        assertThat(forAdmin.voteKept()).isEqualTo(new NoticeVoteKeptResponse(List.of("30분", "25분", "24분"), 5L, false, true));
+        assertThat(forMember.vote()).isNull();
+        assertThat(forMember.voteKept()).isNull();
+
+        // While the notice shows its vote there is nothing kept aside, and a notice that never had one has none.
+        notice.setVoteStatus("OPEN");
+        assertThat(noticeService.open(1L, 2L, ADMIN).voteKept()).isNull();
+        notice.setVoteStatus("NONE");
+        when(noticeVoteRepository.listOptions(2L)).thenReturn(List.of());
+        assertThat(noticeService.open(1L, 2L, ADMIN).voteKept()).isNull();
     }
 
     @Test
@@ -645,6 +873,15 @@ class NoticeServiceTest {
         Notice notice = notice(id, "notice " + id, adminOnly);
         when(noticeRepository.findByIdAndGroupId(id, 1L)).thenReturn(Optional.of(notice));
         when(noticeRepository.findByIdAndGroupIdForShare(id, 1L)).thenReturn(Optional.of(notice));
+        when(noticeRepository.findByIdAndGroupIdForUpdate(id, 1L)).thenReturn(Optional.of(notice));
+        return notice;
+    }
+
+    /** A notice members may open, with a vote in the given state on the given options. */
+    private Notice stubVote(Long id, String status, List<OptionRow> options) {
+        Notice notice = stubNotice(id, false);
+        notice.setVoteStatus(status);
+        when(noticeVoteRepository.listOptions(id)).thenReturn(options);
         return notice;
     }
 

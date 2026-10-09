@@ -497,6 +497,27 @@ public class OperationAuditLogService {
         operationAuditLogRepository.save(log);
     }
 
+    /** An admin took an option off a vote, with the votes on it. Says how many, never whose. */
+    @Transactional
+    public void recordNoticeVoteOptionRemoved(
+        String actorEmail,
+        String actorNickname,
+        Long groupId,
+        Notice notice,
+        String optionLabel,
+        long removedVotes
+    ) {
+        if (notice == null) {
+            return;
+        }
+
+        OperationAuditLog log = baseLog(
+            actorEmail, actorNickname, ACTION_NOTICE_UPDATED, "NOTICE", notice.getId(), notice.getTitle(), groupId
+        );
+        log.setSummary("투표 항목 삭제: " + optionLabel + " (" + removedVotes + "표)");
+        operationAuditLogRepository.save(log);
+    }
+
     @Transactional
     public void recordNoticeDeleted(
         String actorEmail,

@@ -51,7 +51,6 @@ import type {
   NoticeList,
   NoticeTitle,
   NoticeUpdateRequest,
-  NoticeVoteChoice,
   OperationAuditLogFilters,
   OperationAuditLogItem,
   OperationAuditLogPage,
@@ -1515,11 +1514,25 @@ export const apiClient = {
       { method: liked ? 'PUT' : 'DELETE' },
       { requireUserEmail: true, includeUserEmail: true }
     ),
-  // A choice casts or changes the member's vote; null takes it back.
-  setNoticeVote: (groupId: number, noticeId: number, choice: NoticeVoteChoice | null) =>
+  // An option casts or moves the member's vote; null takes it back.
+  setNoticeVote: (groupId: number, noticeId: number, optionId: number | null) =>
     apiRequest<NoticeDetail>(
       `/api/groups/${groupId}/notices/${noticeId}/vote`,
-      choice === null ? { method: 'DELETE' } : { method: 'PUT', body: JSON.stringify({ choice }) },
+      optionId === null ? { method: 'DELETE' } : { method: 'PUT', body: JSON.stringify({ optionId }) },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  // For admins, and for members when the vote allows additions.
+  addNoticeVoteOption: (groupId: number, noticeId: number, label: string) =>
+    apiRequest<NoticeDetail>(
+      `/api/groups/${groupId}/notices/${noticeId}/vote/options`,
+      { method: 'POST', body: JSON.stringify({ label }) },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  // Admins only. The votes on the option go with it.
+  removeNoticeVoteOption: (groupId: number, noticeId: number, optionId: number) =>
+    apiRequest<NoticeDetail>(
+      `/api/groups/${groupId}/notices/${noticeId}/vote/options/${optionId}`,
+      { method: 'DELETE' },
       { requireUserEmail: true, includeUserEmail: true }
     ),
   createNotice: (groupId: number, payload: NoticeCreateRequest) =>

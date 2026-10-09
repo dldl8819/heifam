@@ -346,6 +346,15 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/notices/{noticeId}"),
             AuthType.SUPER_ADMIN_EMAIL
         ),
+        // Voting and adding an option are for whoever may open the notice (NoticeService decides);
+        // taking an option away, with the votes on it, is for admins.
+        new ProtectedRoute(
+            "DELETE",
+            PathPatternParser.defaultInstance.parse(
+                "/api/groups/{groupId}/notices/{noticeId}/vote/options/{optionId}"
+            ),
+            AuthType.ADMIN_EMAIL
+        ),
         // Admins upload the images of a notice; a member reads those of a notice they may open,
         // which the service decides per image.
         new ProtectedRoute(

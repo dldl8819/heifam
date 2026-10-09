@@ -9,7 +9,9 @@ import com.balancify.backend.service.NoticeAdminService;
 import com.balancify.backend.service.exception.NoticeImageException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.NoSuchElementException;
+import com.balancify.backend.service.exception.NoticeVoteConflictException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -89,6 +91,14 @@ public class GroupNoticeAdminController {
                 HttpStatus.BAD_REQUEST,
                 illegalArgumentException.getMessage(),
                 illegalArgumentException
+            );
+        } catch (NoticeVoteConflictException voteConflictException) {
+            // The edit asks for something the votes already cast do not allow. Not 409, which
+            // this route already answers for an image the notice cannot show.
+            throw new ResponseStatusException(
+                HttpStatusCode.valueOf(422),
+                voteConflictException.getMessage(),
+                voteConflictException
             );
         } catch (NoSuchElementException noSuchElementException) {
             throw new ResponseStatusException(

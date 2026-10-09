@@ -104,6 +104,22 @@ class AccountPersonalDataRepositoryTest {
     }
 
     @Test
+    void leavesAnOptionTheAccountAddedToAVoteButNoLongerAsTheirs() {
+        AccountPersonalDataRepository repository = new AccountPersonalDataRepository(jdbcTemplate);
+
+        repository.deleteAccountIdentity(UUID.randomUUID(), "your_username@example.com");
+
+        ArgumentCaptor<String> statements = ArgumentCaptor.forClass(String.class);
+        verify(jdbcTemplate, atLeastOnce()).update(statements.capture(), any(SqlParameterSource.class));
+        assertThat(statements.getAllValues()).contains(
+            "DELETE FROM notice_votes WHERE voter_email = :email",
+            "UPDATE notice_vote_options SET created_by_email = NULL WHERE created_by_email = :email"
+        );
+        // The option stays for those who voted for it: nothing deletes options by who added them.
+        assertThat(statements.getAllValues()).noneMatch(statement -> statement.startsWith("DELETE FROM notice_vote_options"));
+    }
+
+    @Test
     void removesNotificationStateWithTheAccount() {
         AccountPersonalDataRepository repository = new AccountPersonalDataRepository(jdbcTemplate);
 

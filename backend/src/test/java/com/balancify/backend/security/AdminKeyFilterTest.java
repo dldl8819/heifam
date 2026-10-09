@@ -148,6 +148,7 @@ import com.balancify.backend.service.exception.NicknameRequestConflictException;
 import com.balancify.backend.service.exception.NoticeForbiddenException;
 import com.balancify.backend.service.exception.NoticeImageException;
 import com.balancify.backend.service.exception.NoticeVoteClosedException;
+import com.balancify.backend.service.exception.NoticeVoteConflictException;
 import java.net.URI;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -2975,7 +2976,8 @@ class AdminKeyFilterTest {
             .perform(delete("/api/groups/1/notices/5/vote").header("X-USER-EMAIL", "member@hei.gg"))
             .andExpect(status().isOk());
 
-        verify(noticeService).castVote(1L, 5L, "member@hei.gg", "AGREE");
+        // A page loaded before votes had options still sends the word.
+        verify(noticeService).castVote(1L, 5L, "member@hei.gg", null, "AGREE");
         verify(noticeService).withdrawVote(1L, 5L, "member@hei.gg");
     }
 
@@ -3000,17 +3002,17 @@ class AdminKeyFilterTest {
             .perform(delete("/api/groups/1/notices/5/vote").header("X-USER-EMAIL", "blocked@hei.gg"))
             .andExpect(status().isForbidden());
 
-        verify(noticeService, never()).castVote(any(), any(), any(), any());
+        verify(noticeService, never()).castVote(any(), any(), any(), any(), any());
         verify(noticeService, never()).withdrawVote(any(), any(), any());
     }
 
     @Test
     void tellsWhyAVoteWasNotTaken() throws Exception {
-        when(noticeService.castVote(1L, 5L, "member@hei.gg", "AGREE"))
+        when(noticeService.castVote(1L, 5L, "member@hei.gg", null, "AGREE"))
             .thenThrow(new NoticeVoteClosedException("closed"));
-        when(noticeService.castVote(1L, 6L, "member@hei.gg", "AGREE"))
+        when(noticeService.castVote(1L, 6L, "member@hei.gg", null, "AGREE"))
             .thenThrow(new NoSuchElementException("Vote not found"));
-        when(noticeService.castVote(1L, 5L, "member@hei.gg", "MAYBE"))
+        when(noticeService.castVote(1L, 5L, "member@hei.gg", null, "MAYBE"))
             .thenThrow(new IllegalArgumentException("neither"));
 
         mockMvc
@@ -3037,6 +3039,122 @@ class AdminKeyFilterTest {
                     .content("{\"choice\":\"MAYBE\"}")
             )
             .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void letsMembersVoteForAnOptionAndAddOneAndOnlyAdminsTakeOneAway() throws Exception {
+        mockMvc
+            .perform(
+                put("/api/groups/1/notices/5/vote")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"optionId\":21}")
+            )
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(
+                post("/api/groups/1/notices/5/vote/options")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"label\":\"26분\"}")
+            )
+            .andExpect(status().isOk());
+        verify(noticeService).castVote(1L, 5L, "member@hei.gg", 21L, null);
+        verify(noticeService).addVoteOption(1L, 5L, "member@hei.gg", "26분");
+
+        // Taking an option away: a member and a visitor are turned back before the service is asked.
+        mockMvc
+            .perform(delete("/api/groups/1/notices/5/vote/options/21").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(delete("/api/groups/1/notices/5/vote/options/21"))
+            .andExpect(status().isForbidden());
+        verify(noticeService, never()).removeVoteOption(any(), any(), any(), any());
+        mockMvc
+            .perform(delete("/api/groups/1/notices/5/vote/options/21").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isOk());
+        verify(noticeService).removeVoteOption(1L, 5L, 21L, "admin@hei.gg");
+
+        // No sign-in, or signed in without access to the site: no option is added.
+        mockMvc
+            .perform(
+                post("/api/groups/1/notices/5/vote/options")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"label\":\"26분\"}")
+            )
+            .andExpect(status().isUnauthorized());
+        mockMvc
+            .perform(
+                post("/api/groups/1/notices/5/vote/options")
+                    .header("X-USER-EMAIL", "blocked@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"label\":\"26분\"}")
+            )
+            .andExpect(status().isForbidden());
+        verify(noticeService, times(1)).addVoteOption(any(), any(), any(), any());
+    }
+
+    @Test
+    void tellsWhyAnOptionWasNotAddedOrAVoteNotMoved() throws Exception {
+        when(noticeService.addVoteOption(any(), any(), any(), any()))
+            .thenThrow(new NoticeForbiddenException("additions are off"))
+            .thenThrow(new NoticeVoteConflictException("already there"))
+            .thenThrow(new IllegalArgumentException("empty"))
+            .thenThrow(new NoticeVoteClosedException("closed"));
+        when(noticeService.castVote(1L, 5L, "member@hei.gg", 99L, null))
+            .thenThrow(new NoticeVoteConflictException("option gone"));
+        when(noticeService.removeVoteOption(1L, 5L, 21L, "admin@hei.gg"))
+            .thenThrow(new IllegalArgumentException("two are needed"));
+
+        for (ResultMatcher expected : List.of(
+            status().isForbidden(), status().isConflict(), status().isBadRequest(), status().isConflict()
+        )) {
+            mockMvc
+                .perform(
+                    post("/api/groups/1/notices/5/vote/options")
+                        .header("X-USER-EMAIL", "member@hei.gg")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"label\":\"26분\"}")
+                )
+                .andExpect(expected);
+        }
+        mockMvc
+            .perform(
+                put("/api/groups/1/notices/5/vote")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"optionId\":99}")
+            )
+            .andExpect(status().isConflict());
+        mockMvc
+            .perform(delete("/api/groups/1/notices/5/vote/options/21").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void tellsAnAdminWhenAnEditAsksWhatTheVotesCastDoNotAllow() throws Exception {
+        when(noticeAdminService.updateNotice(eq(1L), eq(5L), any(), eq("admin@hei.gg"), any()))
+            .thenThrow(new NoticeVoteConflictException("votes were cast"));
+
+        mockMvc
+            .perform(
+                put("/api/groups/1/notices/5")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"title\":\"t\",\"content\":\"c\",\"voteOptions\":[\"30분\",\"25분\"],\"voteAnonymous\":false}")
+            )
+            .andExpect(status().is(422));
+
+        verify(noticeAdminService).updateNotice(
+            eq(1L),
+            eq(5L),
+            argThat(request -> request != null
+                && List.of("30분", "25분").equals(request.voteOptions())
+                && Boolean.FALSE.equals(request.voteAnonymous())
+                && request.voteAllowAdditions() == null),
+            eq("admin@hei.gg"),
+            any()
+        );
     }
 
     @Test
