@@ -728,6 +728,34 @@ export type BoardPostDetail = {
   comments: BoardComment[]
 }
 
+export type NicknameRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELED'
+
+export type NicknameRequest = {
+  id: number
+  // The nickname the account showed when it asked; missing when it had none.
+  currentNickname?: string | null
+  desiredNickname: string
+  reason?: string | null
+  status: NicknameRequestStatus
+  adminNote?: string | null
+  // The admin who decided it; missing while it waits and for an admin without a nickname.
+  processedByNickname?: string | null
+  processedAt?: string | null
+  createdAt: string
+  mine: boolean
+  canCancel: boolean
+  canDecide: boolean
+}
+
+export type NicknameRequestList = {
+  // The reader's own requests, newest first.
+  mine: NicknameRequest[]
+  // Everyone's requests, those still waiting first; empty unless the reader is an admin.
+  received: NicknameRequest[]
+  admin: boolean
+  currentNickname?: string | null
+}
+
 export type LedgerExpenseType = 'FIXED' | 'VARIABLE'
 
 export type LedgerIncomeEntry = {

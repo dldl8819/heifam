@@ -358,6 +358,14 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/notice-images/{imageId}"),
             AuthType.SERVICE_ACCESS
         ),
+        // Members file and call off their own nickname requests; deciding one is for admins.
+        new ProtectedRoute(
+            "PUT",
+            PathPatternParser.defaultInstance.parse(
+                "/api/groups/{groupId}/nickname-requests/{requestId}/decision"
+            ),
+            AuthType.ADMIN_EMAIL
+        ),
         // Members read the donation ledger on the notices page; only super admins change it.
         new ProtectedRoute(
             "GET",
