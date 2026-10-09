@@ -32,11 +32,13 @@ import com.balancify.backend.api.group.GroupMatchAdminController;
 import com.balancify.backend.api.group.GroupMatchController;
 import com.balancify.backend.api.group.GroupLedgerAdminController;
 import com.balancify.backend.api.group.GroupLedgerController;
+import com.balancify.backend.api.group.GroupNicknameRequestController;
 import com.balancify.backend.api.group.GroupNoticeAdminController;
 import com.balancify.backend.api.group.GroupBoardController;
 import com.balancify.backend.api.group.GroupNoticeController;
 import com.balancify.backend.api.group.GroupNoticeImageController;
 import com.balancify.backend.api.group.dto.BoardPostListResponse;
+import com.balancify.backend.api.group.dto.NicknameRequestListResponse;
 import com.balancify.backend.api.group.dto.NoticeListResponse;
 import com.balancify.backend.api.group.GroupDashboardController;
 import com.balancify.backend.api.group.GroupPlayerController;
@@ -110,6 +112,7 @@ import com.balancify.backend.service.MatchResultService;
 import com.balancify.backend.service.ManualMatchService;
 import com.balancify.backend.service.MultiMatchBalancingService;
 import com.balancify.backend.service.BoardService;
+import com.balancify.backend.service.NicknameRequestService;
 import com.balancify.backend.service.NoticeAdminService;
 import com.balancify.backend.service.NoticeImageService;
 import com.balancify.backend.service.NoticeService;
@@ -138,6 +141,7 @@ import com.balancify.backend.service.TeamBalancingService;
 import com.balancify.backend.service.exception.MatchEditQuotaExceededException;
 import com.balancify.backend.service.exception.BoardForbiddenException;
 import com.balancify.backend.service.exception.BoardLimitException;
+import com.balancify.backend.service.exception.NicknameRequestConflictException;
 import com.balancify.backend.service.exception.NoticeForbiddenException;
 import com.balancify.backend.service.exception.NoticeImageException;
 import com.balancify.backend.service.exception.NoticeVoteClosedException;
@@ -157,6 +161,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultMatcher;
 
 @WebMvcTest(controllers = {
     MatchResultController.class,
@@ -177,6 +182,7 @@ import org.springframework.test.web.servlet.MockMvc;
     GroupNoticeAdminController.class,
     GroupNoticeController.class,
     GroupBoardController.class,
+    GroupNicknameRequestController.class,
     GroupNoticeImageController.class,
     GroupLedgerController.class,
     GroupLedgerAdminController.class,
@@ -264,6 +270,9 @@ class AdminKeyFilterTest {
 
     @MockitoBean
     private BoardService boardService;
+
+    @MockitoBean
+    private NicknameRequestService nicknameRequestService;
 
     @MockitoBean
     private NoticeImageService noticeImageService;
@@ -3192,6 +3201,111 @@ class AdminKeyFilterTest {
                     .content("{\"title\":\"\",\"content\":\"c\"}")
             )
             .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void letsMembersFileNicknameRequestsAndOnlyAdminsDecideThem() throws Exception {
+        NicknameRequestListResponse empty = new NicknameRequestListResponse(List.of(), List.of(), false, null);
+        when(nicknameRequestService.list(1L, "member@hei.gg")).thenReturn(empty);
+
+        mockMvc
+            .perform(get("/api/groups/1/nickname-requests").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.admin").value(false));
+        mockMvc
+            .perform(
+                post("/api/groups/1/nickname-requests")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"desiredNickname\":\"YOUR_USERNAME\",\"reason\":\"why\"}")
+            )
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(post("/api/groups/1/nickname-requests/4/cancel").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk());
+        verify(nicknameRequestService).create(1L, "member@hei.gg", "YOUR_USERNAME", "why");
+        verify(nicknameRequestService).cancel(1L, 4L, "member@hei.gg");
+
+        // Deciding: a member is turned away before the service is asked; an admin gets through.
+        String decision = "{\"status\":\"APPROVED\",\"note\":\"done\"}";
+        mockMvc
+            .perform(
+                put("/api/groups/1/nickname-requests/4/decision")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(decision)
+            )
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(
+                put("/api/groups/1/nickname-requests/4/decision")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(decision)
+            )
+            .andExpect(status().isForbidden());
+        verify(nicknameRequestService, never()).decide(any(), any(), any(), any(), any());
+        mockMvc
+            .perform(
+                put("/api/groups/1/nickname-requests/4/decision")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(decision)
+            )
+            .andExpect(status().isOk());
+        verify(nicknameRequestService).decide(1L, 4L, "admin@hei.gg", "APPROVED", "done");
+
+        // No sign-in, or signed in without access to the site: nothing.
+        mockMvc
+            .perform(get("/api/groups/1/nickname-requests"))
+            .andExpect(status().isUnauthorized());
+        mockMvc
+            .perform(get("/api/groups/1/nickname-requests").header("X-USER-EMAIL", "blocked@hei.gg"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(
+                post("/api/groups/1/nickname-requests")
+                    .header("X-USER-EMAIL", "blocked@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"desiredNickname\":\"YOUR_USERNAME\"}")
+            )
+            .andExpect(status().isForbidden());
+        verify(nicknameRequestService, times(1)).create(any(), any(), any(), any());
+    }
+
+    @Test
+    void tellsWhyANicknameRequestWasNotTaken() throws Exception {
+        when(nicknameRequestService.create(any(), any(), any(), any()))
+            .thenThrow(new NicknameRequestConflictException("one is waiting"))
+            .thenThrow(new BoardLimitException("too many"))
+            .thenThrow(new IllegalArgumentException("no nickname"));
+        when(nicknameRequestService.cancel(1L, 4L, "member@hei.gg"))
+            .thenThrow(new NoSuchElementException("Request not found"));
+        when(nicknameRequestService.decide(any(), any(), any(), any(), any()))
+            .thenThrow(new NicknameRequestConflictException("already decided"));
+
+        for (ResultMatcher expected : List.of(
+            status().isConflict(), status().isTooManyRequests(), status().isBadRequest()
+        )) {
+            mockMvc
+                .perform(
+                    post("/api/groups/1/nickname-requests")
+                        .header("X-USER-EMAIL", "member@hei.gg")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"desiredNickname\":\"YOUR_USERNAME\"}")
+                )
+                .andExpect(expected);
+        }
+        mockMvc
+            .perform(post("/api/groups/1/nickname-requests/4/cancel").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isNotFound());
+        mockMvc
+            .perform(
+                put("/api/groups/1/nickname-requests/4/decision")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"status\":\"REJECTED\"}")
+            )
+            .andExpect(status().isConflict());
     }
 
     @Test

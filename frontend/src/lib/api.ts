@@ -42,6 +42,7 @@ import type {
   BoardKind,
   BoardPostDetail,
   BoardPostList,
+  NicknameRequestList,
   NoticeCreateRequest,
   NoticeDetail,
   NoticeImageUpload,
@@ -1425,6 +1426,36 @@ export const apiClient = {
     apiRequest<BoardPostDetail>(
       `/api/groups/${groupId}/boards/${board}/posts/${postId}/like`,
       { method: liked ? 'PUT' : 'DELETE' },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  // Requests for a nickname change: a member's own, and for admins everyone's. Each change answers
+  // with the lists as they now are.
+  getNicknameRequests: (groupId: number) =>
+    apiRequest<NicknameRequestList>(`/api/groups/${groupId}/nickname-requests`, undefined, {
+      requireUserEmail: true,
+      includeUserEmail: true,
+    }),
+  createNicknameRequest: (groupId: number, payload: { desiredNickname: string; reason?: string }) =>
+    apiRequest<NicknameRequestList>(
+      `/api/groups/${groupId}/nickname-requests`,
+      { method: 'POST', body: JSON.stringify(payload) },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  cancelNicknameRequest: (groupId: number, requestId: number) =>
+    apiRequest<NicknameRequestList>(
+      `/api/groups/${groupId}/nickname-requests/${requestId}/cancel`,
+      { method: 'POST' },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  // Admins only. It records the decision; the nickname itself is changed by hand.
+  decideNicknameRequest: (
+    groupId: number,
+    requestId: number,
+    payload: { status: 'APPROVED' | 'REJECTED'; note?: string }
+  ) =>
+    apiRequest<NicknameRequestList>(
+      `/api/groups/${groupId}/nickname-requests/${requestId}/decision`,
+      { method: 'PUT', body: JSON.stringify(payload) },
       { requireUserEmail: true, includeUserEmail: true }
     ),
   // Open to visitors: titles and dates of the notices members may read.

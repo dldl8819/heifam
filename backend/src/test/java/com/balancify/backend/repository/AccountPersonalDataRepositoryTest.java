@@ -90,6 +90,20 @@ class AccountPersonalDataRepositoryTest {
     }
 
     @Test
+    void removesTheAccountsNicknameRequestsAndItsNameFromThoseItDecided() {
+        AccountPersonalDataRepository repository = new AccountPersonalDataRepository(jdbcTemplate);
+
+        repository.deleteAccountIdentity(UUID.randomUUID(), "your_username@example.com");
+
+        ArgumentCaptor<String> statements = ArgumentCaptor.forClass(String.class);
+        verify(jdbcTemplate, atLeastOnce()).update(statements.capture(), any(SqlParameterSource.class));
+        assertThat(statements.getAllValues()).contains(
+            "DELETE FROM nickname_change_requests WHERE requester_email = :email",
+            "UPDATE nickname_change_requests SET processed_by_email = NULL WHERE processed_by_email = :email"
+        );
+    }
+
+    @Test
     void removesNotificationStateWithTheAccount() {
         AccountPersonalDataRepository repository = new AccountPersonalDataRepository(jdbcTemplate);
 

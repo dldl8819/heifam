@@ -241,6 +241,12 @@ public class AccountPersonalDataRepository {
             jdbcTemplate.update("DELETE FROM board_post_views WHERE viewer_email = :email", parameters);
             jdbcTemplate.update("DELETE FROM board_comments WHERE author_email = :email", parameters);
             jdbcTemplate.update("DELETE FROM board_posts WHERE author_email = :email", parameters);
+            // Their nickname requests go too; one they decided as an admin stays, without their name.
+            jdbcTemplate.update("DELETE FROM nickname_change_requests WHERE requester_email = :email", parameters);
+            jdbcTemplate.update(
+                "UPDATE nickname_change_requests SET processed_by_email = NULL WHERE processed_by_email = :email",
+                parameters
+            );
             // So do how far it read its notifications and the browsers it registered for push.
             jdbcTemplate.update("DELETE FROM notification_cursors WHERE email = :email", parameters);
             jdbcTemplate.update("DELETE FROM push_subscriptions WHERE email = :email", parameters);
