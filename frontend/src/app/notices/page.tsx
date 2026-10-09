@@ -160,7 +160,8 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
         setFormError(t('notices.posts.titleRequired'))
         return
       }
-      if (!content.trim()) {
+      // A vote's question is its title; text is only needed for a notice without a vote.
+      if (!withVote && !content.trim()) {
         setFormError(t('notices.posts.contentRequired'))
         return
       }
@@ -203,12 +204,13 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
     [adminOnly, content, loadNotices, title, withVote]
   )
 
-  const filterButtonClass = (value: NoticeFilter) =>
+  const filterButtonClassFor = (selected: boolean) =>
     `rounded-md px-2.5 py-1 text-xs font-medium ${
-      filter === value
+      selected
         ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
         : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
     }`
+  const filterButtonClass = (value: NoticeFilter) => filterButtonClassFor(filter === value)
 
   return (
     <>
@@ -281,18 +283,38 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
                   {formError}
                 </p>
               )}
+              <div
+                role="group"
+                aria-label={t('notices.posts.kindLabel')}
+                className="inline-flex gap-1 rounded-lg border border-slate-200 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-900"
+              >
+                <button type="button" onClick={() => setWithVote(false)} aria-pressed={!withVote} className={filterButtonClassFor(!withVote)}>
+                  {t('notices.posts.kindNotice')}
+                </button>
+                <button type="button" onClick={() => setWithVote(true)} aria-pressed={withVote} className={filterButtonClassFor(withVote)}>
+                  {t('notices.posts.kindVote')}
+                </button>
+              </div>
               <input
                 type="text"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
-                placeholder={t('notices.posts.titlePlaceholder')}
+                placeholder={withVote ? t('notices.posts.voteTitlePlaceholder') : t('notices.posts.titlePlaceholder')}
                 className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900"
               />
+              {/* In the order the notice will show them: the question, the vote, then any text. */}
+              {withVote && (
+                <div className="space-y-1">
+                  <NoticeVoteView vote={{ status: 'OPEN', agreeCount: 0, disagreeCount: 0 }} />
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{t('notices.posts.votePreview')}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{t('notices.posts.voteHint')}</p>
+                </div>
+              )}
               <NoticeContentEditor
                 groupId={TEMP_GROUP_ID}
                 value={content}
                 onChange={setContent}
-                placeholder={t('notices.posts.contentPlaceholder')}
+                placeholder={withVote ? t('notices.posts.voteContentPlaceholder') : t('notices.posts.contentPlaceholder')}
                 onUploadingChange={setImageUploading}
               />
               <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -306,23 +328,6 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
                 />
                 {t('notices.posts.adminOnlyLabel')}
               </label>
-              <div className="space-y-1">
-                <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200">
-                  <input
-                    type="checkbox"
-                    checked={withVote}
-                    onChange={(event) => setWithVote(event.target.checked)}
-                  />
-                  {t('notices.posts.voteLabel')}
-                </label>
-                <p className="pl-5 text-xs text-slate-500 dark:text-slate-400">{t('notices.posts.voteHint')}</p>
-                {withVote && (
-                  <div className="max-w-md space-y-1 pl-5 pt-1">
-                    <p className="text-xs text-slate-500 dark:text-slate-400">{t('notices.posts.votePreview')}</p>
-                    <NoticeVoteView vote={{ status: 'OPEN', agreeCount: 0, disagreeCount: 0 }} />
-                  </div>
-                )}
-              </div>
               <div className="flex gap-2">
                 <button
                   type="submit"

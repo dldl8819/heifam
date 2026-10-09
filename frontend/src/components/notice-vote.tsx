@@ -6,9 +6,6 @@ import { summarizeNoticeVote } from '@/lib/notice-vote'
 import { t } from '@/lib/i18n'
 import type { NoticeDetail, NoticeVote, NoticeVoteChoice } from '@/types/api'
 
-// Where the page scrolls to from the "there is a vote" line above a long notice.
-export const NOTICE_VOTE_ANCHOR = 'notice-vote'
-
 type NoticeVoteViewProps = {
   vote: NoticeVote
   // Left out, nothing can be pressed: the form shows the vote this way before it exists.
@@ -65,9 +62,8 @@ export function NoticeVoteView({ vote, onPress, onWithdraw, busy = false }: Noti
 
   return (
     <section
-      id={NOTICE_VOTE_ANCHOR}
       aria-label={t('notices.posts.voteTitle')}
-      className="scroll-mt-24 space-y-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900"
+      className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900"
     >
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('notices.posts.voteTitle')}</h2>
