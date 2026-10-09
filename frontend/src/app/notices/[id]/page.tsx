@@ -10,7 +10,7 @@ import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { NoticeBody } from '@/components/notice-body'
 import { NoticeComments } from '@/components/notice-comments'
 import { NoticeContentEditor } from '@/components/notice-content-editor'
-import { NoticeVotePanel } from '@/components/notice-vote'
+import { NOTICE_VOTE_ANCHOR, NoticeVotePanel, NoticeVoteView } from '@/components/notice-vote'
 import { NOTICE_IMAGE_MAX_COUNT, noticeImageIds } from '@/lib/notice-images'
 import { t } from '@/lib/i18n'
 import type { NoticeDetail, NoticeVoteStatus } from '@/types/api'
@@ -215,6 +215,16 @@ export default function NoticeDetailPage() {
                   : ''}
               </p>
             </div>
+            {/* The vote sits under the text, which can be long: say so before the reader scrolls. */}
+            {notice.vote?.status === 'OPEN' && !notice.vote.myChoice && (
+              <a
+                href={`#${NOTICE_VOTE_ANCHOR}`}
+                className="flex items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-950/70"
+              >
+                <span>{t('notices.posts.voteJump')}</span>
+                <span className="shrink-0 font-semibold">{t('notices.posts.voteJumpLink')}</span>
+              </a>
+            )}
             <NoticeBody groupId={TEMP_GROUP_ID} content={notice.content} />
 
             {notice.vote && (
@@ -325,6 +335,19 @@ export default function NoticeDetailPage() {
               </select>
             </label>
             <p className="text-xs text-slate-500 dark:text-slate-400">{t('notices.posts.voteSettingHint')}</p>
+            {voteStatus !== 'NONE' && (
+              <div className="max-w-md space-y-1 pt-1">
+                <p className="text-xs text-slate-500 dark:text-slate-400">{t('notices.posts.votePreview')}</p>
+                <NoticeVoteView
+                  vote={{
+                    status: voteStatus,
+                    agreeCount: notice.vote?.agreeCount ?? 0,
+                    disagreeCount: notice.vote?.disagreeCount ?? 0,
+                    myChoice: notice.vote?.myChoice,
+                  }}
+                />
+              </div>
+            )}
           </div>
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200">

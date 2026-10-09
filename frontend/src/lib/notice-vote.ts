@@ -1,4 +1,4 @@
-import type { NoticeVote, NoticeVoteChoice } from '@/types/api'
+import type { NoticeVote } from '@/types/api'
 
 export type NoticeVoteSummary = {
   total: number
@@ -16,12 +16,4 @@ export function summarizeNoticeVote(vote: Pick<NoticeVote, 'agreeCount' | 'disag
   }
   const agreePercent = Math.round((agree / total) * 100)
   return { total, agreePercent, disagreePercent: 100 - agreePercent }
-}
-
-/** What pressing a side does: the side already chosen takes the vote back, the other one changes it. */
-export function nextNoticeVote(
-  current: NoticeVoteChoice | null | undefined,
-  pressed: NoticeVoteChoice
-): NoticeVoteChoice | null {
-  return current === pressed ? null : pressed
 }
