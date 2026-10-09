@@ -21,6 +21,10 @@
     "results": "경기 결과",
     "ranking": "랭킹",
     "notices": "공지사항",
+    "boards": "게시판",
+    "freeBoard": "자유게시판",
+    "anonymousBoard": "익명게시판",
+    "nicknameRequests": "닉변 요청",
     "points": "포인트",
     "predictions": "승부 예측",
     "tournaments": "토너먼트"
