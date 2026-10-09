@@ -35,9 +35,11 @@ import com.balancify.backend.api.group.GroupLedgerController;
 import com.balancify.backend.api.group.GroupNicknameRequestController;
 import com.balancify.backend.api.group.GroupNoticeAdminController;
 import com.balancify.backend.api.group.GroupBoardController;
+import com.balancify.backend.api.group.GroupBoardSearchController;
 import com.balancify.backend.api.group.GroupNoticeController;
 import com.balancify.backend.api.group.GroupNoticeImageController;
 import com.balancify.backend.api.group.dto.BoardPostListResponse;
+import com.balancify.backend.api.group.dto.BoardSearchResponse;
 import com.balancify.backend.api.group.dto.NicknameRequestListResponse;
 import com.balancify.backend.api.group.dto.NoticeListResponse;
 import com.balancify.backend.api.group.GroupDashboardController;
@@ -111,6 +113,7 @@ import com.balancify.backend.service.MatchImportService;
 import com.balancify.backend.service.MatchResultService;
 import com.balancify.backend.service.ManualMatchService;
 import com.balancify.backend.service.MultiMatchBalancingService;
+import com.balancify.backend.service.BoardSearchService;
 import com.balancify.backend.service.BoardService;
 import com.balancify.backend.service.NicknameRequestService;
 import com.balancify.backend.service.NoticeAdminService;
@@ -182,6 +185,7 @@ import org.springframework.test.web.servlet.ResultMatcher;
     GroupNoticeAdminController.class,
     GroupNoticeController.class,
     GroupBoardController.class,
+    GroupBoardSearchController.class,
     GroupNicknameRequestController.class,
     GroupNoticeImageController.class,
     GroupLedgerController.class,
@@ -270,6 +274,9 @@ class AdminKeyFilterTest {
 
     @MockitoBean
     private BoardService boardService;
+
+    @MockitoBean
+    private BoardSearchService boardSearchService;
 
     @MockitoBean
     private NicknameRequestService nicknameRequestService;
@@ -3201,6 +3208,39 @@ class AdminKeyFilterTest {
                     .content("{\"title\":\"\",\"content\":\"c\"}")
             )
             .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void letsMembersSearchTheBoardsAndKeepsEveryoneElseOut() throws Exception {
+        when(boardSearchService.search(1L, "member@hei.gg", "rules", 2))
+            .thenReturn(new BoardSearchResponse("rules", List.of(), 0, 2, 20));
+        when(boardSearchService.search(1L, "member@hei.gg", "", 1))
+            .thenThrow(new IllegalArgumentException("too short"));
+
+        mockMvc
+            .perform(
+                get("/api/groups/1/boards/search")
+                    .param("q", "rules")
+                    .param("page", "2")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.query").value("rules"))
+            .andExpect(jsonPath("$.page").value(2));
+        // Without a word to look for there is nothing to search.
+        mockMvc
+            .perform(get("/api/groups/1/boards/search").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isBadRequest());
+
+        mockMvc
+            .perform(get("/api/groups/1/boards/search").param("q", "rules"))
+            .andExpect(status().isUnauthorized());
+        mockMvc
+            .perform(get("/api/groups/1/boards/search").param("q", "rules").header("X-USER-EMAIL", "blocked@hei.gg"))
+            .andExpect(status().isForbidden());
+        verify(boardSearchService, times(2)).search(any(), any(), any(), anyInt());
+        // The search is not a board: nothing of it reaches the posts of one.
+        verify(boardService, never()).list(any(), any(), any(), anyInt());
     }
 
     @Test

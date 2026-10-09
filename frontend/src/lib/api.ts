@@ -42,6 +42,7 @@ import type {
   BoardKind,
   BoardPostDetail,
   BoardPostList,
+  BoardSearchResult,
   NicknameRequestList,
   NoticeCreateRequest,
   NoticeDetail,
@@ -1426,6 +1427,13 @@ export const apiClient = {
     apiRequest<BoardPostDetail>(
       `/api/groups/${groupId}/boards/${board}/posts/${postId}/like`,
       { method: liked ? 'PUT' : 'DELETE' },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  // Posts with the word in their title or text, among the notices the member may read and the free board.
+  searchBoards: (groupId: number, query: string, page: number) =>
+    apiRequest<BoardSearchResult>(
+      `/api/groups/${groupId}/boards/search?${new URLSearchParams({ q: query, page: String(page) }).toString()}`,
+      undefined,
       { requireUserEmail: true, includeUserEmail: true }
     ),
   // Requests for a nickname change: a member's own, and for admins everyone's. Each change answers

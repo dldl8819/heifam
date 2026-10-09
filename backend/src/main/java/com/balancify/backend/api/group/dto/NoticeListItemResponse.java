@@ -14,6 +14,10 @@ public record NoticeListItemResponse(
     long likeCount,
     long commentCount,
     // Members are being asked to vote on this notice.
-    boolean voteOpen
+    boolean voteOpen,
+    // People who have opened the notice, each counted once.
+    long viewCount,
+    // People who have voted, whatever they chose; null for a notice that asks for no vote.
+    Long voteCount
 ) {
 }

@@ -616,6 +616,10 @@ export type NoticeListItem = {
   commentCount: number
   // Members are being asked to vote on this notice.
   voteOpen?: boolean
+  // People who have opened the notice, each counted once.
+  viewCount?: number
+  // People who have voted, whatever they chose; missing or null for a notice that asks for no vote.
+  voteCount?: number | null
 }
 
 export type NoticeList = {
@@ -653,6 +657,8 @@ export type NoticeDetail = {
   comments: NoticeComment[]
   // Missing or null for a notice that asks for no vote.
   vote?: NoticeVote | null
+  // People who have opened the notice, each counted once, this reader included.
+  viewCount?: number
 }
 
 export type NoticeCreateRequest = {
@@ -726,6 +732,31 @@ export type BoardPostDetail = {
   likedByMe: boolean
   viewCount: number
   comments: BoardComment[]
+}
+
+/** A post found by the search: a notice or a post on the free board. */
+export type BoardSearchItem = {
+  kind: 'NOTICE' | 'FREE'
+  id: number
+  title: string
+  // A stretch of the text around the first match, or its beginning when only the title matched.
+  snippet: string
+  authorNickname?: string | null
+  createdAt: string
+  adminOnly: boolean
+  viewCount: number
+  commentCount: number
+  likeCount: number
+  // Missing or null unless the post is a notice that asks for a vote.
+  voteCount?: number | null
+}
+
+export type BoardSearchResult = {
+  query: string
+  results: BoardSearchItem[]
+  total: number
+  page: number
+  pageSize: number
 }
 
 export type NicknameRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELED'

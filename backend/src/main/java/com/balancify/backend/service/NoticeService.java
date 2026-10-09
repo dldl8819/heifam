@@ -81,6 +81,8 @@ public class NoticeService {
         List<Long> noticeIds = notices.stream().map(Notice::getId).toList();
         Set<Long> readIds = noticeEngagementRepository.findReadNoticeIds(reader, noticeIds);
         Map<Long, Long> likeCounts = noticeEngagementRepository.countLikes(noticeIds);
+        Map<Long, Long> viewCounts = noticeEngagementRepository.countReads(noticeIds);
+        Map<Long, Long> voterCounts = noticeEngagementRepository.countVoters(noticeIds);
         Map<Long, Long> commentCounts = new HashMap<>();
         if (!noticeIds.isEmpty()) {
             noticeCommentRepository.countByNotice(noticeIds)
@@ -99,7 +101,10 @@ public class NoticeService {
                 notice.getRevision() > 0,
                 likeCounts.getOrDefault(notice.getId(), 0L),
                 commentCounts.getOrDefault(notice.getId(), 0L),
-                NoticeVotes.OPEN.equals(notice.getVoteStatus())
+                NoticeVotes.OPEN.equals(notice.getVoteStatus()),
+                viewCounts.getOrDefault(notice.getId(), 0L),
+                // A vote that was taken off the notice keeps its votes but shows none of them.
+                asksForVote(notice) ? voterCounts.getOrDefault(notice.getId(), 0L) : null
             ))
             .toList();
         int readCount = (int) items.stream().filter(NoticeListItemResponse::read).count();
@@ -271,9 +276,14 @@ public class NoticeService {
         return notice;
     }
 
+    private static boolean asksForVote(Notice notice) {
+        String status = notice.getVoteStatus();
+        return NoticeVotes.OPEN.equals(status) || NoticeVotes.CLOSED.equals(status);
+    }
+
     private NoticeVoteResponse vote(Notice notice, String reader) {
         String status = notice.getVoteStatus();
-        if (!NoticeVotes.OPEN.equals(status) && !NoticeVotes.CLOSED.equals(status)) {
+        if (!asksForVote(notice)) {
             return null;
         }
         Map<String, Long> counts = noticeEngagementRepository.countVotes(notice.getId());
@@ -333,7 +343,8 @@ public class NoticeService {
                     );
                 })
                 .toList(),
-            vote(notice, reader)
+            vote(notice, reader),
+            noticeEngagementRepository.countReads(List.of(notice.getId())).getOrDefault(notice.getId(), 0L)
         );
     }
 
