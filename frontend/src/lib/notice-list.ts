@@ -20,9 +20,9 @@ export type NoticeCommentThread = {
 }
 
 /**
- * Comments as they are drawn: each comment on the notice with its replies under it, both in the
- * order they were written. A reply whose comment is not in the list is shown as a comment of its
- * own, so nothing a member wrote goes missing.
+ * Comments as they are drawn: the newest comment on the notice first, each with its replies under
+ * it in the order they were written, since a thread reads as a conversation. A reply whose comment
+ * is not in the list is shown as a comment of its own, so nothing a member wrote goes missing.
  */
 export function threadNoticeComments(comments: NoticeComment[]): NoticeCommentThread[] {
   const threads: NoticeCommentThread[] = []
@@ -45,7 +45,11 @@ export function threadNoticeComments(comments: NoticeComment[]): NoticeCommentTh
       threads.push({ comment, replies: [] })
     }
   }
-  return threads.sort((left, right) => left.comment.id - right.comment.id)
+  // Ids go up with time, and unlike the timestamps two of them are never equal.
+  for (const thread of threads) {
+    thread.replies.sort((left, right) => left.id - right.id)
+  }
+  return threads.sort((left, right) => right.comment.id - left.comment.id)
 }
 
 /** How many comments people can read: an emptied place is not one. */
