@@ -588,6 +588,33 @@ class NoticeServiceTest {
     }
 
     @Test
+    void showsHowManyPeopleOpenedEachNoticeAndVotedOnThoseThatAsk() {
+        when(noticeRepository.findByGroupIdOrderByCreatedAtDescIdDesc(1L)).thenAnswer(invocation -> {
+            Notice open = notice(3L, "third", false);
+            open.setVoteStatus("OPEN");
+            Notice closed = notice(2L, "second", false);
+            closed.setVoteStatus("CLOSED");
+            // Its vote was taken off again; the votes cast are kept but no longer shown.
+            Notice plain = notice(1L, "first", false);
+            return List.of(open, closed, plain);
+        });
+        when(noticeEngagementRepository.countReads(List.of(3L, 2L, 1L))).thenReturn(Map.of(3L, 12L, 1L, 5L));
+        when(noticeEngagementRepository.countVoters(List.of(3L, 2L, 1L))).thenReturn(Map.of(3L, 9L, 1L, 4L));
+
+        assertThat(noticeService.list(1L, MEMBER).notices())
+            .extracting(NoticeListItemResponse::id, NoticeListItemResponse::viewCount, NoticeListItemResponse::voteCount)
+            .containsExactly(tuple(3L, 12L, 9L), tuple(2L, 0L, 0L), tuple(1L, 5L, null));
+    }
+
+    @Test
+    void countsTheReaderAmongThoseWhoOpenedTheNotice() {
+        when(noticeRepository.findByIdAndGroupIdForShare(2L, 1L)).thenReturn(Optional.of(notice(2L, "second", false)));
+        when(noticeEngagementRepository.countReads(List.of(2L))).thenReturn(Map.of(2L, 31L));
+
+        assertThat(noticeService.open(1L, 2L, MEMBER).viewCount()).isEqualTo(31L);
+    }
+
+    @Test
     void marksNoticesWithAnOpenVoteInTheList() {
         // The list in setUp holds notices 3 (admins only), 2 and 1.
         when(noticeRepository.findByGroupIdOrderByCreatedAtDescIdDesc(1L)).thenAnswer(invocation -> {

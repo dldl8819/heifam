@@ -380,6 +380,8 @@
       "emptyUnread": "아직 확인하지 않은 공지가 없습니다.",
       "likeCount": "좋아요 {count}",
       "commentCount": "댓글 {count}",
+      "viewCount": "조회 {count}",
+      "voteCount": "투표 {count}",
       "like": "좋아요",
       "liked": "좋아요 취소",
       "comments": "댓글",
@@ -692,6 +694,21 @@
       "REJECTED": "반려",
       "CANCELED": "취소"
     }
+  },
+  "boardSearch": {
+    "title": "글 검색",
+    "description": "공지사항과 자유게시판의 제목·내용에서 찾습니다. 익명게시판과 닉변 요청은 검색되지 않습니다.",
+    "placeholder": "공지사항·자유게시판 글 검색",
+    "submit": "검색",
+    "queryTooShort": "검색어는 {min}자 이상 입력해 주세요.",
+    "queryTooLong": "검색어는 {max}자를 넘을 수 없습니다.",
+    "prompt": "검색어를 입력해 주세요.",
+    "summary": "'{query}' 검색 결과 {total}건",
+    "empty": "검색 결과가 없습니다.",
+    "loadError": "검색하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    "kindNotice": "공지사항",
+    "kindFree": "자유게시판",
+    "votes": "투표 {count}"
   },
   "adminGuard": {
     "loginTitle": "Google 로그인이 필요합니다",

@@ -15,6 +15,8 @@ public record NoticeDetailResponse(
     boolean likedByMe,
     List<NoticeCommentResponse> comments,
     // Null for a notice that asks for no vote.
-    NoticeVoteResponse vote
+    NoticeVoteResponse vote,
+    // People who have opened the notice, each counted once, this reader included.
+    long viewCount
 ) {
 }

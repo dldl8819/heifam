@@ -6,6 +6,7 @@ import { useAdminAuth } from '@/lib/admin-auth'
 import { ApiRequestError, apiClient } from '@/lib/api'
 import { Alert, AlertContent, AlertDescription, AlertIcon } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
+import { BoardSearchBox } from '@/components/board-search-box'
 import { LedgerSection } from '@/components/ledger-section'
 import { NoticeContentEditor } from '@/components/notice-content-editor'
 import { NoticeVoteView } from '@/components/notice-vote'
@@ -347,6 +348,8 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
             </form>
           )}
 
+          <BoardSearchBox />
+
           <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
             <table className="min-w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs tracking-wide text-slate-500 dark:bg-slate-800/80 dark:text-slate-300">
@@ -411,13 +414,17 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
                             </span>
                           )}
                         </div>
-                        {(notice.likeCount > 0 || notice.commentCount > 0) && (
-                          <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
-                            {t('notices.posts.likeCount', { count: notice.likeCount })}
-                            {' · '}
-                            {t('notices.posts.commentCount', { count: notice.commentCount })}
-                          </p>
-                        )}
+                        <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
+                          {t('notices.posts.viewCount', { count: notice.viewCount ?? 0 })}
+                          {' · '}
+                          {t('notices.posts.likeCount', { count: notice.likeCount })}
+                          {' · '}
+                          {t('notices.posts.commentCount', { count: notice.commentCount })}
+                          {/* Only a notice that asks for a vote has a number of voters to show. */}
+                          {notice.voteCount !== null && notice.voteCount !== undefined
+                            ? ` · ${t('notices.posts.voteCount', { count: notice.voteCount })}`
+                            : ''}
+                        </p>
                       </td>
                       <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{formatDate(notice.createdAt)}</td>
                     </tr>

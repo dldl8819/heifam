@@ -97,6 +97,31 @@ public class NoticeEngagementRepository {
         return counts;
     }
 
+    /** How many people have opened each notice, each counted once; a notice nobody opened is left out. */
+    public Map<Long, Long> countReads(Collection<Long> noticeIds) {
+        return countPerNotice("notice_reads", noticeIds);
+    }
+
+    /** How many people have voted on each notice, whatever they chose; a notice without votes is left out. */
+    public Map<Long, Long> countVoters(Collection<Long> noticeIds) {
+        return countPerNotice("notice_votes", noticeIds);
+    }
+
+    private Map<Long, Long> countPerNotice(String table, Collection<Long> noticeIds) {
+        Map<Long, Long> counts = new HashMap<>();
+        if (noticeIds.isEmpty()) {
+            return counts;
+        }
+        jdbcTemplate.query(
+            "SELECT notice_id, count(*) AS total FROM " + table + " WHERE notice_id IN (:noticeIds) GROUP BY notice_id",
+            new MapSqlParameterSource("noticeIds", noticeIds),
+            row -> {
+                counts.put(row.getLong("notice_id"), row.getLong("total"));
+            }
+        );
+        return counts;
+    }
+
     /** Returns whether this call added the like; false when the person liked the comment already. */
     public boolean likeComment(Long commentId, String email) {
         return jdbcTemplate.update(

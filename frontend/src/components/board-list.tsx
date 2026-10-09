@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { FormEvent, useCallback, useEffect, useState } from 'react'
 import { ApiRequestError, apiClient } from '@/lib/api'
 import { useAdminAuth } from '@/lib/admin-auth'
+import { BoardSearchBox } from '@/components/board-search-box'
 import { Alert, AlertContent, AlertDescription, AlertIcon } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { BOARD_CONTENT_MAX_LENGTH, BOARD_TITLE_MAX_LENGTH, boardPageCount, validateBoardPost } from '@/lib/boards'
@@ -115,6 +116,9 @@ export function BoardList({ board }: { board: BoardKind }) {
           {t('boards.write')}
         </button>
       </div>
+
+      {/* The search covers the notices and the free board; what is on the anonymous board is never found by it. */}
+      {!anonymous && <BoardSearchBox />}
 
       {successMessage && (
         <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">

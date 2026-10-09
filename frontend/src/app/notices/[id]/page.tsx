@@ -214,6 +214,7 @@ export default function NoticeDetailPage() {
                 {notice.updatedAt !== notice.createdAt
                   ? ` · ${t('notices.posts.updatedAt', { date: formatDate(notice.updatedAt) })}`
                   : ''}
+                {` · ${t('notices.posts.viewCount', { count: notice.viewCount ?? 0 })}`}
               </p>
             </div>
             {/* A notice that asks for a vote shows the vote first: its title is the question, and any
