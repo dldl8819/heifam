@@ -235,6 +235,12 @@ public class AccountPersonalDataRepository {
             jdbcTemplate.update("DELETE FROM notice_comment_likes WHERE liker_email = :email", parameters);
             jdbcTemplate.update("DELETE FROM notice_votes WHERE voter_email = :email", parameters);
             jdbcTemplate.update("DELETE FROM notice_comments WHERE author_email = :email", parameters);
+            // And what they left on the member boards: their likes, views and comments, then their
+            // posts, with whatever others left on those posts (ON DELETE CASCADE).
+            jdbcTemplate.update("DELETE FROM board_post_likes WHERE liker_email = :email", parameters);
+            jdbcTemplate.update("DELETE FROM board_post_views WHERE viewer_email = :email", parameters);
+            jdbcTemplate.update("DELETE FROM board_comments WHERE author_email = :email", parameters);
+            jdbcTemplate.update("DELETE FROM board_posts WHERE author_email = :email", parameters);
             // So do how far it read its notifications and the browsers it registered for push.
             jdbcTemplate.update("DELETE FROM notification_cursors WHERE email = :email", parameters);
             jdbcTemplate.update("DELETE FROM push_subscriptions WHERE email = :email", parameters);

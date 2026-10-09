@@ -71,6 +71,25 @@ class AccountPersonalDataRepositoryTest {
     }
 
     @Test
+    void removesWhatTheAccountLeftOnTheBoards() {
+        AccountPersonalDataRepository repository = new AccountPersonalDataRepository(jdbcTemplate);
+
+        repository.deleteAccountIdentity(UUID.randomUUID(), "your_username@example.com");
+
+        ArgumentCaptor<String> statements = ArgumentCaptor.forClass(String.class);
+        verify(jdbcTemplate, atLeastOnce()).update(statements.capture(), any(SqlParameterSource.class));
+        assertThat(statements.getAllValues()).contains(
+            "DELETE FROM board_post_likes WHERE liker_email = :email",
+            "DELETE FROM board_post_views WHERE viewer_email = :email",
+            "DELETE FROM board_comments WHERE author_email = :email",
+            "DELETE FROM board_posts WHERE author_email = :email"
+        );
+        // Comments first: removing a post takes the comments on it along, their own included.
+        assertThat(statements.getAllValues().indexOf("DELETE FROM board_comments WHERE author_email = :email"))
+            .isLessThan(statements.getAllValues().indexOf("DELETE FROM board_posts WHERE author_email = :email"));
+    }
+
+    @Test
     void removesNotificationStateWithTheAccount() {
         AccountPersonalDataRepository repository = new AccountPersonalDataRepository(jdbcTemplate);
 

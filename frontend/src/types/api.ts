@@ -677,6 +677,57 @@ export type NoticeImageUpload = {
   id: number
 }
 
+// The member boards, as they are named in a path.
+export type BoardKind = 'free' | 'anonymous'
+
+export type BoardPostListItem = {
+  id: number
+  title: string
+  // Missing on the anonymous board, for everyone.
+  authorNickname?: string | null
+  createdAt: string
+  commentCount: number
+  likeCount: number
+  // People who have opened the post, each counted once.
+  viewCount: number
+  mine: boolean
+}
+
+export type BoardPostList = {
+  posts: BoardPostListItem[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export type BoardComment = {
+  id: number
+  // Missing on the anonymous board when the comment is by whoever wrote the post.
+  authorNickname?: string | null
+  byPostAuthor: boolean
+  content: string
+  createdAt: string
+  mine: boolean
+  canDelete: boolean
+}
+
+export type BoardPostDetail = {
+  id: number
+  board: 'FREE' | 'ANONYMOUS'
+  title: string
+  content: string
+  authorNickname?: string | null
+  createdAt: string
+  edited: boolean
+  mine: boolean
+  canEdit: boolean
+  canDelete: boolean
+  likeCount: number
+  likedByMe: boolean
+  viewCount: number
+  comments: BoardComment[]
+}
+
 export type LedgerExpenseType = 'FIXED' | 'VARIABLE'
 
 export type LedgerIncomeEntry = {
