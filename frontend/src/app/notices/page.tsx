@@ -8,6 +8,7 @@ import { Alert, AlertContent, AlertDescription, AlertIcon } from '@/components/u
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { LedgerSection } from '@/components/ledger-section'
 import { NoticeContentEditor } from '@/components/notice-content-editor'
+import { NoticeVoteView } from '@/components/notice-vote'
 import { NOTICE_IMAGE_MAX_COUNT, noticeImageIds } from '@/lib/notice-images'
 import { filterNotices, showsRevisedMark, type NoticeFilter } from '@/lib/notice-list'
 import { t } from '@/lib/i18n'
@@ -315,6 +316,12 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
                   {t('notices.posts.voteLabel')}
                 </label>
                 <p className="pl-5 text-xs text-slate-500 dark:text-slate-400">{t('notices.posts.voteHint')}</p>
+                {withVote && (
+                  <div className="max-w-md space-y-1 pl-5 pt-1">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{t('notices.posts.votePreview')}</p>
+                    <NoticeVoteView vote={{ status: 'OPEN', agreeCount: 0, disagreeCount: 0 }} />
+                  </div>
+                )}
               </div>
               <div className="flex gap-2">
                 <button

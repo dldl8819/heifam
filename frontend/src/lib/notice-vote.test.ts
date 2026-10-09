@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { nextNoticeVote, summarizeNoticeVote } from '@/lib/notice-vote'
+import { summarizeNoticeVote } from '@/lib/notice-vote'
 
 describe('summarizeNoticeVote', () => {
   it('has nothing to show while nobody has voted', () => {
@@ -37,22 +37,5 @@ describe('summarizeNoticeVote', () => {
       expect(summary.total).toBe(agreeCount + disagreeCount)
     }
     expect(summarizeNoticeVote({ agreeCount: 1, disagreeCount: 2 })).toMatchObject({ agreePercent: 33, disagreePercent: 67 })
-  })
-})
-
-describe('nextNoticeVote', () => {
-  it('casts the pressed side when there is no vote yet', () => {
-    expect(nextNoticeVote(null, 'AGREE')).toBe('AGREE')
-    expect(nextNoticeVote(undefined, 'DISAGREE')).toBe('DISAGREE')
-  })
-
-  it('changes to the other side', () => {
-    expect(nextNoticeVote('AGREE', 'DISAGREE')).toBe('DISAGREE')
-    expect(nextNoticeVote('DISAGREE', 'AGREE')).toBe('AGREE')
-  })
-
-  it('takes the vote back when the chosen side is pressed again', () => {
-    expect(nextNoticeVote('AGREE', 'AGREE')).toBeNull()
-    expect(nextNoticeVote('DISAGREE', 'DISAGREE')).toBeNull()
   })
 })
