@@ -33,8 +33,10 @@ import com.balancify.backend.api.group.GroupMatchController;
 import com.balancify.backend.api.group.GroupLedgerAdminController;
 import com.balancify.backend.api.group.GroupLedgerController;
 import com.balancify.backend.api.group.GroupNoticeAdminController;
+import com.balancify.backend.api.group.GroupBoardController;
 import com.balancify.backend.api.group.GroupNoticeController;
 import com.balancify.backend.api.group.GroupNoticeImageController;
+import com.balancify.backend.api.group.dto.BoardPostListResponse;
 import com.balancify.backend.api.group.dto.NoticeListResponse;
 import com.balancify.backend.api.group.GroupDashboardController;
 import com.balancify.backend.api.group.GroupPlayerController;
@@ -107,6 +109,7 @@ import com.balancify.backend.service.MatchImportService;
 import com.balancify.backend.service.MatchResultService;
 import com.balancify.backend.service.ManualMatchService;
 import com.balancify.backend.service.MultiMatchBalancingService;
+import com.balancify.backend.service.BoardService;
 import com.balancify.backend.service.NoticeAdminService;
 import com.balancify.backend.service.NoticeImageService;
 import com.balancify.backend.service.NoticeService;
@@ -133,6 +136,8 @@ import com.balancify.backend.service.RankingService;
 import com.balancify.backend.service.RatingRecalculationService;
 import com.balancify.backend.service.TeamBalancingService;
 import com.balancify.backend.service.exception.MatchEditQuotaExceededException;
+import com.balancify.backend.service.exception.BoardForbiddenException;
+import com.balancify.backend.service.exception.BoardLimitException;
 import com.balancify.backend.service.exception.NoticeForbiddenException;
 import com.balancify.backend.service.exception.NoticeImageException;
 import com.balancify.backend.service.exception.NoticeVoteClosedException;
@@ -171,6 +176,7 @@ import org.springframework.test.web.servlet.MockMvc;
     OperationAuditLogController.class,
     GroupNoticeAdminController.class,
     GroupNoticeController.class,
+    GroupBoardController.class,
     GroupNoticeImageController.class,
     GroupLedgerController.class,
     GroupLedgerAdminController.class,
@@ -255,6 +261,9 @@ class AdminKeyFilterTest {
 
     @MockitoBean
     private NoticeService noticeService;
+
+    @MockitoBean
+    private BoardService boardService;
 
     @MockitoBean
     private NoticeImageService noticeImageService;
@@ -3061,6 +3070,128 @@ class AdminKeyFilterTest {
             eq(1L), eq(6L), argThat(request -> request != null && request.voteStatus() == null),
             eq("admin@hei.gg"), any()
         );
+    }
+
+    @Test
+    void letsMembersUseTheBoardsAndKeepsEveryoneElseOut() throws Exception {
+        when(boardService.list(1L, BoardService.Board.FREE, "member@hei.gg", 2))
+            .thenReturn(new BoardPostListResponse(List.of(), 0, 2, 20));
+
+        mockMvc
+            .perform(get("/api/groups/1/boards/free/posts").param("page", "2").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.page").value(2));
+        mockMvc
+            .perform(
+                post("/api/groups/1/boards/anonymous/posts")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"title\":\"t\",\"content\":\"c\"}")
+            )
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(get("/api/groups/1/boards/free/posts/7").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(
+                put("/api/groups/1/boards/free/posts/7")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"title\":\"t2\",\"content\":\"c2\"}")
+            )
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(
+                post("/api/groups/1/boards/free/posts/7/comments")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"content\":\"hello\"}")
+            )
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(delete("/api/groups/1/boards/free/posts/7/comments/31").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(put("/api/groups/1/boards/free/posts/7/like").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(delete("/api/groups/1/boards/free/posts/7/like").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk());
+        mockMvc
+            .perform(delete("/api/groups/1/boards/free/posts/7").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk());
+
+        verify(boardService).create(1L, BoardService.Board.ANONYMOUS, "member@hei.gg", "t", "c");
+        verify(boardService).open(1L, BoardService.Board.FREE, 7L, "member@hei.gg");
+        verify(boardService).edit(1L, BoardService.Board.FREE, 7L, "member@hei.gg", "t2", "c2");
+        verify(boardService).addComment(1L, BoardService.Board.FREE, 7L, "member@hei.gg", "hello");
+        verify(boardService).deleteComment(1L, BoardService.Board.FREE, 7L, 31L, "member@hei.gg");
+        verify(boardService).setLike(1L, BoardService.Board.FREE, 7L, "member@hei.gg", true);
+        verify(boardService).setLike(1L, BoardService.Board.FREE, 7L, "member@hei.gg", false);
+        verify(boardService).delete(1L, BoardService.Board.FREE, 7L, "member@hei.gg");
+
+        // No sign-in, or signed in without access to the site: nothing of either board.
+        for (String board : new String[] {"free", "anonymous"}) {
+            mockMvc
+                .perform(get("/api/groups/1/boards/" + board + "/posts"))
+                .andExpect(status().isUnauthorized());
+            mockMvc
+                .perform(get("/api/groups/1/boards/" + board + "/posts/7").header("X-USER-EMAIL", "blocked@hei.gg"))
+                .andExpect(status().isForbidden());
+            mockMvc
+                .perform(
+                    post("/api/groups/1/boards/" + board + "/posts")
+                        .header("X-USER-EMAIL", "blocked@hei.gg")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"t\",\"content\":\"c\"}")
+                )
+                .andExpect(status().isForbidden());
+        }
+        verify(boardService, times(1)).create(any(), any(), any(), any(), any());
+        verify(boardService, times(1)).open(any(), any(), any(), any());
+    }
+
+    @Test
+    void tellsWhyABoardRequestWasNotTaken() throws Exception {
+        when(boardService.open(1L, BoardService.Board.ANONYMOUS, 7L, "member@hei.gg"))
+            .thenThrow(new NoSuchElementException("Post not found"));
+        when(boardService.edit(any(), any(), any(), any(), any(), any()))
+            .thenThrow(new BoardForbiddenException("not yours"));
+        when(boardService.create(any(), any(), any(), any(), any()))
+            .thenThrow(new BoardLimitException("too many"))
+            .thenThrow(new IllegalArgumentException("no title"));
+
+        mockMvc
+            .perform(get("/api/groups/1/boards/anonymous/posts/7").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isNotFound());
+        // A board that does not exist is not found either, whatever is asked of it.
+        mockMvc
+            .perform(get("/api/groups/1/boards/notices/posts").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isNotFound());
+        mockMvc
+            .perform(
+                put("/api/groups/1/boards/free/posts/7")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"title\":\"t\",\"content\":\"c\"}")
+            )
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(
+                post("/api/groups/1/boards/free/posts")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"title\":\"t\",\"content\":\"c\"}")
+            )
+            .andExpect(status().isTooManyRequests());
+        mockMvc
+            .perform(
+                post("/api/groups/1/boards/free/posts")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"title\":\"\",\"content\":\"c\"}")
+            )
+            .andExpect(status().isBadRequest());
     }
 
     @Test

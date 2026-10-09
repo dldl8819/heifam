@@ -39,6 +39,9 @@ import type {
   MatchResultResponse,
   MatchResultUpdateRequest,
   ManualMatchCreateRequest,
+  BoardKind,
+  BoardPostDetail,
+  BoardPostList,
   NoticeCreateRequest,
   NoticeDetail,
   NoticeImageUpload,
@@ -1375,6 +1378,54 @@ export const apiClient = {
         timeoutMs: ACCESS_API_REQUEST_TIMEOUT_MS,
         baseUrlOverride: ACCESS_API_BASE_URL,
       }
+    ),
+  // The member boards: 'free' or 'anonymous'. Every call needs a signed-in member with access.
+  getBoardPosts: (groupId: number, board: BoardKind, page: number) =>
+    apiRequest<BoardPostList>(`/api/groups/${groupId}/boards/${board}/posts?page=${page}`, undefined, {
+      requireUserEmail: true,
+      includeUserEmail: true,
+    }),
+  // Opening a post counts the member once among those who have seen it.
+  getBoardPost: (groupId: number, board: BoardKind, postId: number) =>
+    apiRequest<BoardPostDetail>(`/api/groups/${groupId}/boards/${board}/posts/${postId}`, undefined, {
+      requireUserEmail: true,
+      includeUserEmail: true,
+    }),
+  createBoardPost: (groupId: number, board: BoardKind, payload: { title: string; content: string }) =>
+    apiRequest<BoardPostDetail>(
+      `/api/groups/${groupId}/boards/${board}/posts`,
+      { method: 'POST', body: JSON.stringify(payload) },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  updateBoardPost: (groupId: number, board: BoardKind, postId: number, payload: { title: string; content: string }) =>
+    apiRequest<BoardPostDetail>(
+      `/api/groups/${groupId}/boards/${board}/posts/${postId}`,
+      { method: 'PUT', body: JSON.stringify(payload) },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  deleteBoardPost: (groupId: number, board: BoardKind, postId: number) =>
+    apiRequest<void>(
+      `/api/groups/${groupId}/boards/${board}/posts/${postId}`,
+      { method: 'DELETE' },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  addBoardComment: (groupId: number, board: BoardKind, postId: number, content: string) =>
+    apiRequest<BoardPostDetail>(
+      `/api/groups/${groupId}/boards/${board}/posts/${postId}/comments`,
+      { method: 'POST', body: JSON.stringify({ content }) },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  deleteBoardComment: (groupId: number, board: BoardKind, postId: number, commentId: number) =>
+    apiRequest<BoardPostDetail>(
+      `/api/groups/${groupId}/boards/${board}/posts/${postId}/comments/${commentId}`,
+      { method: 'DELETE' },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  setBoardPostLike: (groupId: number, board: BoardKind, postId: number, liked: boolean) =>
+    apiRequest<BoardPostDetail>(
+      `/api/groups/${groupId}/boards/${board}/posts/${postId}/like`,
+      { method: liked ? 'PUT' : 'DELETE' },
+      { requireUserEmail: true, includeUserEmail: true }
     ),
   // Open to visitors: titles and dates of the notices members may read.
   getNoticeTitles: (groupId: number) =>
