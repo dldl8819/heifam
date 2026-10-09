@@ -10,7 +10,7 @@ import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { NoticeBody } from '@/components/notice-body'
 import { NoticeComments } from '@/components/notice-comments'
 import { NoticeContentEditor } from '@/components/notice-content-editor'
-import { NOTICE_VOTE_ANCHOR, NoticeVotePanel, NoticeVoteView } from '@/components/notice-vote'
+import { NoticeVotePanel, NoticeVoteView } from '@/components/notice-vote'
 import { NOTICE_IMAGE_MAX_COUNT, noticeImageIds } from '@/lib/notice-images'
 import { t } from '@/lib/i18n'
 import type { NoticeDetail, NoticeVoteStatus } from '@/types/api'
@@ -96,7 +96,8 @@ export default function NoticeDetailPage() {
         setFormError(t('notices.posts.titleRequired'))
         return
       }
-      if (!content.trim()) {
+      // A vote's question is its title; text is only needed for a notice without a vote.
+      if (voteStatus === 'NONE' && !content.trim()) {
         setFormError(t('notices.posts.contentRequired'))
         return
       }
@@ -215,18 +216,8 @@ export default function NoticeDetailPage() {
                   : ''}
               </p>
             </div>
-            {/* The vote sits under the text, which can be long: say so before the reader scrolls. */}
-            {notice.vote?.status === 'OPEN' && !notice.vote.myChoice && (
-              <a
-                href={`#${NOTICE_VOTE_ANCHOR}`}
-                className="flex items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-950/70"
-              >
-                <span>{t('notices.posts.voteJump')}</span>
-                <span className="shrink-0 font-semibold">{t('notices.posts.voteJumpLink')}</span>
-              </a>
-            )}
-            <NoticeBody groupId={TEMP_GROUP_ID} content={notice.content} />
-
+            {/* A notice that asks for a vote shows the vote first: its title is the question, and any
+                text the writer added follows. */}
             {notice.vote && (
               <NoticeVotePanel
                 groupId={TEMP_GROUP_ID}
@@ -236,6 +227,7 @@ export default function NoticeDetailPage() {
                 onClosed={() => void refreshNotice()}
               />
             )}
+            {notice.content.trim().length > 0 && <NoticeBody groupId={TEMP_GROUP_ID} content={notice.content} />}
 
             <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
               <button
@@ -300,27 +292,6 @@ export default function NoticeDetailPage() {
               {formError}
             </p>
           )}
-          <input
-            type="text"
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            placeholder={t('notices.posts.titlePlaceholder')}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900"
-          />
-          <NoticeContentEditor
-            groupId={TEMP_GROUP_ID}
-            value={content}
-            onChange={setContent}
-            placeholder={t('notices.posts.contentPlaceholder')}
-            onUploadingChange={setImageUploading}
-          />
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            {t('notices.posts.contentLimitHint', { max: NOTICE_CONTENT_MAX_LENGTH })}
-          </p>
-          <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200">
-            <input type="checkbox" checked={adminOnly} onChange={(event) => setAdminOnly(event.target.checked)} />
-            {t('notices.posts.adminOnlyLabel')}
-          </label>
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200">
               {t('notices.posts.voteSettingLabel')}
@@ -335,20 +306,42 @@ export default function NoticeDetailPage() {
               </select>
             </label>
             <p className="text-xs text-slate-500 dark:text-slate-400">{t('notices.posts.voteSettingHint')}</p>
-            {voteStatus !== 'NONE' && (
-              <div className="max-w-md space-y-1 pt-1">
-                <p className="text-xs text-slate-500 dark:text-slate-400">{t('notices.posts.votePreview')}</p>
-                <NoticeVoteView
-                  vote={{
-                    status: voteStatus,
-                    agreeCount: notice.vote?.agreeCount ?? 0,
-                    disagreeCount: notice.vote?.disagreeCount ?? 0,
-                    myChoice: notice.vote?.myChoice,
-                  }}
-                />
-              </div>
-            )}
           </div>
+          <input
+            type="text"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            placeholder={voteStatus === 'NONE' ? t('notices.posts.titlePlaceholder') : t('notices.posts.voteTitlePlaceholder')}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900"
+          />
+          {/* In the order the notice shows them: the question, the vote, then any text. */}
+          {voteStatus !== 'NONE' && (
+            <div className="space-y-1">
+              <NoticeVoteView
+                vote={{
+                  status: voteStatus,
+                  agreeCount: notice.vote?.agreeCount ?? 0,
+                  disagreeCount: notice.vote?.disagreeCount ?? 0,
+                  myChoice: notice.vote?.myChoice,
+                }}
+              />
+              <p className="text-xs text-slate-500 dark:text-slate-400">{t('notices.posts.votePreview')}</p>
+            </div>
+          )}
+          <NoticeContentEditor
+            groupId={TEMP_GROUP_ID}
+            value={content}
+            onChange={setContent}
+            placeholder={voteStatus === 'NONE' ? t('notices.posts.contentPlaceholder') : t('notices.posts.voteContentPlaceholder')}
+            onUploadingChange={setImageUploading}
+          />
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {t('notices.posts.contentLimitHint', { max: NOTICE_CONTENT_MAX_LENGTH })}
+          </p>
+          <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200">
+            <input type="checkbox" checked={adminOnly} onChange={(event) => setAdminOnly(event.target.checked)} />
+            {t('notices.posts.adminOnlyLabel')}
+          </label>
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200">
               <input type="checkbox" checked={notifyAgain} onChange={(event) => setNotifyAgain(event.target.checked)} />

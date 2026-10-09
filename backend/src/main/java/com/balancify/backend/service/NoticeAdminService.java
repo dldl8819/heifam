@@ -48,7 +48,10 @@ public class NoticeAdminService {
     ) {
         requireAdmin(actorEmail);
         String title = requireTitle(request == null ? null : request.title());
-        String content = requireContent(request == null ? null : request.content());
+        String voteStatus = request != null && request.voteStatus() != null
+            ? NoticeVotes.requireStatus(request.voteStatus())
+            : NoticeVotes.NONE;
+        String content = requireContent(request == null ? null : request.content(), voteStatus);
 
         Notice notice = new Notice();
         notice.setGroupId(groupId);
@@ -56,9 +59,7 @@ public class NoticeAdminService {
         notice.setContent(content);
         notice.setAuthorEmail(safeTrim(actorEmail).toLowerCase(Locale.ROOT));
         notice.setAdminOnly(request != null && Boolean.TRUE.equals(request.adminOnly()));
-        if (request != null && request.voteStatus() != null) {
-            notice.setVoteStatus(NoticeVotes.requireStatus(request.voteStatus()));
-        }
+        notice.setVoteStatus(voteStatus);
         noticeRepository.save(notice);
         // Fails the whole save when the text names an image this notice cannot show.
         noticeImageService.placeInNotice(groupId, notice.getId(), content);
@@ -93,11 +94,17 @@ public class NoticeAdminService {
     ) {
         requireAdmin(actorEmail);
         String title = requireTitle(request == null ? null : request.title());
-        String content = requireContent(request == null ? null : request.content());
 
         // Locked before the revision time is taken, so reads in flight end up on the right side of it.
         Notice notice = noticeRepository.findByIdAndGroupIdForUpdate(noticeId, groupId)
             .orElseThrow(() -> new NoSuchElementException("Notice not found"));
+        // Left out of the request, the vote stays as it is. The votes themselves are never touched
+        // here: closing keeps the result, and a vote taken off a notice comes back as it was if it
+        // is put on again.
+        String voteStatus = request != null && request.voteStatus() != null
+            ? NoticeVotes.requireStatus(request.voteStatus())
+            : notice.getVoteStatus();
+        String content = requireContent(request == null ? null : request.content(), voteStatus);
         boolean wasAdminOnly = notice.isAdminOnly();
         notice.setTitle(title);
         notice.setContent(content);
@@ -105,11 +112,7 @@ public class NoticeAdminService {
         if (request != null && request.adminOnly() != null) {
             notice.setAdminOnly(request.adminOnly());
         }
-        // The votes themselves are never touched here: closing keeps the result, and a vote taken
-        // off a notice comes back as it was if it is put on again.
-        if (request != null && request.voteStatus() != null) {
-            notice.setVoteStatus(NoticeVotes.requireStatus(request.voteStatus()));
-        }
+        notice.setVoteStatus(voteStatus);
         // A notice opened up to members reaches them as a new one; they have no reads to turn back.
         boolean openedToMembers = wasAdminOnly && !notice.isAdminOnly();
         boolean closedToMembers = !wasAdminOnly && notice.isAdminOnly();
@@ -191,9 +194,13 @@ public class NoticeAdminService {
         return trimmed;
     }
 
-    private String requireContent(String value) {
+    /**
+     * A notice needs its text, unless it asks for a vote: then the title is the question and the
+     * vote is what the notice shows, with text only if the writer adds some.
+     */
+    private String requireContent(String value, String voteStatus) {
         String trimmed = safeTrim(value);
-        if (trimmed.isEmpty()) {
+        if (trimmed.isEmpty() && NoticeVotes.NONE.equals(voteStatus)) {
             throw new IllegalArgumentException("Content is required");
         }
         return trimmed;

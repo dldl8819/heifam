@@ -311,6 +311,57 @@ class NoticeAdminServiceTest {
     }
 
     @Test
+    void aNoticeThatAsksForAVoteNeedsNoTextButAnyOtherDoes() {
+        NoticeResponse questionOnly = noticeAdminService.createNotice(
+            1L, new NoticeCreateRequest("YOUR_QUESTION", "  ", null, "OPEN"), "ops@hei.gg", "OpsUser"
+        );
+        NoticeResponse withoutTextAtAll = noticeAdminService.createNotice(
+            1L, new NoticeCreateRequest("YOUR_QUESTION", null, null, "OPEN"), "ops@hei.gg", "OpsUser"
+        );
+        NoticeResponse withText = noticeAdminService.createNotice(
+            1L, new NoticeCreateRequest("YOUR_QUESTION", " why we ask ", null, "OPEN"), "ops@hei.gg", "OpsUser"
+        );
+
+        assertThat(questionOnly.content()).isEmpty();
+        assertThat(questionOnly.voteStatus()).isEqualTo("OPEN");
+        assertThat(withoutTextAtAll.content()).isEmpty();
+        assertThat(withText.content()).isEqualTo("why we ask");
+        for (String voteStatus : new String[] {null, "NONE"}) {
+            assertThatThrownBy(() -> noticeAdminService.createNotice(
+                1L, new NoticeCreateRequest("YOUR_TITLE", " ", null, voteStatus), "ops@hei.gg", "OpsUser"
+            )).isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+
+    @Test
+    void anEditMayEmptyTheTextOnlyWhileTheNoticeKeepsItsVote() {
+        Notice notice = existingNotice(5L, false);
+        notice.setVoteStatus("OPEN");
+
+        // Says nothing about the vote: it stays, so the text may go.
+        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("t", "", null, null, null), "ops@hei.gg", "OpsUser");
+        assertThat(notice.getContent()).isEmpty();
+        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("t", null, null, null, "CLOSED"), "ops@hei.gg", "OpsUser");
+        assertThat(notice.getContent()).isEmpty();
+        assertThat(notice.getVoteStatus()).isEqualTo("CLOSED");
+
+        // Taking the vote off would leave a notice that shows nothing.
+        assertThatThrownBy(() -> noticeAdminService.updateNotice(
+            1L, 5L, new NoticeUpdateRequest("t", " ", null, null, "NONE"), "ops@hei.gg", "OpsUser"
+        )).isInstanceOf(IllegalArgumentException.class);
+        assertThat(notice.getVoteStatus()).isEqualTo("CLOSED");
+        noticeAdminService.updateNotice(1L, 5L, new NoticeUpdateRequest("t", "now with text", null, null, "NONE"), "ops@hei.gg", "OpsUser");
+        assertThat(notice.getVoteStatus()).isEqualTo("NONE");
+        assertThat(notice.getContent()).isEqualTo("now with text");
+
+        // Without a vote the text is needed again.
+        assertThatThrownBy(() -> noticeAdminService.updateNotice(
+            1L, 5L, new NoticeUpdateRequest("t", "", null, null, null), "ops@hei.gg", "OpsUser"
+        )).isInstanceOf(IllegalArgumentException.class);
+        assertThat(notice.getContent()).isEqualTo("now with text");
+    }
+
+    @Test
     void rejectsCreateWhenActorIsNotAdmin() {
         assertThatThrownBy(() ->
             noticeAdminService.createNotice(1L, new NoticeCreateRequest("t", "c", null, null), "member@hei.gg", "Member")
