@@ -90,10 +90,15 @@ describe('navigation items', () => {
     }
   })
 
-  it('puts a member\'s points and the monthly ranking under one menu, with the prize events for admins', () => {
-    expect(menu(getVisibleNavItems(MEMBER), '/points')).toEqual(['/points', '/points/ranking'])
+  it('puts a member\'s points, the monthly ranking and the policy under one menu, with the prize events for admins', () => {
+    expect(menu(getVisibleNavItems(MEMBER), '/points')).toEqual(['/points', '/points/ranking', '/points/policy'])
     for (const context of [ADMIN, SUPER_ADMIN]) {
-      expect(menu(getVisibleNavItems(context), '/points')).toEqual(['/points', '/points/ranking', '/points/events'])
+      expect(menu(getVisibleNavItems(context), '/points')).toEqual([
+        '/points',
+        '/points/ranking',
+        '/points/policy',
+        '/points/events',
+      ])
     }
   })
 
@@ -131,6 +136,7 @@ describe('findActiveNavHref', () => {
     expect(findActiveNavHref('/boards/video/3', items)).toBe('/boards/video')
     expect(findActiveNavHref('/tournaments', items)).toBe('/tournaments')
     expect(findActiveNavHref('/points/ranking', items)).toBe('/points/ranking')
+    expect(findActiveNavHref('/points/policy', items)).toBe('/points/policy')
     expect(findActiveNavHref('/admin/access/allowed', items)).toBe('/admin/access/allowed')
     expect(findActiveNavHref('/admin/audit', items)).toBe('/admin/audit')
   })

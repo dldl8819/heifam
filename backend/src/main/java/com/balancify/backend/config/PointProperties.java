@@ -23,6 +23,15 @@ public class PointProperties {
     private int matchConfirm = 1;
     private int matchConfirmDailyCap = 10;
     private int matchConfirmWindowHours = 48;
+    // The free board and the video board: writing a post, and commenting on and liking someone
+    // else's post, once per post. The anonymous board earns nothing, so no point row can tell who
+    // wrote there.
+    private int boardPost = 1;
+    private int boardPostDailyCap = 3;
+    private int boardComment = 1;
+    private int boardCommentDailyCap = 10;
+    private int boardLike = 1;
+    private int boardLikeDailyCap = 10;
 
     public boolean isMembersEnabled() {
         return membersEnabled;
@@ -118,5 +127,53 @@ public class PointProperties {
 
     public void setMatchConfirmWindowHours(int matchConfirmWindowHours) {
         this.matchConfirmWindowHours = Math.max(1, matchConfirmWindowHours);
+    }
+
+    public int getBoardPost() {
+        return boardPost;
+    }
+
+    public void setBoardPost(int boardPost) {
+        this.boardPost = Math.max(0, boardPost);
+    }
+
+    public int getBoardPostDailyCap() {
+        return boardPostDailyCap;
+    }
+
+    public void setBoardPostDailyCap(int boardPostDailyCap) {
+        this.boardPostDailyCap = Math.max(0, boardPostDailyCap);
+    }
+
+    public int getBoardComment() {
+        return boardComment;
+    }
+
+    public void setBoardComment(int boardComment) {
+        this.boardComment = Math.max(0, boardComment);
+    }
+
+    public int getBoardCommentDailyCap() {
+        return boardCommentDailyCap;
+    }
+
+    public void setBoardCommentDailyCap(int boardCommentDailyCap) {
+        this.boardCommentDailyCap = Math.max(0, boardCommentDailyCap);
+    }
+
+    public int getBoardLike() {
+        return boardLike;
+    }
+
+    public void setBoardLike(int boardLike) {
+        this.boardLike = Math.max(0, boardLike);
+    }
+
+    public int getBoardLikeDailyCap() {
+        return boardLikeDailyCap;
+    }
+
+    public void setBoardLikeDailyCap(int boardLikeDailyCap) {
+        this.boardLikeDailyCap = Math.max(0, boardLikeDailyCap);
     }
 }

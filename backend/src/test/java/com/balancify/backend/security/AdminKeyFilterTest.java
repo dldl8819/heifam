@@ -2312,6 +2312,29 @@ class AdminKeyFilterTest {
     }
 
     @Test
+    void showsMembersThePointPolicyAndNobodyWithoutAccess() throws Exception {
+        when(pointService.canUsePoints("member@hei.gg")).thenReturn(true);
+        com.balancify.backend.api.points.dto.PointPolicyResponse.Capped tenADay =
+            new com.balancify.backend.api.points.dto.PointPolicyResponse.Capped(1, 10);
+        when(pointService.getPolicy()).thenReturn(new com.balancify.backend.api.points.dto.PointPolicyResponse(
+            1, tenADay, tenADay, 48, tenADay, 1, tenADay,
+            new com.balancify.backend.api.points.dto.PointPolicyResponse.Capped(1, 3), tenADay, tenADay
+        ));
+
+        mockMvc
+            .perform(get("/api/points/policy").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.boardPost.points").value(1))
+            .andExpect(jsonPath("$.boardPost.dailyCap").value(3));
+        mockMvc
+            .perform(get("/api/points/policy").header("X-USER-EMAIL", "blocked@hei.gg"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(get("/api/points/policy"))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
     void grantsTheDailyLoginPointWithoutHoldingUpTheAccessCheck() throws Exception {
         when(pointService.needsDailyLoginPoint("admin@hei.gg")).thenReturn(true);
         doThrow(new IllegalStateException("ledger unavailable")).when(pointService).grantDailyLoginPoint("admin@hei.gg");

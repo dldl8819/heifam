@@ -49,7 +49,7 @@ function boardsMenu(): NavItem {
   }
 }
 
-/** A member's points and the month's ranking; and for admins the prize events. */
+/** A member's points, the month's ranking and the rules; and for admins the prize events. */
 function pointsMenu(isAdmin: boolean): NavItem {
   return {
     label: t('nav.points'),
@@ -57,6 +57,7 @@ function pointsMenu(isAdmin: boolean): NavItem {
     children: [
       { label: t('nav.myPoints'), href: '/points' },
       { label: t('nav.pointRanking'), href: '/points/ranking' },
+      { label: t('nav.pointPolicy'), href: '/points/policy' },
       ...(isAdmin ? [{ label: t('nav.pointEvents'), href: '/points/events' }] : []),
     ],
   }

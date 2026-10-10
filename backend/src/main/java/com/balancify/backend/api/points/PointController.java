@@ -1,6 +1,7 @@
 package com.balancify.backend.api.points;
 
 import com.balancify.backend.api.points.dto.PointMonthlyHistoryResponse;
+import com.balancify.backend.api.points.dto.PointPolicyResponse;
 import com.balancify.backend.api.points.dto.PointRankingResponse;
 import com.balancify.backend.api.points.dto.PointSummaryResponse;
 import com.balancify.backend.security.AuthenticatedRequestResolver;
@@ -35,6 +36,12 @@ public class PointController {
         String requestEmail = requireRequestEmail(request);
         requirePointAccess(requestEmail);
         return pointService.getSummary(requestEmail);
+    }
+
+    @GetMapping("/api/points/policy")
+    public PointPolicyResponse getPolicy(HttpServletRequest request) {
+        requirePointAccess(requireRequestEmail(request));
+        return pointService.getPolicy();
     }
 
     @GetMapping("/api/points/ranking")

@@ -57,11 +57,14 @@ class BoardServiceTest {
     @Mock
     private AccessControlService accessControlService;
 
+    @Mock
+    private PointService pointService;
+
     private BoardService boardService;
 
     @BeforeEach
     void setUp() {
-        boardService = new BoardService(boardRepository, accessControlService);
+        boardService = new BoardService(boardRepository, accessControlService, pointService);
         when(accessControlService.isAdminEmail(ADMIN)).thenReturn(true);
         // Only the nicknames asked for come back, so a test sees whose names the service looked up.
         when(accessControlService.resolveDisplayNicknames(anyCollection())).thenAnswer(invocation -> {
@@ -396,6 +399,56 @@ class BoardServiceTest {
         assertThatThrownBy(() -> boardService.create(1L, Board.VIDEO, WRITER, "title", "", "https://youtu.be/" + VIDEO_ID))
             .isInstanceOf(BoardLimitException.class);
         assertThat(boardService.create(1L, Board.VIDEO, OTHER, "title", "", "https://youtu.be/" + VIDEO_ID).id()).isEqualTo(9L);
+    }
+
+    @Test
+    void paysForWritingOnTheFreeAndVideoBoardsAndTakesItBackWithThePost() {
+        when(boardRepository.insertPost(eq(1L), eq("FREE"), any(), any(), eq(WRITER), isNull())).thenReturn(7L);
+        when(boardRepository.insertPost(eq(1L), eq("VIDEO"), any(), any(), eq(WRITER), eq(VIDEO_ID))).thenReturn(8L);
+        when(boardRepository.findPost(1L, "FREE", 7L)).thenReturn(Optional.of(post(7L, "FREE", WRITER)));
+        when(boardRepository.findPost(1L, "VIDEO", 8L)).thenReturn(Optional.of(video(8L, WRITER)));
+
+        boardService.create(1L, Board.FREE, WRITER, "title", "text", null);
+        boardService.create(1L, Board.VIDEO, WRITER, "title", "", "https://youtu.be/" + VIDEO_ID);
+        verify(pointService).grantBoardPostPoint(WRITER, 7L);
+        verify(pointService).grantBoardPostPoint(WRITER, 8L);
+
+        // Removed by an admin or by the writer, the post takes its point with it.
+        boardService.delete(1L, Board.FREE, 7L, ADMIN);
+        boardService.delete(1L, Board.VIDEO, 8L, WRITER);
+        verify(pointService).reverseBoardPostPoint(7L);
+        verify(pointService).reverseBoardPostPoint(8L);
+    }
+
+    @Test
+    void paysForCommentsAndLikesOnOtherPeoplesPostsOnly() {
+        when(boardRepository.findPost(1L, "FREE", 7L)).thenReturn(Optional.of(post(7L, "FREE", WRITER)));
+        when(boardRepository.findPost(1L, "VIDEO", 8L)).thenReturn(Optional.of(video(8L, WRITER)));
+
+        boardService.addComment(1L, Board.FREE, 7L, OTHER, "hello");
+        boardService.addComment(1L, Board.FREE, 7L, " Member@Hei.gg ", "thanks");
+        boardService.setLike(1L, Board.VIDEO, 8L, OTHER, true);
+        boardService.setLike(1L, Board.VIDEO, 8L, WRITER, true);
+        boardService.setLike(1L, Board.VIDEO, 8L, OTHER, false);
+
+        verify(pointService).grantBoardCommentPoint(OTHER, 7L);
+        verify(pointService, never()).grantBoardCommentPoint(eq(WRITER), any());
+        verify(pointService).grantBoardLikePoint(OTHER, 8L);
+        verify(pointService, never()).grantBoardLikePoint(eq(WRITER), any());
+    }
+
+    @Test
+    void paysNothingOnTheAnonymousBoard() {
+        when(boardRepository.insertPost(1L, "ANONYMOUS", "title", "text", WRITER, null)).thenReturn(9L);
+        when(boardRepository.findPost(1L, "ANONYMOUS", 9L)).thenReturn(Optional.of(post(9L, "ANONYMOUS", WRITER)));
+
+        boardService.create(1L, Board.ANONYMOUS, WRITER, "title", "text", null);
+        boardService.addComment(1L, Board.ANONYMOUS, 9L, ADMIN, "answer");
+        boardService.addComment(1L, Board.ANONYMOUS, 9L, WRITER, "thanks");
+        boardService.delete(1L, Board.ANONYMOUS, 9L, WRITER);
+
+        verify(boardRepository).deletePost(9L);
+        org.mockito.Mockito.verifyNoInteractions(pointService);
     }
 
     private static PostRow post(Long id, String board, String author) {

@@ -16,6 +16,10 @@ const REASON_KEYS: Record<PointReason, string> = {
   NOTICE_COMMENT_LIKE: 'points.reasons.noticeCommentLike',
   MATCH_CONFIRM: 'points.reasons.matchConfirm',
   MATCH_CONFIRM_REVERSED: 'points.reasons.matchConfirmReversed',
+  BOARD_POST: 'points.reasons.boardPost',
+  BOARD_POST_REVERSED: 'points.reasons.boardPostReversed',
+  BOARD_COMMENT: 'points.reasons.boardComment',
+  BOARD_LIKE: 'points.reasons.boardLike',
 }
 
 

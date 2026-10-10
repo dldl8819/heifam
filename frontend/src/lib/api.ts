@@ -61,6 +61,7 @@ import type {
   PlayerRace,
   PlayerTierStatus,
   PointMonthlyHistory,
+  PointPolicyResponse,
   PointRankingResponse,
   PointSummaryResponse,
   LatestTeamTournamentResponse,
@@ -1749,6 +1750,11 @@ export const apiClient = {
     ),
   getMyPoints: () =>
     apiRequest<PointSummaryResponse>('/api/points/me', undefined, {
+      requireUserEmail: true,
+      includeUserEmail: true,
+    }),
+  getPointPolicy: () =>
+    apiRequest<PointPolicyResponse>('/api/points/policy', undefined, {
       requireUserEmail: true,
       includeUserEmail: true,
     }),
