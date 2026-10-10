@@ -64,14 +64,15 @@ describe('navigation items', () => {
     }
   })
 
-  it('puts the matches under one menu: balance and multi-balance for members, tournaments and the draft for admins too', () => {
-    expect(menu(getVisibleNavItems(MEMBER), '/matches')).toEqual(['/balance', '/balance/multi'])
+  it('puts the matches under one menu: balance, multi-balance and the cannon draw for members, tournaments and the draft for admins too', () => {
+    expect(menu(getVisibleNavItems(MEMBER), '/matches')).toEqual(['/balance', '/balance/multi', '/cannon'])
     for (const context of [ADMIN, SUPER_ADMIN]) {
       expect(menu(getVisibleNavItems(context), '/matches')).toEqual([
         '/balance',
         '/balance/multi',
         '/tournaments',
         '/captain-draft',
+        '/cannon',
       ])
     }
   })
