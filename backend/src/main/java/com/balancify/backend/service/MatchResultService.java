@@ -119,9 +119,10 @@ public class MatchResultService {
         this.predictionService = predictionService;
     }
 
+    // An import of past matches: the result is taken whoever played, tier set or not.
     @Transactional
     public MatchResultResponse processMatchResult(Long matchId, MatchResultRequest request) {
-        return processMatchResult(matchId, request, null, null, false);
+        return processMatchResultInternal(matchId, request, null, null, false, false).response();
     }
 
     @Transactional
@@ -151,7 +152,7 @@ public class MatchResultService {
         String recordedByNickname,
         boolean allowReprocess
     ) {
-        return processMatchResultInternal(matchId, request, recordedByEmail, recordedByNickname, allowReprocess)
+        return processMatchResultInternal(matchId, request, recordedByEmail, recordedByNickname, allowReprocess, true)
             .response();
     }
 
@@ -231,7 +232,8 @@ public class MatchResultService {
                 new MatchResultRequest(winnerTeam),
                 recordedByEmail,
                 recordedByNickname,
-                true
+                true,
+                false
             );
             MatchResultUpdateAuditSnapshot winnerAudit = processed.updateAuditSnapshot();
             outcome = new MatchResultUpdateOutcome(
@@ -259,7 +261,9 @@ public class MatchResultService {
         MatchResultRequest request,
         String recordedByEmail,
         String recordedByNickname,
-        boolean allowReprocess
+        boolean allowReprocess,
+        // A first result of a balance match or a multi-balance game waits for every tier to be set.
+        boolean requireAssignedTiers
     ) {
         Match match = matchRepository.findByIdForUpdate(matchId)
             .orElseThrow(() -> new NoSuchElementException("Match not found: " + matchId));
@@ -290,6 +294,17 @@ public class MatchResultService {
         }
 
         ValidatedParticipants validatedParticipants = loadValidatedParticipants(matchId, match);
+        if (requireAssignedTiers
+            && !allowReprocess
+            && match.getSeriesId() == null
+            && match.getSource() != MatchSource.MANUAL) {
+            List<String> unassigned = UnassignedPlayerPolicy.unassignedNicknames(
+                validatedParticipants.all().stream().map(MatchParticipant::getPlayer).toList()
+            );
+            if (!unassigned.isEmpty()) {
+                throw new MatchConflictException(UnassignedPlayerPolicy.message(unassigned));
+            }
+        }
         if (!alreadyProcessed) {
             rejectResultEnteredTwice(match, validatedParticipants);
         }

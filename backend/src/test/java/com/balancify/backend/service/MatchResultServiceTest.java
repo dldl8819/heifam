@@ -1324,6 +1324,64 @@ class MatchResultServiceTest {
     }
 
     @Test
+    void refusesTheFirstResultOfABalanceMatchOrSeriesGameWhileATierIsStillToBeSet() {
+        for (long matchId : new long[] {31L, 32L}) {
+            Match match = new Match();
+            match.setId(matchId);
+            match.setStatus(MatchStatus.CONFIRMED);
+            match.setTeamSize(3);
+            if (matchId == 32L) {
+                match.setBalanceSeriesId(80L);
+                match.setSeriesGameNumber(1);
+            }
+            List<MatchParticipant> participants = buildParticipants(match);
+            participants.get(5).getPlayer().setTier("UNASSIGNED");
+            participants.get(3).getPlayer().setTier("UNASSIGNED");
+            when(matchRepository.findByIdForUpdate(matchId)).thenReturn(Optional.of(match));
+            when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(matchId)).thenReturn(participants);
+
+            assertThatThrownBy(() -> matchResultService.processMatchResult(
+                matchId, new MatchResultRequest("HOME"), "member@example.com", "Member", false
+            ))
+                .isInstanceOf(MatchConflictException.class)
+                .hasMessageContaining("배정 필요 선수(A1, A3)");
+            assertThat(match.getWinningTeam()).isNull();
+        }
+        verify(playerRepository, never()).saveAll(any());
+        verify(matchRepository, never()).save(any(Match.class));
+        verify(pointService, never()).grantMatchResultPoint(any(), any());
+    }
+
+    @Test
+    void takesAResultWithAnUnassignedPlayerFromAManualEntryOrATournamentGame() {
+        for (long matchId : new long[] {33L, 34L}) {
+            Match match = new Match();
+            match.setId(matchId);
+            match.setStatus(MatchStatus.CONFIRMED);
+            match.setTeamSize(3);
+            if (matchId == 33L) {
+                match.setSource(MatchSource.MANUAL);
+            } else {
+                match.setSeriesId(70L);
+                match.setSeriesGameNumber(1);
+            }
+            List<MatchParticipant> participants = buildParticipants(match);
+            participants.get(3).getPlayer().setTier("UNASSIGNED");
+            when(matchRepository.findByIdForUpdate(matchId)).thenReturn(Optional.of(match));
+            when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(matchId)).thenReturn(participants);
+            lenient().when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+            lenient().when(playerRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+            lenient().when(mmrHistoryRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+            lenient().when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            matchResultService.processMatchResult(matchId, new MatchResultRequest("HOME"), "admin@example.com", "Admin", false);
+
+            assertThat(match.getWinningTeam()).isEqualTo("HOME");
+            assertThat(participants.get(3).getPlayer().getTier()).isNotEqualTo("UNASSIGNED");
+        }
+    }
+
+    @Test
     void recordsTwoVsTwoResultWithoutChangingMmr() {
         Match match = new Match();
         match.setId(25L);
