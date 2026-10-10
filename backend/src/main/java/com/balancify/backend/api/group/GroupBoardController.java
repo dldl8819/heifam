@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * The member boards: {board} is "free" or "anonymous". Every route needs member access
+ * The member boards: {board} is "free", "anonymous" or "video". Every route needs member access
  * (ServiceAccessFilter); who may read or change which post is BoardService's to decide.
  */
 @RestController
@@ -64,7 +64,8 @@ public class GroupBoardController {
             Board.fromPath(board),
             email,
             body == null ? null : body.title(),
-            body == null ? null : body.content()
+            body == null ? null : body.content(),
+            body == null ? null : body.videoUrl()
         ));
     }
 
@@ -94,7 +95,8 @@ public class GroupBoardController {
             postId,
             email,
             body == null ? null : body.title(),
-            body == null ? null : body.content()
+            body == null ? null : body.content(),
+            body == null ? null : body.videoUrl()
         ));
     }
 

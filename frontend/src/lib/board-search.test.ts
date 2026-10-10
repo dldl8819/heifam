@@ -52,5 +52,6 @@ describe('boardSearchResultHref', () => {
   it('leads to the notice or to the post on the free board', () => {
     expect(boardSearchResultHref({ kind: 'NOTICE', id: 12 })).toBe('/notices/12')
     expect(boardSearchResultHref({ kind: 'FREE', id: 7 })).toBe('/boards/free/7')
+    expect(boardSearchResultHref({ kind: 'VIDEO', id: 3 })).toBe('/boards/video/3')
   })
 })

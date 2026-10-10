@@ -29,7 +29,9 @@ public class BoardRepository {
         OffsetDateTime updatedAt,
         long commentCount,
         long likeCount,
-        long viewCount
+        long viewCount,
+        // The YouTube video of a post on the video board; null on the other boards.
+        String videoId
     ) {
     }
 
@@ -40,7 +42,8 @@ public class BoardRepository {
         "p.id, p.board, p.title, p.content, p.author_email, p.created_at, p.updated_at, "
             + "(SELECT count(*) FROM board_comments c WHERE c.post_id = p.id) AS comment_count, "
             + "(SELECT count(*) FROM board_post_likes l WHERE l.post_id = p.id) AS like_count, "
-            + "(SELECT count(*) FROM board_post_views v WHERE v.post_id = p.id) AS view_count ";
+            + "(SELECT count(*) FROM board_post_views v WHERE v.post_id = p.id) AS view_count, "
+            + "p.video_id ";
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
 
@@ -48,17 +51,18 @@ public class BoardRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public long insertPost(Long groupId, String board, String title, String content, String authorEmail) {
+    public long insertPost(Long groupId, String board, String title, String content, String authorEmail, String videoId) {
         GeneratedKeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(
-            "INSERT INTO board_posts (group_id, board, title, content, author_email) "
-                + "VALUES (:groupId, :board, :title, :content, :authorEmail)",
+            "INSERT INTO board_posts (group_id, board, title, content, author_email, video_id) "
+                + "VALUES (:groupId, :board, :title, :content, :authorEmail, :videoId)",
             new MapSqlParameterSource()
                 .addValue("groupId", groupId)
                 .addValue("board", board)
                 .addValue("title", title)
                 .addValue("content", content)
-                .addValue("authorEmail", authorEmail),
+                .addValue("authorEmail", authorEmail)
+                .addValue("videoId", videoId, Types.VARCHAR),
             keyHolder,
             new String[] {"id"}
         );
@@ -113,10 +117,15 @@ public class BoardRepository {
         return found == null ? 0 : found;
     }
 
-    public void updatePost(Long postId, String title, String content) {
+    public void updatePost(Long postId, String title, String content, String videoId) {
         jdbcTemplate.update(
-            "UPDATE board_posts SET title = :title, content = :content, updated_at = now() WHERE id = :postId",
-            new MapSqlParameterSource().addValue("postId", postId).addValue("title", title).addValue("content", content)
+            "UPDATE board_posts SET title = :title, content = :content, video_id = :videoId, updated_at = now() "
+                + "WHERE id = :postId",
+            new MapSqlParameterSource()
+                .addValue("postId", postId)
+                .addValue("title", title)
+                .addValue("content", content)
+                .addValue("videoId", videoId, Types.VARCHAR)
         );
     }
 
@@ -222,7 +231,8 @@ public class BoardRepository {
             row.getObject("updated_at", OffsetDateTime.class),
             row.getLong("comment_count"),
             row.getLong("like_count"),
-            row.getLong("view_count")
+            row.getLong("view_count"),
+            row.getString("video_id")
         );
     }
 

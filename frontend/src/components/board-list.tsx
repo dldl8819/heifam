@@ -5,9 +5,16 @@ import { FormEvent, useCallback, useEffect, useState } from 'react'
 import { ApiRequestError, apiClient } from '@/lib/api'
 import { useAdminAuth } from '@/lib/admin-auth'
 import { BoardSearchBox } from '@/components/board-search-box'
+import { VideoLinkField, YouTubeThumbnail } from '@/components/board-video'
 import { Alert, AlertContent, AlertDescription, AlertIcon } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
-import { BOARD_CONTENT_MAX_LENGTH, BOARD_TITLE_MAX_LENGTH, boardPageCount, validateBoardPost } from '@/lib/boards'
+import {
+  BOARD_CONTENT_MAX_LENGTH,
+  BOARD_TITLE_MAX_LENGTH,
+  boardPageCount,
+  validateBoardPost,
+  validateBoardVideoLink,
+} from '@/lib/boards'
 import { formatKstFullDateTime } from '@/lib/kst-time'
 import { t } from '@/lib/i18n'
 import type { BoardKind, BoardPostList } from '@/types/api'
@@ -22,11 +29,13 @@ const plainButtonClass =
 
 /**
  * A member board: its posts, newest first, and the form for a new one. On the anonymous board a
- * member sees only what they wrote themselves and admins see everything, without names.
+ * member sees only what they wrote themselves and admins see everything, without names. On the
+ * video board a post is a YouTube video, and the posts are shown as pictures of their videos.
  */
 export function BoardList({ board }: { board: BoardKind }) {
   const { isAdmin } = useAdminAuth()
   const anonymous = board === 'anonymous'
+  const video = board === 'video'
 
   const [list, setList] = useState<BoardPostList | null>(null)
   const [page, setPage] = useState<number>(1)
@@ -36,6 +45,7 @@ export function BoardList({ board }: { board: BoardKind }) {
   const [composing, setComposing] = useState<boolean>(false)
   const [title, setTitle] = useState<string>('')
   const [content, setContent] = useState<string>('')
+  const [videoLink, setVideoLink] = useState<string>('')
   const [saving, setSaving] = useState<boolean>(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
@@ -62,7 +72,7 @@ export function BoardList({ board }: { board: BoardKind }) {
   const handleSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault()
-      const problem = validateBoardPost(title, content)
+      const problem = (video ? validateBoardVideoLink(videoLink) : null) ?? validateBoardPost(title, content, { contentOptional: video })
       if (problem) {
         setFormError(t(`boards.${problem.key}`, { max: problem.max }))
         return
@@ -71,9 +81,14 @@ export function BoardList({ board }: { board: BoardKind }) {
       setFormError(null)
       setSaving(true)
       try {
-        await apiClient.createBoardPost(TEMP_GROUP_ID, board, { title: title.trim(), content: content.trim() })
+        await apiClient.createBoardPost(TEMP_GROUP_ID, board, {
+          title: title.trim(),
+          content: content.trim(),
+          ...(video ? { videoUrl: videoLink.trim() } : {}),
+        })
         setTitle('')
         setContent('')
+        setVideoLink('')
         setComposing(false)
         setSuccessMessage(anonymous ? t('boards.anonymous.saveSuccess') : null)
         if (page === 1) {
@@ -90,13 +105,13 @@ export function BoardList({ board }: { board: BoardKind }) {
         setSaving(false)
       }
     },
-    [anonymous, board, content, load, page, title]
+    [anonymous, board, content, load, page, title, video, videoLink]
   )
 
   const pages = boardPageCount(list?.total ?? 0, list?.pageSize ?? 20)
   const emptyText = anonymous
     ? t(isAdmin ? 'boards.anonymous.emptyForAdmins' : 'boards.anonymous.empty')
-    : t('boards.free.empty')
+    : t(video ? 'boards.video.empty' : 'boards.free.empty')
 
   return (
     <section className="space-y-4">
@@ -117,7 +132,7 @@ export function BoardList({ board }: { board: BoardKind }) {
         </button>
       </div>
 
-      {/* The search covers the notices and the free board; what is on the anonymous board is never found by it. */}
+      {/* The search covers the notices, the free board and the video board; the anonymous board is never in it. */}
       {!anonymous && <BoardSearchBox />}
 
       {successMessage && (
@@ -136,6 +151,7 @@ export function BoardList({ board }: { board: BoardKind }) {
               {formError}
             </p>
           )}
+          {video && <VideoLinkField value={videoLink} onChange={setVideoLink} />}
           <input
             type="text"
             value={title}
@@ -147,7 +163,7 @@ export function BoardList({ board }: { board: BoardKind }) {
           <textarea
             value={content}
             onChange={(event) => setContent(event.target.value)}
-            placeholder={t('boards.contentPlaceholder')}
+            placeholder={video ? t('boards.video.contentPlaceholder') : t('boards.contentPlaceholder')}
             rows={8}
             className={fieldClass}
           />
@@ -190,7 +206,31 @@ export function BoardList({ board }: { board: BoardKind }) {
         {!loading && !error && list && list.posts.length === 0 && (
           <p className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">{emptyText}</p>
         )}
-        {!loading && !error && list && list.posts.length > 0 && (
+        {!loading && !error && list && list.posts.length > 0 && video && (
+          <ul className="grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3">
+            {list.posts.map((post) => (
+              <li key={post.id}>
+                <Link
+                  href={`/boards/video/${post.id}`}
+                  className="block space-y-2 rounded-lg p-1.5 hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                >
+                  {post.videoId && <YouTubeThumbnail videoId={post.videoId} />}
+                  <span className="line-clamp-2 break-all text-sm font-medium text-slate-900 dark:text-slate-100">{post.title}</span>
+                  <span className="block text-xs text-slate-500 dark:text-slate-400">
+                    {post.authorNickname ?? '-'}
+                    {` · ${formatKstFullDateTime(post.createdAt) || post.createdAt}`}
+                  </span>
+                  <span className="block text-xs text-slate-500 dark:text-slate-400">
+                    {t('boards.views', { count: post.viewCount })}
+                    {` · ${t('boards.comments', { count: post.commentCount })}`}
+                    {` · ${t('boards.likes', { count: post.likeCount })}`}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+        {!loading && !error && list && list.posts.length > 0 && !video && (
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
             {list.posts.map((post) => (
               <li key={post.id}>

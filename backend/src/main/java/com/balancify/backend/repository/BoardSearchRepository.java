@@ -9,15 +9,17 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 /**
- * Finds posts by a word in their title or text, across the notices and the free board, newest
- * first. The anonymous board is never searched, for anyone: what is written there is for the
- * admins' eyes on its own page, not something to turn up beside a name in a list of results.
+ * Finds posts by a word in their title or text, across the notices, the free board and the video
+ * board, newest first. The anonymous board is never searched, for anyone: what is written there
+ * is for the admins' eyes on its own page, not something to turn up beside a name in a list of
+ * results.
  */
 @Repository
 public class BoardSearchRepository {
 
     public static final String KIND_NOTICE = "NOTICE";
     public static final String KIND_FREE = "FREE";
+    public static final String KIND_VIDEO = "VIDEO";
 
     public record FoundRow(
         String kind,
@@ -43,7 +45,7 @@ public class BoardSearchRepository {
             + "AND (n.title ILIKE :pattern ESCAPE '\\' OR " + NOTICE_TEXT + " ILIKE :pattern ESCAPE '\\') ";
 
     private static final String FREE_POST_MATCH =
-        "p.group_id = :groupId AND p.board = 'FREE' "
+        "p.group_id = :groupId AND p.board IN ('FREE', 'VIDEO') "
             + "AND (p.title ILIKE :pattern ESCAPE '\\' OR p.content ILIKE :pattern ESCAPE '\\') ";
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
@@ -67,7 +69,7 @@ public class BoardSearchRepository {
                 + "(SELECT count(*) FROM notice_votes v WHERE v.notice_id = n.id) AS vote_count "
                 + "FROM notices n WHERE " + NOTICE_MATCH
                 + "UNION ALL "
-                + "SELECT '" + KIND_FREE + "' AS kind, p.id, p.title, p.content, "
+                + "SELECT p.board AS kind, p.id, p.title, p.content, "
                 + "p.author_email, p.created_at, false AS admin_only, 'NONE' AS vote_status, "
                 + "(SELECT count(*) FROM board_post_views v WHERE v.post_id = p.id) AS view_count, "
                 + "(SELECT count(*) FROM board_comments c WHERE c.post_id = p.id) AS comment_count, "

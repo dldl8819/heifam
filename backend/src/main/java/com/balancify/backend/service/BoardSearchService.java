@@ -13,9 +13,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Search across what a member may read anyway: the notices open to them and the free board. A
- * notice kept to admins is found only by admins. The anonymous board and the nickname requests
- * are not searched at all.
+ * Search across what a member may read anyway: the notices open to them, the free board and the
+ * video board. A notice kept to admins is found only by admins. The anonymous board and the
+ * nickname requests are not searched at all.
  */
 @Service
 public class BoardSearchService {

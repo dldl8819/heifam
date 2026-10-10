@@ -38,6 +38,7 @@ function boardsMenu(): NavItem {
       { label: t('nav.notices'), href: '/notices' },
       { label: t('nav.freeBoard'), href: '/boards/free' },
       { label: t('nav.anonymousBoard'), href: '/boards/anonymous' },
+      { label: t('nav.videoBoard'), href: '/boards/video' },
       { label: t('nav.nicknameRequests'), href: '/boards/nickname' },
     ],
   }

@@ -7,7 +7,23 @@ import {
   boardPageCount,
   validateBoardComment,
   validateBoardPost,
+  validateBoardVideoLink,
 } from '@/lib/boards'
+
+describe('a video post', () => {
+  it('may leave its text empty, but not too long', () => {
+    expect(validateBoardPost('YOUR_TITLE', '  ', { contentOptional: true })).toBeNull()
+    expect(validateBoardPost('  ', '', { contentOptional: true })?.key).toBe('titleRequired')
+    expect(validateBoardPost('YOUR_TITLE', 'y'.repeat(BOARD_CONTENT_MAX_LENGTH + 1), { contentOptional: true })?.key).toBe('contentTooLong')
+  })
+
+  it('needs a link to one YouTube video', () => {
+    expect(validateBoardVideoLink('https://youtu.be/dQw4w9WgXcQ')).toBeNull()
+    expect(validateBoardVideoLink('  ')?.key).toBe('videoRequired')
+    expect(validateBoardVideoLink('https://example.com/watch?v=dQw4w9WgXcQ')?.key).toBe('videoInvalid')
+    expect(validateBoardVideoLink('https://www.youtube.com/@channel')?.key).toBe('videoInvalid')
+  })
+})
 
 describe('validateBoardPost', () => {
   it('lets a post with a title and a text through', () => {

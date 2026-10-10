@@ -7,13 +7,16 @@ import { ApiRequestError, apiClient } from '@/lib/api'
 import { useAdminAuth } from '@/lib/admin-auth'
 import { Alert, AlertContent, AlertDescription, AlertIcon } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
+import { VideoLinkField, YouTubePlayer } from '@/components/board-video'
 import {
   BOARD_COMMENT_MAX_LENGTH,
   BOARD_CONTENT_MAX_LENGTH,
   BOARD_TITLE_MAX_LENGTH,
   validateBoardComment,
   validateBoardPost,
+  validateBoardVideoLink,
 } from '@/lib/boards'
+import { youTubeWatchUrl } from '@/lib/youtube'
 import { formatKstFullDateTime } from '@/lib/kst-time'
 import { t } from '@/lib/i18n'
 import type { BoardComment, BoardKind, BoardPostDetail } from '@/types/api'
@@ -47,6 +50,7 @@ export function BoardPost({ board, postId }: { board: BoardKind; postId: number 
   const router = useRouter()
   const { isAdmin } = useAdminAuth()
   const anonymous = board === 'anonymous'
+  const video = board === 'video'
 
   const [post, setPost] = useState<BoardPostDetail | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
@@ -55,6 +59,7 @@ export function BoardPost({ board, postId }: { board: BoardKind; postId: number 
   const [editing, setEditing] = useState<boolean>(false)
   const [title, setTitle] = useState<string>('')
   const [content, setContent] = useState<string>('')
+  const [videoLink, setVideoLink] = useState<string>('')
   const [formError, setFormError] = useState<string | null>(null)
 
   const [commentDraft, setCommentDraft] = useState<string>('')
@@ -109,14 +114,19 @@ export function BoardPost({ board, postId }: { board: BoardKind; postId: number 
 
   const handleEdit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    const problem = validateBoardPost(title, content)
+    const problem = (video ? validateBoardVideoLink(videoLink) : null) ?? validateBoardPost(title, content, { contentOptional: video })
     if (problem) {
       setFormError(t(`boards.${problem.key}`, { max: problem.max }))
       return
     }
     setFormError(null)
     void run(
-      () => apiClient.updateBoardPost(TEMP_GROUP_ID, board, postId, { title: title.trim(), content: content.trim() }),
+      () =>
+        apiClient.updateBoardPost(TEMP_GROUP_ID, board, postId, {
+          title: title.trim(),
+          content: content.trim(),
+          ...(video ? { videoUrl: videoLink.trim() } : {}),
+        }),
       () => setEditing(false)
     )
   }
@@ -192,7 +202,11 @@ export function BoardPost({ board, postId }: { board: BoardKind; postId: number 
               </p>
             </div>
 
-            <p className="whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-200">{post.content}</p>
+            {/* On the video board the video is the post: it comes first, any words after it. */}
+            {video && post.videoId && <YouTubePlayer videoId={post.videoId} title={post.title} />}
+            {post.content.trim().length > 0 && (
+              <p className="whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-200">{post.content}</p>
+            )}
 
             <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
               {!anonymous && (
@@ -217,6 +231,7 @@ export function BoardPost({ board, postId }: { board: BoardKind; postId: number 
                   onClick={() => {
                     setTitle(post.title)
                     setContent(post.content)
+                    setVideoLink(post.videoId ? youTubeWatchUrl(post.videoId) : '')
                     setFormError(null)
                     setEditing(true)
                   }}
@@ -309,6 +324,7 @@ export function BoardPost({ board, postId }: { board: BoardKind; postId: number 
         >
           {formError && <p className={errorClass}>{formError}</p>}
           {actionError && <p className={errorClass}>{actionError}</p>}
+          {video && <VideoLinkField value={videoLink} onChange={setVideoLink} />}
           <input
             type="text"
             value={title}
@@ -320,7 +336,7 @@ export function BoardPost({ board, postId }: { board: BoardKind; postId: number 
           <textarea
             value={content}
             onChange={(event) => setContent(event.target.value)}
-            placeholder={t('boards.contentPlaceholder')}
+            placeholder={video ? t('boards.video.contentPlaceholder') : t('boards.contentPlaceholder')}
             rows={8}
             className={fieldClass}
           />

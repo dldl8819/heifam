@@ -119,7 +119,13 @@ export function BoardSearch() {
                           : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
                       }`}
                     >
-                      {t(item.kind === 'NOTICE' ? 'boardSearch.kindNotice' : 'boardSearch.kindFree')}
+                      {t(
+                        item.kind === 'NOTICE'
+                          ? 'boardSearch.kindNotice'
+                          : item.kind === 'VIDEO'
+                            ? 'boardSearch.kindVideo'
+                            : 'boardSearch.kindFree'
+                      )}
                     </span>
                     {item.adminOnly && (
                       <span className={`${badgeClass} bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300`}>
