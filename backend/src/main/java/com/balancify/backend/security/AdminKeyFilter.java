@@ -375,6 +375,17 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             ),
             AuthType.ADMIN_EMAIL
         ),
+        // Members read the records of prize draws; an admin saves one, a super admin removes one.
+        new ProtectedRoute(
+            "POST",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/prize-draws"),
+            AuthType.ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "DELETE",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/prize-draws/{drawId}"),
+            AuthType.SUPER_ADMIN_EMAIL
+        ),
         // Members read the donation ledger on the notices page; only super admins change it.
         new ProtectedRoute(
             "GET",

@@ -44,6 +44,8 @@ import type {
   BoardPostList,
   BoardSearchResult,
   NicknameRequestList,
+  PrizeDrawList,
+  PrizeDrawSaveRequest,
   NoticeCreateRequest,
   NoticeDetail,
   NoticeImageUpload,
@@ -1433,6 +1435,26 @@ export const apiClient = {
     apiRequest<BoardSearchResult>(
       `/api/groups/${groupId}/boards/search?${new URLSearchParams({ q: query, page: String(page) }).toString()}`,
       undefined,
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  // The records of prize draws; members read them. Saving and removing answer with the records as they now are.
+  getPrizeDraws: (groupId: number) =>
+    apiRequest<PrizeDrawList>(`/api/groups/${groupId}/prize-draws`, undefined, {
+      requireUserEmail: true,
+      includeUserEmail: true,
+    }),
+  // Admins only: the outcome of a draw that was run on the pinball page.
+  savePrizeDraw: (groupId: number, payload: PrizeDrawSaveRequest) =>
+    apiRequest<PrizeDrawList>(
+      `/api/groups/${groupId}/prize-draws`,
+      { method: 'POST', body: JSON.stringify(payload) },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  // Super admins only.
+  deletePrizeDraw: (groupId: number, drawId: number) =>
+    apiRequest<PrizeDrawList>(
+      `/api/groups/${groupId}/prize-draws/${drawId}`,
+      { method: 'DELETE' },
       { requireUserEmail: true, includeUserEmail: true }
     ),
   // Requests for a nickname change: a member's own, and for admins everyone's. Each change answers

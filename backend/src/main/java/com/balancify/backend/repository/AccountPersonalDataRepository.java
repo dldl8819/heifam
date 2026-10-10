@@ -198,6 +198,13 @@ public class AccountPersonalDataRepository {
                 .addValue("deletedMemberLabel", deletedMemberLabel)
                 .addValue("playerIds", playerIds)
         );
+        // A prize they won stays on record; the name it was won under does not.
+        jdbcTemplate.update(
+            "UPDATE prize_draw_winners SET name = :deletedMemberLabel WHERE player_id IN (:playerIds)",
+            new MapSqlParameterSource()
+                .addValue("deletedMemberLabel", deletedMemberLabel)
+                .addValue("playerIds", playerIds)
+        );
     }
 
     public void deleteAccountIdentity(UUID authUserId, String normalizedEmail) {
@@ -211,7 +218,8 @@ public class AccountPersonalDataRepository {
                 "allowed_user_emails",
                 "admin_mmr_access_emails",
                 "match_result_editor_emails",
-                "point_transactions"
+                "point_transactions",
+                "prize_draws"
             )) {
                 jdbcTemplate.update(
                     "UPDATE " + table + " SET created_by_email = NULL "

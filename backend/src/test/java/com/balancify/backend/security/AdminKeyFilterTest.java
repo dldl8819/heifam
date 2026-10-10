@@ -34,6 +34,7 @@ import com.balancify.backend.api.group.GroupLedgerAdminController;
 import com.balancify.backend.api.group.GroupLedgerController;
 import com.balancify.backend.api.group.GroupNicknameRequestController;
 import com.balancify.backend.api.group.GroupNoticeAdminController;
+import com.balancify.backend.api.group.GroupPrizeDrawController;
 import com.balancify.backend.api.group.GroupBoardController;
 import com.balancify.backend.api.group.GroupBoardSearchController;
 import com.balancify.backend.api.group.GroupNoticeController;
@@ -42,6 +43,7 @@ import com.balancify.backend.api.group.dto.BoardPostListResponse;
 import com.balancify.backend.api.group.dto.BoardSearchResponse;
 import com.balancify.backend.api.group.dto.NicknameRequestListResponse;
 import com.balancify.backend.api.group.dto.NoticeListResponse;
+import com.balancify.backend.api.group.dto.PrizeDrawListResponse;
 import com.balancify.backend.api.group.GroupDashboardController;
 import com.balancify.backend.api.group.GroupPlayerController;
 import com.balancify.backend.api.group.GroupPlayerAdminController;
@@ -118,6 +120,7 @@ import com.balancify.backend.service.BoardService;
 import com.balancify.backend.service.NicknameRequestService;
 import com.balancify.backend.service.NoticeAdminService;
 import com.balancify.backend.service.NoticeImageService;
+import com.balancify.backend.service.PrizeDrawService;
 import com.balancify.backend.service.NoticeService;
 import com.balancify.backend.service.OperationAuditLogService;
 import com.balancify.backend.service.PlayerActivityQueryService;
@@ -188,6 +191,7 @@ import org.springframework.test.web.servlet.ResultMatcher;
     GroupBoardController.class,
     GroupBoardSearchController.class,
     GroupNicknameRequestController.class,
+    GroupPrizeDrawController.class,
     GroupNoticeImageController.class,
     GroupLedgerController.class,
     GroupLedgerAdminController.class,
@@ -281,6 +285,9 @@ class AdminKeyFilterTest {
 
     @MockitoBean
     private NicknameRequestService nicknameRequestService;
+
+    @MockitoBean
+    private PrizeDrawService prizeDrawService;
 
     @MockitoBean
     private NoticeImageService noticeImageService;
@@ -3359,6 +3366,91 @@ class AdminKeyFilterTest {
         verify(boardSearchService, times(2)).search(any(), any(), any(), anyInt());
         // The search is not a board: nothing of it reaches the posts of one.
         verify(boardService, never()).list(any(), any(), any(), anyInt());
+    }
+
+    @Test
+    void letsMembersReadThePrizeDrawsAdminsSaveOneAndSuperAdminsRemoveOne() throws Exception {
+        when(prizeDrawService.list(1L, "member@hei.gg")).thenReturn(new PrizeDrawListResponse(List.of(), false));
+        String draw = "{\"title\":\"YOUR_TITLE\",\"mode\":\"FIRST\",\"entrantCount\":5,"
+            + "\"winners\":[{\"place\":1,\"name\":\"YOUR_USERNAME\",\"playerId\":7,\"prize\":\"mouse\"}]}";
+
+        mockMvc
+            .perform(get("/api/groups/1/prize-draws").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.canRun").value(false));
+
+        // Saving: a member and a visitor are turned back before the service is asked.
+        mockMvc
+            .perform(
+                post("/api/groups/1/prize-draws")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(draw)
+            )
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(post("/api/groups/1/prize-draws").contentType(MediaType.APPLICATION_JSON).content(draw))
+            .andExpect(status().isForbidden());
+        verify(prizeDrawService, never()).save(any(), any(), any(), any());
+        mockMvc
+            .perform(
+                post("/api/groups/1/prize-draws")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(draw)
+            )
+            .andExpect(status().isOk());
+        verify(prizeDrawService).save(
+            eq(1L),
+            eq("admin@hei.gg"),
+            any(),
+            argThat(request -> request != null
+                && "YOUR_TITLE".equals(request.title())
+                && "FIRST".equals(request.mode())
+                && Integer.valueOf(5).equals(request.entrantCount())
+                && request.winners().size() == 1
+                && Long.valueOf(7L).equals(request.winners().get(0).playerId())
+                && "mouse".equals(request.winners().get(0).prize()))
+        );
+
+        // Removing a record: admins too are turned back; only a super admin gets through.
+        mockMvc
+            .perform(delete("/api/groups/1/prize-draws/40").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(delete("/api/groups/1/prize-draws/40").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isForbidden());
+        verify(prizeDrawService, never()).delete(any(), any(), any(), any());
+        mockMvc
+            .perform(delete("/api/groups/1/prize-draws/40").header("X-USER-EMAIL", "superadmin@hei.gg"))
+            .andExpect(status().isOk());
+        verify(prizeDrawService).delete(eq(1L), eq(40L), eq("superadmin@hei.gg"), any());
+
+        // No sign-in, or signed in without access to the site: not even the records.
+        mockMvc
+            .perform(get("/api/groups/1/prize-draws"))
+            .andExpect(status().isUnauthorized());
+        mockMvc
+            .perform(get("/api/groups/1/prize-draws").header("X-USER-EMAIL", "blocked@hei.gg"))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void tellsWhyAPrizeDrawWasNotSavedOrRemoved() throws Exception {
+        when(prizeDrawService.save(any(), any(), any(), any())).thenThrow(new IllegalArgumentException("no winner"));
+        when(prizeDrawService.delete(eq(1L), eq(99L), any(), any())).thenThrow(new NoSuchElementException("Draw not found"));
+
+        mockMvc
+            .perform(
+                post("/api/groups/1/prize-draws")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"title\":\"YOUR_TITLE\"}")
+            )
+            .andExpect(status().isBadRequest());
+        mockMvc
+            .perform(delete("/api/groups/1/prize-draws/99").header("X-USER-EMAIL", "superadmin@hei.gg"))
+            .andExpect(status().isNotFound());
     }
 
     @Test
