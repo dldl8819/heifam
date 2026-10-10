@@ -14,6 +14,7 @@ import com.balancify.backend.security.AdminKeyProperties;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -188,6 +189,11 @@ public class AccessControlService {
                 || adminKeyProperties.isConfiguredAllowedEmail(normalizedEmail));
     }
 
+    /**
+     * The admins and super admins, with their nicknames and MMR access. Everything is read in three
+     * queries for the whole list: the lists are shown over a database a network round trip away,
+     * where a lookup per row made them take seconds.
+     */
     @Transactional(readOnly = true)
     public AdminEmailSnapshot getAdminEmailSnapshot() {
         List<String> superAdminEmails = adminKeyProperties
@@ -195,41 +201,41 @@ public class AccessControlService {
             .stream()
             .sorted()
             .toList();
+        List<ManagedAdminEmail> managedAdmins = managedAdminEmailRepository.findAllByOrderByNormalizedEmailAsc();
+        Map<String, String> nicknames = nicknamesOf(allowedUserEmailRepository.findAllByOrderByNormalizedEmailAsc(), managedAdmins);
+        Set<String> mmrAccessEmails = new HashSet<>();
+        adminMmrAccessEmailRepository.findAll()
+            .forEach(row -> mmrAccessEmails.add(normalizeEmail(row.getNormalizedEmail())));
 
         List<AccessEmailEntry> superAdmins = superAdminEmails.stream()
-            .map(superAdminEmail -> new AccessEmailEntry(superAdminEmail, resolveNickname(superAdminEmail), true))
+            .map(superAdminEmail -> new AccessEmailEntry(superAdminEmail, nicknames.get(superAdminEmail), true))
             .toList();
 
         Set<String> adminSet = new LinkedHashSet<>(adminKeyProperties.getNormalizedAdminEmails());
-        adminSet.addAll(
-            managedAdminEmailRepository.findAllByOrderByNormalizedEmailAsc()
-                .stream()
-                .map(ManagedAdminEmail::getNormalizedEmail)
-                .toList()
-        );
+        adminSet.addAll(managedAdmins.stream().map(ManagedAdminEmail::getNormalizedEmail).toList());
         adminSet.removeAll(superAdminEmails);
 
+        // Everyone left is an admin and no super admin, so an MMR access row is all it takes (canViewMmr).
         List<AccessEmailEntry> admins = adminSet.stream()
             .sorted()
-            .map(adminEmail -> new AccessEmailEntry(adminEmail, resolveNickname(adminEmail), canViewMmr(adminEmail)))
+            .map(adminEmail -> new AccessEmailEntry(adminEmail, nicknames.get(adminEmail), mmrAccessEmails.contains(adminEmail)))
             .toList();
 
         return new AdminEmailSnapshot(superAdmins, admins);
     }
 
+    /** The members allowed in, with their nicknames: two queries for the whole list. */
     @Transactional(readOnly = true)
     public AllowedEmailSnapshot getAllowedEmailSnapshot() {
+        List<AllowedUserEmail> allowedRows = allowedUserEmailRepository.findAllByOrderByNormalizedEmailAsc();
+        Map<String, String> nicknames = nicknamesOf(allowedRows, managedAdminEmailRepository.findAllByOrderByNormalizedEmailAsc());
+
         Set<String> allowedSet = new LinkedHashSet<>(adminKeyProperties.getNormalizedAllowedEmails());
-        allowedSet.addAll(
-            allowedUserEmailRepository.findAllByOrderByNormalizedEmailAsc()
-                .stream()
-                .map(AllowedUserEmail::getNormalizedEmail)
-                .toList()
-        );
+        allowedSet.addAll(allowedRows.stream().map(AllowedUserEmail::getNormalizedEmail).toList());
 
         List<AccessEmailEntry> allowedUsers = new ArrayList<>(allowedSet).stream()
             .sorted()
-            .map(allowedEmail -> new AccessEmailEntry(allowedEmail, resolveNickname(allowedEmail), false))
+            .map(allowedEmail -> new AccessEmailEntry(allowedEmail, nicknames.get(allowedEmail), false))
             .toList();
 
         return new AllowedEmailSnapshot(allowedUsers);
@@ -370,10 +376,17 @@ public class AccessControlService {
 
     @Transactional(readOnly = true)
     public List<AccessEmailEntry> getMatchResultEditors() {
-        return matchResultEditorEmailRepository.findAllByOrderByNormalizedEmailAsc()
-            .stream()
+        List<MatchResultEditorEmail> editors = matchResultEditorEmailRepository.findAllByOrderByNormalizedEmailAsc();
+        if (editors.isEmpty()) {
+            return List.of();
+        }
+        Map<String, String> nicknames = nicknamesOf(
+            allowedUserEmailRepository.findAllByOrderByNormalizedEmailAsc(),
+            managedAdminEmailRepository.findAllByOrderByNormalizedEmailAsc()
+        );
+        return editors.stream()
             .map(MatchResultEditorEmail::getNormalizedEmail)
-            .map(editorEmail -> new AccessEmailEntry(editorEmail, resolveNickname(editorEmail), false))
+            .map(editorEmail -> new AccessEmailEntry(editorEmail, nicknames.get(normalizeEmail(editorEmail)), false))
             .toList();
     }
 
@@ -569,19 +582,27 @@ public class AccessControlService {
 
     /** {@link #resolveDisplayNickname} for many emails with two queries; emails without one map to null. */
     public Map<String, String> resolveDisplayNicknames(Collection<String> emails) {
-        Map<String, String> knownNicknames = new HashMap<>();
-        for (AllowedUserEmail allowedUser : allowedUserEmailRepository.findAllByOrderByNormalizedEmailAsc()) {
-            putNickname(knownNicknames, allowedUser.getNormalizedEmail(), allowedUser.getNickname());
-        }
-        // An admin entry's nickname wins, as in resolveNickname.
-        for (ManagedAdminEmail admin : managedAdminEmailRepository.findAllByOrderByNormalizedEmailAsc()) {
-            putNickname(knownNicknames, admin.getNormalizedEmail(), admin.getNickname());
-        }
+        Map<String, String> knownNicknames = nicknamesOf(
+            allowedUserEmailRepository.findAllByOrderByNormalizedEmailAsc(),
+            managedAdminEmailRepository.findAllByOrderByNormalizedEmailAsc()
+        );
 
         Map<String, String> nicknames = new HashMap<>();
         for (String email : emails) {
             String normalizedEmail = normalizeEmail(email);
             nicknames.put(normalizedEmail, knownNicknames.get(normalizedEmail));
+        }
+        return nicknames;
+    }
+
+    /** Every nickname the access lists know, by email; an admin entry's wins, as in resolveNickname. */
+    private Map<String, String> nicknamesOf(List<AllowedUserEmail> allowedUsers, List<ManagedAdminEmail> admins) {
+        Map<String, String> nicknames = new HashMap<>();
+        for (AllowedUserEmail allowedUser : allowedUsers) {
+            putNickname(nicknames, allowedUser.getNormalizedEmail(), allowedUser.getNickname());
+        }
+        for (ManagedAdminEmail admin : admins) {
+            putNickname(nicknames, admin.getNormalizedEmail(), admin.getNickname());
         }
         return nicknames;
     }

@@ -21,6 +21,7 @@ import com.balancify.backend.repository.ManagedAdminEmailRepository;
 import com.balancify.backend.repository.MatchResultEditorEmailRepository;
 import com.balancify.backend.repository.UserRacePreferenceRepository;
 import com.balancify.backend.security.AdminKeyProperties;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -83,6 +84,80 @@ class AccessControlServiceTest {
             matchResultEditorEmailRepository,
             60_000L
         );
+    }
+
+    private static AllowedUserEmail allowedUser(String email, String nickname) {
+        AllowedUserEmail row = new AllowedUserEmail();
+        row.setEmail(email);
+        row.setNormalizedEmail(email);
+        row.setNickname(nickname);
+        return row;
+    }
+
+    private static ManagedAdminEmail managedAdmin(String email, String nickname) {
+        ManagedAdminEmail row = new ManagedAdminEmail();
+        row.setEmail(email);
+        row.setNormalizedEmail(email);
+        row.setNickname(nickname);
+        return row;
+    }
+
+    @Test
+    void readsTheAccessListsInAFewQueriesHoweverLongTheyAre() {
+        List<AllowedUserEmail> allowed = new ArrayList<>();
+        for (int index = 1; index <= 68; index++) {
+            allowed.add(allowedUser("member-" + index + "@hei.gg", "Member" + index));
+        }
+        allowed.add(allowedUser("promoted@hei.gg", "OldNickname"));
+        when(allowedUserEmailRepository.findAllByOrderByNormalizedEmailAsc()).thenReturn(allowed);
+        when(managedAdminEmailRepository.findAllByOrderByNormalizedEmailAsc())
+            .thenReturn(List.of(managedAdmin("promoted@hei.gg", "AdminNickname"), managedAdmin("viewer@hei.gg", "Viewer")));
+        AdminMmrAccessEmail mmrAccess = new AdminMmrAccessEmail();
+        mmrAccess.setEmail("viewer@hei.gg");
+        mmrAccess.setNormalizedEmail("viewer@hei.gg");
+        when(adminMmrAccessEmailRepository.findAll()).thenReturn(List.of(mmrAccess));
+        MatchResultEditorEmail editor = new MatchResultEditorEmail();
+        editor.setEmail("member-3@hei.gg");
+        editor.setNormalizedEmail("member-3@hei.gg");
+        when(matchResultEditorEmailRepository.findAllByOrderByNormalizedEmailAsc()).thenReturn(List.of(editor));
+
+        AccessControlService.AllowedEmailSnapshot allowedSnapshot = accessControlService.getAllowedEmailSnapshot();
+        AccessControlService.AdminEmailSnapshot adminSnapshot = accessControlService.getAdminEmailSnapshot();
+        List<AccessControlService.AccessEmailEntry> editors = accessControlService.getMatchResultEditors();
+
+        // The member allowed in the settings, and the 69 rows; an admin entry's nickname wins.
+        assertThat(allowedSnapshot.allowedUsers()).hasSize(70);
+        assertThat(allowedSnapshot.allowedUsers())
+            .filteredOn(entry -> List.of("member-7@hei.gg", "promoted@hei.gg", "member@hei.gg").contains(entry.email()))
+            .extracting(AccessControlService.AccessEmailEntry::email, AccessControlService.AccessEmailEntry::nickname)
+            .containsExactly(
+                org.assertj.core.groups.Tuple.tuple("member-7@hei.gg", "Member7"),
+                org.assertj.core.groups.Tuple.tuple("member@hei.gg", null),
+                org.assertj.core.groups.Tuple.tuple("promoted@hei.gg", "AdminNickname")
+            );
+        assertThat(adminSnapshot.superAdmins())
+            .containsExactly(new AccessControlService.AccessEmailEntry("superadmin@hei.gg", null, true));
+        assertThat(adminSnapshot.admins()).containsExactly(
+            new AccessControlService.AccessEmailEntry("ops@hei.gg", null, false),
+            new AccessControlService.AccessEmailEntry("promoted@hei.gg", "AdminNickname", false),
+            new AccessControlService.AccessEmailEntry("viewer@hei.gg", "Viewer", true)
+        );
+        assertThat(editors).containsExactly(new AccessControlService.AccessEmailEntry("member-3@hei.gg", "Member3", false));
+
+        // No lookup per row: the lists are read whole, whatever their length.
+        verify(managedAdminEmailRepository, never()).findByNormalizedEmail(anyString());
+        verify(allowedUserEmailRepository, never()).findByNormalizedEmail(anyString());
+        verify(adminMmrAccessEmailRepository, never()).findByNormalizedEmail(anyString());
+        verify(userRacePreferenceRepository, never()).findByNormalizedEmail(anyString());
+    }
+
+    @Test
+    void readsNoNicknamesForAnEmptyListOfResultEditors() {
+        when(matchResultEditorEmailRepository.findAllByOrderByNormalizedEmailAsc()).thenReturn(List.of());
+
+        assertThat(accessControlService.getMatchResultEditors()).isEmpty();
+
+        verify(allowedUserEmailRepository, never()).findAllByOrderByNormalizedEmailAsc();
     }
 
     @Test
