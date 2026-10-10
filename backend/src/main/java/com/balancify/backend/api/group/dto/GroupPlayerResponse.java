@@ -27,8 +27,63 @@ public record GroupPlayerResponse(
     OffsetDateTime tierChangeAcknowledgedAt,
     String lifecycleStatus,
     OffsetDateTime identityRetainedUntil,
-    boolean isOwnPlayer
+    boolean isOwnPlayer,
+    // 휴면: when an admin set the player aside. Only admins who asked for dormant players get one.
+    OffsetDateTime dormantAt
 ) {
+    public GroupPlayerResponse(
+        Long id,
+        String nickname,
+        String race,
+        String tier,
+        Integer baseMmr,
+        String baseTier,
+        Integer currentMmr,
+        OffsetDateTime lastTierSnapshotAt,
+        Integer lastTierSnapshotMmr,
+        String lastTierSnapshotTier,
+        String liveTier,
+        int wins,
+        int losses,
+        int games,
+        boolean active,
+        OffsetDateTime chatLeftAt,
+        String chatLeftReason,
+        OffsetDateTime chatRejoinedAt,
+        String tierChangeAcknowledgedTier,
+        OffsetDateTime tierChangeAcknowledgedAt,
+        String lifecycleStatus,
+        OffsetDateTime identityRetainedUntil,
+        boolean isOwnPlayer
+    ) {
+        this(
+            id,
+            nickname,
+            race,
+            tier,
+            baseMmr,
+            baseTier,
+            currentMmr,
+            lastTierSnapshotAt,
+            lastTierSnapshotMmr,
+            lastTierSnapshotTier,
+            liveTier,
+            wins,
+            losses,
+            games,
+            active,
+            chatLeftAt,
+            chatLeftReason,
+            chatRejoinedAt,
+            tierChangeAcknowledgedTier,
+            tierChangeAcknowledgedAt,
+            lifecycleStatus,
+            identityRetainedUntil,
+            isOwnPlayer,
+            null
+        );
+    }
+
     public GroupPlayerResponse(
         Long id,
         String nickname,
@@ -75,7 +130,8 @@ public record GroupPlayerResponse(
             tierChangeAcknowledgedAt,
             null,
             null,
-            isOwnPlayer
+            isOwnPlayer,
+            null
         );
     }
 }

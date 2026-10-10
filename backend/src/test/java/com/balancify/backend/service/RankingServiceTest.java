@@ -73,6 +73,21 @@ class RankingServiceTest {
     }
 
     @Test
+    void leavesDormantPlayersOffTheRanking() {
+        Group group = new Group();
+        group.setId(1L);
+        Player onRoster = player(1L, group, "PlayerAlpha", "P", "B-", 790);
+        Player dormant = player(2L, group, "PlayerBravo", "T", "A", 1200);
+        dormant.setDormantAt(java.time.OffsetDateTime.parse("2026-07-01T03:00:00Z"));
+        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of(dormant, onRoster));
+        when(playerMonthlyStatsRepository.findByGroupIdAndStatMonth(1L, JULY_2026)).thenReturn(List.of());
+
+        assertThat(rankingService.getGroupRanking(1L))
+            .extracting(RankingItemResponse::nickname)
+            .containsExactly("PlayerAlpha");
+    }
+
+    @Test
     void mapsRankingStatsFromCurrentMonthStatsWithoutLoadingFullHistory() {
         Group group = new Group();
         group.setId(1L);

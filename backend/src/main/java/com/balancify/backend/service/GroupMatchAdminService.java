@@ -86,7 +86,8 @@ public class GroupMatchAdminService {
             DuplicateHandling.REUSE_ACTIVE_REJECT_COMPLETED,
             null,
             Boolean.TRUE.equals(request.resultFollows()),
-            createdByEmail
+            createdByEmail,
+            true
         );
 
         if (outcome.duplicateRejected()) {
@@ -134,7 +135,8 @@ public class GroupMatchAdminService {
             null,
             // Entered with its result; the result entry that follows refuses a result entered twice.
             false,
-            null
+            null,
+            false
         ).match();
     }
 
@@ -162,7 +164,8 @@ public class GroupMatchAdminService {
             DuplicateHandling.NONE,
             new SeriesLink(seriesId, null, seriesGameNumber),
             false,
-            null
+            null,
+            false
         ).match();
     }
 
@@ -192,7 +195,8 @@ public class GroupMatchAdminService {
             DuplicateHandling.NONE,
             new SeriesLink(null, balanceSeriesId, seriesGameNumber),
             false,
-            createdByEmail
+            createdByEmail,
+            false
         ).match();
     }
 
@@ -250,7 +254,9 @@ public class GroupMatchAdminService {
         SeriesLink seriesLink,
         // The balance page saves the match only to enter its result at once.
         boolean resultFollows,
-        String createdByEmail
+        String createdByEmail,
+        // Players on the roster only: a dormant one (휴면) is refused like one not in the group.
+        boolean rosterOnly
     ) {
         int normalizedTeamSize = normalizeRequestedTeamSize(requestedTeamSize);
         String normalizedRaceComposition = RaceCompositionPolicy.normalizeForTeamSize(
@@ -281,7 +287,9 @@ public class GroupMatchAdminService {
 
         List<Player> players = playerRepository.findByGroup_IdAndIdIn(groupId, new ArrayList<>(allIds))
             .stream()
-            .filter(player -> !PlayerIdentityPolicy.isIdentityHidden(player))
+            .filter(player -> rosterOnly
+                ? PlayerRosterPolicy.isOnRoster(player)
+                : !PlayerIdentityPolicy.isIdentityHidden(player))
             .toList();
         if (players.size() != normalizedTeamSize * 2) {
             throw new IllegalArgumentException("All players must belong to the group");

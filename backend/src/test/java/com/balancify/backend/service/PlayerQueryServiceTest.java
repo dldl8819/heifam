@@ -93,6 +93,33 @@ class PlayerQueryServiceTest {
     }
 
     @Test
+    void leavesDormantPlayersOutOfTheRosterAndTheTierBoardShowingThemOnlyToAdminsWhoAsk() {
+        Group group = new Group();
+        group.setId(1L);
+        Player onRoster = player(1L, group, "Alpha", "P", "A", 1500);
+        Player dormant = player(2L, group, "Bravo", "T", "A", 1700);
+        dormant.setDormantAt(java.time.OffsetDateTime.parse("2026-10-01T03:00:00Z"));
+        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of(onRoster, dormant));
+        when(playerStatsRepository.findByGroupId(1L)).thenReturn(List.of());
+
+        assertThat(playerQueryService.getGroupPlayers(1L, false))
+            .extracting(GroupPlayerResponse::nickname)
+            .containsExactly("Alpha");
+        assertThat(playerQueryService.getGroupPlayers(1L, true, null))
+            .extracting(GroupPlayerResponse::nickname)
+            .containsExactly("Alpha");
+        assertThat(playerQueryService.getGroupPlayers(1L, false, true, null))
+            .extracting(GroupPlayerResponse::nickname, GroupPlayerResponse::dormantAt)
+            .containsExactly(
+                org.assertj.core.groups.Tuple.tuple("Bravo", java.time.OffsetDateTime.parse("2026-10-01T03:00:00Z")),
+                org.assertj.core.groups.Tuple.tuple("Alpha", null)
+            );
+        assertThat(playerQueryService.getGroupPlayerTierBoard(1L))
+            .extracting(GroupPlayerTierBoardResponse::nickname)
+            .containsExactly("Alpha");
+    }
+
+    @Test
     void returnsEmptyWhenGroupHasNoPlayers() {
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(99L)).thenReturn(List.of());
 

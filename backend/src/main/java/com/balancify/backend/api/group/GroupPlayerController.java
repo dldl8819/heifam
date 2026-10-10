@@ -53,6 +53,8 @@ public class GroupPlayerController {
         this.authenticatedRequestResolver = authenticatedRequestResolver;
     }
 
+    // Players who have not played for a while (balancify.rank.dormancy): the ones an admin may set
+    // aside (휴면). Those already set aside are left out of the roster this is matched against.
     @GetMapping("/{groupId}/players/dormant")
     public List<GroupDormantPlayerResponse> getDormantGroupPlayers(
         @PathVariable Long groupId,
@@ -84,6 +86,8 @@ public class GroupPlayerController {
     public List<GroupPlayerResponse> getGroupPlayers(
         @PathVariable Long groupId,
         @RequestParam(name = "includeInactive", defaultValue = "false") boolean includeInactive,
+        // Dormant players (휴면) are listed for admins who ask; nobody else ever gets them.
+        @RequestParam(name = "includeDormant", defaultValue = "false") boolean includeDormant,
         HttpServletRequest request,
         HttpServletResponse httpResponse
     ) {
@@ -95,9 +99,10 @@ public class GroupPlayerController {
         List<GroupPlayerResponse> response = playerQueryService.getGroupPlayers(
             groupId,
             accessProfile.admin() && includeInactive,
+            accessProfile.admin() && includeDormant,
             resolveVerifiedAuthUserId(identity)
         );
-        if (accessProfile.admin() && includeInactive) {
+        if (accessProfile.admin() && (includeInactive || includeDormant)) {
             preventSensitiveResponseCaching(httpResponse);
         }
         if (accessProfile.superAdmin()) {

@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -146,6 +147,49 @@ public class GroupPlayerAdminController {
                 HttpStatus.CONFLICT,
                 illegalStateException.getMessage(),
                 illegalStateException
+            );
+        } catch (NoSuchElementException noSuchElementException) {
+            throw new ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                noSuchElementException.getMessage(),
+                noSuchElementException
+            );
+        }
+    }
+
+    /** 휴면: sets a player aside. Admins only, as the filter also says. See PlayerRosterPolicy. */
+    @PutMapping("/{groupId}/players/{playerId}/dormant")
+    public void setPlayerDormant(
+        @PathVariable Long groupId,
+        @PathVariable Long playerId,
+        HttpServletRequest httpRequest
+    ) {
+        updateDormancy(groupId, playerId, true, httpRequest);
+    }
+
+    /** Wakes a dormant player: back on the roster, the ranking and new matches. */
+    @DeleteMapping("/{groupId}/players/{playerId}/dormant")
+    public void wakePlayer(
+        @PathVariable Long groupId,
+        @PathVariable Long playerId,
+        HttpServletRequest httpRequest
+    ) {
+        updateDormancy(groupId, playerId, false, httpRequest);
+    }
+
+    private void updateDormancy(Long groupId, Long playerId, boolean dormant, HttpServletRequest httpRequest) {
+        AuthenticatedRequestResolver.ResolvedRequestIdentity identity =
+            authenticatedRequestResolver.resolve(httpRequest);
+        if (!accessControlService.isAdminEmail(identity.email())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only admins can set players dormant");
+        }
+        try {
+            playerAdminService.updateDormancy(
+                groupId,
+                playerId,
+                dormant,
+                identity.email(),
+                resolveActorNickname(identity)
             );
         } catch (NoSuchElementException noSuchElementException) {
             throw new ResponseStatusException(

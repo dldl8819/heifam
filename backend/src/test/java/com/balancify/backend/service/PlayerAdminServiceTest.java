@@ -10,6 +10,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -902,6 +903,47 @@ class PlayerAdminServiceTest {
         assertThatThrownBy(() -> playerAdminService.deletePlayer(1L, 10L))
             .isInstanceOf(IllegalStateException.class)
             .hasMessage("경기 또는 정기 감전 기록이 있는 선수는 삭제할 수 없습니다. 명단에서 빼려면 비활성 처리를 사용해 주세요.");
+    }
+
+    @Test
+    void setsAPlayerAsideAndWakesThemLoggingEachChangeOnce() {
+        Player target = player(10L, 1L, "PlayerAlpha");
+        when(playerRepository.findByIdAndGroup_Id(10L, 1L)).thenReturn(Optional.of(target));
+
+        playerAdminService.updateDormancy(1L, 10L, true, "admin@example.com", "Admin");
+        assertThat(target.getDormantAt()).isNotNull();
+        assertThat(PlayerRosterPolicy.isOnRoster(target)).isFalse();
+        assertThat(target.isActive()).isTrue();
+        assertThat(target.getLifecycleStatus()).isEqualTo(PlayerLifecycleStatus.ACTIVE);
+        verify(operationAuditLogService).recordPlayerDormancyUpdate("admin@example.com", "Admin", 1L, target, true);
+
+        // Asked again: nothing changes and nothing more is logged.
+        OffsetDateTime setAsideAt = target.getDormantAt();
+        playerAdminService.updateDormancy(1L, 10L, true, "admin@example.com", "Admin");
+        assertThat(target.getDormantAt()).isEqualTo(setAsideAt);
+        verify(playerRepository, times(1)).save(target);
+
+        playerAdminService.updateDormancy(1L, 10L, false, "admin@example.com", "Admin");
+        assertThat(target.getDormantAt()).isNull();
+        assertThat(PlayerRosterPolicy.isOnRoster(target)).isTrue();
+        verify(operationAuditLogService).recordPlayerDormancyUpdate("admin@example.com", "Admin", 1L, target, false);
+        verify(accountDeletionService, never()).deactivatePlayer(anyLong(), any(OffsetDateTime.class), anyString());
+    }
+
+    @Test
+    void setsNoHiddenOrMissingPlayerAside() {
+        Player hidden = player(11L, 1L, "PlayerBravo");
+        hidden.setActive(false);
+        hidden.setLifecycleStatus(PlayerLifecycleStatus.INACTIVE);
+        when(playerRepository.findByIdAndGroup_Id(11L, 1L)).thenReturn(Optional.of(hidden));
+        when(playerRepository.findByIdAndGroup_Id(12L, 1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> playerAdminService.updateDormancy(1L, 11L, true, "admin@example.com", "Admin"))
+            .isInstanceOf(NoSuchElementException.class);
+        assertThatThrownBy(() -> playerAdminService.updateDormancy(1L, 12L, true, "admin@example.com", "Admin"))
+            .isInstanceOf(NoSuchElementException.class);
+        assertThat(hidden.getDormantAt()).isNull();
+        verify(operationAuditLogService, never()).recordPlayerDormancyUpdate(any(), any(), any(), any(), anyBoolean());
     }
 
     private Player player(Long playerId, Long groupId, String nickname) {

@@ -83,6 +83,10 @@ public class Player {
     @Column(name = "anonymized_at")
     private OffsetDateTime anonymizedAt;
 
+    // 휴면: when an admin set the player aside, null while on the roster. See PlayerRosterPolicy.
+    @Column(name = "dormant_at")
+    private OffsetDateTime dormantAt;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "lifecycle_status", nullable = false, length = 20)
     private PlayerLifecycleStatus lifecycleStatus = PlayerLifecycleStatus.ACTIVE;
@@ -254,6 +258,14 @@ public class Player {
 
     public void setAnonymizedAt(OffsetDateTime anonymizedAt) {
         this.anonymizedAt = anonymizedAt;
+    }
+
+    public OffsetDateTime getDormantAt() {
+        return dormantAt;
+    }
+
+    public void setDormantAt(OffsetDateTime dormantAt) {
+        this.dormantAt = dormantAt;
     }
 
     public boolean isAnonymized() {

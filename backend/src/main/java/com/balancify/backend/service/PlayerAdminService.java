@@ -360,6 +360,30 @@ public class PlayerAdminService {
         groupReadCacheService.evictGroup(groupId);
     }
 
+    /**
+     * Sets a player aside (휴면) or wakes them. Only a visible player can be either; doing what is
+     * already done changes nothing and logs nothing.
+     */
+    @Transactional
+    public void updateDormancy(
+        Long groupId,
+        Long playerId,
+        boolean dormant,
+        String actorEmail,
+        String actorNickname
+    ) {
+        Player player = playerRepository.findByIdAndGroup_Id(playerId, groupId)
+            .orElseThrow(() -> new NoSuchElementException("Player not found"));
+        requireActivePlayer(player);
+        if (PlayerRosterPolicy.isDormant(player) == dormant) {
+            return;
+        }
+        player.setDormantAt(dormant ? OffsetDateTime.now(clock) : null);
+        playerRepository.save(player);
+        operationAuditLogService.recordPlayerDormancyUpdate(actorEmail, actorNickname, groupId, player, dormant);
+        groupReadCacheService.evictGroup(groupId);
+    }
+
     @Transactional
     public void deletePlayer(Long groupId, Long playerId) {
         Player player = playerRepository.findByIdAndGroup_Id(playerId, groupId)

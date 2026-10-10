@@ -21,6 +21,8 @@ const AUDIT_ACTION_FILTER_OPTIONS = [
   'PLAYER_TIER_UPDATED',
   'PLAYER_DEACTIVATED',
   'PLAYER_REACTIVATED',
+  'PLAYER_DORMANT',
+  'PLAYER_WOKEN',
   'MATCH_DELETED',
   'MATCH_RESULT_UPDATED',
   'POINT_ADJUSTED',
@@ -115,6 +117,10 @@ function getActionLabel(action: string): string {
       return t('audit.actions.playerDeactivated')
     case 'PLAYER_REACTIVATED':
       return t('audit.actions.playerReactivated')
+    case 'PLAYER_DORMANT':
+      return t('audit.actions.playerDormant')
+    case 'PLAYER_WOKEN':
+      return t('audit.actions.playerWoken')
     case 'MATCH_DELETED':
       return t('audit.actions.matchDeleted')
     case 'MATCH_RESULT_UPDATED':
