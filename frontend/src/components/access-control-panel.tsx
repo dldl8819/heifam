@@ -1,0 +1,748 @@
+'use client'
+
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { AdminOnlyContent } from '@/components/admin-only-content'
+import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
+import { LoadingIndicator } from '@/components/ui/loading-indicator'
+import { useAdminAuth } from '@/lib/admin-auth'
+import { apiClient, isApiBadRequestError, isApiForbiddenError } from '@/lib/api'
+import { t } from '@/lib/i18n'
+import type {
+  AccessEmailEntry,
+  AccessAdminListResponse,
+  AccessAllowedEmailListResponse,
+  AccessResultEditorListResponse,
+} from '@/types/api'
+
+function normalizeEmail(value: string): string {
+  return value.trim().toLowerCase()
+}
+
+function normalizeNickname(value: string): string {
+  return value.trim()
+}
+
+function isEmailFormatValid(value: string): boolean {
+  const normalized = normalizeEmail(value)
+  return normalized.length > 3 && normalized.includes('@')
+}
+
+function isNicknameFormatValid(value: string): boolean {
+  const normalized = normalizeNickname(value)
+  return normalized.length > 0 && normalized.length <= 100
+}
+
+function formatAccessEntryTarget(entry: AccessEmailEntry): string {
+  const normalizedNickname = normalizeNickname(entry.nickname ?? '')
+  return normalizedNickname.length > 0 ? `${normalizedNickname} (${entry.email})` : entry.email
+}
+
+export type AccessView = 'admins' | 'result-editors' | 'allowed'
+
+// The texts of each view, under access.views.
+const VIEW_TEXT_KEYS: Record<AccessView, string> = {
+  admins: 'admins',
+  'result-editors': 'resultEditors',
+  allowed: 'allowed',
+}
+
+/**
+ * One of the three access pages: the admins (with the signed-in account's own access), the members
+ * who may correct match results, or the emails allowed in. Each loads only the lists it shows.
+ */
+export function AccessControlPanel({ view }: { view: AccessView }) {
+  const { email, nickname, role, canAccess, isAdmin, isSuperAdmin, canViewMmr, refreshAccess } = useAdminAuth()
+  const [loading, setLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
+
+  const [adminList, setAdminList] = useState<AccessAdminListResponse | null>(null)
+  const [allowedList, setAllowedList] = useState<AccessAllowedEmailListResponse | null>(null)
+  const [resultEditorList, setResultEditorList] = useState<AccessResultEditorListResponse | null>(null)
+
+  const [newAdminEmail, setNewAdminEmail] = useState<string>('')
+  const [newAdminNickname, setNewAdminNickname] = useState<string>('')
+  const [newAllowedEmail, setNewAllowedEmail] = useState<string>('')
+  const [newAllowedNickname, setNewAllowedNickname] = useState<string>('')
+  const [newResultEditorEmail, setNewResultEditorEmail] = useState<string>('')
+  const [allowedSearch, setAllowedSearch] = useState<string>('')
+  const [editingAllowedEmail, setEditingAllowedEmail] = useState<string | null>(null)
+  const [editingAllowedNickname, setEditingAllowedNickname] = useState<string>('')
+  const [saving, setSaving] = useState<boolean>(false)
+
+  const loadLists = useCallback(async () => {
+    if (!isAdmin) {
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      // The result editors page reads the other two lists only to suggest whom to add: if they
+      // fail, the editors still show. If the editors fail, the page says so where they would be.
+      const suggestionsOnly = view === 'result-editors'
+      const [admins, allowed, resultEditors] = await Promise.all([
+        view === 'admins'
+          ? apiClient.getAdminEmailList()
+          : suggestionsOnly
+            ? apiClient.getAdminEmailList().catch(() => null)
+            : Promise.resolve(null),
+        view === 'allowed'
+          ? apiClient.getAllowedEmailList()
+          : suggestionsOnly
+            ? apiClient.getAllowedEmailList().catch(() => null)
+            : Promise.resolve(null),
+        suggestionsOnly && isSuperAdmin ? apiClient.getMatchResultEditorList().catch(() => null) : Promise.resolve(null),
+      ])
+      setAdminList(admins)
+      setAllowedList(allowed)
+      setResultEditorList(resultEditors)
+    } catch {
+      setError(t('access.loadError'))
+    } finally {
+      setLoading(false)
+    }
+  }, [isAdmin, isSuperAdmin, view])
+
+  // The backend revokes result editing when a member becomes an operator or leaves the allowlist.
+  const dropResultEditor = (targetEmail: string) => {
+    const normalizedTarget = normalizeEmail(targetEmail)
+    setResultEditorList((current) =>
+      current === null
+        ? current
+        : {
+            resultEditors: current.resultEditors.filter(
+              (entry) => normalizeEmail(entry.email) !== normalizedTarget
+            ),
+          }
+    )
+  }
+
+  useEffect(() => {
+    void loadLists()
+  }, [loadLists])
+
+  const handleAddAdmin = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setError(null)
+    setMessage(null)
+
+    const normalized = normalizeEmail(newAdminEmail)
+    const normalizedNickname = normalizeNickname(newAdminNickname)
+    if (!isEmailFormatValid(normalized)) {
+      setError(t('access.messages.invalidEmail'))
+      return
+    }
+    if (!isNicknameFormatValid(normalizedNickname)) {
+      setError(t('access.messages.invalidNickname'))
+      return
+    }
+    if (!isSuperAdmin) {
+      setError(t('access.superOnly'))
+      return
+    }
+
+    setSaving(true)
+    try {
+      const response = await apiClient.addAdminEmail(normalized, normalizedNickname)
+      setAdminList(response)
+      dropResultEditor(normalized)
+      setNewAdminEmail('')
+      setNewAdminNickname('')
+      setMessage(t('access.messages.adminSaved'))
+      await refreshAccess()
+    } catch (requestError) {
+      if (isApiForbiddenError(requestError)) {
+        setError(t('access.superOnly'))
+      } else {
+        setError(t('access.loadError'))
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleRemoveAdmin = async (target: AccessEmailEntry) => {
+    setError(null)
+    setMessage(null)
+    if (!isSuperAdmin) {
+      setError(t('access.superOnly'))
+      return
+    }
+
+    const targetLabel = formatAccessEntryTarget(target)
+    if (!window.confirm(t('access.messages.removeConfirm', { target: targetLabel }))) {
+      return
+    }
+
+    setSaving(true)
+    try {
+      const response = await apiClient.removeAdminEmail(target.email)
+      setAdminList(response)
+      setMessage(t('access.messages.removeSavedTarget', { target: targetLabel }))
+      await refreshAccess()
+    } catch (requestError) {
+      if (isApiForbiddenError(requestError)) {
+        setError(t('access.superOnly'))
+      } else {
+        setError(t('access.loadError'))
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleToggleAdminMmrAccess = async (targetEmail: string, nextCanViewMmr: boolean) => {
+    setError(null)
+    setMessage(null)
+    if (!isSuperAdmin) {
+      setError(t('access.superOnly'))
+      return
+    }
+
+    setSaving(true)
+    try {
+      const response = await apiClient.updateAdminMmrAccess(targetEmail, nextCanViewMmr)
+      setAdminList(response)
+      setMessage(t('access.messages.mmrAccessSaved'))
+      await refreshAccess()
+    } catch (requestError) {
+      if (isApiForbiddenError(requestError)) {
+        setError(t('access.superOnly'))
+      } else {
+        setError(t('access.loadError'))
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleAddResultEditor = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setError(null)
+    setMessage(null)
+
+    const normalized = normalizeEmail(newResultEditorEmail)
+    if (!isEmailFormatValid(normalized)) {
+      setError(t('access.messages.invalidEmail'))
+      return
+    }
+    if (!isSuperAdmin) {
+      setError(t('common.permissionDenied'))
+      return
+    }
+
+    setSaving(true)
+    try {
+      const response = await apiClient.addMatchResultEditor(normalized)
+      setResultEditorList(response)
+      setNewResultEditorEmail('')
+      const addedEntry = response.resultEditors.find((entry) => normalizeEmail(entry.email) === normalized)
+      setMessage(
+        t('access.messages.resultEditorSaved', {
+          target: addedEntry ? formatAccessEntryTarget(addedEntry) : normalized,
+        })
+      )
+    } catch (requestError) {
+      if (isApiForbiddenError(requestError)) {
+        setError(t('common.permissionDenied'))
+      } else if (isApiBadRequestError(requestError)) {
+        setError(t('access.messages.resultEditorInvalidTarget'))
+      } else {
+        setError(t('access.loadError'))
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleRemoveResultEditor = async (target: AccessEmailEntry) => {
+    setError(null)
+    setMessage(null)
+    if (!isSuperAdmin) {
+      setError(t('common.permissionDenied'))
+      return
+    }
+
+    const targetLabel = formatAccessEntryTarget(target)
+    if (!window.confirm(t('access.messages.resultEditorRemoveConfirm', { target: targetLabel }))) {
+      return
+    }
+
+    setSaving(true)
+    try {
+      const response = await apiClient.removeMatchResultEditor(target.email)
+      setResultEditorList(response)
+      setMessage(t('access.messages.resultEditorRemoved', { target: targetLabel }))
+    } catch (requestError) {
+      if (isApiForbiddenError(requestError)) {
+        setError(t('common.permissionDenied'))
+      } else {
+        setError(t('access.loadError'))
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleAddAllowed = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setError(null)
+    setMessage(null)
+
+    const normalized = normalizeEmail(newAllowedEmail)
+    const normalizedNickname = normalizeNickname(newAllowedNickname)
+    if (!isEmailFormatValid(normalized)) {
+      setError(t('access.messages.invalidEmail'))
+      return
+    }
+    if (!isNicknameFormatValid(normalizedNickname)) {
+      setError(t('access.messages.invalidNickname'))
+      return
+    }
+
+    setSaving(true)
+    try {
+      const response = await apiClient.addAllowedEmail(normalized, normalizedNickname)
+      setAllowedList(response)
+      setNewAllowedEmail('')
+      setNewAllowedNickname('')
+      setMessage(t('access.messages.allowedSavedTarget', { nickname: normalizedNickname, email: normalized }))
+    } catch {
+      setError(t('access.loadError'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleRemoveAllowed = async (target: AccessEmailEntry) => {
+    setError(null)
+    setMessage(null)
+
+    const targetLabel = formatAccessEntryTarget(target)
+    if (!window.confirm(t('access.messages.removeConfirm', { target: targetLabel }))) {
+      return
+    }
+
+    setSaving(true)
+    try {
+      const response = await apiClient.removeAllowedEmail(target.email)
+      setAllowedList(response)
+      dropResultEditor(target.email)
+      setMessage(t('access.messages.removeSavedTarget', { target: targetLabel }))
+    } catch {
+      setError(t('access.loadError'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleStartEditAllowedNickname = (target: AccessEmailEntry) => {
+    setError(null)
+    setMessage(null)
+    setEditingAllowedEmail(target.email)
+    setEditingAllowedNickname(target.nickname ?? '')
+  }
+
+  const handleCancelEditAllowedNickname = () => {
+    setEditingAllowedEmail(null)
+    setEditingAllowedNickname('')
+  }
+
+  const handleSaveAllowedNickname = async (targetEmail: string) => {
+    setError(null)
+    setMessage(null)
+
+    const normalizedNickname = normalizeNickname(editingAllowedNickname)
+    if (!isNicknameFormatValid(normalizedNickname)) {
+      setError(t('access.messages.invalidNickname'))
+      return
+    }
+
+    setSaving(true)
+    try {
+      const response = await apiClient.updateAllowedEmailNickname(targetEmail, normalizedNickname)
+      setAllowedList(response)
+      setMessage(t('access.messages.nicknameSaved', { email: targetEmail, nickname: normalizedNickname }))
+      setEditingAllowedEmail(null)
+      setEditingAllowedNickname('')
+    } catch {
+      setError(t('access.loadError'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const filteredAllowedUsers = useMemo(() => {
+    const searchText = allowedSearch.trim().toLowerCase()
+    const allowedUsers = allowedList?.allowedUsers ?? []
+    if (searchText.length === 0) {
+      return allowedUsers
+    }
+    return allowedUsers.filter((entry) => {
+      const nickname = normalizeNickname(entry.nickname ?? '').toLowerCase()
+      return nickname.includes(searchText) || entry.email.toLowerCase().includes(searchText)
+    })
+  }, [allowedList, allowedSearch])
+
+  // Suggest allowed members who are neither operators nor editors yet.
+  const resultEditorCandidates = useMemo(() => {
+    const excludedEmails = new Set(
+      [
+        ...(adminList?.superAdmins ?? []),
+        ...(adminList?.admins ?? []),
+        ...(resultEditorList?.resultEditors ?? []),
+      ].map((entry) => normalizeEmail(entry.email))
+    )
+    return (allowedList?.allowedUsers ?? []).filter(
+      (entry) => !excludedEmails.has(normalizeEmail(entry.email))
+    )
+  }, [adminList, allowedList, resultEditorList])
+
+  return (
+    <section className="space-y-6">
+      <header className="space-y-1 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <h2 className="text-2xl font-semibold tracking-tight">{t(`access.views.${VIEW_TEXT_KEYS[view]}.title`)}</h2>
+        <p className="text-sm text-slate-600 dark:text-slate-300">{t(`access.views.${VIEW_TEXT_KEYS[view]}.description`)}</p>
+      </header>
+
+      <AdminOnlyContent>
+        {error && (
+          <Alert variant="destructive" appearance="light">
+            <AlertIcon icon="destructive">!</AlertIcon>
+            <AlertContent>
+              <AlertTitle>{t('common.errorPrefix')}</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </AlertContent>
+          </Alert>
+        )}
+        {message && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+            {message}
+          </div>
+        )}
+
+        {loading && <LoadingIndicator label={t('common.loading')} />}
+
+        {view === 'admins' && (
+          <>
+            <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('access.sections.me')}</h3>
+              <div className="mt-3 grid gap-2 text-sm text-slate-700 dark:text-slate-300 sm:grid-cols-2 lg:grid-cols-5">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-950/60">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{t('access.me.email')}</p>
+                  <p className="mt-1 font-medium">{email ?? '-'}</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-950/60">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{t('access.me.nickname')}</p>
+                  <p className="mt-1 font-medium">{nickname ?? t('access.labels.nicknameNotSet')}</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-950/60">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{t('access.me.role')}</p>
+                  <p className="mt-1 font-medium">{role}</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-950/60">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{t('access.me.access')}</p>
+                  <p className="mt-1 font-medium">
+                    {canAccess ? t('access.me.yes') : t('access.me.no')}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-950/60">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{t('access.me.mmrAccess')}</p>
+                  <p className="mt-1 font-medium">
+                    {canViewMmr ? t('access.me.yes') : t('access.me.no')}
+                  </p>
+                </div>
+              </div>
+            </article>
+
+            <div className="grid gap-4 xl:grid-cols-2">
+              <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('access.sections.superAdmins')}</h3>
+                <ul className="mt-3 space-y-2">
+                  {(adminList?.superAdmins ?? []).map((superAdminUser) => (
+                    <li
+                      key={`super-admin-${superAdminUser.email}`}
+                      className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-200"
+                    >
+                      <span>
+                        <span className="font-medium">{superAdminUser.nickname ?? t('access.labels.nicknameNotSet')}</span>
+                        <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">({superAdminUser.email})</span>
+                      </span>
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300">
+                          {t('access.actions.mmrAlwaysAllowed')}
+                        </span>
+                        <span className="rounded-md bg-slate-900 px-2 py-0.5 text-xs font-medium text-white dark:bg-slate-700 dark:text-slate-100">
+                          {t('access.actions.fixed')}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+
+              <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('access.sections.admins')}</h3>
+                {!isSuperAdmin && (
+                  <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                    {t('access.superOnly')}
+                  </p>
+                )}
+                {isSuperAdmin && (
+                  <form className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]" onSubmit={handleAddAdmin}>
+                    <input
+                      type="email"
+                      value={newAdminEmail}
+                      onChange={(event) => setNewAdminEmail(event.target.value)}
+                      placeholder={t('access.form.emailPlaceholder')}
+                      className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
+                    />
+                    <input
+                      type="text"
+                      value={newAdminNickname}
+                      onChange={(event) => setNewAdminNickname(event.target.value)}
+                      placeholder={t('access.form.nicknamePlaceholder')}
+                      className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
+                    />
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
+                    >
+                      {saving ? t('access.actions.saving') : t('access.form.addAdmin')}
+                    </button>
+                  </form>
+                )}
+
+                <ul className="mt-3 space-y-2">
+                  {(adminList?.admins ?? []).map((adminUser) => (
+                    <li
+                      key={`admin-${adminUser.email}`}
+                      className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-200"
+                    >
+                      <span>
+                        <span className="font-medium">{adminUser.nickname ?? t('access.labels.nicknameNotSet')}</span>
+                        <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">({adminUser.email})</span>
+                      </span>
+                      {isSuperAdmin ? (
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <label className="flex cursor-pointer items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                            <input
+                              type="checkbox"
+                              checked={adminUser.canViewMmr}
+                              disabled={saving}
+                              onChange={(event) => void handleToggleAdminMmrAccess(adminUser.email, event.target.checked)}
+                              className="h-3.5 w-3.5 accent-slate-900 dark:accent-amber-400"
+                            />
+                            {t('access.actions.mmrAccess')}
+                          </label>
+                          <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() => handleRemoveAdmin(adminUser)}
+                            className="rounded-md border border-rose-300 bg-white px-2 py-1 text-xs font-medium text-rose-700 transition-colors hover:border-rose-500 hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 dark:border-rose-800 dark:bg-slate-900 dark:text-rose-300 dark:hover:border-rose-600 dark:hover:bg-rose-950/40 dark:disabled:border-slate-700 dark:disabled:text-slate-500"
+                          >
+                            {t('access.actions.remove')}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${
+                            adminUser.canViewMmr
+                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300'
+                              : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                          }`}>
+                            {adminUser.canViewMmr
+                              ? t('access.actions.mmrAllowed')
+                              : t('access.actions.mmrDenied')}
+                          </span>
+                          <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                            {t('common.readOnly')}
+                          </span>
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            </div>
+          </>
+        )}
+
+        {view === 'result-editors' && isSuperAdmin && (
+          <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('access.sections.resultEditors')}</h3>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('access.resultEditors.description')}</p>
+            <form className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]" onSubmit={handleAddResultEditor}>
+              <input
+                type="email"
+                list="result-editor-candidates"
+                value={newResultEditorEmail}
+                onChange={(event) => setNewResultEditorEmail(event.target.value)}
+                placeholder={t('access.resultEditors.placeholder')}
+                className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
+              />
+              <button
+                type="submit"
+                disabled={saving || loading}
+                className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
+              >
+                {saving ? t('access.actions.saving') : t('access.resultEditors.add')}
+              </button>
+            </form>
+            <datalist id="result-editor-candidates">
+              {resultEditorCandidates.map((candidate) => (
+                <option key={`result-editor-candidate-${candidate.email}`} value={candidate.email}>
+                  {candidate.nickname ?? ''}
+                </option>
+              ))}
+            </datalist>
+
+            {!loading && resultEditorList === null && (
+              <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300">
+                {t('access.loadError')}
+              </p>
+            )}
+            {!loading && resultEditorList !== null && resultEditorList.resultEditors.length === 0 && (
+              <p className="mt-3 rounded-lg border border-dashed border-slate-200 px-3 py-3 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                {t('access.resultEditors.empty')}
+              </p>
+            )}
+            {resultEditorList !== null && resultEditorList.resultEditors.length > 0 && (
+              <ul className="mt-3 space-y-2">
+                {resultEditorList.resultEditors.map((editor) => (
+                  <li
+                    key={`result-editor-${editor.email}`}
+                    className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-200"
+                  >
+                    <span className="min-w-0 flex-1 truncate">
+                      <span className="font-medium">{editor.nickname ?? t('access.labels.nicknameNotSet')}</span>
+                      <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">({editor.email})</span>
+                    </span>
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => void handleRemoveResultEditor(editor)}
+                      className="shrink-0 rounded-md border border-rose-300 bg-white px-2 py-1 text-xs font-medium text-rose-700 transition-colors hover:border-rose-500 hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 dark:border-rose-800 dark:bg-slate-900 dark:text-rose-300 dark:hover:border-rose-600 dark:hover:bg-rose-950/40 dark:disabled:border-slate-700 dark:disabled:text-slate-500"
+                    >
+                      {t('access.resultEditors.revoke')}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </article>
+        )}
+
+        {view === 'allowed' && (
+          <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('access.sections.allowlist')}</h3>
+            <form className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]" onSubmit={handleAddAllowed}>
+              <input
+                type="email"
+                value={newAllowedEmail}
+                onChange={(event) => setNewAllowedEmail(event.target.value)}
+                placeholder={t('access.form.emailPlaceholder')}
+                className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
+              />
+              <input
+                type="text"
+                value={newAllowedNickname}
+                onChange={(event) => setNewAllowedNickname(event.target.value)}
+                placeholder={t('access.form.nicknamePlaceholder')}
+                className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
+              />
+              <button
+                type="submit"
+                disabled={saving || loading}
+                className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
+              >
+                {saving ? t('access.actions.saving') : t('access.form.addAllowed')}
+              </button>
+            </form>
+
+            <input
+              type="text"
+              value={allowedSearch}
+              onChange={(event) => setAllowedSearch(event.target.value)}
+              placeholder={t('access.form.searchPlaceholder')}
+              className="mt-3 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
+            />
+
+            <ul className="mt-3 space-y-2">
+              {filteredAllowedUsers.map((allowedUser) => (
+                <li
+                  key={`allowed-${allowedUser.email}`}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-200"
+                >
+                  {editingAllowedEmail === allowedUser.email ? (
+                    <>
+                      <div className="flex min-w-0 flex-1 items-center gap-2">
+                        <input
+                          type="text"
+                          value={editingAllowedNickname}
+                          onChange={(event) => setEditingAllowedNickname(event.target.value)}
+                          placeholder={t('access.form.nicknamePlaceholder')}
+                          autoFocus
+                          className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
+                        />
+                        <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">({allowedUser.email})</span>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={saving}
+                          onClick={() => void handleSaveAllowedNickname(allowedUser.email)}
+                          className="rounded-md bg-slate-900 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
+                        >
+                          {t('access.actions.save')}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={saving}
+                          onClick={handleCancelEditAllowedNickname}
+                          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:cursor-not-allowed disabled:text-slate-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-400 dark:hover:bg-slate-800"
+                        >
+                          {t('access.actions.cancel')}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <span className="min-w-0 flex-1 truncate">
+                        <span className="font-medium">{allowedUser.nickname ?? t('access.labels.nicknameNotSet')}</span>
+                        <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">({allowedUser.email})</span>
+                      </span>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={saving}
+                          onClick={() => handleStartEditAllowedNickname(allowedUser)}
+                          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:cursor-not-allowed disabled:text-slate-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-400 dark:hover:bg-slate-800"
+                        >
+                          {t('access.actions.editNickname')}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={saving}
+                          onClick={() => handleRemoveAllowed(allowedUser)}
+                          className="rounded-md border border-rose-300 bg-white px-2 py-1 text-xs font-medium text-rose-700 transition-colors hover:border-rose-500 hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 dark:border-rose-800 dark:bg-slate-900 dark:text-rose-300 dark:hover:border-rose-600 dark:hover:bg-rose-950/40 dark:disabled:border-slate-700 dark:disabled:text-slate-500"
+                        >
+                          {t('access.actions.remove')}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </article>
+        )}
+
+      </AdminOnlyContent>
+    </section>
+  )
+}

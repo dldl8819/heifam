@@ -154,6 +154,29 @@ describe('route access', () => {
     }
   })
 
+  it('opens a member\'s points and the monthly ranking to members and keeps the prize events with admins', () => {
+    const member = { isLoggedIn: true, canAccess: true, isAdmin: false, isSuperAdmin: false }
+
+    for (const path of ['/points', '/points/ranking']) {
+      expect(getRouteAccessDecision(path, member).allowed).toBe(true)
+    }
+    expect(getRouteAccessDecision('/points/events', member)).toEqual({
+      allowed: false,
+      redirectTo: '/players',
+      blocked: false,
+    })
+    expect(getRouteAccessDecision('/points/events', { ...member, isAdmin: true }).allowed).toBe(true)
+  })
+
+  it('keeps every one of the three access pages with super admins', () => {
+    const admin = { isLoggedIn: true, canAccess: true, isAdmin: true, isSuperAdmin: false }
+
+    for (const path of ['/admin/access/admins', '/admin/access/result-editors', '/admin/access/allowed']) {
+      expect(getRouteAccessDecision(path, admin)).toEqual({ allowed: false, redirectTo: '/players', blocked: false })
+      expect(getRouteAccessDecision(path, { ...admin, isSuperAdmin: true }).allowed).toBe(true)
+    }
+  })
+
   it('keeps the tournament page with admins', () => {
     const member = { isLoggedIn: true, canAccess: true, isAdmin: false, isSuperAdmin: false }
 

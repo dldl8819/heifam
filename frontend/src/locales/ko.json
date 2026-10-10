@@ -12,11 +12,15 @@
     "dashboard": "대시보드",
     "players": "선수 관리",
     "balance": "밸런스 매치",
+    "matches": "매치",
     "captainDraft": "정기 감전",
     "multiBalance": "다중 밸런스",
     "events": "이벤트",
-    "accessControl": "권한 관리",
     "auditLogs": "운영 로그",
+    "admin": "관리자",
+    "accessAdmins": "운영진 관리자",
+    "accessResultEditors": "경기 결과 수정 권한",
+    "accessAllowed": "접속 허용 이메일",
     "ads": "파트너스",
     "results": "경기 결과",
     "ranking": "랭킹",
@@ -26,8 +30,11 @@
     "anonymousBoard": "익명게시판",
     "nicknameRequests": "닉변 요청",
     "points": "포인트",
+    "myPoints": "내 포인트",
+    "pointRanking": "포인트 월간 랭킹",
+    "pointEvents": "포인트 이벤트",
     "predictions": "승부 예측",
-    "draws": "추첨",
+    "draws": "상품 추첨",
     "tournaments": "토너먼트"
   },
   "landing": {
@@ -270,10 +277,22 @@
     "blockedApply": "구글폼으로 이용 신청하기",
     "blockedEmail": "현재 로그인: {email}",
     "blockedEmailHint": "신청서에는 위 이메일 주소를 그대로 적어 주세요.",
-    "title": "권한 관리",
-    "description": "최상위 관리자/운영진/접속 허용 이메일을 관리합니다.",
     "loadError": "권한 목록을 불러오지 못했습니다.",
     "superOnly": "최상위 관리자만 운영진을 등록/삭제할 수 있습니다.",
+    "views": {
+      "admins": {
+        "title": "운영진 관리자",
+        "description": "최고 관리자와 운영진, 운영진의 MMR 열람 권한을 관리합니다."
+      },
+      "resultEditors": {
+        "title": "경기 결과 수정 권한",
+        "description": "운영진이 아닌 팸원 중 경기 결과를 고칠 수 있는 사람을 정합니다."
+      },
+      "allowed": {
+        "title": "접속 허용 이메일",
+        "description": "사이트에 들어올 수 있는 구글 이메일과 닉네임을 관리합니다."
+      }
+    },
     "sections": {
       "me": "내 권한 상태",
       "superAdmins": "최상위 관리자",
@@ -736,7 +755,7 @@
     "votes": "투표 {count}"
   },
   "prizeDraw": {
-    "title": "추첨",
+    "title": "상품 추첨",
     "description": "핀볼로 진행한 상품 추첨의 결과를 모아 둔 곳입니다. 추첨은 운영진 화면에서 진행되고, 여기에는 결과만 남습니다.",
     "loadError": "불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
     "saveError": "저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
@@ -2004,6 +2023,9 @@
   "points": {
     "title": "포인트",
     "description": "출석과 경기 결과 입력으로 포인트를 모읍니다.",
+    "events": {
+      "description": "포인트를 많이 모은 팸원에게 상품을 주는 이벤트입니다. 운영진에게만 보입니다."
+    },
     "loadError": "포인트를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
     "forbidden": "아직 포인트를 쓸 수 없는 계정입니다.",
     "summary": {
