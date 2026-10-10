@@ -6,195 +6,141 @@ const MEMBER = { isLoggedIn: true, canAccess: true, isAdmin: false, isSuperAdmin
 const ADMIN = { isLoggedIn: true, canAccess: true, isAdmin: true, isSuperAdmin: false }
 const SUPER_ADMIN = { isLoggedIn: true, canAccess: true, isAdmin: true, isSuperAdmin: true }
 const VISITOR = { isLoggedIn: false, canAccess: false, isAdmin: false, isSuperAdmin: false }
+const PENDING = { isLoggedIn: true, canAccess: false, isAdmin: false, isSuperAdmin: false }
 
 /** Every place the navigation leads to, the links inside a menu included. */
 function linkHrefs(items: NavItem[]): string[] {
   return items.flatMap((item) => (item.children ? item.children.map((child) => child.href) : [item.href]))
 }
 
+/** The bar as it reads: a plain link by its address, a menu by its name. */
+function bar(items: NavItem[]): string[] {
+  return items.map((item) => (item.children ? `menu:${item.href}` : item.href))
+}
+
+function menu(items: NavItem[], href: string): string[] {
+  return (items.find((item) => item.href === href && item.children)?.children ?? []).map((child) => child.href)
+}
+
 describe('navigation items', () => {
-  it('shows public ads page to visitors', () => {
-    const items = getVisibleNavItems({
-      isLoggedIn: false,
-      canAccess: false,
-      isAdmin: false,
-      isSuperAdmin: false,
-    })
+  it('shows visitors the public pages and the plain notices link, and no menu', () => {
+    const items = getVisibleNavItems(VISITOR)
 
-    expect(items.map((item) => item.href)).toContain('/ads')
-    expect(items.map((item) => item.href)).toContain('/events')
+    expect(bar(items)).toEqual(['/', '/notices', '/events', '/ads', '/results'])
   })
 
-  it('hides temporarily disabled dashboard for admins', () => {
-    const items = getVisibleNavItems({
-      isLoggedIn: true,
-      canAccess: true,
-      isAdmin: true,
-      isSuperAdmin: false,
-    })
-
-    expect(items.map((item) => item.href)).not.toContain('/dashboard')
-    expect(items.map((item) => item.href)).toContain('/players')
-    expect(items.map((item) => item.href)).not.toContain('/stats')
-    expect(items.map((item) => item.href)).toContain('/events')
-    expect(items.map((item) => item.href)).toContain('/ads')
-    expect(items.map((item) => item.href)).not.toContain('/admin/access')
-    expect(items.map((item) => item.href)).toContain('/admin/audit')
-    expect(linkHrefs(items)).toContain('/notices')
+  it('shows nothing to a signed-in account without access', () => {
+    expect(getVisibleNavItems(PENDING)).toEqual([])
   })
 
-  it('shows multi-balance, points and predictions to members', () => {
-    const memberItems = getVisibleNavItems({
-      isLoggedIn: true,
-      canAccess: true,
-      isAdmin: false,
-      isSuperAdmin: false,
-    })
-    const adminItems = getVisibleNavItems({
-      isLoggedIn: true,
-      canAccess: true,
-      isAdmin: true,
-      isSuperAdmin: false,
-    })
+  it('gathers a member bar into four menus and a few links', () => {
+    expect(bar(getVisibleNavItems(MEMBER))).toEqual([
+      '/players',
+      '/ranking',
+      'menu:/matches',
+      'menu:/boards',
+      'menu:/points',
+      '/predictions',
+      '/events',
+      '/ads',
+      '/results',
+    ])
+  })
 
-    for (const href of ['/balance/multi', '/points', '/predictions']) {
-      expect(memberItems.map((item) => item.href)).toContain(href)
-      expect(adminItems.map((item) => item.href)).toContain(href)
+  it('gives admins the same bar with the admin menu at its end', () => {
+    for (const context of [ADMIN, SUPER_ADMIN]) {
+      expect(bar(getVisibleNavItems(context))).toEqual([
+        '/players',
+        '/ranking',
+        'menu:/matches',
+        'menu:/boards',
+        'menu:/points',
+        '/predictions',
+        '/events',
+        '/ads',
+        '/results',
+        'menu:/admin',
+      ])
     }
   })
 
-  it('gives tournaments their own admin menu next to multi-balance', () => {
-    const memberItems = getVisibleNavItems({
-      isLoggedIn: true,
-      canAccess: true,
-      isAdmin: false,
-      isSuperAdmin: false,
-    })
-    const adminHrefs = getVisibleNavItems({
-      isLoggedIn: true,
-      canAccess: true,
-      isAdmin: true,
-      isSuperAdmin: false,
-    }).map((item) => item.href)
-
-    expect(memberItems.map((item) => item.href)).not.toContain('/tournaments')
-    expect(adminHrefs.indexOf('/tournaments')).toBe(adminHrefs.indexOf('/balance/multi') + 1)
-  })
-
-  it('hides the audit log from regular members', () => {
-    const items = getVisibleNavItems({
-      isLoggedIn: true,
-      canAccess: true,
-      isAdmin: false,
-      isSuperAdmin: false,
-    })
-
-    expect(items.map((item) => item.href)).not.toContain('/admin/audit')
-  })
-
-  it('shows access control and the audit log to super admins', () => {
-    const items = getVisibleNavItems({
-      isLoggedIn: true,
-      canAccess: true,
-      isAdmin: true,
-      isSuperAdmin: true,
-    })
-
-    expect(items.map((item) => item.href)).toEqual(
-      expect.arrayContaining(['/admin/access', '/admin/audit'])
-    )
-    expect(items.filter((item) => item.href === '/admin/audit')).toHaveLength(1)
-  })
-
-  it('shows notices to regular members', () => {
-    const items = getVisibleNavItems({
-      isLoggedIn: true,
-      canAccess: true,
-      isAdmin: false,
-      isSuperAdmin: false,
-    })
-
-    expect(linkHrefs(items)).toContain('/notices')
-  })
-
-  it('shows notices to visitors who are not signed in', () => {
-    const items = getVisibleNavItems({
-      isLoggedIn: false,
-      canAccess: false,
-      isAdmin: false,
-      isSuperAdmin: false,
-    })
-
-    expect(items.map((item) => item.href)).toContain('/notices')
-  })
-
-  it('shows notices to super admins', () => {
-    const items = getVisibleNavItems({
-      isLoggedIn: true,
-      canAccess: true,
-      isAdmin: true,
-      isSuperAdmin: true,
-    })
-
-    expect(linkHrefs(items)).toContain('/notices')
+  it('puts the matches under one menu: balance and multi-balance for members, tournaments and the draft for admins too', () => {
+    expect(menu(getVisibleNavItems(MEMBER), '/matches')).toEqual(['/balance', '/balance/multi'])
+    for (const context of [ADMIN, SUPER_ADMIN]) {
+      expect(menu(getVisibleNavItems(context), '/matches')).toEqual([
+        '/balance',
+        '/balance/multi',
+        '/tournaments',
+        '/captain-draft',
+      ])
+    }
   })
 
   it('gathers the notices and the member boards under one menu, in that order', () => {
     for (const context of [MEMBER, ADMIN, SUPER_ADMIN]) {
-      const items = getVisibleNavItems(context)
-      const menus = items.filter((item) => item.children)
-
-      expect(menus).toHaveLength(1)
-      expect(menus[0].children?.map((child) => child.href)).toEqual([
+      expect(menu(getVisibleNavItems(context), '/boards')).toEqual([
         '/notices',
         '/boards/free',
         '/boards/anonymous',
         '/boards/nickname',
       ])
-      // The notices are reached through the menu, not beside it as well.
-      expect(items.map((item) => item.href)).not.toContain('/notices')
-      // Where the notices link used to be: right before the points.
-      expect(items.indexOf(menus[0])).toBe(items.findIndex((item) => item.href === '/points') - 1)
     }
   })
 
-  it('leads members and admins to the prize draws, right after the predictions, and visitors nowhere near', () => {
+  it('puts a member\'s points, the monthly ranking and the prize draws under one menu, with the prize events for admins', () => {
+    expect(menu(getVisibleNavItems(MEMBER), '/points')).toEqual(['/points', '/points/ranking', '/draws'])
+    for (const context of [ADMIN, SUPER_ADMIN]) {
+      expect(menu(getVisibleNavItems(context), '/points')).toEqual(['/points', '/points/ranking', '/points/events', '/draws'])
+    }
+  })
+
+  it('splits access in three for super admins and gives every admin the operation log', () => {
+    expect(menu(getVisibleNavItems(SUPER_ADMIN), '/admin')).toEqual([
+      '/admin/access/admins',
+      '/admin/access/result-editors',
+      '/admin/access/allowed',
+      '/admin/audit',
+    ])
+    expect(menu(getVisibleNavItems(ADMIN), '/admin')).toEqual(['/admin/audit'])
+  })
+
+  it('leads every page once, and nowhere a member may not go', () => {
     for (const context of [MEMBER, ADMIN, SUPER_ADMIN]) {
-      const hrefs = getVisibleNavItems(context).map((item) => item.href)
+      const hrefs = linkHrefs(getVisibleNavItems(context))
 
-      expect(hrefs.indexOf('/draws')).toBe(hrefs.indexOf('/predictions') + 1)
+      expect(new Set(hrefs).size).toBe(hrefs.length)
     }
-    expect(getVisibleNavItems(VISITOR).map((item) => item.href)).not.toContain('/draws')
-  })
-
-  it('leaves visitors the plain notices link and none of the member boards', () => {
-    const items = getVisibleNavItems(VISITOR)
-
-    expect(items.some((item) => item.children)).toBe(false)
-    expect(items.map((item) => item.href)).toContain('/notices')
-    expect(linkHrefs(items).filter((href) => href.startsWith('/boards'))).toEqual([])
+    const memberHrefs = linkHrefs(getVisibleNavItems(MEMBER))
+    for (const adminOnly of ['/tournaments', '/captain-draft', '/points/events', '/admin/audit', '/admin/access/admins']) {
+      expect(memberHrefs).not.toContain(adminOnly)
+    }
+    expect(linkHrefs(getVisibleNavItems(MEMBER))).not.toContain('/dashboard')
   })
 })
 
 describe('findActiveNavHref', () => {
-  const items = getVisibleNavItems(ADMIN)
+  const items = getVisibleNavItems(SUPER_ADMIN)
 
-  it('picks the link the page is under, inside the menu too', () => {
+  it('picks the link the page is under, inside a menu too', () => {
     expect(findActiveNavHref('/players', items)).toBe('/players')
-    expect(findActiveNavHref('/notices', items)).toBe('/notices')
     expect(findActiveNavHref('/notices/12', items)).toBe('/notices')
     expect(findActiveNavHref('/boards/free/7', items)).toBe('/boards/free')
-    expect(findActiveNavHref('/boards/anonymous', items)).toBe('/boards/anonymous')
-    expect(findActiveNavHref('/boards/nickname', items)).toBe('/boards/nickname')
+    expect(findActiveNavHref('/tournaments', items)).toBe('/tournaments')
+    expect(findActiveNavHref('/points/ranking', items)).toBe('/points/ranking')
+    expect(findActiveNavHref('/admin/access/allowed', items)).toBe('/admin/access/allowed')
+    expect(findActiveNavHref('/admin/audit', items)).toBe('/admin/audit')
   })
 
   it('picks the longer of two links a page is under', () => {
     expect(findActiveNavHref('/balance/multi', items)).toBe('/balance/multi')
     expect(findActiveNavHref('/balance', items)).toBe('/balance')
+    expect(findActiveNavHref('/points', items)).toBe('/points')
+    expect(findActiveNavHref('/points/events', items)).toBe('/points/events')
   })
 
   it('falls back to the menu for a page under it that no link covers', () => {
     expect(findActiveNavHref('/boards/search', items)).toBe('/boards')
+    expect(findActiveNavHref('/admin/access', items)).toBe('/admin')
   })
 
   it('finds nothing for a page outside the navigation', () => {
@@ -206,21 +152,21 @@ describe('findActiveNavHref', () => {
 })
 
 describe('isNavItemActive', () => {
-  const items = getVisibleNavItems(MEMBER)
-  const menu = items.find((item) => item.children) as NavItem
-  const players = items.find((item) => item.href === '/players') as NavItem
+  const items = getVisibleNavItems(SUPER_ADMIN)
+  const byHref = (href: string) => items.find((item) => item.href === href) as NavItem
 
-  it('lights the menu for any of its links and for its own path', () => {
-    for (const href of ['/notices', '/boards/free', '/boards/anonymous', '/boards/nickname', '/boards']) {
-      expect(isNavItemActive(menu, href)).toBe(true)
-      expect(isNavItemActive(players, href)).toBe(false)
-    }
+  it('lights a menu for any of its links', () => {
+    expect(isNavItemActive(byHref('/matches'), '/captain-draft')).toBe(true)
+    expect(isNavItemActive(byHref('/boards'), '/notices')).toBe(true)
+    expect(isNavItemActive(byHref('/points'), '/draws')).toBe(true)
+    expect(isNavItemActive(byHref('/admin'), '/admin/access/result-editors')).toBe(true)
+    expect(isNavItemActive(byHref('/admin'), '/admin')).toBe(true)
   })
 
-  it('lights a plain link only for itself, and nothing when no link is active', () => {
-    expect(isNavItemActive(players, '/players')).toBe(true)
-    expect(isNavItemActive(menu, '/players')).toBe(false)
-    expect(isNavItemActive(menu, undefined)).toBe(false)
-    expect(isNavItemActive(players, undefined)).toBe(false)
+  it('lights one item only, and nothing when no link is active', () => {
+    expect(isNavItemActive(byHref('/players'), '/players')).toBe(true)
+    expect(isNavItemActive(byHref('/matches'), '/players')).toBe(false)
+    expect(isNavItemActive(byHref('/points'), '/balance')).toBe(false)
+    expect(isNavItemActive(byHref('/matches'), undefined)).toBe(false)
   })
 })

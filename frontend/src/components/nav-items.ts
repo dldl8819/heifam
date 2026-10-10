@@ -8,6 +8,27 @@ type NavVisibilityContext = {
   isSuperAdmin: boolean
 }
 
+/**
+ * The matches: setting one up for members, and the tournaments and regular draft for admins.
+ * Its links share no path; "/matches" only names the menu.
+ */
+function matchesMenu(isAdmin: boolean): NavItem {
+  return {
+    label: t('nav.matches'),
+    href: '/matches',
+    children: [
+      { label: t('nav.balance'), href: '/balance' },
+      { label: t('nav.multiBalance'), href: '/balance/multi' },
+      ...(isAdmin
+        ? [
+            { label: t('nav.tournaments'), href: '/tournaments' },
+            { label: t('nav.captainDraft'), href: '/captain-draft' },
+          ]
+        : []),
+    ],
+  }
+}
+
 /** The boards a member reads and writes, gathered under one menu. */
 function boardsMenu(): NavItem {
   return {
@@ -18,6 +39,39 @@ function boardsMenu(): NavItem {
       { label: t('nav.freeBoard'), href: '/boards/free' },
       { label: t('nav.anonymousBoard'), href: '/boards/anonymous' },
       { label: t('nav.nicknameRequests'), href: '/boards/nickname' },
+    ],
+  }
+}
+
+/** A member's points, the month's ranking, the prize draws; and for admins the prize events. */
+function pointsMenu(isAdmin: boolean): NavItem {
+  return {
+    label: t('nav.points'),
+    href: '/points',
+    children: [
+      { label: t('nav.myPoints'), href: '/points' },
+      { label: t('nav.pointRanking'), href: '/points/ranking' },
+      ...(isAdmin ? [{ label: t('nav.pointEvents'), href: '/points/events' }] : []),
+      // Members read the records of prize draws there; admins also run the draws.
+      { label: t('nav.draws'), href: '/draws' },
+    ],
+  }
+}
+
+/** What runs the site: access for super admins, the operation log for every admin. */
+function adminMenu(isSuperAdmin: boolean): NavItem {
+  return {
+    label: t('nav.admin'),
+    href: '/admin',
+    children: [
+      ...(isSuperAdmin
+        ? [
+            { label: t('nav.accessAdmins'), href: '/admin/access/admins' },
+            { label: t('nav.accessResultEditors'), href: '/admin/access/result-editors' },
+            { label: t('nav.accessAllowed'), href: '/admin/access/allowed' },
+          ]
+        : []),
+      { label: t('nav.auditLogs'), href: '/admin/audit' },
     ],
   }
 }
@@ -38,45 +92,21 @@ export function getVisibleNavItems(context: NavVisibilityContext): NavItem[] {
     return []
   }
 
-  if (context.isAdmin) {
-    const adminItems: NavItem[] = [
-      { label: t('nav.players'), href: '/players' },
-      { label: t('nav.ranking'), href: '/ranking' },
-      { label: t('nav.balance'), href: '/balance' },
-      { label: t('nav.captainDraft'), href: '/captain-draft' },
-      { label: t('nav.multiBalance'), href: '/balance/multi' },
-      { label: t('nav.tournaments'), href: '/tournaments' },
-      boardsMenu(),
-      { label: t('nav.points'), href: '/points' },
-      { label: t('nav.predictions'), href: '/predictions' },
-      { label: t('nav.draws'), href: '/draws' },
-      { label: t('nav.events'), href: '/events' },
-      { label: t('nav.ads'), href: '/ads' },
-      { label: t('nav.results'), href: '/results' },
-    ]
-
-    if (context.isSuperAdmin) {
-      adminItems.splice(adminItems.length - 1, 0, { label: t('nav.accessControl'), href: '/admin/access' })
-    }
-    adminItems.splice(adminItems.length - 1, 0, { label: t('nav.auditLogs'), href: '/admin/audit' })
-
-    return adminItems
-  }
-
-  return [
+  const items: NavItem[] = [
     { label: t('nav.players'), href: '/players' },
     { label: t('nav.ranking'), href: '/ranking' },
-    { label: t('nav.balance'), href: '/balance' },
-    { label: t('nav.multiBalance'), href: '/balance/multi' },
+    matchesMenu(context.isAdmin),
     boardsMenu(),
-    { label: t('nav.points'), href: '/points' },
+    pointsMenu(context.isAdmin),
     { label: t('nav.predictions'), href: '/predictions' },
-    // Members read the records of prize draws there; admins also run the draws.
-    { label: t('nav.draws'), href: '/draws' },
     { label: t('nav.events'), href: '/events' },
     { label: t('nav.ads'), href: '/ads' },
     { label: t('nav.results'), href: '/results' },
   ]
+  if (context.isAdmin) {
+    items.push(adminMenu(context.isSuperAdmin))
+  }
+  return items
 }
 
 function isUnder(pathname: string, href: string): boolean {

@@ -14,6 +14,8 @@ const MENU_CLOSE_DELAY_MS = 150
 // The opened list is this wide (w-44) and keeps this far from the edge of the screen.
 const MENU_WIDTH_PX = 176
 const MENU_EDGE_GAP_PX = 8
+// Sent when a menu opens, so that any other one closes at once instead of after its delay.
+const MENU_OPENED_EVENT = 'heifam:nav-menu-opened'
 
 function useVisibleNavItems() {
   const pathname = usePathname()
@@ -68,8 +70,9 @@ function DesktopMenu({ item, active, activeHref }: { item: NavItem; active: bool
       // Under the name, pulled back in when the bar is scrolled so far that it would hang off the screen.
       const furthestLeft = window.innerWidth - MENU_WIDTH_PX - MENU_EDGE_GAP_PX
       setPosition({ top: rect.bottom, left: Math.max(MENU_EDGE_GAP_PX, Math.min(rect.left, furthestLeft)) })
+      window.dispatchEvent(new CustomEvent<string>(MENU_OPENED_EVENT, { detail: menuId }))
     }
-  }, [cancelClose])
+  }, [cancelClose, menuId])
 
   const closeSoon = useCallback(() => {
     cancelClose()
@@ -81,6 +84,17 @@ function DesktopMenu({ item, active, activeHref }: { item: NavItem; active: bool
   }, [close, pathname])
 
   useEffect(() => cancelClose, [cancelClose])
+
+  // One menu open at a time: moving from one name to the next swaps them without an overlap.
+  useEffect(() => {
+    const handleOpened = (event: Event) => {
+      if ((event as CustomEvent<string>).detail !== menuId) {
+        close()
+      }
+    }
+    window.addEventListener(MENU_OPENED_EVENT, handleOpened)
+    return () => window.removeEventListener(MENU_OPENED_EVENT, handleOpened)
+  }, [close, menuId])
 
   useEffect(() => {
     if (!open) {
@@ -205,9 +219,12 @@ export function TopNavDesktop() {
 export function TopNavMobile() {
   const { pathname, isLoading, navItems } = useVisibleNavItems()
   const [open, setOpen] = useState<boolean>(false)
+  // The one group opened out, by its menu's href; every group starts folded.
+  const [openGroup, setOpenGroup] = useState<string | null>(null)
 
   useEffect(() => {
     setOpen(false)
+    setOpenGroup(null)
   }, [pathname])
 
   if (isLoading || navItems.length === 0) {
@@ -224,7 +241,10 @@ export function TopNavMobile() {
     <div className="relative md:hidden">
       <button
         type="button"
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={() => {
+          setOpen((prev) => !prev)
+          setOpenGroup(null)
+        }}
         aria-label="메뉴 열기"
         aria-expanded={open}
         className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-700 bg-slate-800/80 text-slate-100 transition-colors hover:bg-slate-700"
@@ -245,18 +265,44 @@ export function TopNavMobile() {
           <ul className="space-y-1">
             {navItems.map((item) =>
               item.children ? (
-                // A menu is shown opened out: its name as a heading, its links set in under it.
+                // A menu is folded under its name, which opens it out; opening one folds the others.
+                // The name of the menu the page is in is lit, so the page can be found while folded.
                 <li key={`mobile-nav-${item.href}`}>
-                  <p className="px-3 pb-1 pt-2 text-xs font-semibold text-slate-400">{item.label}</p>
-                  <ul className="space-y-1 border-l border-slate-700 pl-2">
-                    {item.children.map((child) => (
-                      <li key={`mobile-nav-${child.href}`}>
-                        <Link href={child.href} className={linkClass(child.href)}>
-                          {child.label}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
+                  <button
+                    type="button"
+                    onClick={() => setOpenGroup((current) => (current === item.href ? null : item.href))}
+                    aria-expanded={openGroup === item.href}
+                    aria-controls={`mobile-nav-group${item.href.replace(/[^a-z0-9]+/gi, '-')}`}
+                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-slate-800 ${
+                      isNavItemActive(item, activeHref) ? 'text-amber-400' : 'text-slate-100'
+                    }`}
+                  >
+                    {item.label}
+                    <svg
+                      viewBox="0 0 24 24"
+                      className={`h-4 w-4 shrink-0 transition-transform ${openGroup === item.href ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      aria-hidden="true"
+                    >
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  </button>
+                  {openGroup === item.href && (
+                    <ul
+                      id={`mobile-nav-group${item.href.replace(/[^a-z0-9]+/gi, '-')}`}
+                      className="ml-3 mt-1 space-y-1 border-l border-slate-700 pl-2"
+                    >
+                      {item.children.map((child) => (
+                        <li key={`mobile-nav-${child.href}`}>
+                          <Link href={child.href} className={linkClass(child.href)}>
+                            {child.label}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </li>
               ) : (
                 <li key={`mobile-nav-${item.href}`}>
