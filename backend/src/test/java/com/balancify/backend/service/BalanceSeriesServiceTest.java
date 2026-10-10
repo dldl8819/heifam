@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -428,6 +429,18 @@ class BalanceSeriesServiceTest {
         assertThat(series.getStatus()).isEqualTo(BalanceSeriesStatus.IN_PROGRESS);
         assertThat(series.getWinnerTeam()).isNull();
         assertThat(game(series, 3)).isNotNull();
+    }
+
+    @Test
+    void startsNoSeriesWithAPlayerWhoseTierIsStillToBeSet() {
+        BalanceSeriesLineupRequest first = lineup(1, "P", "P", "P", "P", "P", "P");
+        players.get(15L).setTier("UNASSIGNED");
+
+        assertThatThrownBy(() -> service.start(7L, List.of(first), ADMIN, "Ops", false))
+            .isInstanceOf(MatchConflictException.class)
+            .hasMessageContaining("배정 필요 선수(YOUR_USERNAME_15)");
+        assertThat(storedSeries).isEmpty();
+        verify(groupMatchAdminService, never()).createBalanceSeriesGameMatch(any(), any(), any(), anyInt(), any(), any(), anyInt(), any());
     }
 
     private BalanceSeriesLineupRequest lineup(int number, String... races) {

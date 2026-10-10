@@ -130,6 +130,11 @@ public class BalanceSeriesService {
         if (players.size() != allIds.size()) {
             throw new IllegalArgumentException("그룹에 없는 선수가 있습니다.");
         }
+        // Every game of a series needs its result, which a player whose tier is still to be set holds up.
+        List<String> unassigned = UnassignedPlayerPolicy.unassignedNicknames(players.values());
+        if (!unassigned.isEmpty()) {
+            throw new MatchConflictException(UnassignedPlayerPolicy.message(unassigned));
+        }
 
         for (int index = 0; index < normalized.size(); index++) {
             Lineup lineup = normalized.get(index);

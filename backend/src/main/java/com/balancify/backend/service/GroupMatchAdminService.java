@@ -255,8 +255,10 @@ public class GroupMatchAdminService {
         // The balance page saves the match only to enter its result at once.
         boolean resultFollows,
         String createdByEmail,
-        // Players on the roster only: a dormant one (휴면) is refused like one not in the group.
-        boolean rosterOnly
+        // Set up from the balance page: players on the roster only (a dormant one, 휴면, is refused
+        // like one not in the group), and none whose tier is still to be set, as its result could
+        // never be entered (UnassignedPlayerPolicy).
+        boolean fromBalancePage
     ) {
         int normalizedTeamSize = normalizeRequestedTeamSize(requestedTeamSize);
         String normalizedRaceComposition = RaceCompositionPolicy.normalizeForTeamSize(
@@ -287,12 +289,18 @@ public class GroupMatchAdminService {
 
         List<Player> players = playerRepository.findByGroup_IdAndIdIn(groupId, new ArrayList<>(allIds))
             .stream()
-            .filter(player -> rosterOnly
+            .filter(player -> fromBalancePage
                 ? PlayerRosterPolicy.isOnRoster(player)
                 : !PlayerIdentityPolicy.isIdentityHidden(player))
             .toList();
         if (players.size() != normalizedTeamSize * 2) {
             throw new IllegalArgumentException("All players must belong to the group");
+        }
+        if (fromBalancePage) {
+            List<String> unassigned = UnassignedPlayerPolicy.unassignedNicknames(players);
+            if (!unassigned.isEmpty()) {
+                throw new IllegalArgumentException(UnassignedPlayerPolicy.message(unassigned));
+            }
         }
 
         Map<Long, Player> playersById = players.stream()

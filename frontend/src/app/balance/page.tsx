@@ -30,6 +30,7 @@ import { recallPageState, rememberPageState } from '@/lib/page-memory'
 import { findUniquePlayerByNicknamePrefix } from '@/lib/player-autocomplete'
 import { getRaceCompositionOptions, normalizeRaceComposition } from '@/lib/race-composition'
 import { ASSIGNED_RACES, composeTeamRaces, normalizeAssignedRace } from '@/lib/participant-races'
+import { unassignedNicknames } from '@/lib/unassigned-players'
 import type {
   AssignedRace,
   BalancePlayerInput,
@@ -359,7 +360,15 @@ export default function BalancePage() {
   }
 
   const hasGeneratedMatchId = Number.isFinite(Number(resultMatchId)) && Number(resultMatchId) > 0
-  const canCreateMatchFromResult = result !== null
+  // Players whose tier is still to be set (배정 필요): these teams can be played but not recorded.
+  const unassignedInResult = useMemo(
+    () =>
+      result
+        ? unassignedNicknames([...result.homeTeam, ...result.awayTeam].map((player) => player.playerId), players)
+        : [],
+    [players, result]
+  )
+  const canCreateMatchFromResult = result !== null && unassignedInResult.length === 0
   const actualRaceError =
     result !== null &&
     raceComposition !== null &&
@@ -372,6 +381,7 @@ export default function BalancePage() {
     (hasGeneratedMatchId || canCreateMatchFromResult) &&
     (resultWinnerTeam === 'HOME' || resultWinnerTeam === 'AWAY') &&
     actualRaceError === null &&
+    unassignedInResult.length === 0 &&
     !resultSubmitting
   const protectedMmrStyle: CSSProperties | undefined = showMmr
     ? {
@@ -954,6 +964,11 @@ export default function BalancePage() {
             {submitting ? t('balance.summary.submitting') : t('balance.summary.submit')}
           </button>
 
+          {unassignedInResult.length > 0 && (
+            <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+              {t('balance.quickResult.unassignedBlocked', { players: unassignedInResult.join(', ') })}
+            </p>
+          )}
           {/* Right under the balance button, so setting the match up needs no scrolling. */}
           {canCreateMatchFromResult && !hasGeneratedMatchId && (
             <div className="mt-2 space-y-1">
@@ -1163,7 +1178,9 @@ export default function BalancePage() {
               : t('balance.quickResult.autoMatchReady')
             : canCreateMatchFromResult
               ? t('balance.quickResult.matchWillBeCreatedOnSubmit')
-              : t('balance.quickResult.matchNotReady')}
+              : unassignedInResult.length > 0
+                ? t('balance.quickResult.unassignedBlocked', { players: unassignedInResult.join(', ') })
+                : t('balance.quickResult.matchNotReady')}
         </p>
         {result && (
           <div className="mt-3 space-y-2">

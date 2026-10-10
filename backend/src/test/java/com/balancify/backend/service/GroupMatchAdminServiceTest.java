@@ -223,6 +223,33 @@ class GroupMatchAdminServiceTest {
         verify(matchRepository).save(any(Match.class));
     }
 
+    @Test
+    void refusesToSetUpABalanceMatchWhoseResultCouldNotBeEnteredButLetsAManualOneThrough() {
+        Group group = new Group();
+        group.setId(1L);
+        Player unassigned = player(6L, group);
+        unassigned.setTier("UNASSIGNED");
+        when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
+        when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L, 5L, 6L))).thenReturn(List.of(
+            player(1L, group), player(2L, group), player(3L, group), player(4L, group), player(5L, group), unassigned
+        ));
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThatThrownBy(() -> groupMatchAdminService.createMatch(
+            1L,
+            new CreateGroupMatchRequest(List.of(1L, 2L, 3L), List.of(4L, 5L, 6L)),
+            "member@example.com"
+        ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("배정 필요 선수(P6)");
+        verify(matchRepository, never()).save(any(Match.class));
+
+        groupMatchAdminService.createConfirmedMatch(
+            1L, List.of(1L, 2L, 3L), List.of(4L, 5L, 6L), 3, MatchSource.MANUAL, null, "PPP"
+        );
+        verify(matchRepository).save(any(Match.class));
+    }
+
     private Group stubSixPlayers() {
         Group group = new Group();
         group.setId(1L);

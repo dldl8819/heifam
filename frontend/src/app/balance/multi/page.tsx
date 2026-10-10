@@ -26,6 +26,7 @@ import {
   MULTI_BALANCE_MODE_OPTIONS,
 } from '@/lib/multi-balance-mode'
 import { useParticipantSelection } from '@/lib/use-participant-selection'
+import { unassignedNicknames } from '@/lib/unassigned-players'
 import type {
   BalancePlayerInput,
   MultiBalanceMatch,
@@ -249,8 +250,23 @@ export default function MultiBalancePage() {
   }
 
   const seriesLineups = result ? buildSeriesLineups(result.matches, seriesFormats) : null
+  // Every game of a series needs its result, which a player whose tier is still to be set holds up.
+  const unassignedInSeries = useMemo(
+    () =>
+      result
+        ? unassignedNicknames(
+            result.matches.flatMap((match) => [...match.homeTeam, ...match.awayTeam]).map((player) => player.playerId),
+            players
+          )
+        : [],
+    [players, result]
+  )
   const canStartSeries =
-    result !== null && result.matches.every((match) => match.seriesPlan) && !startingSeries && !seriesStarted
+    result !== null &&
+    result.matches.every((match) => match.seriesPlan) &&
+    unassignedInSeries.length === 0 &&
+    !startingSeries &&
+    !seriesStarted
 
   const handleStartSeries = async () => {
     if (!result) {
@@ -609,6 +625,11 @@ export default function MultiBalancePage() {
               </button>
               {seriesError && <p className="text-xs text-rose-600 dark:text-rose-300">{seriesError}</p>}
             </div>
+            {unassignedInSeries.length > 0 && (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                {t('balanceSeries.plan.unassignedBlocked', { players: unassignedInSeries.join(', ') })}
+              </p>
+            )}
           </section>
         </section>
       )}
