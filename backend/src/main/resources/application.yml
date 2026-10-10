@@ -131,6 +131,15 @@ balancify:
     match-confirm: ${POINTS_MATCH_CONFIRM:1}
     match-confirm-daily-cap: ${POINTS_MATCH_CONFIRM_DAILY_CAP:10}
     match-confirm-window-hours: ${POINTS_MATCH_CONFIRM_WINDOW_HOURS:48}
+    # The free board and the video board. Writing a post (taken back when the post is deleted), and
+    # commenting on or liking someone else's post once per post, each up to its cap a day. The
+    # anonymous board earns nothing: other members read the reasons on the ranking's history.
+    board-post: ${POINTS_BOARD_POST:1}
+    board-post-daily-cap: ${POINTS_BOARD_POST_DAILY_CAP:3}
+    board-comment: ${POINTS_BOARD_COMMENT:1}
+    board-comment-daily-cap: ${POINTS_BOARD_COMMENT_DAILY_CAP:10}
+    board-like: ${POINTS_BOARD_LIKE:1}
+    board-like-daily-cap: ${POINTS_BOARD_LIKE_DAILY_CAP:10}
   tournament:
     # Admins try team tournaments out first. true lets members record tournament games; running
     # tournaments also needs the tournament routes in AdminKeyFilter and the screen opened to members.

@@ -15,6 +15,7 @@ import static org.mockito.Mockito.when;
 
 import com.balancify.backend.api.points.dto.PointHistoryItemResponse;
 import com.balancify.backend.api.points.dto.PointMonthlyHistoryResponse;
+import com.balancify.backend.api.points.dto.PointPolicyResponse;
 import com.balancify.backend.api.points.dto.PointReasonTotalResponse;
 import com.balancify.backend.api.points.dto.PointRankingEntryResponse;
 import com.balancify.backend.api.points.dto.PointRankingResponse;
@@ -272,6 +273,92 @@ class PointServiceTest {
         pointService.reverseMatchConfirmPoints(5L);
 
         verify(pointTransactionRepository, Mockito.times(2)).save(any());
+    }
+
+    @Test
+    void paysForBoardPostsCommentsAndLikesOncePerPost() {
+        stubAccount(ADMIN_EMAIL, 7L);
+        lenient().when(pointTransactionRepository.existsByAccount_IdAndReasonAndReferenceKey(7L, PointService.REASON_BOARD_COMMENT, "board-post:5"))
+            .thenReturn(true);
+
+        pointService.grantBoardPostPoint(ADMIN_EMAIL, 5L);
+        pointService.grantBoardLikePoint(ADMIN_EMAIL, 5L);
+        // Already paid for commenting on this post.
+        pointService.grantBoardCommentPoint(ADMIN_EMAIL, 5L);
+        pointService.grantBoardPostPoint(ADMIN_EMAIL, null);
+
+        ArgumentCaptor<PointTransaction> captor = ArgumentCaptor.forClass(PointTransaction.class);
+        verify(pointTransactionRepository, Mockito.times(2)).save(captor.capture());
+        assertThat(captor.getAllValues())
+            .extracting(PointTransaction::getReason, PointTransaction::getAmount, PointTransaction::getReferenceKey, PointTransaction::getKstDate)
+            .containsExactly(
+                tuple(PointService.REASON_BOARD_POST, 1, "board-post:5", TODAY),
+                tuple(PointService.REASON_BOARD_LIKE, 1, "board-post:5", TODAY)
+            );
+    }
+
+    @Test
+    void stopsPayingBoardPostsAtThreeADayAndCommentsAndLikesAtTen() {
+        stubAccount(ADMIN_EMAIL, 7L);
+        when(pointTransactionRepository.countByAccount_IdAndReasonAndKstDate(7L, PointService.REASON_BOARD_POST, TODAY)).thenReturn(3L);
+        when(pointTransactionRepository.countByAccount_IdAndReasonAndKstDate(7L, PointService.REASON_BOARD_COMMENT, TODAY)).thenReturn(10L);
+        when(pointTransactionRepository.countByAccount_IdAndReasonAndKstDate(7L, PointService.REASON_BOARD_LIKE, TODAY)).thenReturn(9L);
+
+        pointService.grantBoardPostPoint(ADMIN_EMAIL, 5L);
+        pointService.grantBoardCommentPoint(ADMIN_EMAIL, 5L);
+        pointService.grantBoardLikePoint(ADMIN_EMAIL, 5L);
+
+        assertThat(captureSavedTransaction().getReason()).isEqualTo(PointService.REASON_BOARD_LIKE);
+    }
+
+    @Test
+    void paysNoBoardPointsWhilePointsAreClosedToTheAccountOrTurnedOff() {
+        pointService.grantBoardPostPoint(MEMBER_EMAIL, 5L);
+        pointProperties.setBoardComment(0);
+        pointService.grantBoardCommentPoint(ADMIN_EMAIL, 5L);
+
+        verifyNoInteractions(pointAccountRepository, pointTransactionRepository);
+    }
+
+    @Test
+    void takesBackTheWritersPointForADeletedPostOnce() {
+        PointAccount writer = stubAccount(MEMBER_EMAIL, 8L);
+        PointTransaction paid = row(PointService.REASON_BOARD_POST, 1, null, "board-post:5");
+        paid.setAccount(writer);
+        when(pointTransactionRepository.findByReasonAndReferenceKey(PointService.REASON_BOARD_POST, "board-post:5"))
+            .thenReturn(List.of(paid));
+
+        pointService.reverseBoardPostPoint(5L);
+
+        PointTransaction saved = captureSavedTransaction();
+        assertThat(saved.getAccount()).isSameAs(writer);
+        assertThat(saved.getReason()).isEqualTo(PointService.REASON_BOARD_POST_REVERSED);
+        assertThat(saved.getAmount()).isEqualTo(-1);
+        assertThat(saved.getReferenceKey()).isEqualTo("board-post:5");
+
+        when(pointTransactionRepository.existsByAccount_IdAndReasonAndReferenceKey(8L, PointService.REASON_BOARD_POST_REVERSED, "board-post:5"))
+            .thenReturn(true);
+        pointService.reverseBoardPostPoint(5L);
+        verify(pointTransactionRepository, Mockito.times(1)).save(any());
+    }
+
+    @Test
+    void tellsThePolicyAsConfigured() {
+        pointProperties.setBoardPostDailyCap(5);
+        pointProperties.setNoticeAction(2);
+
+        PointPolicyResponse policy = pointService.getPolicy();
+
+        assertThat(policy.dailyLogin()).isEqualTo(1);
+        assertThat(policy.matchResult()).isEqualTo(new PointPolicyResponse.Capped(1, 10));
+        assertThat(policy.matchConfirm()).isEqualTo(new PointPolicyResponse.Capped(1, 10));
+        assertThat(policy.matchConfirmWindowHours()).isEqualTo(48);
+        assertThat(policy.predictionHit()).isEqualTo(new PointPolicyResponse.Capped(1, 10));
+        assertThat(policy.noticeAction()).isEqualTo(2);
+        assertThat(policy.noticeCommentLike()).isEqualTo(new PointPolicyResponse.Capped(1, 10));
+        assertThat(policy.boardPost()).isEqualTo(new PointPolicyResponse.Capped(1, 5));
+        assertThat(policy.boardComment()).isEqualTo(new PointPolicyResponse.Capped(1, 10));
+        assertThat(policy.boardLike()).isEqualTo(new PointPolicyResponse.Capped(1, 10));
     }
 
     @Test

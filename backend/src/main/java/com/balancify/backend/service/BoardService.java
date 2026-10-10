@@ -49,6 +49,14 @@ public class BoardService {
             return this != ANONYMOUS;
         }
 
+        /**
+         * Activity earns points everywhere but on the anonymous board: other members read the
+         * reasons and days of a member's points, which would tell who wrote there and when.
+         */
+        public boolean earnsPoints() {
+            return this != ANONYMOUS;
+        }
+
         /** The board named in a path ("free", "anonymous"); anything else is not a board. */
         public static Board fromPath(String value) {
             String name = value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
@@ -72,10 +80,12 @@ public class BoardService {
 
     private final BoardRepository boardRepository;
     private final AccessControlService accessControlService;
+    private final PointService pointService;
 
-    public BoardService(BoardRepository boardRepository, AccessControlService accessControlService) {
+    public BoardService(BoardRepository boardRepository, AccessControlService accessControlService, PointService pointService) {
         this.boardRepository = boardRepository;
         this.accessControlService = accessControlService;
+        this.pointService = pointService;
     }
 
     /** The free board in full; of the anonymous board, everything for admins and their own posts for members. */
@@ -128,6 +138,9 @@ public class BoardService {
             throw new BoardLimitException("하루에 올릴 수 있는 글 수를 넘었습니다. 내일 다시 올려 주세요.");
         }
         long postId = boardRepository.insertPost(groupId, board.name(), cleanTitle, cleanContent, author, videoId);
+        if (board.earnsPoints()) {
+            pointService.grantBoardPostPoint(author, postId);
+        }
         return detail(requirePost(groupId, board, postId), board, author);
     }
 
@@ -172,6 +185,9 @@ public class BoardService {
         if (!actor.equals(normalizeEmail(post.authorEmail())) && !accessControlService.isAdminEmail(actor)) {
             throw new BoardForbiddenException("본인 글만 지울 수 있습니다.");
         }
+        if (board.earnsPoints()) {
+            pointService.reverseBoardPostPoint(post.id());
+        }
         boardRepository.deletePost(post.id());
     }
 
@@ -182,6 +198,9 @@ public class BoardService {
         PostRow post = requireReadable(groupId, board, postId, author);
         String text = requireText(content, MAX_COMMENT_LENGTH, "댓글은 1~" + MAX_COMMENT_LENGTH + "자로 입력해 주세요.");
         boardRepository.insertComment(post.id(), author, text);
+        if (board.earnsPoints() && !author.equals(normalizeEmail(post.authorEmail()))) {
+            pointService.grantBoardCommentPoint(author, post.id());
+        }
         return detail(requirePost(groupId, board, postId), board, author);
     }
 
@@ -209,6 +228,9 @@ public class BoardService {
         PostRow post = requireReadable(groupId, board, postId, member);
         if (liked) {
             boardRepository.like(post.id(), member);
+            if (board.earnsPoints() && !member.equals(normalizeEmail(post.authorEmail()))) {
+                pointService.grantBoardLikePoint(member, post.id());
+            }
         } else {
             boardRepository.unlike(post.id(), member);
         }

@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import { apiClient, isApiForbiddenError } from '@/lib/api'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
@@ -17,7 +18,7 @@ function SummaryStat({ label, value }: { label: string; value: string }) {
   )
 }
 
-/** A member's own points: the balance, what can still be earned today, the rules and recent history. */
+/** A member's own points: the balance, what can still be earned today and recent history; the rules have their own page. */
 export default function MyPointsPage() {
   const [summary, setSummary] = useState<PointSummaryResponse | null>(null)
   const [summaryLoading, setSummaryLoading] = useState<boolean>(true)
@@ -34,10 +35,6 @@ export default function MyPointsPage() {
       setSummaryLoading(false)
     }
   }, [])
-
-  useEffect(() => {
-    void loadSummary()
-  }, [loadSummary])
 
   useEffect(() => {
     void loadSummary()
@@ -85,40 +82,15 @@ export default function MyPointsPage() {
               />
             </div>
 
-            <div className="space-y-1 text-xs text-slate-600 dark:text-slate-300">
-              <p className="font-medium text-slate-700 dark:text-slate-200">{t('points.rules.title')}</p>
-              <ul className="list-disc space-y-0.5 pl-4">
-                <li>{t('points.rules.dailyLogin', { points: summary.dailyLoginPoints })}</li>
-                <li>
-                  {t('points.rules.matchResult', {
-                    points: summary.matchResultPoints,
-                    cap: summary.matchResultDailyCap,
-                  })}
-                </li>
-                <li>
-                  {t('points.rules.prediction', {
-                    points: summary.predictionHitPoints,
-                    cap: summary.predictionHitDailyCap,
-                  })}
-                </li>
-                <li>
-                  {t('points.rules.matchConfirm', {
-                    points: summary.matchConfirmPoints,
-                    cap: summary.matchConfirmDailyCap,
-                    hours: summary.matchConfirmWindowHours,
-                  })}
-                </li>
-                {typeof summary.noticeCommentLikeDailyCap === 'number' && (
-                  <li>
-                    {t('points.rules.noticeCommentLike', {
-                      points: summary.noticeCommentLikePoints ?? 1,
-                      cap: summary.noticeCommentLikeDailyCap,
-                    })}
-                  </li>
-                )}
-                <li>{t('points.rules.reversal')}</li>
-              </ul>
-            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-300">
+              {t('points.policyLink.text')}{' '}
+              <Link
+                href="/points/policy"
+                className="font-semibold text-slate-900 underline decoration-slate-300 underline-offset-4 transition-colors hover:text-amber-700 hover:decoration-amber-500 dark:text-slate-100 dark:decoration-slate-600 dark:hover:text-amber-300"
+              >
+                {t('points.policyLink.action')}
+              </Link>
+            </p>
 
             <div className="space-y-2">
               <h3 className="text-xs font-semibold text-slate-700 dark:text-slate-200">{t('points.history.title')}</h3>

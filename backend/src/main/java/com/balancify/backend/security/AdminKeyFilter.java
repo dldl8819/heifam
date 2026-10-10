@@ -89,6 +89,11 @@ public class AdminKeyFilter extends OncePerRequestFilter {
         ),
         new ProtectedRoute(
             "GET",
+            PathPatternParser.defaultInstance.parse("/api/points/policy"),
+            AuthType.SERVICE_ACCESS
+        ),
+        new ProtectedRoute(
+            "GET",
             PathPatternParser.defaultInstance.parse("/api/points/ranking"),
             AuthType.SERVICE_ACCESS
         ),

@@ -29,6 +29,10 @@ describe('points helpers', () => {
     expect(pointReasonKey('MATCH_RESULT_REVERSED')).toBe('points.reasons.matchResultReversed')
     expect(pointReasonKey('MATCH_CONFIRM')).toBe('points.reasons.matchConfirm')
     expect(pointReasonKey('MATCH_CONFIRM_REVERSED')).toBe('points.reasons.matchConfirmReversed')
+    expect(pointReasonKey('BOARD_POST')).toBe('points.reasons.boardPost')
+    expect(pointReasonKey('BOARD_POST_REVERSED')).toBe('points.reasons.boardPostReversed')
+    expect(pointReasonKey('BOARD_COMMENT')).toBe('points.reasons.boardComment')
+    expect(pointReasonKey('BOARD_LIKE')).toBe('points.reasons.boardLike')
     expect(pointReasonKey('SOMETHING_NEW')).toBeNull()
   })
 

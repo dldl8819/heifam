@@ -2,6 +2,7 @@ package com.balancify.backend.service;
 
 import com.balancify.backend.api.points.dto.PointHistoryItemResponse;
 import com.balancify.backend.api.points.dto.PointMonthlyHistoryResponse;
+import com.balancify.backend.api.points.dto.PointPolicyResponse;
 import com.balancify.backend.api.points.dto.PointReasonTotalResponse;
 import com.balancify.backend.api.points.dto.PointRankingEntryResponse;
 import com.balancify.backend.api.points.dto.PointRankingResponse;
@@ -55,6 +56,10 @@ public class PointService {
     public static final String REASON_NOTICE_COMMENT_LIKE = "NOTICE_COMMENT_LIKE";
     public static final String REASON_MATCH_CONFIRM = "MATCH_CONFIRM";
     public static final String REASON_MATCH_CONFIRM_REVERSED = "MATCH_CONFIRM_REVERSED";
+    public static final String REASON_BOARD_POST = "BOARD_POST";
+    public static final String REASON_BOARD_POST_REVERSED = "BOARD_POST_REVERSED";
+    public static final String REASON_BOARD_COMMENT = "BOARD_COMMENT";
+    public static final String REASON_BOARD_LIKE = "BOARD_LIKE";
     private static final List<String> NOTICE_REASONS = List.of(REASON_NOTICE_READ, REASON_NOTICE_LIKE, REASON_NOTICE_COMMENT);
     private static final List<String> PREDICTION_REASONS = List.of(REASON_PREDICTION_HIT, REASON_PREDICTION_HIT_REVERSED);
 
@@ -245,13 +250,14 @@ public class PointService {
         reverseMatchGrants(matchId, REASON_MATCH_CONFIRM, REASON_MATCH_CONFIRM_REVERSED);
     }
 
-    // Accounts are locked in id order, so two deletions sharing people never wait on each other in a circle.
     private void reverseMatchGrants(Long matchId, String reason, String reversedReason) {
-        if (matchId == null) {
-            return;
+        if (matchId != null) {
+            reverseGrants(matchReference(matchId), reason, reversedReason);
         }
+    }
 
-        String referenceKey = matchReference(matchId);
+    // Accounts are locked in id order, so two deletions sharing people never wait on each other in a circle.
+    private void reverseGrants(String referenceKey, String reason, String reversedReason) {
         List<PointTransaction> grants = new ArrayList<>(pointTransactionRepository.findByReasonAndReferenceKey(reason, referenceKey));
         grants.sort(Comparator.comparing(grant -> grant.getAccount().getId(), Comparator.nullsLast(Comparator.naturalOrder())));
         for (PointTransaction grant : grants) {
@@ -297,27 +303,106 @@ public class PointService {
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public void grantNoticeCommentLikePoint(String email, Long commentId) {
+        if (commentId != null) {
+            grantOncePerReference(
+                email,
+                REASON_NOTICE_COMMENT_LIKE,
+                "notice-comment:" + commentId,
+                pointProperties.getNoticeCommentLike(),
+                pointProperties.getNoticeCommentLikeDailyCap()
+            );
+        }
+    }
+
+    /**
+     * Writing a post on the free board or the video board earns a point, up to a daily cap. Deleting
+     * the post takes it back, and the take-backs leave the day's count as it was, so writing and
+     * deleting cannot be repeated for more. BoardService leaves out the anonymous board.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void grantBoardPostPoint(String email, Long postId) {
+        if (postId != null) {
+            grantOncePerReference(
+                email,
+                REASON_BOARD_POST,
+                boardPostReference(postId),
+                pointProperties.getBoardPost(),
+                pointProperties.getBoardPostDailyCap()
+            );
+        }
+    }
+
+    /**
+     * Commenting on someone else's post earns a point once per post, up to a daily cap; BoardService
+     * leaves out one's own posts. Deleting the comment keeps the point and earns no second one.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void grantBoardCommentPoint(String email, Long postId) {
+        if (postId != null) {
+            grantOncePerReference(
+                email,
+                REASON_BOARD_COMMENT,
+                boardPostReference(postId),
+                pointProperties.getBoardComment(),
+                pointProperties.getBoardCommentDailyCap()
+            );
+        }
+    }
+
+    /** Liking someone else's post earns a point once per post, up to a daily cap, like a comment. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void grantBoardLikePoint(String email, Long postId) {
+        if (postId != null) {
+            grantOncePerReference(
+                email,
+                REASON_BOARD_LIKE,
+                boardPostReference(postId),
+                pointProperties.getBoardLike(),
+                pointProperties.getBoardLikeDailyCap()
+            );
+        }
+    }
+
+    /** Takes back the writer's point for a deleted post; what others earned on it stays. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void reverseBoardPostPoint(Long postId) {
+        if (postId != null) {
+            reverseGrants(boardPostReference(postId), REASON_BOARD_POST, REASON_BOARD_POST_REVERSED);
+        }
+    }
+
+    /** Every amount, cap and window in force, for the page that explains the rules. */
+    public PointPolicyResponse getPolicy() {
+        return new PointPolicyResponse(
+            pointProperties.getDailyLogin(),
+            new PointPolicyResponse.Capped(pointProperties.getMatchResult(), pointProperties.getMatchResultDailyCap()),
+            new PointPolicyResponse.Capped(pointProperties.getMatchConfirm(), pointProperties.getMatchConfirmDailyCap()),
+            pointProperties.getMatchConfirmWindowHours(),
+            new PointPolicyResponse.Capped(pointProperties.getPredictionHit(), pointProperties.getPredictionHitDailyCap()),
+            pointProperties.getNoticeAction(),
+            new PointPolicyResponse.Capped(pointProperties.getNoticeCommentLike(), pointProperties.getNoticeCommentLikeDailyCap()),
+            new PointPolicyResponse.Capped(pointProperties.getBoardPost(), pointProperties.getBoardPostDailyCap()),
+            new PointPolicyResponse.Capped(pointProperties.getBoardComment(), pointProperties.getBoardCommentDailyCap()),
+            new PointPolicyResponse.Capped(pointProperties.getBoardLike(), pointProperties.getBoardLikeDailyCap())
+        );
+    }
+
+    // One grant per reference, while today's grants for the reason stay under the cap.
+    private void grantOncePerReference(String email, String reason, String referenceKey, int amount, int dailyCap) {
         String normalizedEmail = normalizeEmail(email);
-        int amount = pointProperties.getNoticeCommentLike();
-        if (commentId == null || amount <= 0 || !canUsePoints(normalizedEmail)) {
+        if (amount <= 0 || !canUsePoints(normalizedEmail)) {
             return;
         }
 
         PointAccount account = lockAccount(normalizedEmail);
-        String referenceKey = "notice-comment:" + commentId;
-        if (pointTransactionRepository.existsByAccount_IdAndReasonAndReferenceKey(
-            account.getId(), REASON_NOTICE_COMMENT_LIKE, referenceKey
-        )) {
+        if (pointTransactionRepository.existsByAccount_IdAndReasonAndReferenceKey(account.getId(), reason, referenceKey)) {
             return;
         }
         LocalDate today = today();
-        long likedToday = pointTransactionRepository.countByAccount_IdAndReasonAndKstDate(
-            account.getId(), REASON_NOTICE_COMMENT_LIKE, today
-        );
-        if (likedToday >= pointProperties.getNoticeCommentLikeDailyCap()) {
+        if (pointTransactionRepository.countByAccount_IdAndReasonAndKstDate(account.getId(), reason, today) >= dailyCap) {
             return;
         }
-        record(account, REASON_NOTICE_COMMENT_LIKE, amount, referenceKey, today, null, null);
+        record(account, reason, amount, referenceKey, today, null, null);
     }
 
     private void grantNoticePoint(String email, String reason, String referenceKey) {
@@ -564,6 +649,10 @@ public class PointService {
 
     private static String matchReference(Long matchId) {
         return "match:" + matchId;
+    }
+
+    private static String boardPostReference(Long postId) {
+        return "board-post:" + postId;
     }
 
     private static String noticeReadReference(Long noticeId, int revision) {

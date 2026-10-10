@@ -1025,6 +1025,30 @@ export type PointReason =
   | 'NOTICE_COMMENT_LIKE'
   | 'MATCH_CONFIRM'
   | 'MATCH_CONFIRM_REVERSED'
+  | 'BOARD_POST'
+  | 'BOARD_POST_REVERSED'
+  | 'BOARD_COMMENT'
+  | 'BOARD_LIKE'
+
+// Points per time and the most times a day (for prediction hits, the most points a day).
+export type PointPolicyCapped = {
+  points: number
+  dailyCap: number
+}
+
+export type PointPolicyResponse = {
+  dailyLogin: number
+  matchResult: PointPolicyCapped
+  matchConfirm: PointPolicyCapped
+  matchConfirmWindowHours: number
+  predictionHit: PointPolicyCapped
+  // Reading, liking and commenting on a notice, each once per notice.
+  noticeAction: number
+  noticeCommentLike: PointPolicyCapped
+  boardPost: PointPolicyCapped
+  boardComment: PointPolicyCapped
+  boardLike: PointPolicyCapped
+}
 
 export type PointHistoryItem = {
   reason: PointReason | string
