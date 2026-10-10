@@ -1,7 +1,7 @@
 'use client'
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
-import { apiClient } from '@/lib/api'
+import { apiClient, isApiNotFoundError } from '@/lib/api'
 import { PinballStage } from '@/components/pinball-stage'
 import { winnersOf, type DrawMode } from '@/lib/pinball/engine'
 import {
@@ -10,6 +10,7 @@ import {
   PRIZE_DRAW_PRIZE_MAX_LENGTH,
   PRIZE_DRAW_TITLE_MAX_LENGTH,
   buildEntrants,
+  draftEntrantIds,
   validatePrizeDraw,
   type DrawEntrant,
 } from '@/lib/prize-draw'
@@ -50,6 +51,8 @@ export function PrizeDrawPanel({ groupId, onSaved }: PrizeDrawPanelProps) {
   const [search, setSearch] = useState<string>('')
   const [manual, setManual] = useState<string>('')
   const [formError, setFormError] = useState<string | null>(null)
+  const [draftLoading, setDraftLoading] = useState<boolean>(false)
+  const [draftNote, setDraftNote] = useState<{ ok: boolean; text: string } | null>(null)
 
   // What the stage runs on: fixed when the stage is opened, so typing elsewhere cannot restart a draw.
   const [stageEntrants, setStageEntrants] = useState<DrawEntrant[]>([])
@@ -105,6 +108,28 @@ export function PrizeDrawPanel({ groupId, onSaved }: PrizeDrawPanelProps) {
       }
       return next
     })
+
+  // Prizes are drawn mostly among the players of the latest regular draft (정기 감전): tick them all.
+  const loadDraftPlayers = async () => {
+    setDraftLoading(true)
+    setDraftNote(null)
+    try {
+      const draft = await apiClient.getLatestCaptainDraft(groupId)
+      const { ids, missing } = draftEntrantIds(draft.participants, players)
+      setSelected(new Set(ids))
+      setSearch('')
+      setDraftNote({
+        ok: true,
+        text:
+          t('prizeDraw.draftPlayersLoaded', { title: draft.title, count: ids.length }) +
+          (missing > 0 ? t('prizeDraw.draftPlayersMissing', { count: missing }) : ''),
+      })
+    } catch (error) {
+      setDraftNote({ ok: false, text: t(isApiNotFoundError(error) ? 'prizeDraw.draftNone' : 'prizeDraw.draftLoadError') })
+    } finally {
+      setDraftLoading(false)
+    }
+  }
 
   const openStage = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -299,8 +324,28 @@ export function PrizeDrawPanel({ groupId, onSaved }: PrizeDrawPanelProps) {
             <button type="button" onClick={() => setSelected(new Set())} className={plainButtonClass}>
               {t('prizeDraw.selectNone')}
             </button>
+            <button
+              type="button"
+              onClick={() => void loadDraftPlayers()}
+              disabled={draftLoading || players.length === 0}
+              className={plainButtonClass}
+            >
+              {draftLoading ? t('prizeDraw.draftLoading') : t('prizeDraw.loadDraftPlayers')}
+            </button>
           </div>
         </div>
+        {draftNote && (
+          <p
+            role="status"
+            className={
+              draftNote.ok
+                ? 'rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200'
+                : errorClass
+            }
+          >
+            {draftNote.text}
+          </p>
+        )}
         {rosterError && <p className={errorClass}>{t('prizeDraw.rosterError')}</p>}
         <ul className="flex max-h-56 flex-wrap gap-1.5 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-900">
           {shownPlayers.length === 0 && (

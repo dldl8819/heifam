@@ -59,6 +59,30 @@ export function buildEntrants(
   return entrants
 }
 
+/**
+ * The roster players of a regular draft (정기 감전), to tick at once: their ids in the order of the
+ * draft, and how many of its players are not on the roster now (withdrawn, dormant, or shown
+ * without an id) and so cannot be ticked.
+ */
+export function draftEntrantIds(
+  participants: ReadonlyArray<{ playerId: number | null }>,
+  roster: ReadonlyArray<{ id: number }>
+): { ids: number[]; missing: number } {
+  const onRoster = new Set(roster.map((player) => player.id))
+  const ids: number[] = []
+  let missing = 0
+  for (const participant of participants) {
+    if (participant.playerId !== null && onRoster.has(participant.playerId)) {
+      if (!ids.includes(participant.playerId)) {
+        ids.push(participant.playerId)
+      }
+    } else {
+      missing += 1
+    }
+  }
+  return { ids, missing }
+}
+
 /** What stops a draw from being run, or null when it can be. */
 export function validatePrizeDraw(title: string, entrants: DrawEntrant[], winnerCount: number, prizes: string[]): PrizeDrawProblem | null {
   const problem = (key: PrizeDrawProblem['key'], min: number, max: number): PrizeDrawProblem => ({ key, min, max })
