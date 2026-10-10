@@ -39,7 +39,10 @@ export function boardSearchPage(value: string | null | undefined): number {
   return Number.isFinite(page) && page >= 1 ? page : 1
 }
 
-/** Where a result leads: a notice or a post on the free board. */
+/** Where a result leads: a notice, or a post on the free board or the video board. */
 export function boardSearchResultHref(item: Pick<BoardSearchItem, 'kind' | 'id'>): string {
-  return item.kind === 'NOTICE' ? `/notices/${item.id}` : `/boards/free/${item.id}`
+  if (item.kind === 'NOTICE') {
+    return `/notices/${item.id}`
+  }
+  return item.kind === 'VIDEO' ? `/boards/video/${item.id}` : `/boards/free/${item.id}`
 }

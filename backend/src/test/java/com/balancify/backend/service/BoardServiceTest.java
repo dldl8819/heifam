@@ -46,6 +46,8 @@ class BoardServiceTest {
     private static final String ADMIN = "ops@hei.gg";
     private static final String WRITER = "member@hei.gg";
     private static final String OTHER = "other@hei.gg";
+    private static final String VIDEO_ID = "dQw4w9WgXcQ";
+    private static final String OTHER_VIDEO_ID = "a-b_c-d_e-f";
     private static final OffsetDateTime WRITTEN = OffsetDateTime.parse("2026-10-10T10:00:00+09:00");
     private static final Map<String, String> NICKNAMES = Map.of(ADMIN, "OpsUser", WRITER, "YOUR_USERNAME", OTHER, "OtherUser");
 
@@ -78,6 +80,7 @@ class BoardServiceTest {
     void readsTheBoardNamedInThePath() {
         assertThat(Board.fromPath("free")).isEqualTo(Board.FREE);
         assertThat(Board.fromPath(" Anonymous ")).isEqualTo(Board.ANONYMOUS);
+        assertThat(Board.fromPath("video")).isEqualTo(Board.VIDEO);
         for (String path : new String[] {null, "", "notices", "FREE2"}) {
             assertThatThrownBy(() -> Board.fromPath(path)).isInstanceOf(NoSuchElementException.class);
         }
@@ -127,19 +130,19 @@ class BoardServiceTest {
 
     @Test
     void savesATrimmedPostAndRefusesOneWithoutTitleOrText() {
-        when(boardRepository.insertPost(1L, "FREE", "title", "text", WRITER)).thenReturn(7L);
+        when(boardRepository.insertPost(1L, "FREE", "title", "text", WRITER, null)).thenReturn(7L);
         when(boardRepository.findPost(1L, "FREE", 7L)).thenReturn(Optional.of(post(7L, "FREE", WRITER)));
 
-        BoardPostDetailResponse created = boardService.create(1L, Board.FREE, " Member@Hei.gg ", "  title ", " text  ");
+        BoardPostDetailResponse created = boardService.create(1L, Board.FREE, " Member@Hei.gg ", "  title ", " text  ", null);
 
         assertThat(created.id()).isEqualTo(7L);
         assertThat(created.mine()).isTrue();
-        verify(boardRepository).insertPost(1L, "FREE", "title", "text", WRITER);
+        verify(boardRepository).insertPost(1L, "FREE", "title", "text", WRITER, null);
         for (String[] bad : new String[][] {{" ", "text"}, {"title", " "}, {null, "text"}, {"x".repeat(201), "text"}, {"title", "x".repeat(5001)}}) {
-            assertThatThrownBy(() -> boardService.create(1L, Board.FREE, WRITER, bad[0], bad[1]))
+            assertThatThrownBy(() -> boardService.create(1L, Board.FREE, WRITER, bad[0], bad[1], null))
                 .isInstanceOf(IllegalArgumentException.class);
         }
-        verify(boardRepository, org.mockito.Mockito.times(1)).insertPost(any(), any(), any(), any(), any());
+        verify(boardRepository, org.mockito.Mockito.times(1)).insertPost(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -147,12 +150,12 @@ class BoardServiceTest {
         when(boardRepository.countPostsSince(eq(1L), eq("FREE"), eq(WRITER), any())).thenReturn(20L);
         when(boardRepository.countPostsSince(eq(1L), eq("ANONYMOUS"), eq(WRITER), any())).thenReturn(5L);
         when(boardRepository.countPostsSince(eq(1L), eq("ANONYMOUS"), eq(OTHER), any())).thenReturn(4L);
-        when(boardRepository.insertPost(1L, "ANONYMOUS", "title", "text", OTHER)).thenReturn(9L);
+        when(boardRepository.insertPost(1L, "ANONYMOUS", "title", "text", OTHER, null)).thenReturn(9L);
         when(boardRepository.findPost(1L, "ANONYMOUS", 9L)).thenReturn(Optional.of(post(9L, "ANONYMOUS", OTHER)));
 
-        assertThatThrownBy(() -> boardService.create(1L, Board.FREE, WRITER, "title", "text")).isInstanceOf(BoardLimitException.class);
-        assertThatThrownBy(() -> boardService.create(1L, Board.ANONYMOUS, WRITER, "title", "text")).isInstanceOf(BoardLimitException.class);
-        assertThat(boardService.create(1L, Board.ANONYMOUS, OTHER, "title", "text").id()).isEqualTo(9L);
+        assertThatThrownBy(() -> boardService.create(1L, Board.FREE, WRITER, "title", "text", null)).isInstanceOf(BoardLimitException.class);
+        assertThatThrownBy(() -> boardService.create(1L, Board.ANONYMOUS, WRITER, "title", "text", null)).isInstanceOf(BoardLimitException.class);
+        assertThat(boardService.create(1L, Board.ANONYMOUS, OTHER, "title", "text", null).id()).isEqualTo(9L);
 
         ArgumentCaptor<OffsetDateTime> since = ArgumentCaptor.forClass(OffsetDateTime.class);
         verify(boardRepository).countPostsSince(eq(1L), eq("FREE"), eq(WRITER), since.capture());
@@ -188,7 +191,7 @@ class BoardServiceTest {
         assertThatThrownBy(() -> boardService.open(1L, Board.ANONYMOUS, 7L, OTHER)).isInstanceOf(NoSuchElementException.class);
         assertThatThrownBy(() -> boardService.addComment(1L, Board.ANONYMOUS, 7L, OTHER, "hello"))
             .isInstanceOf(NoSuchElementException.class);
-        assertThatThrownBy(() -> boardService.edit(1L, Board.ANONYMOUS, 7L, OTHER, "t", "c")).isInstanceOf(NoSuchElementException.class);
+        assertThatThrownBy(() -> boardService.edit(1L, Board.ANONYMOUS, 7L, OTHER, "t", "c", null)).isInstanceOf(NoSuchElementException.class);
         assertThatThrownBy(() -> boardService.delete(1L, Board.ANONYMOUS, 7L, OTHER)).isInstanceOf(NoSuchElementException.class);
 
         verify(boardRepository, never()).recordView(7L, OTHER);
@@ -227,21 +230,21 @@ class BoardServiceTest {
         PostRow post = post(7L, "FREE", WRITER);
         when(boardRepository.findPost(1L, "FREE", 7L)).thenReturn(Optional.of(post));
 
-        assertThatThrownBy(() -> boardService.edit(1L, Board.FREE, 7L, ADMIN, "new", "text")).isInstanceOf(BoardForbiddenException.class);
-        assertThatThrownBy(() -> boardService.edit(1L, Board.FREE, 7L, OTHER, "new", "text")).isInstanceOf(BoardForbiddenException.class);
-        assertThatThrownBy(() -> boardService.edit(1L, Board.FREE, 7L, WRITER, " ", "text")).isInstanceOf(IllegalArgumentException.class);
-        verify(boardRepository, never()).updatePost(anyLong(), any(), any());
+        assertThatThrownBy(() -> boardService.edit(1L, Board.FREE, 7L, ADMIN, "new", "text", null)).isInstanceOf(BoardForbiddenException.class);
+        assertThatThrownBy(() -> boardService.edit(1L, Board.FREE, 7L, OTHER, "new", "text", null)).isInstanceOf(BoardForbiddenException.class);
+        assertThatThrownBy(() -> boardService.edit(1L, Board.FREE, 7L, WRITER, " ", "text", null)).isInstanceOf(IllegalArgumentException.class);
+        verify(boardRepository, never()).updatePost(anyLong(), any(), any(), any());
 
         // Saved as it was, nothing is written, so the post is not marked as edited.
-        boardService.edit(1L, Board.FREE, 7L, WRITER, " title-7 ", "content-7");
-        verify(boardRepository, never()).updatePost(anyLong(), any(), any());
-        boardService.edit(1L, Board.FREE, 7L, WRITER, "new title", " new text ");
-        verify(boardRepository).updatePost(7L, "new title", "new text");
+        boardService.edit(1L, Board.FREE, 7L, WRITER, " title-7 ", "content-7", null);
+        verify(boardRepository, never()).updatePost(anyLong(), any(), any(), any());
+        boardService.edit(1L, Board.FREE, 7L, WRITER, "new title", " new text ", null);
+        verify(boardRepository).updatePost(7L, "new title", "new text", null);
     }
 
     @Test
     void marksAPostChangedAfterItWasWritten() {
-        PostRow edited = new PostRow(7L, "FREE", "t", "c", WRITER, WRITTEN, WRITTEN.plusMinutes(5), 0, 0, 0);
+        PostRow edited = new PostRow(7L, "FREE", "t", "c", WRITER, WRITTEN, WRITTEN.plusMinutes(5), 0, 0, 0, null);
         when(boardRepository.findPost(1L, "FREE", 7L)).thenReturn(Optional.of(edited));
         when(boardRepository.findPost(1L, "FREE", 8L)).thenReturn(Optional.of(post(8L, "FREE", WRITER)));
 
@@ -309,8 +312,98 @@ class BoardServiceTest {
         verify(boardRepository, never()).listPosts(anyLong(), any(), any(), anyInt(), anyInt());
     }
 
+    @Test
+    void savesAVideoPostByItsYouTubeIdWithOrWithoutWords() {
+        when(boardRepository.insertPost(eq(1L), eq("VIDEO"), any(), any(), eq(WRITER), eq(VIDEO_ID))).thenReturn(7L);
+        when(boardRepository.findPost(1L, "VIDEO", 7L)).thenReturn(Optional.of(video(7L, WRITER)));
+
+        BoardPostDetailResponse created = boardService.create(
+            1L, Board.VIDEO, WRITER, " title ", "  ", " https://youtu.be/" + VIDEO_ID + "?si=share "
+        );
+        boardService.create(1L, Board.VIDEO, WRITER, "title", " a few words ", "https://www.youtube.com/watch?v=" + VIDEO_ID);
+
+        verify(boardRepository).insertPost(1L, "VIDEO", "title", "", WRITER, VIDEO_ID);
+        verify(boardRepository).insertPost(1L, "VIDEO", "title", "a few words", WRITER, VIDEO_ID);
+        assertThat(created.videoId()).isEqualTo(VIDEO_ID);
+        assertThat(created.board()).isEqualTo("VIDEO");
+    }
+
+    @Test
+    void refusesAVideoPostWithoutALinkToOneYouTubeVideo() {
+        for (String link : new String[] {null, " ", "https://example.com/watch?v=" + VIDEO_ID, "https://www.youtube.com/@channel", "not a link"}) {
+            assertThatThrownBy(() -> boardService.create(1L, Board.VIDEO, WRITER, "title", "", link))
+                .isInstanceOf(IllegalArgumentException.class);
+        }
+        assertThatThrownBy(() -> boardService.create(1L, Board.VIDEO, WRITER, "title", "x".repeat(5001), "https://youtu.be/" + VIDEO_ID))
+            .isInstanceOf(IllegalArgumentException.class);
+        verify(boardRepository, never()).insertPost(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void keepsNoVideoOnTheOtherBoardsWhateverIsSent() {
+        when(boardRepository.insertPost(1L, "FREE", "title", "text", WRITER, null)).thenReturn(7L);
+        when(boardRepository.findPost(1L, "FREE", 7L)).thenReturn(Optional.of(post(7L, "FREE", WRITER)));
+
+        boardService.create(1L, Board.FREE, WRITER, "title", "text", "https://youtu.be/" + VIDEO_ID);
+
+        verify(boardRepository).insertPost(1L, "FREE", "title", "text", WRITER, null);
+        // And the free board still needs its words.
+        assertThatThrownBy(() -> boardService.create(1L, Board.FREE, WRITER, "title", " ", "https://youtu.be/" + VIDEO_ID))
+            .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void letsTheWriterChangeTheVideoOfTheirPost() {
+        when(boardRepository.findPost(1L, "VIDEO", 7L)).thenReturn(Optional.of(video(7L, WRITER)));
+
+        boardService.edit(1L, Board.VIDEO, 7L, WRITER, "title-7", "content-7", "https://youtu.be/" + VIDEO_ID);
+        verify(boardRepository, never()).updatePost(anyLong(), any(), any(), any());
+        boardService.edit(1L, Board.VIDEO, 7L, WRITER, "title-7", "content-7", "https://youtu.be/" + OTHER_VIDEO_ID);
+        verify(boardRepository).updatePost(7L, "title-7", "content-7", OTHER_VIDEO_ID);
+        assertThatThrownBy(() -> boardService.edit(1L, Board.VIDEO, 7L, WRITER, "title-7", "content-7", "https://example.com"))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> boardService.edit(1L, Board.VIDEO, 7L, OTHER, "t", "c", "https://youtu.be/" + VIDEO_ID))
+            .isInstanceOf(BoardForbiddenException.class);
+    }
+
+    @Test
+    void namesWritersAndTakesLikesOnTheVideoBoardAsOnTheFreeBoard() {
+        when(boardRepository.listPosts(1L, "VIDEO", null, 20, 0)).thenReturn(List.of(video(2L, OTHER), video(1L, WRITER)));
+        when(boardRepository.findPost(1L, "VIDEO", 7L)).thenReturn(Optional.of(video(7L, WRITER)));
+        when(boardRepository.listComments(7L)).thenReturn(List.of(comment(31L, 7L, WRITER)));
+
+        BoardPostListResponse list = boardService.list(1L, Board.VIDEO, OTHER, 1);
+        BoardPostDetailResponse opened = boardService.open(1L, Board.VIDEO, 7L, OTHER);
+        boardService.setLike(1L, Board.VIDEO, 7L, OTHER, true);
+
+        // Every member sees the whole board, not only their own posts as on the anonymous board.
+        assertThat(list.posts())
+            .extracting(BoardPostListItemResponse::id, BoardPostListItemResponse::authorNickname, BoardPostListItemResponse::videoId)
+            .containsExactly(tuple(2L, "OtherUser", VIDEO_ID), tuple(1L, "YOUR_USERNAME", VIDEO_ID));
+        assertThat(opened.authorNickname()).isEqualTo("YOUR_USERNAME");
+        assertThat(opened.comments()).extracting(BoardCommentResponse::authorNickname).containsExactly("YOUR_USERNAME");
+        assertThat(opened.videoId()).isEqualTo(VIDEO_ID);
+        verify(boardRepository).like(7L, OTHER);
+    }
+
+    @Test
+    void stopsAPersonAtTenVideosADay() {
+        when(boardRepository.countPostsSince(eq(1L), eq("VIDEO"), eq(WRITER), any())).thenReturn(10L);
+        when(boardRepository.countPostsSince(eq(1L), eq("VIDEO"), eq(OTHER), any())).thenReturn(9L);
+        when(boardRepository.insertPost(any(), any(), any(), any(), eq(OTHER), any())).thenReturn(9L);
+        when(boardRepository.findPost(1L, "VIDEO", 9L)).thenReturn(Optional.of(video(9L, OTHER)));
+
+        assertThatThrownBy(() -> boardService.create(1L, Board.VIDEO, WRITER, "title", "", "https://youtu.be/" + VIDEO_ID))
+            .isInstanceOf(BoardLimitException.class);
+        assertThat(boardService.create(1L, Board.VIDEO, OTHER, "title", "", "https://youtu.be/" + VIDEO_ID).id()).isEqualTo(9L);
+    }
+
     private static PostRow post(Long id, String board, String author) {
-        return new PostRow(id, board, "title-" + id, "content-" + id, author, WRITTEN, WRITTEN, 0, 0, 0);
+        return new PostRow(id, board, "title-" + id, "content-" + id, author, WRITTEN, WRITTEN, 0, 0, 0, null);
+    }
+
+    private static PostRow video(Long id, String author) {
+        return new PostRow(id, "VIDEO", "title-" + id, "content-" + id, author, WRITTEN, WRITTEN, 0, 0, 0, VIDEO_ID);
     }
 
     private static CommentRow comment(Long id, Long postId, String author) {

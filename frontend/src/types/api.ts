@@ -721,11 +721,13 @@ export type NoticeImageUpload = {
 }
 
 // The member boards, as they are named in a path.
-export type BoardKind = 'free' | 'anonymous'
+export type BoardKind = 'free' | 'anonymous' | 'video'
 
 export type BoardPostListItem = {
   id: number
   title: string
+  // The YouTube video of a post on the video board; missing on the other boards.
+  videoId?: string | null
   // Missing on the anonymous board, for everyone.
   authorNickname?: string | null
   createdAt: string
@@ -756,9 +758,11 @@ export type BoardComment = {
 
 export type BoardPostDetail = {
   id: number
-  board: 'FREE' | 'ANONYMOUS'
+  board: 'FREE' | 'ANONYMOUS' | 'VIDEO'
   title: string
   content: string
+  // The YouTube video of a post on the video board, played on its page; missing on the other boards.
+  videoId?: string | null
   authorNickname?: string | null
   createdAt: string
   edited: boolean
@@ -773,7 +777,7 @@ export type BoardPostDetail = {
 
 /** A post found by the search: a notice or a post on the free board. */
 export type BoardSearchItem = {
-  kind: 'NOTICE' | 'FREE'
+  kind: 'NOTICE' | 'FREE' | 'VIDEO'
   id: number
   title: string
   // A stretch of the text around the first match, or its beginning when only the title matched.

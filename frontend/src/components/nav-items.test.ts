@@ -82,6 +82,7 @@ describe('navigation items', () => {
         '/notices',
         '/boards/free',
         '/boards/anonymous',
+        '/boards/video',
         '/boards/nickname',
       ])
     }
@@ -125,6 +126,7 @@ describe('findActiveNavHref', () => {
     expect(findActiveNavHref('/players', items)).toBe('/players')
     expect(findActiveNavHref('/notices/12', items)).toBe('/notices')
     expect(findActiveNavHref('/boards/free/7', items)).toBe('/boards/free')
+    expect(findActiveNavHref('/boards/video/3', items)).toBe('/boards/video')
     expect(findActiveNavHref('/tournaments', items)).toBe('/tournaments')
     expect(findActiveNavHref('/points/ranking', items)).toBe('/points/ranking')
     expect(findActiveNavHref('/admin/access/allowed', items)).toBe('/admin/access/allowed')

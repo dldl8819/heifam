@@ -17,13 +17,15 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The member boards. Every member with access reads and writes the free board. The anonymous board
- * is a suggestion box: any member writes, and a post is read by the admins and by whoever wrote it.
+ * The member boards. Every member with access reads and writes the free board and the video board,
+ * where a post is a YouTube video. The anonymous board is a suggestion box: any member writes, and a
+ * post is read by the admins and by whoever wrote it.
  *
  * <p>On the anonymous board nobody is told who wrote a post, admins included: the answers carry no
  * name and no email for the writer, only "mine" for the writer themselves. The writer is kept in
@@ -34,7 +36,18 @@ public class BoardService {
 
     public enum Board {
         FREE,
-        ANONYMOUS;
+        ANONYMOUS,
+        VIDEO;
+
+        /** Posts and comments carry their writers' nicknames everywhere but on the anonymous board. */
+        public boolean named() {
+            return this != ANONYMOUS;
+        }
+
+        /** Posts can be liked everywhere but on the anonymous board. */
+        public boolean likes() {
+            return this != ANONYMOUS;
+        }
 
         /** The board named in a path ("free", "anonymous"); anything else is not a board. */
         public static Board fromPath(String value) {
@@ -55,6 +68,7 @@ public class BoardService {
     // Posts one person may write on a board within a day.
     static final int FREE_POSTS_PER_DAY = 20;
     static final int ANONYMOUS_POSTS_PER_DAY = 5;
+    static final int VIDEO_POSTS_PER_DAY = 10;
 
     private final BoardRepository boardRepository;
     private final AccessControlService accessControlService;
@@ -72,13 +86,14 @@ public class BoardService {
         String author = ownOnly ? reader : null;
         int safePage = Math.max(1, page);
         List<PostRow> rows = boardRepository.listPosts(groupId, board.name(), author, PAGE_SIZE, (safePage - 1) * PAGE_SIZE);
-        Map<String, String> nicknames = board == Board.FREE
+        Map<String, String> nicknames = board.named()
             ? nicknames(rows.stream().map(PostRow::authorEmail).toList())
             : Map.of();
         List<BoardPostListItemResponse> posts = rows.stream()
             .map(row -> new BoardPostListItemResponse(
                 row.id(),
                 row.title(),
+                row.videoId(),
                 nicknames.get(normalizeEmail(row.authorEmail())),
                 row.createdAt(),
                 row.commentCount(),
@@ -90,16 +105,29 @@ public class BoardService {
         return new BoardPostListResponse(posts, boardRepository.countPosts(groupId, board.name(), author), safePage, PAGE_SIZE);
     }
 
+    /** A video post needs its link and may go without words; any other post needs its text. */
     @Transactional
-    public BoardPostDetailResponse create(Long groupId, Board board, String email, String title, String content) {
+    public BoardPostDetailResponse create(
+        Long groupId,
+        Board board,
+        String email,
+        String title,
+        String content,
+        String videoLink
+    ) {
         String author = normalizeEmail(email);
         String cleanTitle = requireText(title, MAX_TITLE_LENGTH, "제목은 1~" + MAX_TITLE_LENGTH + "자로 입력해 주세요.");
-        String cleanContent = requireText(content, MAX_CONTENT_LENGTH, "내용은 1~" + MAX_CONTENT_LENGTH + "자로 입력해 주세요.");
-        int limit = board == Board.ANONYMOUS ? ANONYMOUS_POSTS_PER_DAY : FREE_POSTS_PER_DAY;
+        String cleanContent = requireContent(board, content);
+        String videoId = requireVideo(board, videoLink);
+        int limit = switch (board) {
+            case ANONYMOUS -> ANONYMOUS_POSTS_PER_DAY;
+            case VIDEO -> VIDEO_POSTS_PER_DAY;
+            case FREE -> FREE_POSTS_PER_DAY;
+        };
         if (boardRepository.countPostsSince(groupId, board.name(), author, OffsetDateTime.now().minusDays(1)) >= limit) {
             throw new BoardLimitException("하루에 올릴 수 있는 글 수를 넘었습니다. 내일 다시 올려 주세요.");
         }
-        long postId = boardRepository.insertPost(groupId, board.name(), cleanTitle, cleanContent, author);
+        long postId = boardRepository.insertPost(groupId, board.name(), cleanTitle, cleanContent, author, videoId);
         return detail(requirePost(groupId, board, postId), board, author);
     }
 
@@ -114,16 +142,25 @@ public class BoardService {
 
     /** Only the writer changes a post; admins can remove one but not reword it. */
     @Transactional
-    public BoardPostDetailResponse edit(Long groupId, Board board, Long postId, String email, String title, String content) {
+    public BoardPostDetailResponse edit(
+        Long groupId,
+        Board board,
+        Long postId,
+        String email,
+        String title,
+        String content,
+        String videoLink
+    ) {
         String actor = normalizeEmail(email);
         PostRow post = requireReadable(groupId, board, postId, actor);
         if (!actor.equals(normalizeEmail(post.authorEmail()))) {
             throw new BoardForbiddenException("본인 글만 수정할 수 있습니다.");
         }
         String cleanTitle = requireText(title, MAX_TITLE_LENGTH, "제목은 1~" + MAX_TITLE_LENGTH + "자로 입력해 주세요.");
-        String cleanContent = requireText(content, MAX_CONTENT_LENGTH, "내용은 1~" + MAX_CONTENT_LENGTH + "자로 입력해 주세요.");
-        if (!cleanTitle.equals(post.title()) || !cleanContent.equals(post.content())) {
-            boardRepository.updatePost(post.id(), cleanTitle, cleanContent);
+        String cleanContent = requireContent(board, content);
+        String videoId = requireVideo(board, videoLink);
+        if (!cleanTitle.equals(post.title()) || !cleanContent.equals(post.content()) || !Objects.equals(videoId, post.videoId())) {
+            boardRepository.updatePost(post.id(), cleanTitle, cleanContent, videoId);
         }
         return detail(requirePost(groupId, board, postId), board, actor);
     }
@@ -162,10 +199,10 @@ public class BoardService {
         return detail(requirePost(groupId, board, postId), board, actor);
     }
 
-    /** Likes are for the free board; a post on the anonymous board has none. */
+    /** A post on the anonymous board has no likes; any other post has. */
     @Transactional
     public BoardPostDetailResponse setLike(Long groupId, Board board, Long postId, String email, boolean liked) {
-        if (board != Board.FREE) {
+        if (!board.likes()) {
             throw new NoSuchElementException("Post not found");
         }
         String member = normalizeEmail(email);
@@ -187,12 +224,12 @@ public class BoardService {
         // Whose names may be shown: everyone's on the free board. On the anonymous board only those
         // of the people answering; the writer of the post is never looked up, so cannot slip out.
         List<String> named = new ArrayList<>();
-        if (board == Board.FREE) {
+        if (board.named()) {
             named.add(postAuthor);
         }
         comments.forEach(comment -> {
             String commenter = normalizeEmail(comment.authorEmail());
-            if (board == Board.FREE || !commenter.equals(postAuthor)) {
+            if (board.named() || !commenter.equals(postAuthor)) {
                 named.add(commenter);
             }
         });
@@ -203,14 +240,15 @@ public class BoardService {
             board.name(),
             post.title(),
             post.content(),
-            nicknames.get(board == Board.FREE ? postAuthor : ""),
+            post.videoId(),
+            nicknames.get(board.named() ? postAuthor : ""),
             post.createdAt(),
             post.updatedAt() != null && post.createdAt() != null && post.updatedAt().isAfter(post.createdAt()),
             mine,
             mine,
             mine || admin,
             post.likeCount(),
-            board == Board.FREE && boardRepository.hasLiked(post.id(), reader),
+            board.likes() && boardRepository.hasLiked(post.id(), reader),
             post.viewCount(),
             comments.stream()
                 .map(comment -> {
@@ -264,6 +302,27 @@ public class BoardService {
             });
         }
         return nicknames;
+    }
+
+    private static String requireContent(Board board, String content) {
+        if (board == Board.VIDEO) {
+            // The video is the post; a few words beside it are welcome but not needed.
+            String text = content == null ? "" : content.trim();
+            if (text.length() > MAX_CONTENT_LENGTH) {
+                throw new IllegalArgumentException("내용은 " + MAX_CONTENT_LENGTH + "자 이하로 입력해 주세요.");
+            }
+            return text;
+        }
+        return requireText(content, MAX_CONTENT_LENGTH, "내용은 1~" + MAX_CONTENT_LENGTH + "자로 입력해 주세요.");
+    }
+
+    /** The video of a post on the video board; no other board keeps one, whatever was sent. */
+    private static String requireVideo(Board board, String videoLink) {
+        if (board != Board.VIDEO) {
+            return null;
+        }
+        return YouTubeVideoIds.fromLink(videoLink)
+            .orElseThrow(() -> new IllegalArgumentException("유튜브 영상 주소를 확인해 주세요."));
     }
 
     private static String requireText(String value, int maxLength, String message) {

@@ -3262,14 +3262,24 @@ class AdminKeyFilterTest {
             .perform(delete("/api/groups/1/boards/free/posts/7").header("X-USER-EMAIL", "member@hei.gg"))
             .andExpect(status().isOk());
 
-        verify(boardService).create(1L, BoardService.Board.ANONYMOUS, "member@hei.gg", "t", "c");
+        verify(boardService).create(1L, BoardService.Board.ANONYMOUS, "member@hei.gg", "t", "c", null);
         verify(boardService).open(1L, BoardService.Board.FREE, 7L, "member@hei.gg");
-        verify(boardService).edit(1L, BoardService.Board.FREE, 7L, "member@hei.gg", "t2", "c2");
+        verify(boardService).edit(1L, BoardService.Board.FREE, 7L, "member@hei.gg", "t2", "c2", null);
         verify(boardService).addComment(1L, BoardService.Board.FREE, 7L, "member@hei.gg", "hello");
         verify(boardService).deleteComment(1L, BoardService.Board.FREE, 7L, 31L, "member@hei.gg");
         verify(boardService).setLike(1L, BoardService.Board.FREE, 7L, "member@hei.gg", true);
         verify(boardService).setLike(1L, BoardService.Board.FREE, 7L, "member@hei.gg", false);
         verify(boardService).delete(1L, BoardService.Board.FREE, 7L, "member@hei.gg");
+
+        mockMvc
+            .perform(
+                post("/api/groups/1/boards/video/posts")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"title\":\"t\",\"content\":\"\",\"videoUrl\":\"https://youtu.be/dQw4w9WgXcQ\"}")
+            )
+            .andExpect(status().isOk());
+        verify(boardService).create(1L, BoardService.Board.VIDEO, "member@hei.gg", "t", "", "https://youtu.be/dQw4w9WgXcQ");
 
         // No sign-in, or signed in without access to the site: nothing of either board.
         for (String board : new String[] {"free", "anonymous"}) {
@@ -3288,7 +3298,7 @@ class AdminKeyFilterTest {
                 )
                 .andExpect(status().isForbidden());
         }
-        verify(boardService, times(1)).create(any(), any(), any(), any(), any());
+        verify(boardService, times(2)).create(any(), any(), any(), any(), any(), any());
         verify(boardService, times(1)).open(any(), any(), any(), any());
     }
 
@@ -3296,9 +3306,9 @@ class AdminKeyFilterTest {
     void tellsWhyABoardRequestWasNotTaken() throws Exception {
         when(boardService.open(1L, BoardService.Board.ANONYMOUS, 7L, "member@hei.gg"))
             .thenThrow(new NoSuchElementException("Post not found"));
-        when(boardService.edit(any(), any(), any(), any(), any(), any()))
+        when(boardService.edit(any(), any(), any(), any(), any(), any(), any()))
             .thenThrow(new BoardForbiddenException("not yours"));
-        when(boardService.create(any(), any(), any(), any(), any()))
+        when(boardService.create(any(), any(), any(), any(), any(), any()))
             .thenThrow(new BoardLimitException("too many"))
             .thenThrow(new IllegalArgumentException("no title"));
 

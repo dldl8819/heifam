@@ -1394,13 +1394,19 @@ export const apiClient = {
       requireUserEmail: true,
       includeUserEmail: true,
     }),
-  createBoardPost: (groupId: number, board: BoardKind, payload: { title: string; content: string }) =>
+  // videoUrl: the YouTube link of a post on the video board.
+  createBoardPost: (groupId: number, board: BoardKind, payload: { title: string; content: string; videoUrl?: string }) =>
     apiRequest<BoardPostDetail>(
       `/api/groups/${groupId}/boards/${board}/posts`,
       { method: 'POST', body: JSON.stringify(payload) },
       { requireUserEmail: true, includeUserEmail: true }
     ),
-  updateBoardPost: (groupId: number, board: BoardKind, postId: number, payload: { title: string; content: string }) =>
+  updateBoardPost: (
+    groupId: number,
+    board: BoardKind,
+    postId: number,
+    payload: { title: string; content: string; videoUrl?: string }
+  ) =>
     apiRequest<BoardPostDetail>(
       `/api/groups/${groupId}/boards/${board}/posts/${postId}`,
       { method: 'PUT', body: JSON.stringify(payload) },

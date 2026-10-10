@@ -27,6 +27,7 @@
     "notices": "공지사항",
     "boards": "게시판",
     "freeBoard": "자유게시판",
+    "videoBoard": "추천영상",
     "anonymousBoard": "익명게시판",
     "nicknameRequests": "닉변 요청",
     "points": "포인트",
@@ -653,6 +654,15 @@
       "saveSuccess": "글이 운영진에게 전달되었습니다."
     },
     "write": "글쓰기",
+    "video": {
+      "title": "추천영상",
+      "description": "같이 보고 싶은 유튜브 영상을 올려 주세요. 주소를 넣으면 글에서 바로 재생됩니다.",
+      "empty": "아직 올라온 영상이 없습니다. 첫 영상을 추천해 보세요.",
+      "linkPlaceholder": "유튜브 영상 주소 (예: https://youtu.be/...)",
+      "linkInvalid": "유튜브 영상 하나의 주소가 아닙니다. 채널이나 재생목록 주소는 쓸 수 없습니다.",
+      "contentPlaceholder": "영상 소개 (선택)",
+      "openOnYouTube": "유튜브에서 보기"
+    },
     "titlePlaceholder": "제목을 입력하세요",
     "contentPlaceholder": "내용을 입력하세요",
     "contentLimitHint": "최대 {max}자까지 작성할 수 있습니다.",
@@ -689,6 +699,8 @@
     "commentEmpty": "아직 댓글이 없습니다.",
     "commentRequired": "댓글을 입력해 주세요.",
     "commentTooLong": "댓글은 {max}자를 넘을 수 없습니다.",
+    "videoRequired": "유튜브 영상 주소를 넣어 주세요.",
+    "videoInvalid": "유튜브 영상 하나의 주소를 넣어 주세요. 채널이나 재생목록 주소는 쓸 수 없습니다.",
     "commentDelete": "삭제",
     "commentDeleteConfirm": "이 댓글을 삭제하시겠습니까?",
     "postAuthorTag": "작성자"
@@ -741,8 +753,8 @@
   },
   "boardSearch": {
     "title": "글 검색",
-    "description": "공지사항과 자유게시판의 제목·내용에서 찾습니다. 익명게시판과 닉변 요청은 검색되지 않습니다.",
-    "placeholder": "공지사항·자유게시판 글 검색",
+    "description": "공지사항, 자유게시판, 추천영상의 제목·내용에서 찾습니다. 익명게시판과 닉변 요청은 검색되지 않습니다.",
+    "placeholder": "공지사항·자유게시판·추천영상 글 검색",
     "submit": "검색",
     "queryTooShort": "검색어는 {min}자 이상 입력해 주세요.",
     "queryTooLong": "검색어는 {max}자를 넘을 수 없습니다.",
@@ -752,6 +764,7 @@
     "loadError": "검색하지 못했습니다. 잠시 후 다시 시도해 주세요.",
     "kindNotice": "공지사항",
     "kindFree": "자유게시판",
+    "kindVideo": "추천영상",
     "votes": "투표 {count}"
   },
   "prizeDraw": {
