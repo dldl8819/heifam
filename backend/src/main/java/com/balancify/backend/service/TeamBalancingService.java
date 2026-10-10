@@ -257,7 +257,7 @@ public class TeamBalancingService {
         List<Player> loadedPlayers = playerRepository.findByGroup_IdAndIdIn(request.groupId(), request.playerIds());
         Map<Long, Player> loadedById = new HashMap<>();
         for (Player player : loadedPlayers) {
-            if (!PlayerIdentityPolicy.isIdentityHidden(player)) {
+            if (PlayerRosterPolicy.isOnRoster(player)) {
                 loadedById.put(player.getId(), player);
             }
         }

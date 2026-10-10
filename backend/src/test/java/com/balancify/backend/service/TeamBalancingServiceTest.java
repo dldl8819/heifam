@@ -55,6 +55,22 @@ class TeamBalancingServiceTest {
     }
 
     @Test
+    void refusesADormantPlayerLikeOneNotInTheGroup() {
+        List<Player> players = createPlayers(1L, List.of(
+            new PlayerSeed(1L, "A", 1600, "P"),
+            new PlayerSeed(2L, "B", 1520, "P"),
+            new PlayerSeed(3L, "C", 1490, "T"),
+            new PlayerSeed(4L, "D", 1440, "T")
+        ));
+        players.get(3).setDormantAt(java.time.OffsetDateTime.parse("2026-10-01T03:00:00Z"));
+        when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(1L, 2L, 3L, 4L))).thenReturn(players);
+
+        assertThatThrownBy(() -> service.balance(new BalanceRequest(1L, List.of(1L, 2L, 3L, 4L), 2, null, "PT")))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("[4]");
+    }
+
+    @Test
     void pricesExpectedHomeWinRateOnTeamAverageMmr() {
         BalanceResponse response = service.toResponse(
             new TeamBalancingService.BalanceCandidate(3, List.of(), List.of(), 3300, 3500, 200)

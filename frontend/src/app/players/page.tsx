@@ -19,6 +19,7 @@ import {
 } from '@/lib/player-edit'
 import {
   filterPlayerRosterByView,
+  isDormantRosterRow,
   type PlayerRosterView,
 } from '@/lib/player-roster-filter'
 import { applyPlayerActivityTransition } from '@/lib/player-activity'
@@ -325,7 +326,8 @@ export default function PlayersPage() {
   const [togglingPlayerId, setTogglingPlayerId] = useState<number | null>(null)
   const [activityForm, setActivityForm] = useState<ActivityFormState | null>(null)
   const [rosterView, setRosterView] = useState<PlayerRosterView>('active')
-  const [dormantPlayerIds, setDormantPlayerIds] = useState<ReadonlySet<number>>(
+  // Players long without a game (the admins' idle list), shown in the idle view.
+  const [idlePlayerIds, setIdlePlayerIds] = useState<ReadonlySet<number>>(
     () => new Set<number>()
   )
   const [playerActionError, setPlayerActionError] = useState<string | null>(null)
@@ -360,11 +362,12 @@ export default function PlayersPage() {
     setError(null)
 
     try {
-      const [response, dormantPlayers] = await Promise.all([
+      const [response, idlePlayers] = await Promise.all([
         apiClient.getGroupPlayers(TEMP_GROUP_ID, {
           includeInactive: isAdmin && effectiveRosterView === 'inactive',
+          includeDormant: isAdmin && effectiveRosterView === 'dormant',
         }),
-        isAdmin && effectiveRosterView === 'dormant'
+        isAdmin && effectiveRosterView === 'idle'
           ? apiClient.getGroupDormantPlayers(TEMP_GROUP_ID)
           : Promise.resolve([]),
       ])
@@ -372,13 +375,13 @@ export default function PlayersPage() {
         return
       }
       setRows(response)
-      setDormantPlayerIds(new Set(dormantPlayers.map((player) => player.playerId)))
+      setIdlePlayerIds(new Set(idlePlayers.map((player) => player.playerId)))
     } catch {
       if (rosterRequestId.current !== requestId) {
         return
       }
       setRows([])
-      setDormantPlayerIds(new Set<number>())
+      setIdlePlayerIds(new Set<number>())
       setError(t('players.loadError'))
     } finally {
       if (rosterRequestId.current === requestId) {
@@ -405,7 +408,7 @@ export default function PlayersPage() {
     }
     lastParticipationRequestId.current += 1
     setRosterView('active')
-    setDormantPlayerIds(new Set<number>())
+    setIdlePlayerIds(new Set<number>())
     setLastParticipation(null)
   }, [isAdmin])
 
@@ -674,6 +677,36 @@ export default function PlayersPage() {
     }
   }
 
+  // 휴면: sets a player aside or wakes them. Unlike deactivating, nothing about the account changes.
+  const handleSetPlayerDormant = async (player: PlayerRosterItem, dormant: boolean) => {
+    setDeleteConflictPlayer(null)
+    if (!isAdmin) {
+      setPlayerActionError(t('common.adminOnlyAction'))
+      return
+    }
+    const confirmKey = dormant ? 'players.actions.setDormantConfirm' : 'players.actions.wakeConfirm'
+    if (!window.confirm(t(confirmKey, { nickname: player.nickname }))) {
+      return
+    }
+
+    setTogglingPlayerId(player.id)
+    setPlayerActionError(null)
+    setPlayerActionSuccess(null)
+    try {
+      await apiClient.setGroupPlayerDormant(TEMP_GROUP_ID, player.id, dormant)
+      setPlayerActionSuccess(
+        t(dormant ? 'players.actions.setDormantSuccess' : 'players.actions.wakeSuccess', { nickname: player.nickname })
+      )
+      await fetchRoster()
+    } catch (actionError) {
+      setPlayerActionError(
+        isApiForbiddenError(actionError) ? t('common.permissionDenied') : t('players.actions.dormancyFailure')
+      )
+    } finally {
+      setTogglingPlayerId(null)
+    }
+  }
+
   const handleTogglePlayerActive = (player: PlayerRosterItem) => {
     setDeleteConflictPlayer(null)
     if (!isAdmin) {
@@ -845,7 +878,7 @@ export default function PlayersPage() {
 
   const handleToggleLastParticipation = useCallback(
     async (player: PlayerRosterItem) => {
-      if (!isAdmin || rosterView !== 'dormant') {
+      if (!isAdmin || rosterView !== 'idle') {
         return
       }
 
@@ -895,8 +928,8 @@ export default function PlayersPage() {
     [rows, showMmrColumn]
   )
   const activityRows = useMemo(
-    () => filterPlayerRosterByView(sortedRows, effectiveRosterView, dormantPlayerIds),
-    [dormantPlayerIds, effectiveRosterView, sortedRows]
+    () => filterPlayerRosterByView(sortedRows, effectiveRosterView, idlePlayerIds),
+    [idlePlayerIds, effectiveRosterView, sortedRows]
   )
   const filteredRows = useMemo(() => {
     const searchText = search.trim().toLowerCase()
@@ -915,9 +948,13 @@ export default function PlayersPage() {
     () => filterPlayerRosterByView(rows, 'inactive').length,
     [rows]
   )
+  const idlePlayerCount = useMemo(
+    () => filterPlayerRosterByView(rows, 'idle', idlePlayerIds).length,
+    [idlePlayerIds, rows]
+  )
   const dormantPlayerCount = useMemo(
-    () => filterPlayerRosterByView(rows, 'dormant', dormantPlayerIds).length,
-    [dormantPlayerIds, rows]
+    () => filterPlayerRosterByView(rows, 'dormant').length,
+    [rows]
   )
 
   const showInactiveRetentionColumns = rosterView === 'inactive'
@@ -1283,8 +1320,12 @@ export default function PlayersPage() {
               <span className="rounded-md border border-slate-300 bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
                 {t('players.filters.inactiveCount', { count: inactivePlayerCount })}
               </span>
-            ) : rosterView === 'dormant' ? (
+            ) : rosterView === 'idle' ? (
               <span className="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                {t('players.filters.idleCount', { count: idlePlayerCount })}
+              </span>
+            ) : rosterView === 'dormant' ? (
+              <span className="rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
                 {t('players.filters.dormantCount', { count: dormantPlayerCount })}
               </span>
             ) : (
@@ -1338,11 +1379,22 @@ export default function PlayersPage() {
             <label className="inline-flex min-h-8 items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
               <input
                 type="checkbox"
+                checked={rosterView === 'idle'}
+                onChange={(event) =>
+                  handleRosterViewChange('idle', event.target.checked)
+                }
+                className="h-4 w-4 rounded border-slate-300 text-amber-700 focus:ring-amber-400 dark:border-slate-600 dark:bg-slate-950 dark:text-amber-300"
+              />
+              <span>{t('players.filters.includeIdle')}</span>
+            </label>
+            <label className="inline-flex min-h-8 items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
+              <input
+                type="checkbox"
                 checked={rosterView === 'dormant'}
                 onChange={(event) =>
                   handleRosterViewChange('dormant', event.target.checked)
                 }
-                className="h-4 w-4 rounded border-slate-300 text-amber-700 focus:ring-amber-400 dark:border-slate-600 dark:bg-slate-950 dark:text-amber-300"
+                className="h-4 w-4 rounded border-slate-300 text-violet-700 focus:ring-violet-400 dark:border-slate-600 dark:bg-slate-950 dark:text-violet-300"
               />
               <span>{t('players.filters.includeDormant')}</span>
             </label>
@@ -1371,6 +1423,12 @@ export default function PlayersPage() {
           </div>
         )}
       </div>
+
+      {isAdmin && rosterView === 'dormant' && (
+        <p className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs leading-5 text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
+          {t('players.table.dormantNotice')}
+        </p>
+      )}
 
       {isAdmin && rosterView === 'inactive' && (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
@@ -1427,9 +1485,12 @@ export default function PlayersPage() {
                 const identityHidden = row.identityHidden === true
                 const lifecycleStatus = resolveLifecycleStatus(row)
                 const isActive = lifecycleStatus === 'ACTIVE' && row.active !== false
+                const isDormant = isDormantRosterRow(row)
                 const isOperationallyInactive = lifecycleStatus === 'INACTIVE'
                 const isWithdrawn = lifecycleStatus === 'WITHDRAWN'
-                const lifecycleLabel = isActive
+                const lifecycleLabel = isDormant
+                  ? t('players.table.dormant')
+                  : isActive
                   ? t('players.table.active')
                   : isOperationallyInactive
                     ? t('players.table.operationallyInactive')
@@ -1442,7 +1503,7 @@ export default function PlayersPage() {
                 const isDeleting = deletingPlayerId === row.id
                 const isToggling = togglingPlayerId === row.id
                 const busy = isSaving || isDeleting || isToggling
-                const canInspectLastParticipation = isAdmin && rosterView === 'dormant'
+                const canInspectLastParticipation = isAdmin && rosterView === 'idle'
                 const lastParticipationExpanded =
                   canInspectLastParticipation && lastParticipation?.playerId === row.id
                 const lastParticipationDetailsId = `player-${row.id}-last-participation`
@@ -1489,7 +1550,7 @@ export default function PlayersPage() {
                             )}
                             {canInspectLastParticipation && (
                               <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-                                {t('players.table.dormant')}
+                                {t('players.table.idle')}
                               </span>
                             )}
                             {!isActive && (
@@ -1628,7 +1689,9 @@ export default function PlayersPage() {
                         <div className="space-y-1">
                           <span
                             className={`inline-flex whitespace-nowrap rounded-md px-2 py-1 text-xs font-semibold ${
-                              isActive
+                              isDormant
+                                ? 'border border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300'
+                                : isActive
                                 ? 'border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
                                 : isWithdrawn
                                   ? 'border border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300'
@@ -1639,6 +1702,11 @@ export default function PlayersPage() {
                           >
                             {lifecycleLabel}
                           </span>
+                          {isDormant && row.dormantAt && (
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                              {t('players.table.dormantAt', { value: formatChatRecordDisplay(row.dormantAt) })}
+                            </div>
+                          )}
                           {!isActive && row.chatLeftAt && (
                               <div className="text-[11px] text-slate-500 dark:text-slate-400">
                               {t(isWithdrawn ? 'players.table.withdrawnAt' : 'players.table.inactiveAt', {
@@ -1734,6 +1802,15 @@ export default function PlayersPage() {
                       <td className="px-4 py-3">
                         {identityHidden ? (
                           <span className="text-slate-500 dark:text-slate-400" aria-hidden="true">—</span>
+                        ) : isDormant ? (
+                          <button
+                            type="button"
+                            disabled={busy || editingPlayerId !== null || activityForm !== null}
+                            onClick={() => void handleSetPlayerDormant(row, false)}
+                            className="rounded-md border border-violet-300 px-2.5 py-1 text-xs font-medium text-violet-700 transition-colors hover:border-violet-600 hover:bg-violet-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-violet-700 dark:text-violet-300 dark:hover:border-violet-400 dark:hover:bg-violet-700"
+                          >
+                            {isToggling ? t('players.actions.toggling') : t('players.actions.wake')}
+                          </button>
                         ) : !isActive ? (
                           canReactivate ? (
                             <button
@@ -1784,6 +1861,15 @@ export default function PlayersPage() {
                               {t('players.actions.edit')}
                             </button>
                           )}
+
+                          <button
+                            type="button"
+                            disabled={busy || editingPlayerId !== null || activityForm !== null}
+                            onClick={() => void handleSetPlayerDormant(row, true)}
+                            className="rounded-md border border-violet-300 px-2.5 py-1 text-xs font-medium text-violet-700 transition-colors hover:border-violet-600 hover:bg-violet-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-violet-700 dark:text-violet-300 dark:hover:border-violet-400 dark:hover:bg-violet-700"
+                          >
+                            {t('players.actions.setDormant')}
+                          </button>
 
                           <button
                             type="button"

@@ -89,7 +89,7 @@ public class TeamTournamentService {
         }
 
         List<Player> players = playerRepository.findByGroup_IdAndIdIn(groupId, requestedIds).stream()
-            .filter(player -> !PlayerIdentityPolicy.isIdentityHidden(player))
+            .filter(PlayerRosterPolicy::isOnRoster)
             .toList();
         if (players.size() != requestedIds.size()) {
             throw new IllegalArgumentException("그룹에 없는 선수가 있습니다.");

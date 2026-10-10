@@ -1362,7 +1362,7 @@ class AdminKeyFilterTest {
 
     @Test
     void hidesMmrFieldsFromMemberForGroupPlayers() throws Exception {
-        when(playerQueryService.getGroupPlayers(eq(1L), eq(false), any()))
+        when(playerQueryService.getGroupPlayers(eq(1L), eq(false), eq(false), any()))
             .thenReturn(List.of(groupPlayerResponseWithOperationalMetadata()));
         mockMvc
             .perform(
@@ -1386,7 +1386,7 @@ class AdminKeyFilterTest {
 
     @Test
     void hidesOnlyMmrFieldsFromAdminWithoutMmrAccessForGroupPlayers() throws Exception {
-        when(playerQueryService.getGroupPlayers(eq(1L), eq(false), any()))
+        when(playerQueryService.getGroupPlayers(eq(1L), eq(false), eq(false), any()))
             .thenReturn(List.of(groupPlayerResponseWithOperationalMetadata()));
         mockMvc
             .perform(
@@ -1410,7 +1410,7 @@ class AdminKeyFilterTest {
 
     @Test
     void returnsMmrFieldsForMmrAllowedAdminForGroupPlayers() throws Exception {
-        when(playerQueryService.getGroupPlayers(eq(1L), eq(false), any()))
+        when(playerQueryService.getGroupPlayers(eq(1L), eq(false), eq(false), any()))
             .thenReturn(List.of(groupPlayerResponseWithOperationalMetadata()));
         mockMvc
             .perform(
@@ -1434,7 +1434,7 @@ class AdminKeyFilterTest {
 
     @Test
     void ignoresIncludeInactiveForMemberGroupPlayersRequest() throws Exception {
-        when(playerQueryService.getGroupPlayers(eq(1L), eq(false), any())).thenReturn(List.of());
+        when(playerQueryService.getGroupPlayers(eq(1L), eq(false), eq(false), any())).thenReturn(List.of());
 
         mockMvc
             .perform(
@@ -1443,12 +1443,12 @@ class AdminKeyFilterTest {
             )
             .andExpect(status().isOk());
 
-        verify(playerQueryService).getGroupPlayers(eq(1L), eq(false), any());
+        verify(playerQueryService).getGroupPlayers(eq(1L), eq(false), eq(false), any());
     }
 
     @Test
     void allowsIncludeInactiveForAdminGroupPlayersRequest() throws Exception {
-        when(playerQueryService.getGroupPlayers(eq(1L), eq(true), any()))
+        when(playerQueryService.getGroupPlayers(eq(1L), eq(true), eq(false), any()))
             .thenReturn(List.of(retainedInactiveGroupPlayerResponse()));
 
         mockMvc
@@ -1482,7 +1482,7 @@ class AdminKeyFilterTest {
             .andExpect(jsonPath("$[0].lifecycleStatus").value("INACTIVE"))
             .andExpect(jsonPath("$[0].identityRetainedUntil").exists());
 
-        verify(playerQueryService).getGroupPlayers(eq(1L), eq(true), any());
+        verify(playerQueryService).getGroupPlayers(eq(1L), eq(true), eq(false), any());
     }
 
     @Test
@@ -3890,6 +3890,64 @@ class AdminKeyFilterTest {
     }
 
     @Test
+    void listsDormantPlayersOnlyForAdminsWhoAskForThem() throws Exception {
+        when(playerQueryService.getGroupPlayers(eq(1L), eq(false), eq(false), any())).thenReturn(List.of());
+        when(playerQueryService.getGroupPlayers(eq(1L), eq(false), eq(true), any()))
+            .thenReturn(List.of(dormantGroupPlayerResponse()));
+
+        mockMvc
+            .perform(get("/api/groups/1/players?includeDormant=true").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(0));
+        verify(playerQueryService, never()).getGroupPlayers(eq(1L), anyBoolean(), eq(true), any());
+
+        mockMvc
+            .perform(get("/api/groups/1/players?includeDormant=true").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isOk())
+            .andExpect(header().string("Cache-Control", "no-store, max-age=0"))
+            .andExpect(jsonPath("$[0].nickname").value("PlayerDormant"))
+            .andExpect(jsonPath("$[0].dormantAt").exists());
+
+        mockMvc
+            .perform(get("/api/groups/1/players?includeDormant=true").header("X-USER-EMAIL", "ops@hei.gg"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].dormantAt").exists());
+    }
+
+    @Test
+    void letsOnlyAdminsSetPlayersDormantAndWakeThem() throws Exception {
+        mockMvc
+            .perform(put("/api/groups/1/players/10/dormant"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(put("/api/groups/1/players/10/dormant").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(delete("/api/groups/1/players/10/dormant").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isForbidden());
+        verify(playerAdminService, never()).updateDormancy(any(), any(), anyBoolean(), any(), any());
+
+        mockMvc
+            .perform(put("/api/groups/1/players/10/dormant").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isOk());
+        verify(playerAdminService).updateDormancy(eq(1L), eq(10L), eq(true), eq("admin@hei.gg"), eq("admin"));
+
+        mockMvc
+            .perform(delete("/api/groups/1/players/10/dormant").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isOk());
+        verify(playerAdminService).updateDormancy(eq(1L), eq(10L), eq(false), eq("admin@hei.gg"), eq("admin"));
+    }
+
+    @Test
+    void answersNotFoundForDormancyOfAPlayerThatIsNotThere() throws Exception {
+        doThrow(new java.util.NoSuchElementException("Player not found"))
+            .when(playerAdminService).updateDormancy(eq(1L), eq(99L), eq(true), any(), any());
+        mockMvc
+            .perform(put("/api/groups/1/players/99/dormant").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
     void doesNotRequireAdminKeyForHealthEndpoint() throws Exception {
         mockMvc
             .perform(get("/api/health"))
@@ -3902,6 +3960,13 @@ class AdminKeyFilterTest {
         mockMvc
             .perform(get("/api/groups/1/matches/recent"))
             .andExpect(status().isOk());
+    }
+
+    private GroupPlayerResponse dormantGroupPlayerResponse() {
+        return new GroupPlayerResponse(
+            11L, "PlayerDormant", "Z", "B", 1100, "B", 1100, null, null, null, "B", 4, 4, 8, true,
+            null, null, null, null, null, "ACTIVE", null, false, OffsetDateTime.parse("2026-10-01T03:00:00Z")
+        );
     }
 
     private GroupPlayerResponse groupPlayerResponseWithOperationalMetadata() {

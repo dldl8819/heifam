@@ -125,7 +125,7 @@ public class BalanceSeriesService {
         }
         Map<Long, Player> players = new HashMap<>();
         playerRepository.findByGroup_IdAndIdIn(groupId, new ArrayList<>(allIds)).stream()
-            .filter(player -> !PlayerIdentityPolicy.isIdentityHidden(player))
+            .filter(PlayerRosterPolicy::isOnRoster)
             .forEach(player -> players.put(player.getId(), player));
         if (players.size() != allIds.size()) {
             throw new IllegalArgumentException("그룹에 없는 선수가 있습니다.");

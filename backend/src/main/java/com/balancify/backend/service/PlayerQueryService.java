@@ -57,14 +57,25 @@ public class PlayerQueryService {
         boolean includeInactive,
         UUID requesterAuthUserId
     ) {
+        return getGroupPlayers(groupId, includeInactive, false, requesterAuthUserId);
+    }
+
+    /** includeDormant: dormant players too (휴면), for the admins' own view of them. */
+    public List<GroupPlayerResponse> getGroupPlayers(
+        Long groupId,
+        boolean includeInactive,
+        boolean includeDormant,
+        UUID requesterAuthUserId
+    ) {
         // Player identity changes must be visible immediately across application instances.
         // The local read cache cannot be invalidated reliably after withdrawal or anonymization.
-        return List.copyOf(loadGroupPlayers(groupId, includeInactive, requesterAuthUserId));
+        return List.copyOf(loadGroupPlayers(groupId, includeInactive, includeDormant, requesterAuthUserId));
     }
 
     private List<GroupPlayerResponse> loadGroupPlayers(
         Long groupId,
         boolean includeInactive,
+        boolean includeDormant,
         UUID requesterAuthUserId
     ) {
         OffsetDateTime now = OffsetDateTime.now(clock);
@@ -73,6 +84,7 @@ public class PlayerQueryService {
             .filter(player -> !PlayerIdentityPolicy.isIdentityHidden(player)
                 || (includeInactive
                     && PlayerIdentityPolicy.isAdministrativeIdentityRetained(player, now)))
+            .filter(player -> includeDormant || !PlayerRosterPolicy.isDormant(player))
             .toList());
         if (players.isEmpty()) {
             return List.of();
@@ -138,7 +150,8 @@ public class PlayerQueryService {
                 player.getTierChangeAcknowledgedAt(),
                 player.getLifecycleStatus() == null ? null : player.getLifecycleStatus().name(),
                 player.getIdentityRetainedUntil(),
-                requesterAuthUserId != null && Objects.equals(requesterAuthUserId, player.getAuthUserId())
+                requesterAuthUserId != null && Objects.equals(requesterAuthUserId, player.getAuthUserId()),
+                player.getDormantAt()
             ));
         }
 
@@ -211,7 +224,7 @@ public class PlayerQueryService {
         List<Player> players = new ArrayList<>(
             playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId)
                 .stream()
-                .filter(player -> !PlayerIdentityPolicy.isIdentityHidden(player))
+                .filter(PlayerRosterPolicy::isOnRoster)
                 .toList()
         );
         players.sort(

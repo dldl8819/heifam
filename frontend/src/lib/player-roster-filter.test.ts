@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { filterPlayerRosterByView } from '@/lib/player-roster-filter'
+import { filterPlayerRosterByView, isDormantRosterRow } from '@/lib/player-roster-filter'
 import type { PlayerRosterItem } from '@/types/api'
 
 function player(
@@ -21,19 +21,32 @@ function player(
 }
 
 describe('filterPlayerRosterByView', () => {
-  it('includes only active players returned by the server dormant list', () => {
-    const dormant = player(1)
+  it('includes only active players returned by the server list of idle players', () => {
+    const idle = player(1)
     const ordinary = player(2)
-    const inactiveDormant = player(3, { active: false })
-    const dormantPlayerIds = new Set([dormant.id, inactiveDormant.id])
+    const inactiveIdle = player(3, { active: false })
+    const idleSetAside = { ...player(4), dormantAt: '2026-10-01T03:00:00Z' }
+    const idlePlayerIds = new Set([idle.id, inactiveIdle.id, idleSetAside.id])
 
     expect(
       filterPlayerRosterByView(
-        [dormant, ordinary, inactiveDormant],
-        'dormant',
-        dormantPlayerIds
+        [idle, ordinary, inactiveIdle, idleSetAside],
+        'idle',
+        idlePlayerIds
       )
-    ).toEqual([dormant])
+    ).toEqual([idle])
+  })
+
+  it('keeps players set aside (휴면) out of the roster and in a view of their own', () => {
+    const onRoster = player(1)
+    const setAside = { ...player(2), dormantAt: '2026-10-01T03:00:00Z' }
+    const inactive = { ...player(3, { active: false }), dormantAt: '2026-10-01T03:00:00Z' }
+    const rows = [onRoster, setAside, inactive]
+
+    expect(filterPlayerRosterByView(rows, 'active')).toEqual([onRoster])
+    expect(filterPlayerRosterByView(rows, 'dormant')).toEqual([setAside])
+    expect(filterPlayerRosterByView(rows, 'inactive')).toEqual([inactive])
+    expect(rows.map(isDormantRosterRow)).toEqual([false, true, false])
   })
 
   it('keeps ordinary active and inactive views separate', () => {

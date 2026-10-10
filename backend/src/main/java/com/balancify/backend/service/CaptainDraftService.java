@@ -87,7 +87,7 @@ public class CaptainDraftService {
 
         List<Player> players = playerRepository.findByGroup_IdAndIdIn(groupId, participantPlayerIds)
             .stream()
-            .filter(player -> !PlayerIdentityPolicy.isIdentityHidden(player))
+            .filter(PlayerRosterPolicy::isOnRoster)
             .toList();
         if (players.size() != participantPlayerIds.size()) {
             throw new IllegalArgumentException("All participants must belong to the group");

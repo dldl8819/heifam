@@ -27,6 +27,17 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/players/dormant"),
             AuthType.ADMIN_EMAIL
         ),
+        // 휴면: an admin sets a player aside (PUT) or wakes them (DELETE).
+        new ProtectedRoute(
+            "PUT",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/players/{playerId}/dormant"),
+            AuthType.ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "DELETE",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/players/{playerId}/dormant"),
+            AuthType.ADMIN_EMAIL
+        ),
         new ProtectedRoute(
             "GET",
             PathPatternParser.defaultInstance.parse(

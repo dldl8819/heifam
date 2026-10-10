@@ -58,9 +58,10 @@ public class RankingService {
     }
 
     private List<RankingItemResponse> loadGroupRanking(Long groupId, LocalDate statMonth) {
+        // Dormant players (휴면) are off the ranking until an admin wakes them.
         List<Player> players = playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId)
             .stream()
-            .filter(player -> !PlayerIdentityPolicy.isIdentityHidden(player))
+            .filter(PlayerRosterPolicy::isOnRoster)
             .toList();
         if (players.isEmpty()) {
             return List.of();

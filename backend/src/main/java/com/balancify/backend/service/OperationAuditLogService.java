@@ -41,6 +41,8 @@ public class OperationAuditLogService {
     public static final String ACTION_PLAYER_TIER_UPDATED = "PLAYER_TIER_UPDATED";
     public static final String ACTION_PLAYER_DEACTIVATED = "PLAYER_DEACTIVATED";
     public static final String ACTION_PLAYER_REACTIVATED = "PLAYER_REACTIVATED";
+    public static final String ACTION_PLAYER_DORMANT = "PLAYER_DORMANT";
+    public static final String ACTION_PLAYER_WOKEN = "PLAYER_WOKEN";
     public static final String ACTION_MATCH_DELETED = "MATCH_DELETED";
     public static final String ACTION_MATCH_RESULT_UPDATED = "MATCH_RESULT_UPDATED";
     public static final String ACTION_NOTICE_POSTED = "NOTICE_POSTED";
@@ -356,6 +358,32 @@ public class OperationAuditLogService {
         log.setDetails(nextActive
             ? "status=" + formatActiveStatus(previousActive) + " -> " + formatActiveStatus(true)
             : null);
+        operationAuditLogRepository.save(log);
+    }
+
+    /** An admin set a player aside (휴면) or woke them. The nickname stays visible, so it is kept. */
+    @Transactional
+    public void recordPlayerDormancyUpdate(
+        String actorEmail,
+        String actorNickname,
+        Long groupId,
+        Player player,
+        boolean dormant
+    ) {
+        if (player == null) {
+            return;
+        }
+
+        OperationAuditLog log = baseLog(
+            actorEmail,
+            actorNickname,
+            dormant ? ACTION_PLAYER_DORMANT : ACTION_PLAYER_WOKEN,
+            "PLAYER",
+            player.getId(),
+            player.getNickname(),
+            groupId
+        );
+        log.setSummary(dormant ? "휴면 처리" : "휴면 해제");
         operationAuditLogRepository.save(log);
     }
 

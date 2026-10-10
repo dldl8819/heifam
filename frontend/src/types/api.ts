@@ -285,6 +285,8 @@ export type PlayerRosterItem = {
   chatLeftReason?: string
   chatRejoinedAt?: string
   isOwnPlayer?: boolean
+  // 휴면: when an admin set the player aside. Only admins who ask for dormant players get these rows.
+  dormantAt?: string
 }
 
 export type GroupPlayerLastParticipationResponse = {

@@ -672,6 +672,7 @@ export function normalizePlayerRosterItem(value: unknown, index = 0): PlayerRost
         ? source.chatRejoinedAt
         : undefined,
     isOwnPlayer: !identityHidden && source.isOwnPlayer === true,
+    dormantAt: !identityHidden && active && typeof source.dormantAt === 'string' ? source.dormantAt : undefined,
   }
 }
 
@@ -1030,6 +1031,13 @@ export const apiClient = {
       },
       { requireUserEmail: true, includeUserEmail: true }
     ),
+  /** 휴면: sets a player aside (true) or wakes them (false). Admins only. */
+  setGroupPlayerDormant: (groupId: number, playerId: number, dormant: boolean) =>
+    apiRequest<void>(
+      `/api/groups/${groupId}/players/${playerId}/dormant`,
+      { method: dormant ? 'PUT' : 'DELETE' },
+      { adminOnly: true }
+    ),
   deleteGroupPlayer: (groupId: number, playerId: number) =>
     apiRequest<void>(
       `/api/groups/${groupId}/players/${playerId}`,
@@ -1049,9 +1057,18 @@ export const apiClient = {
     ),
   getGroupPlayers: async (
     groupId: number,
-    options?: { includeInactive?: boolean }
+    options?: { includeInactive?: boolean; includeDormant?: boolean }
   ): Promise<PlayerRosterItem[]> => {
-    const query = options?.includeInactive ? '?includeInactive=true' : ''
+    const params = new URLSearchParams()
+    if (options?.includeInactive) {
+      params.set('includeInactive', 'true')
+    }
+    // Dormant players (휴면): the backend lists them for admins only.
+    if (options?.includeDormant) {
+      params.set('includeDormant', 'true')
+    }
+    const search = params.toString()
+    const query = search.length > 0 ? `?${search}` : ''
     const payload = await apiRequest<unknown>(`/api/groups/${groupId}/players${query}`, undefined, {
       includeUserEmail: true,
     })

@@ -161,7 +161,7 @@ public class PlayerRaceStatsQueryService {
     private List<GroupPlayerRaceStatsResponse> loadGroupPlayerRaceStats(Long groupId) {
         List<Player> players = playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId)
             .stream()
-            .filter(candidate -> !PlayerIdentityPolicy.isIdentityHidden(candidate))
+            .filter(PlayerRosterPolicy::isOnRoster)
             .toList();
         Map<Long, List<PlayerRaceStats>> raceStatsByPlayerId = groupByPlayerId(
             playerRaceStatsRepository.findByGroupId(groupId)

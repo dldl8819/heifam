@@ -80,7 +80,8 @@ public final class MmrMaskingMapper {
                     response.tierChangeAcknowledgedAt(),
                     response.lifecycleStatus(),
                     response.identityRetainedUntil(),
-                    response.isOwnPlayer()
+                    response.isOwnPlayer(),
+                    response.dormantAt()
                 )
             )
             .toList();
@@ -113,7 +114,8 @@ public final class MmrMaskingMapper {
                     response.tierChangeAcknowledgedAt(),
                     response.lifecycleStatus(),
                     response.identityRetainedUntil(),
-                    response.isOwnPlayer()
+                    response.isOwnPlayer(),
+                    response.dormantAt()
                 )
             )
             .toList();
