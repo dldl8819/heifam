@@ -64,8 +64,8 @@ describe('navigation items', () => {
     }
   })
 
-  it('puts the matches under one menu: balance, multi-balance and the cannon draw for members, tournaments and the draft for admins too', () => {
-    expect(menu(getVisibleNavItems(MEMBER), '/matches')).toEqual(['/balance', '/balance/multi', '/cannon'])
+  it('puts the matches under one menu: balance, multi-balance, the cannon and the prize draws for members, tournaments and the draft for admins too', () => {
+    expect(menu(getVisibleNavItems(MEMBER), '/matches')).toEqual(['/balance', '/balance/multi', '/cannon', '/draws'])
     for (const context of [ADMIN, SUPER_ADMIN]) {
       expect(menu(getVisibleNavItems(context), '/matches')).toEqual([
         '/balance',
@@ -73,6 +73,7 @@ describe('navigation items', () => {
         '/tournaments',
         '/captain-draft',
         '/cannon',
+        '/draws',
       ])
     }
   })
@@ -89,10 +90,10 @@ describe('navigation items', () => {
     }
   })
 
-  it('puts a member\'s points, the monthly ranking and the prize draws under one menu, with the prize events for admins', () => {
-    expect(menu(getVisibleNavItems(MEMBER), '/points')).toEqual(['/points', '/points/ranking', '/draws'])
+  it('puts a member\'s points and the monthly ranking under one menu, with the prize events for admins', () => {
+    expect(menu(getVisibleNavItems(MEMBER), '/points')).toEqual(['/points', '/points/ranking'])
     for (const context of [ADMIN, SUPER_ADMIN]) {
-      expect(menu(getVisibleNavItems(context), '/points')).toEqual(['/points', '/points/ranking', '/points/events', '/draws'])
+      expect(menu(getVisibleNavItems(context), '/points')).toEqual(['/points', '/points/ranking', '/points/events'])
     }
   })
 
@@ -161,7 +162,8 @@ describe('isNavItemActive', () => {
   it('lights a menu for any of its links', () => {
     expect(isNavItemActive(byHref('/matches'), '/captain-draft')).toBe(true)
     expect(isNavItemActive(byHref('/boards'), '/notices')).toBe(true)
-    expect(isNavItemActive(byHref('/points'), '/draws')).toBe(true)
+    expect(isNavItemActive(byHref('/matches'), '/draws')).toBe(true)
+    expect(isNavItemActive(byHref('/points'), '/draws')).toBe(false)
     expect(isNavItemActive(byHref('/admin'), '/admin/access/result-editors')).toBe(true)
     expect(isNavItemActive(byHref('/admin'), '/admin')).toBe(true)
   })
