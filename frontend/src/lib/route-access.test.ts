@@ -154,6 +154,23 @@ describe('route access', () => {
     }
   })
 
+  it('opens the cannon draw to members but not to visitors or applicants without access', () => {
+    const member = { isLoggedIn: true, canAccess: true, isAdmin: false, isSuperAdmin: false }
+
+    expect(getRouteAccessDecision('/cannon', member)).toEqual({ allowed: true, redirectTo: null, blocked: false })
+    expect(getRouteAccessDecision('/cannon', { ...member, canAccess: false })).toEqual({
+      allowed: false,
+      redirectTo: null,
+      blocked: true,
+    })
+    expect(getRouteAccessDecision('/cannon', { ...member, isLoggedIn: false, canAccess: false })).toEqual({
+      allowed: false,
+      redirectTo: '/',
+      blocked: false,
+    })
+    expect(isPublicRoute('/cannon')).toBe(false)
+  })
+
   it('opens a member\'s points and the monthly ranking to members and keeps the prize events with admins', () => {
     const member = { isLoggedIn: true, canAccess: true, isAdmin: false, isSuperAdmin: false }
 

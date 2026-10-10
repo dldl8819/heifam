@@ -9,7 +9,8 @@ type NavVisibilityContext = {
 }
 
 /**
- * The matches: setting one up for members, and the tournaments and regular draft for admins.
+ * The matches: setting one up and the cannon draw for members, and the tournaments and regular
+ * draft for admins.
  * Its links share no path; "/matches" only names the menu.
  */
 function matchesMenu(isAdmin: boolean): NavItem {
@@ -25,6 +26,7 @@ function matchesMenu(isAdmin: boolean): NavItem {
             { label: t('nav.captainDraft'), href: '/captain-draft' },
           ]
         : []),
+      { label: t('nav.cannonDraw'), href: '/cannon' },
     ],
   }
 }
