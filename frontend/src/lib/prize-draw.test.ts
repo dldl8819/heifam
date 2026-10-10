@@ -8,6 +8,7 @@ import {
   ballColor,
   ballLabel,
   buildEntrants,
+  draftEntrantIds,
   formatDrawClock,
   parseManualEntrants,
   validatePrizeDraw,
@@ -45,6 +46,16 @@ describe('buildEntrants', () => {
 
   it('is empty when nothing is ticked or typed', () => {
     expect(buildEntrants(ROSTER, new Set(), '')).toEqual([])
+  })
+})
+
+describe('draftEntrantIds', () => {
+  it('ticks the draft\'s players who are on the roster, and counts the others', () => {
+    expect(draftEntrantIds([{ playerId: 3 }, { playerId: 1 }, { playerId: 9 }, { playerId: null }, { playerId: 3 }], ROSTER)).toEqual({
+      ids: [3, 1],
+      missing: 2,
+    })
+    expect(draftEntrantIds([], ROSTER)).toEqual({ ids: [], missing: 0 })
   })
 })
 
