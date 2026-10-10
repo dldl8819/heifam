@@ -65,6 +65,8 @@ public class OperationAuditLogService {
     public static final String ACTION_PRIZE_EVENT_CREATED = "PRIZE_EVENT_CREATED";
     public static final String ACTION_PRIZE_EVENT_CONFIRMED = "PRIZE_EVENT_CONFIRMED";
     public static final String ACTION_PRIZE_EVENT_CANCELLED = "PRIZE_EVENT_CANCELLED";
+    public static final String ACTION_PRIZE_DRAW_SAVED = "PRIZE_DRAW_SAVED";
+    public static final String ACTION_PRIZE_DRAW_DELETED = "PRIZE_DRAW_DELETED";
 
     private static final int MAX_PAGE_SIZE = 200;
 
@@ -494,6 +496,23 @@ public class OperationAuditLogService {
             actorEmail, actorNickname, ACTION_NOTICE_UPDATED, "NOTICE", notice.getId(), notice.getTitle(), groupId
         );
         log.setSummary(announcedAgain ? "공지 수정 (다시 알림)" : "공지 수정");
+        operationAuditLogRepository.save(log);
+    }
+
+    /** An admin saved the outcome of a prize draw, or a super admin removed the record of one. */
+    @Transactional
+    public void recordPrizeDraw(
+        String action,
+        String actorEmail,
+        String actorNickname,
+        Long drawId,
+        Long groupId,
+        String title,
+        String details
+    ) {
+        OperationAuditLog log = baseLog(actorEmail, actorNickname, action, "PRIZE_DRAW", drawId, title, groupId);
+        log.setSummary(ACTION_PRIZE_DRAW_DELETED.equals(action) ? "추첨 기록 삭제" : "추첨 결과 저장");
+        log.setDetails(details);
         operationAuditLogRepository.save(log);
     }
 

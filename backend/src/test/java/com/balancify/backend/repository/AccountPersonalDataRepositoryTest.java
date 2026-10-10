@@ -120,6 +120,36 @@ class AccountPersonalDataRepositoryTest {
     }
 
     @Test
+    void keepsAPrizeDrawTheAccountSavedButNoLongerAsTheirs() {
+        AccountPersonalDataRepository repository = new AccountPersonalDataRepository(jdbcTemplate);
+
+        repository.deleteAccountIdentity(UUID.randomUUID(), "your_username@example.com");
+
+        ArgumentCaptor<String> statements = ArgumentCaptor.forClass(String.class);
+        verify(jdbcTemplate, atLeastOnce()).update(statements.capture(), any(SqlParameterSource.class));
+        assertThat(statements.getAllValues()).contains(
+            "UPDATE prize_draws SET created_by_email = NULL WHERE LOWER(BTRIM(created_by_email)) = :email"
+        );
+    }
+
+    @Test
+    void blanksTheNameAPlayerWonAPrizeDrawUnder() {
+        AccountPersonalDataRepository repository = new AccountPersonalDataRepository(jdbcTemplate);
+
+        repository.anonymizeHistoricalPlayerIdentity(List.of(7L, 8L), "탈퇴한 팸원");
+
+        ArgumentCaptor<String> statements = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<SqlParameterSource> parameters = ArgumentCaptor.forClass(SqlParameterSource.class);
+        verify(jdbcTemplate, atLeastOnce()).update(statements.capture(), parameters.capture());
+        int index = statements.getAllValues().indexOf(
+            "UPDATE prize_draw_winners SET name = :deletedMemberLabel WHERE player_id IN (:playerIds)"
+        );
+        assertThat(index).isNotNegative();
+        assertThat(parameters.getAllValues().get(index).getValue("deletedMemberLabel")).isEqualTo("탈퇴한 팸원");
+        assertThat(parameters.getAllValues().get(index).getValue("playerIds")).isEqualTo(List.of(7L, 8L));
+    }
+
+    @Test
     void removesNotificationStateWithTheAccount() {
         AccountPersonalDataRepository repository = new AccountPersonalDataRepository(jdbcTemplate);
 

@@ -49,6 +49,7 @@ export function getVisibleNavItems(context: NavVisibilityContext): NavItem[] {
       boardsMenu(),
       { label: t('nav.points'), href: '/points' },
       { label: t('nav.predictions'), href: '/predictions' },
+      { label: t('nav.draws'), href: '/draws' },
       { label: t('nav.events'), href: '/events' },
       { label: t('nav.ads'), href: '/ads' },
       { label: t('nav.results'), href: '/results' },
@@ -70,6 +71,8 @@ export function getVisibleNavItems(context: NavVisibilityContext): NavItem[] {
     boardsMenu(),
     { label: t('nav.points'), href: '/points' },
     { label: t('nav.predictions'), href: '/predictions' },
+    // Members read the records of prize draws there; admins also run the draws.
+    { label: t('nav.draws'), href: '/draws' },
     { label: t('nav.events'), href: '/events' },
     { label: t('nav.ads'), href: '/ads' },
     { label: t('nav.results'), href: '/results' },

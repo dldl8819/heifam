@@ -796,6 +796,41 @@ export type BoardSearchResult = {
   pageSize: number
 }
 
+export type PrizeDrawMode = 'FIRST' | 'LAST'
+
+export type PrizeDrawWinner = {
+  place: number
+  name: string
+  prize?: string | null
+}
+
+/** The record of a prize draw that was run: who won which place and prize. */
+export type PrizeDraw = {
+  id: number
+  title: string
+  // FIRST: the first balls to arrive won. LAST: the last ones did.
+  mode: PrizeDrawMode
+  entrantCount: number
+  createdAt: string
+  savedByNickname?: string | null
+  canDelete: boolean
+  winners: PrizeDrawWinner[]
+}
+
+export type PrizeDrawList = {
+  // Newest first.
+  draws: PrizeDraw[]
+  // The reader may run a draw and save its outcome.
+  canRun: boolean
+}
+
+export type PrizeDrawSaveRequest = {
+  title: string
+  mode: PrizeDrawMode
+  entrantCount: number
+  winners: { place: number; name: string; playerId?: number; prize?: string }[]
+}
+
 export type NicknameRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELED'
 
 export type NicknameRequest = {

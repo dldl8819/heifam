@@ -17,7 +17,7 @@ const AUTH_PATH_PREFIX = '/auth'
 const DISABLED_PATHS = ['/dashboard']
 const PUBLIC_PATHS = ['/', '/events', '/ads', '/results', '/privacy', '/terms']
 // /balance covers /balance/multi as well.
-const MEMBER_PATHS = ['/balance', '/players', '/ranking', '/notices', '/boards', '/points', '/predictions']
+const MEMBER_PATHS = ['/balance', '/players', '/ranking', '/notices', '/boards', '/points', '/predictions', '/draws']
 // Admins see only what match result editors did on /admin/audit; the backend narrows the logs.
 const ADMIN_PATHS = ['/captain-draft', '/import', '/players/import', '/tournaments', '/admin/audit']
 // Anyone may see the notice titles; opening a notice needs member access (MEMBER_PATHS).

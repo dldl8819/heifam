@@ -158,6 +158,15 @@ describe('navigation items', () => {
     }
   })
 
+  it('leads members and admins to the prize draws, right after the predictions, and visitors nowhere near', () => {
+    for (const context of [MEMBER, ADMIN, SUPER_ADMIN]) {
+      const hrefs = getVisibleNavItems(context).map((item) => item.href)
+
+      expect(hrefs.indexOf('/draws')).toBe(hrefs.indexOf('/predictions') + 1)
+    }
+    expect(getVisibleNavItems(VISITOR).map((item) => item.href)).not.toContain('/draws')
+  })
+
   it('leaves visitors the plain notices link and none of the member boards', () => {
     const items = getVisibleNavItems(VISITOR)
 
