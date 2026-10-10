@@ -9,8 +9,9 @@ type NavVisibilityContext = {
 }
 
 /**
- * The matches: setting one up and the cannon draw for members, and the tournaments and regular
- * draft for admins.
+ * The matches: setting one up, the cannon draw and the prize draws for members, and the
+ * tournaments and regular draft for admins. Prizes are drawn mostly among the players of a
+ * regular draft, so the draws sit with the matches.
  * Its links share no path; "/matches" only names the menu.
  */
 function matchesMenu(isAdmin: boolean): NavItem {
@@ -27,6 +28,8 @@ function matchesMenu(isAdmin: boolean): NavItem {
           ]
         : []),
       { label: t('nav.cannonDraw'), href: '/cannon' },
+      // Members read the records of prize draws there; admins also run the draws.
+      { label: t('nav.draws'), href: '/draws' },
     ],
   }
 }
@@ -46,7 +49,7 @@ function boardsMenu(): NavItem {
   }
 }
 
-/** A member's points, the month's ranking, the prize draws; and for admins the prize events. */
+/** A member's points and the month's ranking; and for admins the prize events. */
 function pointsMenu(isAdmin: boolean): NavItem {
   return {
     label: t('nav.points'),
@@ -55,8 +58,6 @@ function pointsMenu(isAdmin: boolean): NavItem {
       { label: t('nav.myPoints'), href: '/points' },
       { label: t('nav.pointRanking'), href: '/points/ranking' },
       ...(isAdmin ? [{ label: t('nav.pointEvents'), href: '/points/events' }] : []),
-      // Members read the records of prize draws there; admins also run the draws.
-      { label: t('nav.draws'), href: '/draws' },
     ],
   }
 }
