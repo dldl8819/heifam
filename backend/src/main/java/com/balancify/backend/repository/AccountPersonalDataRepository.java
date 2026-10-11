@@ -219,7 +219,8 @@ public class AccountPersonalDataRepository {
                 "admin_mmr_access_emails",
                 "match_result_editor_emails",
                 "point_transactions",
-                "prize_draws"
+                "prize_draws",
+                "access_people"
             )) {
                 jdbcTemplate.update(
                     "UPDATE " + table + " SET created_by_email = NULL "

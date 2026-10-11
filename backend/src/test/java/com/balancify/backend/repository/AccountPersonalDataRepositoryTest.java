@@ -133,6 +133,20 @@ class AccountPersonalDataRepositoryTest {
     }
 
     @Test
+    void keepsAPersonTheAccountGroupedButNoLongerAsTheirs() {
+        AccountPersonalDataRepository repository = new AccountPersonalDataRepository(jdbcTemplate);
+
+        repository.deleteAccountIdentity(UUID.randomUUID(), "your_username@example.com");
+
+        ArgumentCaptor<String> statements = ArgumentCaptor.forClass(String.class);
+        verify(jdbcTemplate, atLeastOnce()).update(statements.capture(), any(SqlParameterSource.class));
+        assertThat(statements.getAllValues()).contains(
+            "UPDATE access_people SET created_by_email = NULL WHERE LOWER(BTRIM(created_by_email)) = :email",
+            "DELETE FROM access_person_emails WHERE normalized_email = :email"
+        );
+    }
+
+    @Test
     void blanksTheNameAPlayerWonAPrizeDrawUnder() {
         AccountPersonalDataRepository repository = new AccountPersonalDataRepository(jdbcTemplate);
 
