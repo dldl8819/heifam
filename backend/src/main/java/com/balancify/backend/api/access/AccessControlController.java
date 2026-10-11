@@ -132,7 +132,7 @@ public class AccessControlController {
     @GetMapping("/admins")
     public AccessAdminListResponse getAdminEmails(HttpServletRequest request) {
         String requestEmail = requireRequestEmail(request);
-        requireAdmin(requestEmail);
+        requireSuperAdmin(requestEmail);
 
         AccessControlService.AdminEmailSnapshot snapshot = accessControlService.getAdminEmailSnapshot();
         return new AccessAdminListResponse(
@@ -227,7 +227,7 @@ public class AccessControlController {
     @GetMapping("/allowed-users")
     public AccessAllowedEmailListResponse getAllowedEmails(HttpServletRequest request) {
         String requestEmail = requireRequestEmail(request);
-        requireAdmin(requestEmail);
+        requireSuperAdmin(requestEmail);
 
         AccessControlService.AllowedEmailSnapshot snapshot = accessControlService.getAllowedEmailSnapshot();
         return new AccessAllowedEmailListResponse(toEntryResponses(snapshot.allowedUsers()));
@@ -239,7 +239,7 @@ public class AccessControlController {
         HttpServletRequest request
     ) {
         String requestEmail = requireRequestEmail(request);
-        requireAdmin(requestEmail);
+        requireSuperAdmin(requestEmail);
         String targetEmail = requireBodyEmail(requestBody);
         String targetNickname = requireBodyNickname(requestBody);
 
@@ -265,7 +265,7 @@ public class AccessControlController {
         HttpServletRequest request
     ) {
         String requestEmail = requireRequestEmail(request);
-        requireAdmin(requestEmail);
+        requireSuperAdmin(requestEmail);
 
         try {
             AccessControlService.AllowedEmailSnapshot snapshot = accessControlService.removeAllowedUserEmail(
@@ -289,7 +289,7 @@ public class AccessControlController {
         HttpServletRequest request
     ) {
         String requestEmail = requireRequestEmail(request);
-        requireAdmin(requestEmail);
+        requireSuperAdmin(requestEmail);
         String targetNickname = safeTrim(requestBody == null ? null : requestBody.nickname());
         if (targetNickname.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nickname is required");
@@ -372,12 +372,6 @@ public class AccessControlController {
             profile.preferredRace(),
             profile.matchResultEditor()
         );
-    }
-
-    private void requireAdmin(String email) {
-        if (!accessControlService.isAdminEmail(email)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin role required");
-        }
     }
 
     private void requireSuperAdmin(String email) {

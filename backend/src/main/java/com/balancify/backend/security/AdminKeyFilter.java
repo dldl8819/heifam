@@ -271,10 +271,11 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             PathPatternParser.defaultInstance.parse("/api/matches/{id}"),
             AuthType.ADMIN_EMAIL
         ),
+        // Who has access and with which emails: super admins only, as the access pages are.
         new ProtectedRoute(
             "GET",
             PathPatternParser.defaultInstance.parse("/api/access/admins"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SUPER_ADMIN_EMAIL
         ),
         new ProtectedRoute(
             "POST",
@@ -341,22 +342,22 @@ public class AdminKeyFilter extends OncePerRequestFilter {
         new ProtectedRoute(
             "GET",
             PathPatternParser.defaultInstance.parse("/api/access/allowed-users"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SUPER_ADMIN_EMAIL
         ),
         new ProtectedRoute(
             "POST",
             PathPatternParser.defaultInstance.parse("/api/access/allowed-users"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SUPER_ADMIN_EMAIL
         ),
         new ProtectedRoute(
             "DELETE",
             PathPatternParser.defaultInstance.parse("/api/access/allowed-users/{email}"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SUPER_ADMIN_EMAIL
         ),
         new ProtectedRoute(
             "PUT",
             PathPatternParser.defaultInstance.parse("/api/access/allowed-users/{email}/nickname"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SUPER_ADMIN_EMAIL
         ),
         new ProtectedRoute(
             "GET",
