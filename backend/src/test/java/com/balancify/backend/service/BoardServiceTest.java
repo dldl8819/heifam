@@ -9,7 +9,10 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -23,6 +26,7 @@ import com.balancify.backend.repository.BoardRepository.PostRow;
 import com.balancify.backend.service.BoardService.Board;
 import com.balancify.backend.service.exception.BoardForbiddenException;
 import com.balancify.backend.service.exception.BoardLimitException;
+import com.balancify.backend.service.exception.CommentLimitException;
 import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.HashMap;
@@ -34,6 +38,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -60,11 +65,14 @@ class BoardServiceTest {
     @Mock
     private PointService pointService;
 
+    @Mock
+    private CommentQuotaService commentQuotaService;
+
     private BoardService boardService;
 
     @BeforeEach
     void setUp() {
-        boardService = new BoardService(boardRepository, accessControlService, pointService);
+        boardService = new BoardService(boardRepository, accessControlService, pointService, commentQuotaService);
         when(accessControlService.isAdminEmail(ADMIN)).thenReturn(true);
         // Only the nicknames asked for come back, so a test sees whose names the service looked up.
         when(accessControlService.resolvePersonNames(anyCollection())).thenAnswer(invocation -> {
@@ -288,6 +296,26 @@ class BoardServiceTest {
         boardService.deleteComment(1L, Board.FREE, 7L, 31L, OTHER);
         boardService.deleteComment(1L, Board.FREE, 7L, 31L, ADMIN);
         verify(boardRepository, org.mockito.Mockito.times(2)).deleteComment(31L);
+    }
+
+    @Test
+    void takesOneOfTheDaysCommentsBeforeWritingAndWritesNothingOnceTheyAreUsedUp() {
+        when(boardRepository.findPost(1L, "FREE", 7L)).thenReturn(Optional.of(post(7L, "FREE", WRITER)));
+
+        // A comment that could not be saved anyway uses up nothing.
+        assertThatThrownBy(() -> boardService.addComment(1L, Board.FREE, 7L, OTHER, " ")).isInstanceOf(IllegalArgumentException.class);
+        verify(commentQuotaService, never()).reserve(any());
+
+        boardService.addComment(1L, Board.FREE, 7L, OTHER, "hello");
+        InOrder order = inOrder(commentQuotaService, boardRepository);
+        order.verify(commentQuotaService).reserve(OTHER);
+        order.verify(boardRepository).insertComment(7L, OTHER, "hello");
+
+        doThrow(new CommentLimitException("used up")).when(commentQuotaService).reserve(OTHER);
+        assertThatThrownBy(() -> boardService.addComment(1L, Board.FREE, 7L, OTHER, "again")).isInstanceOf(CommentLimitException.class);
+        verify(boardRepository, never()).insertComment(7L, OTHER, "again");
+        // The refused comment earns nothing either.
+        verify(pointService, times(1)).grantBoardCommentPoint(OTHER, 7L);
     }
 
     @Test

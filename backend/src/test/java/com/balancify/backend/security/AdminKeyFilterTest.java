@@ -147,6 +147,7 @@ import com.balancify.backend.service.TeamBalancingService;
 import com.balancify.backend.service.exception.MatchEditQuotaExceededException;
 import com.balancify.backend.service.exception.BoardForbiddenException;
 import com.balancify.backend.service.exception.BoardLimitException;
+import com.balancify.backend.service.exception.CommentLimitException;
 import com.balancify.backend.service.exception.NicknameRequestConflictException;
 import com.balancify.backend.service.exception.NoticeForbiddenException;
 import com.balancify.backend.service.exception.NoticeImageException;
@@ -3370,6 +3371,29 @@ class AdminKeyFilterTest {
                     .content("{\"title\":\"\",\"content\":\"c\"}")
             )
             .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void answersTooManyRequestsOnceTheDaysCommentsAreUsedUp() throws Exception {
+        when(boardService.addComment(any(), any(), any(), any(), any())).thenThrow(new CommentLimitException("used up"));
+        when(noticeService.addComment(any(), any(), any(), any(), any())).thenThrow(new CommentLimitException("used up"));
+
+        mockMvc
+            .perform(
+                post("/api/groups/1/boards/free/posts/7/comments")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"content\":\"YOUR_COMMENT\"}")
+            )
+            .andExpect(status().isTooManyRequests());
+        mockMvc
+            .perform(
+                post("/api/groups/1/notices/7/comments")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"content\":\"YOUR_COMMENT\"}")
+            )
+            .andExpect(status().isTooManyRequests());
     }
 
     @Test

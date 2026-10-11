@@ -106,7 +106,16 @@ export function BoardPost({ board, postId }: { board: BoardKind; postId: number 
       onDone?.()
     } catch (caught) {
       const status = caught instanceof ApiRequestError ? caught.status : 0
-      setActionError(status === 403 ? t('boards.notAllowed') : status === 404 ? t('boards.notFound') : t('boards.saveError'))
+      // 429: more comments today than one person may write.
+      setActionError(
+        status === 403
+          ? t('boards.notAllowed')
+          : status === 404
+            ? t('boards.notFound')
+            : status === 429
+              ? t('boards.commentLimitReached')
+              : t('boards.saveError')
+      )
     } finally {
       setBusy(false)
     }

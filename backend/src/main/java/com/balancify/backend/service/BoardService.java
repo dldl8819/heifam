@@ -81,11 +81,18 @@ public class BoardService {
     private final BoardRepository boardRepository;
     private final AccessControlService accessControlService;
     private final PointService pointService;
+    private final CommentQuotaService commentQuotaService;
 
-    public BoardService(BoardRepository boardRepository, AccessControlService accessControlService, PointService pointService) {
+    public BoardService(
+        BoardRepository boardRepository,
+        AccessControlService accessControlService,
+        PointService pointService,
+        CommentQuotaService commentQuotaService
+    ) {
         this.boardRepository = boardRepository;
         this.accessControlService = accessControlService;
         this.pointService = pointService;
+        this.commentQuotaService = commentQuotaService;
     }
 
     /** The free board in full; of the anonymous board, everything for admins and their own posts for members. */
@@ -197,6 +204,7 @@ public class BoardService {
         String author = normalizeEmail(email);
         PostRow post = requireReadable(groupId, board, postId, author);
         String text = requireText(content, MAX_COMMENT_LENGTH, "댓글은 1~" + MAX_COMMENT_LENGTH + "자로 입력해 주세요.");
+        commentQuotaService.reserve(author);
         boardRepository.insertComment(post.id(), author, text);
         if (board.earnsPoints() && !isWriter(author, post.authorEmail())) {
             pointService.grantBoardCommentPoint(author, post.id());
