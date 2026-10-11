@@ -13,6 +13,28 @@ public interface PointAccountRepository extends JpaRepository<PointAccount, Long
 
     Optional<PointAccount> findByNormalizedEmail(String normalizedEmail);
 
+    /**
+     * The email whose account holds the points of the person this email is, when it is grouped with
+     * others as one person (access_people) and one of them has an account; empty otherwise. Grouping
+     * merges their accounts into one, so there is one such account at most.
+     */
+    @Query(
+        value = """
+            select account.normalized_email
+            from point_accounts account
+            where account.normalized_email in (
+                select other.normalized_email
+                from access_person_emails mine
+                join access_person_emails other on other.person_id = mine.person_id
+                where mine.normalized_email = :email
+            )
+            order by account.id
+            limit 1
+            """,
+        nativeQuery = true
+    )
+    Optional<String> findPersonAccountEmail(@Param("email") String email);
+
     // Two first-time grants for the same person may race; the unique email keeps one row.
     @Modifying
     @Query(

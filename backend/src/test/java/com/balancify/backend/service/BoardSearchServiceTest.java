@@ -50,7 +50,7 @@ class BoardSearchServiceTest {
     void setUp() {
         boardSearchService = new BoardSearchService(boardSearchRepository, accessControlService);
         when(accessControlService.isAdminEmail(ADMIN)).thenReturn(true);
-        when(accessControlService.resolveDisplayNicknames(anyCollection())).thenAnswer(call -> {
+        when(accessControlService.resolvePersonNames(anyCollection())).thenAnswer(call -> {
             Map<String, String> found = new HashMap<>();
             call.<Collection<String>>getArgument(0).forEach(email -> found.put(email, NICKNAMES.get(email)));
             return found;

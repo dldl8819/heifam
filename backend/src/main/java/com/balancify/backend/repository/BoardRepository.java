@@ -177,9 +177,13 @@ public class BoardRepository {
         );
     }
 
+    /** One like a person: nothing is added when another of their emails liked the post already. */
     public void like(Long postId, String email) {
+        jdbcTemplate.queryForList(PersonSql.LOCK_PERSON, person(postId, email), Long.class);
         jdbcTemplate.update(
-            "INSERT INTO board_post_likes (post_id, liker_email) VALUES (:postId, :email) "
+            "INSERT INTO board_post_likes (post_id, liker_email) SELECT :postId, :email "
+                + "WHERE NOT EXISTS (SELECT 1 FROM board_post_likes WHERE post_id = :postId AND "
+                + PersonSql.samePerson("liker_email") + ") "
                 + "ON CONFLICT (post_id, liker_email) DO NOTHING",
             person(postId, email)
         );
@@ -187,14 +191,14 @@ public class BoardRepository {
 
     public void unlike(Long postId, String email) {
         jdbcTemplate.update(
-            "DELETE FROM board_post_likes WHERE post_id = :postId AND liker_email = :email",
+            "DELETE FROM board_post_likes WHERE post_id = :postId AND " + PersonSql.samePerson("liker_email"),
             person(postId, email)
         );
     }
 
     public boolean hasLiked(Long postId, String email) {
         Long found = jdbcTemplate.queryForObject(
-            "SELECT count(*) FROM board_post_likes WHERE post_id = :postId AND liker_email = :email",
+            "SELECT count(*) FROM board_post_likes WHERE post_id = :postId AND " + PersonSql.samePerson("liker_email"),
             person(postId, email),
             Long.class
         );
@@ -203,7 +207,10 @@ public class BoardRepository {
 
     public void recordView(Long postId, String email) {
         jdbcTemplate.update(
-            "INSERT INTO board_post_views (post_id, viewer_email) VALUES (:postId, :email) "
+            // Viewed once a person, whichever of their emails opened it.
+            "INSERT INTO board_post_views (post_id, viewer_email) SELECT :postId, :email "
+                + "WHERE NOT EXISTS (SELECT 1 FROM board_post_views WHERE post_id = :postId AND "
+                + PersonSql.samePerson("viewer_email") + ") "
                 + "ON CONFLICT (post_id, viewer_email) DO NOTHING",
             person(postId, email)
         );

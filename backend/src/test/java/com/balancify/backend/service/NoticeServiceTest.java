@@ -101,7 +101,7 @@ class NoticeServiceTest {
         );
         when(accessControlService.isAdminEmail(ADMIN)).thenReturn(true);
         when(accessControlService.resolveDisplayNickname(ADMIN)).thenReturn("OpsUser");
-        when(accessControlService.resolveDisplayNicknames(anyCollection()))
+        when(accessControlService.resolvePersonNames(anyCollection()))
             .thenReturn(Map.of(ADMIN, "OpsUser", MEMBER, "YOUR_USERNAME", OTHER, "OtherUser"));
         when(noticeRepository.findByGroupIdOrderByCreatedAtDescIdDesc(1L)).thenReturn(List.of(
             notice(3L, "admins only", true),

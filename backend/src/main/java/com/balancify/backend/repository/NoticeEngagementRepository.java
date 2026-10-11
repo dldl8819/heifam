@@ -34,11 +34,18 @@ public class NoticeEngagementRepository {
      * earlier read of an older revision is moved up to readAt; a current one is left as it is.
      */
     public boolean markRead(Long noticeId, String email, OffsetDateTime readAt, OffsetDateTime revisedAt) {
+        // Read once a person: when another of their emails read it before, that read is the one moved up.
+        String reader = jdbcTemplate.queryForList(
+            "SELECT reader_email FROM notice_reads WHERE notice_id = :noticeId AND "
+                + PersonSql.samePerson("reader_email") + " ORDER BY read_at, id LIMIT 1",
+            params(noticeId, email),
+            String.class
+        ).stream().findFirst().orElse(email);
         return jdbcTemplate.update(
             "INSERT INTO notice_reads (notice_id, reader_email, read_at) VALUES (:noticeId, :email, :readAt) "
                 + "ON CONFLICT (notice_id, reader_email) DO UPDATE SET read_at = EXCLUDED.read_at "
                 + "WHERE notice_reads.read_at < CAST(:revisedAt AS timestamptz)",
-            params(noticeId, email)
+            params(noticeId, reader)
                 .addValue("readAt", readAt, Types.TIMESTAMP_WITH_TIMEZONE)
                 .addValue("revisedAt", revisedAt, Types.TIMESTAMP_WITH_TIMEZONE)
         ) > 0;
@@ -50,7 +57,7 @@ public class NoticeEngagementRepository {
         }
         List<Long> ids = jdbcTemplate.queryForList(
             "SELECT r.notice_id FROM notice_reads r JOIN notices n ON n.id = r.notice_id "
-                + "WHERE r.reader_email = :email AND r.notice_id IN (:noticeIds) "
+                + "WHERE " + PersonSql.samePerson("r.reader_email") + " AND r.notice_id IN (:noticeIds) "
                 + "AND (n.revised_at IS NULL OR r.read_at >= n.revised_at)",
             new MapSqlParameterSource().addValue("email", email).addValue("noticeIds", noticeIds),
             Long.class
@@ -58,9 +65,13 @@ public class NoticeEngagementRepository {
         return new HashSet<>(ids);
     }
 
+    /** One like a person: nothing is added when another of their emails liked the notice already. */
     public void like(Long noticeId, String email) {
+        jdbcTemplate.queryForList(PersonSql.LOCK_PERSON, params(noticeId, email), Long.class);
         jdbcTemplate.update(
-            "INSERT INTO notice_likes (notice_id, liker_email) VALUES (:noticeId, :email) "
+            "INSERT INTO notice_likes (notice_id, liker_email) SELECT :noticeId, :email "
+                + "WHERE NOT EXISTS (SELECT 1 FROM notice_likes WHERE notice_id = :noticeId AND "
+                + PersonSql.samePerson("liker_email") + ") "
                 + "ON CONFLICT (notice_id, liker_email) DO NOTHING",
             params(noticeId, email)
         );
@@ -68,14 +79,14 @@ public class NoticeEngagementRepository {
 
     public void unlike(Long noticeId, String email) {
         jdbcTemplate.update(
-            "DELETE FROM notice_likes WHERE notice_id = :noticeId AND liker_email = :email",
+            "DELETE FROM notice_likes WHERE notice_id = :noticeId AND " + PersonSql.samePerson("liker_email"),
             params(noticeId, email)
         );
     }
 
     public boolean hasLiked(Long noticeId, String email) {
         Integer found = jdbcTemplate.queryForObject(
-            "SELECT count(*) FROM notice_likes WHERE notice_id = :noticeId AND liker_email = :email",
+            "SELECT count(*) FROM notice_likes WHERE notice_id = :noticeId AND " + PersonSql.samePerson("liker_email"),
             params(noticeId, email),
             Integer.class
         );
@@ -122,10 +133,16 @@ public class NoticeEngagementRepository {
         return counts;
     }
 
-    /** Returns whether this call added the like; false when the person liked the comment already. */
+    /**
+     * Returns whether this call added the like; false when the person liked the comment already,
+     * with this email or another of theirs.
+     */
     public boolean likeComment(Long commentId, String email) {
+        jdbcTemplate.queryForList(PersonSql.LOCK_PERSON, commentParams(commentId, email), Long.class);
         return jdbcTemplate.update(
-            "INSERT INTO notice_comment_likes (comment_id, liker_email) VALUES (:commentId, :email) "
+            "INSERT INTO notice_comment_likes (comment_id, liker_email) SELECT :commentId, :email "
+                + "WHERE NOT EXISTS (SELECT 1 FROM notice_comment_likes WHERE comment_id = :commentId AND "
+                + PersonSql.samePerson("liker_email") + ") "
                 + "ON CONFLICT (comment_id, liker_email) DO NOTHING",
             commentParams(commentId, email)
         ) > 0;
@@ -133,7 +150,7 @@ public class NoticeEngagementRepository {
 
     public void unlikeComment(Long commentId, String email) {
         jdbcTemplate.update(
-            "DELETE FROM notice_comment_likes WHERE comment_id = :commentId AND liker_email = :email",
+            "DELETE FROM notice_comment_likes WHERE comment_id = :commentId AND " + PersonSql.samePerson("liker_email"),
             commentParams(commentId, email)
         );
     }
@@ -162,7 +179,7 @@ public class NoticeEngagementRepository {
     public Set<Long> findLikedCommentIds(Long noticeId, String email) {
         List<Long> ids = jdbcTemplate.queryForList(
             "SELECT l.comment_id FROM notice_comment_likes l JOIN notice_comments c ON c.id = l.comment_id "
-                + "WHERE c.notice_id = :noticeId AND l.liker_email = :email",
+                + "WHERE c.notice_id = :noticeId AND " + PersonSql.samePerson("l.liker_email"),
             new MapSqlParameterSource().addValue("noticeId", noticeId).addValue("email", email),
             Long.class
         );

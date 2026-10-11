@@ -317,6 +317,27 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             PathPatternParser.defaultInstance.parse("/api/access/result-editors/{email}"),
             AuthType.SUPER_ADMIN_EMAIL
         ),
+        // Emails grouped as one person: super admins only; the controller checks the same.
+        new ProtectedRoute(
+            "GET",
+            PathPatternParser.defaultInstance.parse("/api/access/people"),
+            AuthType.SUPER_ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "POST",
+            PathPatternParser.defaultInstance.parse("/api/access/people"),
+            AuthType.SUPER_ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "PATCH",
+            PathPatternParser.defaultInstance.parse("/api/access/people/{personId}"),
+            AuthType.SUPER_ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "POST",
+            PathPatternParser.defaultInstance.parse("/api/access/people/ungroup"),
+            AuthType.SUPER_ADMIN_EMAIL
+        ),
         new ProtectedRoute(
             "GET",
             PathPatternParser.defaultInstance.parse("/api/access/allowed-users"),

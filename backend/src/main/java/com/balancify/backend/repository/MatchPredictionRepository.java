@@ -13,6 +13,9 @@ public interface MatchPredictionRepository extends JpaRepository<MatchPrediction
 
     Optional<MatchPrediction> findByMatchIdAndPredictorEmail(Long matchId, String predictorEmail);
 
+    /** A person's prediction on a match, whichever of their emails made it. */
+    List<MatchPrediction> findByMatchIdAndPredictorEmailInOrderByUpdatedAtDescIdDesc(Long matchId, Collection<String> predictorEmails);
+
     List<MatchPrediction> findByMatchIdOrderByPredictorEmailAsc(Long matchId);
 
     List<MatchPrediction> findByMatchIdIn(Collection<Long> matchIds);
@@ -21,21 +24,21 @@ public interface MatchPredictionRepository extends JpaRepository<MatchPrediction
         select prediction
         from MatchPrediction prediction, Match game
         where game.id = prediction.matchId
-          and prediction.predictorEmail = :email
+          and prediction.predictorEmail in :emails
           and game.winningTeam is not null
         order by prediction.matchId desc
         """)
-    List<MatchPrediction> findResolvedByPredictor(@Param("email") String email, Pageable pageable);
+    List<MatchPrediction> findResolvedByPredictors(@Param("emails") Collection<String> emails, Pageable pageable);
 
     @Query("""
         select count(prediction) as total,
                coalesce(sum(case when prediction.predictedTeam = game.winningTeam then 1 else 0 end), 0) as hits
         from MatchPrediction prediction, Match game
         where game.id = prediction.matchId
-          and prediction.predictorEmail = :email
+          and prediction.predictorEmail in :emails
           and game.winningTeam is not null
         """)
-    PredictionRecord summarizeResolved(@Param("email") String email);
+    PredictionRecord summarizeResolved(@Param("emails") Collection<String> emails);
 
     interface PredictionRecord {
         Long getTotal();

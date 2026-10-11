@@ -57,7 +57,7 @@ public class BoardSearchService {
         });
         Map<String, String> nicknames = authors.isEmpty()
             ? Map.of()
-            : accessControlService.resolveDisplayNicknames(authors);
+            : accessControlService.resolvePersonNames(authors);
 
         List<BoardSearchItemResponse> results = rows.stream()
             .map(row -> new BoardSearchItemResponse(

@@ -202,7 +202,8 @@ import org.springframework.test.web.servlet.ResultMatcher;
     NotificationController.class,
     PredictionController.class,
     TeamScoreController.class,
-    PrizeEventController.class
+    PrizeEventController.class,
+    com.balancify.backend.api.access.AccessPeopleController.class
 })
 @Import({ AdminKeyFilter.class, ServiceAccessFilter.class, AdminKeyProperties.class })
 @TestPropertySource(properties = {
@@ -357,6 +358,9 @@ class AdminKeyFilterTest {
 
     @MockitoBean
     private NotificationService notificationService;
+
+    @MockitoBean
+    private com.balancify.backend.service.AccessPersonService accessPersonService;
 
     @BeforeEach
     void setUp() {
@@ -3968,6 +3972,49 @@ class AdminKeyFilterTest {
         mockMvc
             .perform(put("/api/groups/1/players/99/dormant").header("X-USER-EMAIL", "admin@hei.gg"))
             .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void keepsGroupingEmailsAsOnePersonWithSuperAdmins() throws Exception {
+        com.balancify.backend.service.AccessPersonService.Overview empty =
+            new com.balancify.backend.service.AccessPersonService.Overview(List.of(), List.of(), List.of());
+        when(accessPersonService.overview()).thenReturn(empty);
+        when(accessPersonService.group(any(), any(), any(), any())).thenReturn(empty);
+        when(accessPersonService.rename(any(), any(), any(), any())).thenReturn(empty);
+        when(accessPersonService.ungroup(any(), any(), any())).thenReturn(empty);
+
+        for (String email : new String[] {"", "member@hei.gg", "admin@hei.gg"}) {
+            mockMvc.perform(get("/api/access/people").header("X-USER-EMAIL", email)).andExpect(status().isForbidden());
+            mockMvc
+                .perform(post("/api/access/people").header("X-USER-EMAIL", email)
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"emails\":[\"a@hei.gg\",\"b@hei.gg\"]}"))
+                .andExpect(status().isForbidden());
+            mockMvc
+                .perform(patch("/api/access/people/5").header("X-USER-EMAIL", email)
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"displayName\":\"YOUR_USERNAME\"}"))
+                .andExpect(status().isForbidden());
+            mockMvc
+                .perform(post("/api/access/people/ungroup").header("X-USER-EMAIL", email)
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"a@hei.gg\"}"))
+                .andExpect(status().isForbidden());
+        }
+        verify(accessPersonService, never()).group(any(), any(), any(), any());
+
+        mockMvc
+            .perform(get("/api/access/people").header("X-USER-EMAIL", "superadmin@hei.gg"))
+            .andExpect(status().isOk())
+            .andExpect(header().string("Cache-Control", "no-store, max-age=0"));
+        mockMvc
+            .perform(post("/api/access/people").header("X-USER-EMAIL", "superadmin@hei.gg")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"emails\":[\"a@hei.gg\",\"b@hei.gg\"],\"displayName\":\"YOUR_USERNAME\"}"))
+            .andExpect(status().isOk());
+        verify(accessPersonService).group(List.of("a@hei.gg", "b@hei.gg"), "YOUR_USERNAME", "superadmin@hei.gg", "superadmin");
+        mockMvc
+            .perform(post("/api/access/people/ungroup").header("X-USER-EMAIL", "superadmin@hei.gg")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"a@hei.gg\"}"))
+            .andExpect(status().isOk());
+        verify(accessPersonService).ungroup("a@hei.gg", "superadmin@hei.gg", "superadmin");
     }
 
     @Test

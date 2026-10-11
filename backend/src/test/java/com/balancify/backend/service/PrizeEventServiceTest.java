@@ -96,7 +96,7 @@ class PrizeEventServiceTest {
             total(13L, "c@example.com", 7),
             total(14L, "d@example.com", 3)
         ));
-        when(accessControlService.resolveDisplayNicknames(anyList())).thenReturn(Map.of(
+        when(accessControlService.resolvePersonNames(anyList())).thenReturn(Map.of(
             "a@example.com", "A",
             "b@example.com", "B",
             "c@example.com", "C",

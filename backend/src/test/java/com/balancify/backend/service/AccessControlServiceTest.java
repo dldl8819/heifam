@@ -53,6 +53,9 @@ class AccessControlServiceTest {
     @Mock
     private MatchResultEditorEmailRepository matchResultEditorEmailRepository;
 
+    @Mock
+    private com.balancify.backend.repository.AccessPersonRepository accessPersonRepository;
+
     private AccessControlService accessControlService;
 
     @BeforeEach
@@ -82,6 +85,7 @@ class AccessControlServiceTest {
             allowedUserEmailRepository,
             userRacePreferenceRepository,
             matchResultEditorEmailRepository,
+            accessPersonRepository,
             60_000L
         );
     }
@@ -206,6 +210,7 @@ class AccessControlServiceTest {
             allowedUserEmailRepository,
             userRacePreferenceRepository,
             matchResultEditorEmailRepository,
+            accessPersonRepository,
             60_000L
         );
 
@@ -242,6 +247,7 @@ class AccessControlServiceTest {
             allowedUserEmailRepository,
             userRacePreferenceRepository,
             matchResultEditorEmailRepository,
+            accessPersonRepository,
             60_000L
         );
 
@@ -257,6 +263,7 @@ class AccessControlServiceTest {
             allowedUserEmailRepository,
             userRacePreferenceRepository,
             matchResultEditorEmailRepository,
+            accessPersonRepository,
             60_000L
         );
 
@@ -549,6 +556,7 @@ class AccessControlServiceTest {
             allowedUserEmailRepository,
             userRacePreferenceRepository,
             matchResultEditorEmailRepository,
+            accessPersonRepository,
             5L
         );
 

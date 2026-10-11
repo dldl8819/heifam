@@ -15,10 +15,12 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -69,6 +71,9 @@ public class OperationAuditLogService {
     public static final String ACTION_PRIZE_EVENT_CANCELLED = "PRIZE_EVENT_CANCELLED";
     public static final String ACTION_PRIZE_DRAW_SAVED = "PRIZE_DRAW_SAVED";
     public static final String ACTION_PRIZE_DRAW_DELETED = "PRIZE_DRAW_DELETED";
+    public static final String ACTION_ACCESS_PEOPLE_GROUPED = "ACCESS_PEOPLE_GROUPED";
+    public static final String ACTION_ACCESS_PEOPLE_RENAMED = "ACCESS_PEOPLE_RENAMED";
+    public static final String ACTION_ACCESS_PEOPLE_UNGROUPED = "ACCESS_PEOPLE_UNGROUPED";
 
     private static final int MAX_PAGE_SIZE = 200;
 
@@ -137,9 +142,18 @@ public class OperationAuditLogService {
                 buildSpecification(normalizedFilter, retentionCutoff, resultEditorsOnly),
                 pageRequest
             );
+        // Whoever acted with an email grouped as one person shows as that person, earlier entries included.
+        Set<String> actors = new HashSet<>();
+        logs.forEach(log -> {
+            String actorEmail = trimToNull(log.getActorEmail());
+            if (actorEmail != null) {
+                actors.add(actorEmail.toLowerCase(Locale.ROOT));
+            }
+        });
+        Map<String, String> personNames = actors.isEmpty() ? Map.of() : accessControlService.resolveGroupedNames(actors);
         List<OperationAuditLogResponse> items = logs
             .stream()
-            .map(this::toResponse)
+            .map(log -> toResponse(log, personNames))
             .toList();
         return new OperationAuditLogPageResponse(
             items,
@@ -384,6 +398,26 @@ public class OperationAuditLogService {
             groupId
         );
         log.setSummary(dormant ? "휴면 처리" : "휴면 해제");
+        operationAuditLogRepository.save(log);
+    }
+
+    /** A super admin grouped emails as one person, renamed one, or took an email out. Counts only, no emails. */
+    @Transactional
+    public void recordAccessPeople(
+        String action,
+        String actorEmail,
+        String actorNickname,
+        Long personId,
+        String displayName,
+        String details
+    ) {
+        OperationAuditLog log = baseLog(actorEmail, actorNickname, action, "ACCESS_PERSON", personId, displayName, null);
+        log.setSummary(switch (action) {
+            case ACTION_ACCESS_PEOPLE_GROUPED -> "같은 사람으로 묶기";
+            case ACTION_ACCESS_PEOPLE_RENAMED -> "대표 이름 바꾸기";
+            default -> "묶음에서 이메일 빼기";
+        });
+        log.setDetails(details);
         operationAuditLogRepository.save(log);
     }
 
@@ -952,12 +986,14 @@ public class OperationAuditLogService {
         };
     }
 
-    private OperationAuditLogResponse toResponse(OperationAuditLog log) {
+    private OperationAuditLogResponse toResponse(OperationAuditLog log, Map<String, String> personNames) {
+        String actorEmail = trimToNull(log.getActorEmail());
+        String personName = actorEmail == null ? null : personNames.get(actorEmail.toLowerCase(Locale.ROOT));
         return new OperationAuditLogResponse(
             log.getId(),
             log.getAction(),
             null,
-            resolveActorNickname(log),
+            personName != null ? personName : resolveActorNickname(log),
             log.getTargetType(),
             log.getTargetId(),
             log.getTargetLabel(),

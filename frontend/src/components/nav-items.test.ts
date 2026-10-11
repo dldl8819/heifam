@@ -102,11 +102,12 @@ describe('navigation items', () => {
     }
   })
 
-  it('splits access in three for super admins and gives every admin the operation log', () => {
+  it('splits access in three for super admins, adds grouping emails as one person, and gives every admin the operation log', () => {
     expect(menu(getVisibleNavItems(SUPER_ADMIN), '/admin')).toEqual([
       '/admin/access/admins',
       '/admin/access/result-editors',
       '/admin/access/allowed',
+      '/admin/access/people',
       '/admin/audit',
     ])
     expect(menu(getVisibleNavItems(ADMIN), '/admin')).toEqual(['/admin/audit'])
@@ -139,6 +140,7 @@ describe('findActiveNavHref', () => {
     expect(findActiveNavHref('/points/policy', items)).toBe('/points/policy')
     expect(findActiveNavHref('/admin/access/allowed', items)).toBe('/admin/access/allowed')
     expect(findActiveNavHref('/admin/audit', items)).toBe('/admin/audit')
+    expect(findActiveNavHref('/admin/access/people', items)).toBe('/admin/access/people')
   })
 
   it('picks the longer of two links a page is under', () => {

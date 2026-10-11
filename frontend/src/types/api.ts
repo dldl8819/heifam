@@ -1029,6 +1029,8 @@ export type PointReason =
   | 'BOARD_POST_REVERSED'
   | 'BOARD_COMMENT'
   | 'BOARD_LIKE'
+  // Given back when emails were grouped as one person: what was earned twice for the same thing.
+  | 'PERSON_MERGE'
 
 // Points per time and the most times a day (for prediction hits, the most points a day).
 export type PointPolicyCapped = {
@@ -1048,6 +1050,39 @@ export type PointPolicyResponse = {
   boardPost: PointPolicyCapped
   boardComment: PointPolicyCapped
   boardLike: PointPolicyCapped
+}
+
+/** An email one person signs in with, as 같은 사람 묶기 shows it to super admins. */
+export type AccessPersonMember = {
+  email: string
+  nickname: string | null
+  // Still on an access list; one that lost access stays grouped until taken out.
+  hasAccess: boolean
+}
+
+export type AccessPerson = {
+  id: number
+  displayName: string
+  members: AccessPersonMember[]
+}
+
+/** Emails whose nicknames are one name with or without "(number)"; personId when some are grouped already. */
+export type AccessPersonSuggestion = {
+  displayName: string
+  personId: number | null
+  members: AccessPersonMember[]
+}
+
+export type AccessPersonCandidate = {
+  email: string
+  nickname: string | null
+  personId: number | null
+}
+
+export type AccessPeopleOverview = {
+  people: AccessPerson[]
+  suggestions: AccessPersonSuggestion[]
+  candidates: AccessPersonCandidate[]
 }
 
 export type PointHistoryItem = {

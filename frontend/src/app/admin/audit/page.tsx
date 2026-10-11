@@ -36,6 +36,9 @@ const AUDIT_ACTION_FILTER_OPTIONS = [
   'PRIZE_EVENT_CANCELLED',
   'PRIZE_DRAW_SAVED',
   'PRIZE_DRAW_DELETED',
+  'ACCESS_PEOPLE_GROUPED',
+  'ACCESS_PEOPLE_RENAMED',
+  'ACCESS_PEOPLE_UNGROUPED',
 ] as const
 
 type AuditActionFilter = (typeof AUDIT_ACTION_FILTER_OPTIONS)[number]
@@ -117,6 +120,12 @@ function getActionLabel(action: string): string {
       return t('audit.actions.playerDeactivated')
     case 'PLAYER_REACTIVATED':
       return t('audit.actions.playerReactivated')
+    case 'ACCESS_PEOPLE_GROUPED':
+      return t('audit.actions.accessPeopleGrouped')
+    case 'ACCESS_PEOPLE_RENAMED':
+      return t('audit.actions.accessPeopleRenamed')
+    case 'ACCESS_PEOPLE_UNGROUPED':
+      return t('audit.actions.accessPeopleUngrouped')
     case 'PLAYER_DORMANT':
       return t('audit.actions.playerDormant')
     case 'PLAYER_WOKEN':
