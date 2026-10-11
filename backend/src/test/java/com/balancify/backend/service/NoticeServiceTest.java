@@ -8,6 +8,8 @@ import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -29,6 +31,7 @@ import com.balancify.backend.repository.NoticeRepository;
 import com.balancify.backend.repository.NoticeVoteRepository;
 import com.balancify.backend.repository.NoticeVoteRepository.OptionRow;
 import com.balancify.backend.repository.NoticeVoteRepository.VoterRow;
+import com.balancify.backend.service.exception.CommentLimitException;
 import com.balancify.backend.service.exception.NoticeForbiddenException;
 import com.balancify.backend.service.exception.NoticeVoteClosedException;
 import com.balancify.backend.service.exception.NoticeVoteConflictException;
@@ -43,6 +46,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -86,6 +90,9 @@ class NoticeServiceTest {
     @Mock
     private OperationAuditLogService operationAuditLogService;
 
+    @Mock
+    private CommentQuotaService commentQuotaService;
+
     private NoticeService noticeService;
 
     @BeforeEach
@@ -97,7 +104,8 @@ class NoticeServiceTest {
             accessControlService,
             pointService,
             noticeVoteRepository,
-            operationAuditLogService
+            operationAuditLogService,
+            commentQuotaService
         );
         when(accessControlService.isAdminEmail(ADMIN)).thenReturn(true);
         when(accessControlService.resolveDisplayNickname(ADMIN)).thenReturn("OpsUser");
@@ -330,6 +338,26 @@ class NoticeServiceTest {
             .isInstanceOf(NoSuchElementException.class);
         verify(noticeCommentRepository, never()).save(any());
         verify(pointService, never()).grantNoticePoint(any(), any(), any());
+    }
+
+    @Test
+    void takesOneOfTheDaysCommentsForACommentOrAReplyAndSavesNothingOnceTheyAreUsedUp() {
+        stubNotice(2L, false);
+        when(noticeCommentRepository.findByIdAndNoticeId(9L, 2L)).thenReturn(Optional.of(comment(9L, 2L, MEMBER)));
+
+        noticeService.addComment(1L, 2L, OTHER, "a comment", null);
+        noticeService.addComment(1L, 2L, OTHER, "a reply", 9L);
+        InOrder order = inOrder(commentQuotaService, noticeCommentRepository);
+        order.verify(commentQuotaService).reserve(OTHER);
+        order.verify(noticeCommentRepository).save(any());
+        order.verify(commentQuotaService).reserve(OTHER);
+        order.verify(noticeCommentRepository).save(any());
+
+        doThrow(new CommentLimitException("used up")).when(commentQuotaService).reserve(MEMBER);
+        assertThatThrownBy(() -> noticeService.addComment(1L, 2L, MEMBER, "one more", null))
+            .isInstanceOf(CommentLimitException.class);
+        verify(noticeCommentRepository, times(2)).save(any());
+        verify(pointService, never()).grantNoticePoint(eq(MEMBER), any(), any());
     }
 
     @Test

@@ -8,6 +8,7 @@ import com.balancify.backend.api.group.dto.NoticeVoteOptionRequest;
 import com.balancify.backend.api.group.dto.NoticeVoteRequest;
 import com.balancify.backend.security.AuthenticatedRequestResolver;
 import com.balancify.backend.service.NoticeService;
+import com.balancify.backend.service.exception.CommentLimitException;
 import com.balancify.backend.service.exception.NoticeForbiddenException;
 import com.balancify.backend.service.exception.NoticeVoteClosedException;
 import com.balancify.backend.service.exception.NoticeVoteConflictException;
@@ -220,6 +221,8 @@ public class GroupNoticeController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, exception.getMessage(), exception);
         } catch (NoticeVoteClosedException | NoticeVoteConflictException exception) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, exception.getMessage(), exception);
+        } catch (CommentLimitException exception) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, exception.getMessage(), exception);
         } catch (NoSuchElementException exception) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, exception.getMessage(), exception);
         } catch (IllegalArgumentException exception) {

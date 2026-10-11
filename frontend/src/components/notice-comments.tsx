@@ -50,12 +50,15 @@ export function NoticeComments({ groupId, noticeId, comments, onChange }: Notice
       } catch (caught) {
         const status = caught instanceof ApiRequestError ? caught.status : 0
         // 404: someone removed the comment meanwhile. 403: it is not this member's to change or like.
+        // 429: more comments today than one person may write.
         setError(
           status === 404
             ? t('notices.posts.commentGone')
             : status === 403
               ? t('notices.posts.commentNotAllowed')
-              : t('notices.loadError')
+              : status === 429
+                ? t('notices.posts.commentLimitReached')
+                : t('notices.loadError')
         )
       } finally {
         setBusy(false)

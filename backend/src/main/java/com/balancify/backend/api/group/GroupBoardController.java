@@ -9,6 +9,7 @@ import com.balancify.backend.service.BoardService;
 import com.balancify.backend.service.BoardService.Board;
 import com.balancify.backend.service.exception.BoardForbiddenException;
 import com.balancify.backend.service.exception.BoardLimitException;
+import com.balancify.backend.service.exception.CommentLimitException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.NoSuchElementException;
 import java.util.function.Supplier;
@@ -179,7 +180,7 @@ public class GroupBoardController {
             return action.get();
         } catch (BoardForbiddenException exception) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, exception.getMessage(), exception);
-        } catch (BoardLimitException exception) {
+        } catch (BoardLimitException | CommentLimitException exception) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, exception.getMessage(), exception);
         } catch (NoSuchElementException exception) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, exception.getMessage(), exception);

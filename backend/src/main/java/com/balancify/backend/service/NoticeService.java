@@ -59,6 +59,7 @@ public class NoticeService {
     private final PointService pointService;
     private final NoticeVoteRepository noticeVoteRepository;
     private final OperationAuditLogService operationAuditLogService;
+    private final CommentQuotaService commentQuotaService;
 
     public NoticeService(
         NoticeRepository noticeRepository,
@@ -67,7 +68,8 @@ public class NoticeService {
         AccessControlService accessControlService,
         PointService pointService,
         NoticeVoteRepository noticeVoteRepository,
-        OperationAuditLogService operationAuditLogService
+        OperationAuditLogService operationAuditLogService,
+        CommentQuotaService commentQuotaService
     ) {
         this.noticeRepository = noticeRepository;
         this.noticeCommentRepository = noticeCommentRepository;
@@ -76,6 +78,7 @@ public class NoticeService {
         this.pointService = pointService;
         this.noticeVoteRepository = noticeVoteRepository;
         this.operationAuditLogService = operationAuditLogService;
+        this.commentQuotaService = commentQuotaService;
     }
 
     @Transactional(readOnly = true)
@@ -151,7 +154,7 @@ public class NoticeService {
     /**
      * A comment on the notice, or with parentId a reply. A reply to a reply is filed under the
      * comment that one answers, so a thread never goes deeper than one level. Replies earn the
-     * same once-per-notice commenting point as comments.
+     * same once-per-notice commenting point as comments, and count among the day's comments.
      */
     @Transactional
     public NoticeDetailResponse addComment(Long groupId, Long noticeId, String email, String content, Long parentId) {
@@ -167,6 +170,7 @@ public class NoticeService {
                 .orElseThrow(() -> new NoSuchElementException("Comment not found"));
             comment.setParentId(answered.getParentId() != null ? answered.getParentId() : answered.getId());
         }
+        commentQuotaService.reserve(author);
         noticeCommentRepository.save(comment);
         pointService.grantNoticePoint(author, notice.getId(), PointService.REASON_NOTICE_COMMENT);
         return detail(notice, author);
