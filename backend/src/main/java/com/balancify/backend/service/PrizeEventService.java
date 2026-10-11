@@ -284,7 +284,7 @@ public class PrizeEventService {
             ranked.add(totals.get(index));
             ranks.add(rank);
         }
-        Map<String, String> nicknames = accessControlService.resolveDisplayNicknames(
+        Map<String, String> nicknames = accessControlService.resolvePersonNames(
             ranked.stream().map(PointTransactionRepository.AccountPointTotal::getNormalizedEmail).toList()
         );
         List<Candidate> candidates = new ArrayList<>();

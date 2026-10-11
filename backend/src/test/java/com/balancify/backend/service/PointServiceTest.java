@@ -501,7 +501,7 @@ class PointServiceTest {
                 new Total(13L, "c@example.com", 3L),
                 new Total(14L, "d@example.com", 1L)
             ));
-        when(accessControlService.resolveDisplayNicknames(List.of("a@example.com", "b@example.com", "c@example.com", "d@example.com")))
+        when(accessControlService.resolvePersonNames(List.of("a@example.com", "b@example.com", "c@example.com", "d@example.com")))
             .thenReturn(Map.of("a@example.com", "A", "b@example.com", "B", "c@example.com", "C", "d@example.com", "D"));
 
         PointRankingResponse ranking = pointService.getMonthlyRanking(YearMonth.of(2026, 9));
@@ -533,7 +533,7 @@ class PointServiceTest {
             row(PointService.REASON_DAILY_LOGIN, 1, null),
             row(PointService.REASON_DAILY_LOGIN, 1, null)
         ));
-        when(accessControlService.resolveDisplayNicknames(List.of(MEMBER_EMAIL))).thenReturn(Map.of(MEMBER_EMAIL, "YOUR_USERNAME"));
+        when(accessControlService.resolvePersonNames(List.of(MEMBER_EMAIL))).thenReturn(Map.of(MEMBER_EMAIL, "YOUR_USERNAME"));
 
         PointMonthlyHistoryResponse history = pointService.getMonthlyHistory(21L, YearMonth.of(2026, 9), ADMIN_EMAIL);
 

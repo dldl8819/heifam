@@ -1,6 +1,7 @@
 import type {
   AccessAdminListResponse,
   AccessAllowedEmailListResponse,
+  AccessPeopleOverview,
   AccessMeResponse,
   AccessResultEditorListResponse,
   BalanceRequest,
@@ -1311,6 +1312,48 @@ export const apiClient = {
         method: 'PUT',
         body: JSON.stringify({ canViewMmr }),
       },
+      {
+        requireUserEmail: true,
+        includeUserEmail: true,
+        timeoutMs: ACCESS_API_REQUEST_TIMEOUT_MS,
+        baseUrlOverride: ACCESS_API_BASE_URL,
+      }
+    ),
+  // 같은 사람 묶기 (super admins): emails one person signs in with, grouped.
+  getAccessPeople: () =>
+    apiRequest<AccessPeopleOverview>('/api/access/people', undefined, {
+      requireUserEmail: true,
+      includeUserEmail: true,
+      timeoutMs: ACCESS_API_REQUEST_TIMEOUT_MS,
+      baseUrlOverride: ACCESS_API_BASE_URL,
+    }),
+  groupAccessPeople: (emails: string[], displayName: string) =>
+    apiRequest<AccessPeopleOverview>(
+      '/api/access/people',
+      { method: 'POST', body: JSON.stringify({ emails, displayName }) },
+      {
+        requireUserEmail: true,
+        includeUserEmail: true,
+        timeoutMs: ACCESS_API_REQUEST_TIMEOUT_MS,
+        baseUrlOverride: ACCESS_API_BASE_URL,
+      }
+    ),
+  renameAccessPerson: (personId: number, displayName: string) =>
+    apiRequest<AccessPeopleOverview>(
+      `/api/access/people/${personId}`,
+      { method: 'PATCH', body: JSON.stringify({ displayName }) },
+      {
+        requireUserEmail: true,
+        includeUserEmail: true,
+        timeoutMs: ACCESS_API_REQUEST_TIMEOUT_MS,
+        baseUrlOverride: ACCESS_API_BASE_URL,
+      }
+    ),
+  // The email goes in the body so that it stays out of request logs.
+  ungroupAccessEmail: (email: string) =>
+    apiRequest<AccessPeopleOverview>(
+      '/api/access/people/ungroup',
+      { method: 'POST', body: JSON.stringify({ email }) },
       {
         requireUserEmail: true,
         includeUserEmail: true,

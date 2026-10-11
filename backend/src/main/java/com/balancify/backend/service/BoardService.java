@@ -198,7 +198,7 @@ public class BoardService {
         PostRow post = requireReadable(groupId, board, postId, author);
         String text = requireText(content, MAX_COMMENT_LENGTH, "댓글은 1~" + MAX_COMMENT_LENGTH + "자로 입력해 주세요.");
         boardRepository.insertComment(post.id(), author, text);
-        if (board.earnsPoints() && !author.equals(normalizeEmail(post.authorEmail()))) {
+        if (board.earnsPoints() && !isWriter(author, post.authorEmail())) {
             pointService.grantBoardCommentPoint(author, post.id());
         }
         return detail(requirePost(groupId, board, postId), board, author);
@@ -228,7 +228,7 @@ public class BoardService {
         PostRow post = requireReadable(groupId, board, postId, member);
         if (liked) {
             boardRepository.like(post.id(), member);
-            if (board.earnsPoints() && !member.equals(normalizeEmail(post.authorEmail()))) {
+            if (board.earnsPoints() && !isWriter(member, post.authorEmail())) {
                 pointService.grantBoardLikePoint(member, post.id());
             }
         } else {
@@ -296,6 +296,15 @@ public class BoardService {
             .orElseThrow(() -> new NoSuchElementException("Post not found"));
     }
 
+    /**
+     * Whether the email wrote the post, itself or as another email of the same person: nobody earns
+     * points on their own post. Editing and removing still go by the email that wrote it.
+     */
+    private boolean isWriter(String email, String authorEmail) {
+        String author = normalizeEmail(authorEmail);
+        return email.equals(author) || accessControlService.personEmailsOf(email).contains(author);
+    }
+
     /** A post the reader may not see answers like one that is not there. */
     private PostRow requireReadable(Long groupId, Board board, Long postId, String reader) {
         PostRow post = requirePost(groupId, board, postId);
@@ -317,7 +326,7 @@ public class BoardService {
         });
         Map<String, String> nicknames = new LinkedHashMap<>();
         if (!unique.isEmpty()) {
-            accessControlService.resolveDisplayNicknames(unique).forEach((email, nickname) -> {
+            accessControlService.resolvePersonNames(unique).forEach((email, nickname) -> {
                 if (nickname != null) {
                     nicknames.put(email, nickname);
                 }

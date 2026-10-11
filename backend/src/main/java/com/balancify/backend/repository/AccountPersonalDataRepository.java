@@ -242,6 +242,26 @@ public class AccountPersonalDataRepository {
             jdbcTemplate.update("DELETE FROM notice_likes WHERE liker_email = :email", parameters);
             jdbcTemplate.update("DELETE FROM notice_comment_likes WHERE liker_email = :email", parameters);
             jdbcTemplate.update("DELETE FROM notice_votes WHERE voter_email = :email", parameters);
+            // A person's points stay theirs when one of their emails goes: the account they share
+            // passes to another of their emails before the account of this email is deleted below.
+            jdbcTemplate.update(
+                "UPDATE point_accounts SET normalized_email = ("
+                    + "SELECT other.normalized_email FROM access_person_emails mine "
+                    + "JOIN access_person_emails other ON other.person_id = mine.person_id "
+                    + "WHERE mine.normalized_email = :email AND other.normalized_email <> :email "
+                    + "ORDER BY other.normalized_email LIMIT 1) "
+                    + "WHERE normalized_email = :email AND EXISTS ("
+                    + "SELECT other.normalized_email FROM access_person_emails mine "
+                    + "JOIN access_person_emails other ON other.person_id = mine.person_id "
+                    + "WHERE mine.normalized_email = :email AND other.normalized_email <> :email)",
+                parameters
+            );
+            // The email leaves the person it was grouped with; a person left with one email is none.
+            jdbcTemplate.update("DELETE FROM access_person_emails WHERE normalized_email = :email", parameters);
+            jdbcTemplate.update(
+                "DELETE FROM access_people p WHERE (SELECT count(*) FROM access_person_emails e WHERE e.person_id = p.id) < 2",
+                parameters
+            );
             // An option they added to a vote stays, with the votes others gave it, but no longer theirs.
             jdbcTemplate.update(
                 "UPDATE notice_vote_options SET created_by_email = NULL WHERE created_by_email = :email",

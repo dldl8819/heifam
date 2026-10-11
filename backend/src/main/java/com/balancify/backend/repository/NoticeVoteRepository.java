@@ -74,7 +74,18 @@ public class NoticeVoteRepository {
     }
 
     /** One vote per person and notice: voting again moves it to the other option. */
+    /**
+     * A vote is one a person: when the email is grouped with others as one person (access_people),
+     * a vote any of them gave this notice moves to this one. The person is locked first, so two of
+     * their emails voting at once come one after the other.
+     */
     public void castVote(Long noticeId, String email, Long optionId) {
+        jdbcTemplate.queryForList(PersonSql.LOCK_PERSON, voter(noticeId, email), Long.class);
+        jdbcTemplate.update(
+            "DELETE FROM notice_votes WHERE notice_id = :noticeId AND voter_email <> :email "
+                + "AND voter_email IN (" + PersonSql.SAME_PERSON + ")",
+            voter(noticeId, email)
+        );
         jdbcTemplate.update(
             "INSERT INTO notice_votes (notice_id, voter_email, option_id) VALUES (:noticeId, :email, :optionId) "
                 + "ON CONFLICT (notice_id, voter_email) DO UPDATE SET option_id = EXCLUDED.option_id, updated_at = now() "
@@ -85,15 +96,18 @@ public class NoticeVoteRepository {
 
     public void withdrawVote(Long noticeId, String email) {
         jdbcTemplate.update(
-            "DELETE FROM notice_votes WHERE notice_id = :noticeId AND voter_email = :email",
+            "DELETE FROM notice_votes WHERE notice_id = :noticeId "
+                + "AND " + PersonSql.samePerson("voter_email"),
             voter(noticeId, email)
         );
     }
 
-    /** The option the person voted for on the notice, or empty when they have not voted. */
+    /** The option the person voted for on the notice, with any of their emails, or empty when they have not voted. */
     public Optional<Long> findVotedOptionId(Long noticeId, String email) {
         return jdbcTemplate.queryForList(
-            "SELECT option_id FROM notice_votes WHERE notice_id = :noticeId AND voter_email = :email",
+            "SELECT option_id FROM notice_votes WHERE notice_id = :noticeId "
+                + "AND " + PersonSql.samePerson("voter_email") + " "
+                + "ORDER BY updated_at DESC, id DESC LIMIT 1",
             voter(noticeId, email),
             Long.class
         ).stream().findFirst();

@@ -20,6 +20,7 @@ const REASON_KEYS: Record<PointReason, string> = {
   BOARD_POST_REVERSED: 'points.reasons.boardPostReversed',
   BOARD_COMMENT: 'points.reasons.boardComment',
   BOARD_LIKE: 'points.reasons.boardLike',
+  PERSON_MERGE: 'points.reasons.personMerge',
 }
 
 

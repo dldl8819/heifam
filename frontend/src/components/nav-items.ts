@@ -74,6 +74,7 @@ function adminMenu(isSuperAdmin: boolean): NavItem {
             { label: t('nav.accessAdmins'), href: '/admin/access/admins' },
             { label: t('nav.accessResultEditors'), href: '/admin/access/result-editors' },
             { label: t('nav.accessAllowed'), href: '/admin/access/allowed' },
+            { label: t('nav.accessPeople'), href: '/admin/access/people' },
           ]
         : []),
       { label: t('nav.auditLogs'), href: '/admin/audit' },

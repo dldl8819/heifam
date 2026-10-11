@@ -528,7 +528,7 @@ public class NoticeService {
         });
         Map<String, String> nicknames = new LinkedHashMap<>();
         if (!unique.isEmpty()) {
-            accessControlService.resolveDisplayNicknames(unique).forEach((email, nickname) -> {
+            accessControlService.resolvePersonNames(unique).forEach((email, nickname) -> {
                 if (nickname != null) {
                     nicknames.put(email, nickname);
                 }

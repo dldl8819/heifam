@@ -214,7 +214,7 @@ public class PointService {
     /** Which of these matches the person has confirmed, and how many results they confirmed today. */
     @Transactional(readOnly = true)
     public MatchConfirmState getMatchConfirmState(String email, Collection<Long> matchIds) {
-        Optional<PointAccount> account = pointAccountRepository.findByNormalizedEmail(normalizeEmail(email));
+        Optional<PointAccount> account = pointAccountRepository.findByNormalizedEmail(accountEmail(email));
         if (account.isEmpty()) {
             return new MatchConfirmState(Set.of(), 0);
         }
@@ -237,7 +237,7 @@ public class PointService {
 
     @Transactional(readOnly = true)
     public boolean hasConfirmedMatch(String email, Long matchId) {
-        return matchId != null && pointAccountRepository.findByNormalizedEmail(normalizeEmail(email))
+        return matchId != null && pointAccountRepository.findByNormalizedEmail(accountEmail(email))
             .map(account -> pointTransactionRepository.existsByAccount_IdAndReasonAndReferenceKey(
                 account.getId(), REASON_MATCH_CONFIRM, matchReference(matchId)
             ))
@@ -430,7 +430,7 @@ public class PointService {
             return;
         }
         int target = hit && canUsePoints(normalizedEmail) ? pointProperties.getPredictionHit() : 0;
-        if (target == 0 && pointAccountRepository.findByNormalizedEmail(normalizedEmail).isEmpty()) {
+        if (target == 0 && pointAccountRepository.findByNormalizedEmail(accountEmail(normalizedEmail)).isEmpty()) {
             return;
         }
 
@@ -457,7 +457,7 @@ public class PointService {
     public PointSummaryResponse getSummary(String email) {
         String normalizedEmail = normalizeEmail(email);
         LocalDate today = today();
-        Optional<PointAccount> account = pointAccountRepository.findByNormalizedEmail(normalizedEmail);
+        Optional<PointAccount> account = pointAccountRepository.findByNormalizedEmail(accountEmail(normalizedEmail));
         if (account.isEmpty()) {
             return new PointSummaryResponse(
                 0L,
@@ -524,7 +524,7 @@ public class PointService {
             targetMonth.atEndOfMonth()
         );
         List<PointTransactionRepository.AccountPointTotal> ranked = totals.subList(0, Math.min(totals.size(), RANKING_LIMIT));
-        Map<String, String> nicknames = accessControlService.resolveDisplayNicknames(
+        Map<String, String> nicknames = accessControlService.resolvePersonNames(
             ranked.stream().map(PointTransactionRepository.AccountPointTotal::getNormalizedEmail).toList()
         );
 
@@ -568,7 +568,8 @@ public class PointService {
         );
         String requester = normalizeEmail(requesterEmail);
         // The time of day would tell every member when this one signs in or reads a notice.
-        boolean showDetails = requester.equals(account.getNormalizedEmail()) || accessControlService.isSuperAdminEmail(requester);
+        boolean showDetails = (!requester.isEmpty() && accountEmail(requester).equals(account.getNormalizedEmail()))
+            || accessControlService.isSuperAdminEmail(requester);
 
         Map<String, long[]> byReason = new LinkedHashMap<>();
         long total = 0;
@@ -594,7 +595,7 @@ public class PointService {
                 showDetails ? row.getCreatedAt() : null
             ))
             .toList();
-        String nickname = accessControlService.resolveDisplayNicknames(List.of(account.getNormalizedEmail()))
+        String nickname = accessControlService.resolvePersonNames(List.of(account.getNormalizedEmail()))
             .get(account.getNormalizedEmail());
         return new PointMonthlyHistoryResponse(targetMonth.toString(), accountId, nickname, total, reasons, entries);
     }
@@ -604,8 +605,9 @@ public class PointService {
     }
 
     private PointAccount lockAccount(String normalizedEmail) {
-        pointAccountRepository.insertIfMissing(normalizedEmail);
-        return pointAccountRepository.findByNormalizedEmailForUpdate(normalizedEmail)
+        String owner = accountEmail(normalizedEmail);
+        pointAccountRepository.insertIfMissing(owner);
+        return pointAccountRepository.findByNormalizedEmailForUpdate(owner)
             .orElseThrow(() -> new IllegalStateException("Point account could not be created"));
     }
 
@@ -641,6 +643,19 @@ public class PointService {
                 dailyLoginGrantedOn.put(normalizedEmail, day);
             }
         });
+    }
+
+    /**
+     * Whose account holds this email's points: one account a person, so an email grouped with others
+     * as one person earns into, and reads, the account they share. Whether the email may use points
+     * at all is still its own (canUsePoints).
+     */
+    private String accountEmail(String email) {
+        String normalized = normalizeEmail(email);
+        if (normalized.isEmpty()) {
+            return normalized;
+        }
+        return pointAccountRepository.findPersonAccountEmail(normalized).orElse(normalized);
     }
 
     private LocalDate today() {

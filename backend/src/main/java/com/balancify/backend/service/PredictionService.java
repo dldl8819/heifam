@@ -137,7 +137,13 @@ public class PredictionService {
             throw new IllegalArgumentException("본인이 뛰는 경기는 예측할 수 없습니다.");
         }
 
-        MatchPrediction prediction = matchPredictionRepository.findByMatchIdAndPredictorEmail(matchId, normalizedEmail)
+        // One prediction a person: picking again with another of their emails changes the same pick.
+        // The match is locked above, so two of their emails picking at once come one after the other.
+        Set<String> mine = personEmails(normalizedEmail);
+        MatchPrediction prediction = matchPredictionRepository
+            .findByMatchIdAndPredictorEmailInOrderByUpdatedAtDescIdDesc(matchId, mine)
+            .stream()
+            .findFirst()
             .orElseGet(() -> {
                 MatchPrediction created = new MatchPrediction();
                 created.setMatchId(matchId);
@@ -146,7 +152,7 @@ public class PredictionService {
             });
         prediction.setPredictedTeam(pickedTeam);
         matchPredictionRepository.save(prediction);
-        return matchResponse(match, participants, List.of(prediction), normalizedEmail, false, now, Map.of());
+        return matchResponse(match, participants, List.of(prediction), normalizedEmail, mine, false, now, Map.of());
     }
 
     /** Closes picks for a match ahead of time; once its result is in they are closed anyway. */
@@ -203,8 +209,9 @@ public class PredictionService {
         String normalizedEmail = normalizeEmail(email);
         OffsetDateTime now = now();
         List<Match> awaiting = matchRepository.findAwaitingResultSince(groupId, now.minusHours(AWAITING_LOOKBACK_HOURS));
-        List<MatchPrediction> myHistory = matchPredictionRepository.findResolvedByPredictor(
-            normalizedEmail,
+        Set<String> mine = personEmails(normalizedEmail);
+        List<MatchPrediction> myHistory = matchPredictionRepository.findResolvedByPredictors(
+            mine,
             PageRequest.of(0, HISTORY_LIMIT)
         );
         List<Match> historyMatches = new ArrayList<>();
@@ -236,7 +243,7 @@ public class PredictionService {
         awaiting.forEach(match -> namedEmails.add(normalizeEmail(match.getCreatedByEmail())));
         historyMatches.forEach(match -> namedEmails.add(normalizeEmail(match.getCreatedByEmail())));
         namedEmails.remove("");
-        Map<String, String> nicknames = accessControlService.resolveDisplayNicknames(List.copyOf(namedEmails));
+        Map<String, String> nicknames = accessControlService.resolvePersonNames(List.copyOf(namedEmails));
 
         List<PredictionMatchResponse> open = new ArrayList<>();
         List<PredictionMatchResponse> closed = new ArrayList<>();
@@ -246,6 +253,7 @@ public class PredictionService {
                 participantsByMatch.getOrDefault(match.getId(), List.of()),
                 predictionsByMatch.getOrDefault(match.getId(), List.of()),
                 normalizedEmail,
+                mine,
                 ownMatch(participantsByMatch.getOrDefault(match.getId(), List.of()), normalizedEmail, userId),
                 now,
                 nicknames
@@ -258,13 +266,14 @@ public class PredictionService {
                 participantsByMatch.getOrDefault(match.getId(), List.of()),
                 predictionsByMatch.getOrDefault(match.getId(), List.of()),
                 normalizedEmail,
+                mine,
                 false,
                 now,
                 nicknames
             ))
             .toList();
 
-        MatchPredictionRepository.PredictionRecord record = matchPredictionRepository.summarizeResolved(normalizedEmail);
+        MatchPredictionRepository.PredictionRecord record = matchPredictionRepository.summarizeResolved(mine);
         return new PredictionBoardResponse(
             now,
             windowMinutes,
@@ -283,6 +292,8 @@ public class PredictionService {
         List<MatchParticipant> participants,
         List<MatchPrediction> predictions,
         String email,
+        // The viewer's emails as one person: their pick is any of these.
+        Set<String> myEmails,
         boolean ownMatch,
         OffsetDateTime now,
         Map<String, String> nicknames
@@ -290,7 +301,7 @@ public class PredictionService {
         String winner = normalizeTeam(match.getWinningTeam());
         String state = winner != null ? STATE_RESOLVED : isOpen(match, now) ? STATE_OPEN : STATE_CLOSED;
         String myPick = predictions.stream()
-            .filter(prediction -> prediction.getPredictorEmail().equals(email))
+            .filter(prediction -> myEmails.contains(normalizeEmail(prediction.getPredictorEmail())))
             .map(MatchPrediction::getPredictedTeam)
             .findFirst()
             .orElse(null);
@@ -362,7 +373,18 @@ public class PredictionService {
     }
 
     private boolean ownMatch(List<MatchParticipant> participants, String email, String userId) {
-        return OwnPlayerPolicy.findOwn(participants, userId, accessControlService.resolveDisplayNickname(email)) != null;
+        if (OwnPlayerPolicy.findOwn(participants, userId, accessControlService.resolveDisplayNickname(email)) != null) {
+            return true;
+        }
+        // Signed in with a second email of theirs (민식(2)): the person's name is their player's too.
+        String personName = accessControlService.resolveGroupedNames(List.of(email)).get(email);
+        return personName != null && OwnPlayerPolicy.findOwn(participants, null, personName) != null;
+    }
+
+    private Set<String> personEmails(String normalizedEmail) {
+        Set<String> emails = new LinkedHashSet<>(accessControlService.personEmailsOf(normalizedEmail));
+        emails.add(normalizedEmail);
+        return emails;
     }
 
     private boolean belongsTo(Match match, Long groupId) {

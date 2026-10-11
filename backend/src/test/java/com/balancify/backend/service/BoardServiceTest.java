@@ -67,7 +67,7 @@ class BoardServiceTest {
         boardService = new BoardService(boardRepository, accessControlService, pointService);
         when(accessControlService.isAdminEmail(ADMIN)).thenReturn(true);
         // Only the nicknames asked for come back, so a test sees whose names the service looked up.
-        when(accessControlService.resolveDisplayNicknames(anyCollection())).thenAnswer(invocation -> {
+        when(accessControlService.resolvePersonNames(anyCollection())).thenAnswer(invocation -> {
             Collection<String> emails = invocation.getArgument(0);
             Map<String, String> found = new HashMap<>();
             emails.forEach(email -> {
@@ -128,7 +128,7 @@ class BoardServiceTest {
         // Nobody is named on the anonymous board, and nobody's name is even looked up.
         assertThat(forAdmin.posts()).extracting(BoardPostListItemResponse::authorNickname).containsOnlyNulls();
         assertThat(forWriter.posts()).extracting(BoardPostListItemResponse::authorNickname).containsOnlyNulls();
-        verify(accessControlService, never()).resolveDisplayNicknames(anyCollection());
+        verify(accessControlService, never()).resolvePersonNames(anyCollection());
     }
 
     @Test
@@ -224,7 +224,7 @@ class BoardServiceTest {
 
         // The writer's nickname is never asked for, so it cannot slip into an answer.
         ArgumentCaptor<Collection<String>> asked = ArgumentCaptor.forClass(Collection.class);
-        verify(accessControlService, org.mockito.Mockito.atLeastOnce()).resolveDisplayNicknames(asked.capture());
+        verify(accessControlService, org.mockito.Mockito.atLeastOnce()).resolvePersonNames(asked.capture());
         assertThat(asked.getAllValues()).allSatisfy(emails -> assertThat(emails).doesNotContain(WRITER));
     }
 
@@ -435,6 +435,18 @@ class BoardServiceTest {
         verify(pointService, never()).grantBoardCommentPoint(eq(WRITER), any());
         verify(pointService).grantBoardLikePoint(OTHER, 8L);
         verify(pointService, never()).grantBoardLikePoint(eq(WRITER), any());
+    }
+
+    @Test
+    void paysNothingOnAPostWrittenWithAnotherEmailOfTheSamePerson() {
+        when(boardRepository.findPost(1L, "FREE", 7L)).thenReturn(Optional.of(post(7L, "FREE", WRITER)));
+        when(accessControlService.personEmailsOf(OTHER)).thenReturn(java.util.Set.of(OTHER, WRITER));
+
+        boardService.addComment(1L, Board.FREE, 7L, OTHER, "hello");
+        boardService.setLike(1L, Board.FREE, 7L, OTHER, true);
+
+        verify(pointService, never()).grantBoardCommentPoint(any(), any());
+        verify(pointService, never()).grantBoardLikePoint(any(), any());
     }
 
     @Test

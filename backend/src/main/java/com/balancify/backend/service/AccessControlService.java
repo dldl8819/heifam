@@ -5,6 +5,7 @@ import com.balancify.backend.domain.AllowedUserEmail;
 import com.balancify.backend.domain.ManagedAdminEmail;
 import com.balancify.backend.domain.MatchResultEditorEmail;
 import com.balancify.backend.domain.UserRacePreference;
+import com.balancify.backend.repository.AccessPersonRepository;
 import com.balancify.backend.repository.AdminMmrAccessEmailRepository;
 import com.balancify.backend.repository.AllowedUserEmailRepository;
 import com.balancify.backend.repository.ManagedAdminEmailRepository;
@@ -44,6 +45,7 @@ public class AccessControlService {
     private final AllowedUserEmailRepository allowedUserEmailRepository;
     private final UserRacePreferenceRepository userRacePreferenceRepository;
     private final MatchResultEditorEmailRepository matchResultEditorEmailRepository;
+    private final AccessPersonRepository accessPersonRepository;
     private final ConcurrentMap<String, CachedAccessState> accessStateCache = new ConcurrentHashMap<>();
 
     /**
@@ -71,6 +73,7 @@ public class AccessControlService {
         AllowedUserEmailRepository allowedUserEmailRepository,
         UserRacePreferenceRepository userRacePreferenceRepository,
         MatchResultEditorEmailRepository matchResultEditorEmailRepository,
+        AccessPersonRepository accessPersonRepository,
         @Value(ACCESS_STATE_CACHE_TTL_PROPERTY) long accessStateCacheTtlMs
     ) {
         this.adminKeyProperties = adminKeyProperties;
@@ -79,6 +82,7 @@ public class AccessControlService {
         this.allowedUserEmailRepository = allowedUserEmailRepository;
         this.userRacePreferenceRepository = userRacePreferenceRepository;
         this.matchResultEditorEmailRepository = matchResultEditorEmailRepository;
+        this.accessPersonRepository = accessPersonRepository;
         this.accessStateCacheTtlMs = Math.max(0L, accessStateCacheTtlMs);
     }
 
@@ -593,6 +597,37 @@ public class AccessControlService {
             nicknames.put(normalizedEmail, knownNicknames.get(normalizedEmail));
         }
         return nicknames;
+    }
+
+    /**
+     * The names shown for the writers of posts and comments and for voters: the person's name for
+     * an email grouped as one person (민식 for 민식(2)), the access nickname otherwise. Only for
+     * showing: who someone is (their own player, their account) keeps going by
+     * resolveDisplayNickname(s).
+     */
+    public Map<String, String> resolvePersonNames(Collection<String> emails) {
+        Map<String, String> names = resolveDisplayNicknames(emails);
+        names.putAll(accessPersonRepository.displayNamesOf(names.keySet()));
+        return names;
+    }
+
+    /**
+     * The emails that are the same person as this one, itself included: what is done once a person
+     * (a prediction, a vote, a like) looks across them. Access is never widened by it.
+     */
+    public Set<String> personEmailsOf(String email) {
+        String normalized = normalizeEmail(email);
+        if (normalized.isEmpty()) {
+            return Set.of();
+        }
+        return new LinkedHashSet<>(accessPersonRepository.samePersonEmails(normalized));
+    }
+
+    /** The person's name for each of these emails that is grouped as one person; the others are left out. */
+    public Map<String, String> resolveGroupedNames(Collection<String> emails) {
+        List<String> normalized = emails.stream().map(this::normalizeEmail)
+            .filter(email -> !email.isEmpty()).distinct().toList();
+        return accessPersonRepository.displayNamesOf(normalized);
     }
 
     /** Every nickname the access lists know, by email; an admin entry's wins, as in resolveNickname. */

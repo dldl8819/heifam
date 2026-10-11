@@ -188,7 +188,7 @@ describe('route access', () => {
   it('keeps every one of the three access pages with super admins', () => {
     const admin = { isLoggedIn: true, canAccess: true, isAdmin: true, isSuperAdmin: false }
 
-    for (const path of ['/admin/access/admins', '/admin/access/result-editors', '/admin/access/allowed']) {
+    for (const path of ['/admin/access/admins', '/admin/access/result-editors', '/admin/access/allowed', '/admin/access/people']) {
       expect(getRouteAccessDecision(path, admin)).toEqual({ allowed: false, redirectTo: '/players', blocked: false })
       expect(getRouteAccessDecision(path, { ...admin, isSuperAdmin: true }).allowed).toBe(true)
     }

@@ -119,7 +119,7 @@ class PredictionServiceTest {
         Match match = match(10L, NOW.minusMinutes(1));
         stubMatch(match, participants(match));
         MatchPrediction earlier = prediction(10L, ADMIN, "HOME");
-        when(matchPredictionRepository.findByMatchIdAndPredictorEmail(10L, ADMIN)).thenReturn(Optional.of(earlier));
+        when(matchPredictionRepository.findByMatchIdAndPredictorEmailInOrderByUpdatedAtDescIdDesc(eq(10L), any())).thenReturn(List.of(earlier));
 
         service.predict(1L, 10L, ADMIN, null, "AWAY");
 
@@ -284,7 +284,7 @@ class PredictionServiceTest {
         resolved.setStatus(MatchStatus.COMPLETED);
         resolved.setResultRecordedByEmail(ADMIN);
         when(matchRepository.findAwaitingResultSince(eq(1L), any())).thenReturn(List.of(open, closed));
-        when(matchPredictionRepository.findResolvedByPredictor(eq(ADMIN), any()))
+        when(matchPredictionRepository.findResolvedByPredictors(eq(java.util.Set.of(ADMIN)), any()))
             .thenReturn(List.of(prediction(12L, ADMIN, "HOME")));
         when(matchRepository.findAllById(List.of(12L))).thenReturn(List.of(resolved));
         List<MatchParticipant> participants = new ArrayList<>();
@@ -300,13 +300,13 @@ class PredictionServiceTest {
             prediction(11L, "d@example.com", "HOME"),
             prediction(12L, ADMIN, "HOME")
         ));
-        when(matchPredictionRepository.summarizeResolved(ADMIN)).thenReturn(record(4, 3));
+        when(matchPredictionRepository.summarizeResolved(java.util.Set.of(ADMIN))).thenReturn(record(4, 3));
         java.util.Map<String, String> nicknames = new java.util.HashMap<>();
         nicknames.put(ADMIN, "Ops");
         nicknames.put("b@example.com", "bravo");
         nicknames.put("c@example.com", "Charlie");
         nicknames.put("d@example.com", null);
-        when(accessControlService.resolveDisplayNicknames(any())).thenReturn(nicknames);
+        when(accessControlService.resolvePersonNames(any())).thenReturn(nicknames);
         open.setCreatedByEmail("b@example.com");
         resolved.setCreatedByEmail(" Admin@Example.com ");
 
@@ -363,7 +363,7 @@ class PredictionServiceTest {
         someoneElses.setCreatedByEmail("b@example.com");
         someoneElses.setResultRecordedByEmail("c@example.com");
         when(matchRepository.findAwaitingResultSince(eq(1L), any())).thenReturn(List.of());
-        when(matchPredictionRepository.findResolvedByPredictor(eq(ADMIN), any()))
+        when(matchPredictionRepository.findResolvedByPredictors(eq(java.util.Set.of(ADMIN)), any()))
             .thenReturn(List.of(prediction(13L, ADMIN, "HOME"), prediction(12L, ADMIN, "HOME")));
         when(matchRepository.findAllById(List.of(13L, 12L))).thenReturn(List.of(someoneElses, mine));
         List<MatchParticipant> participants = new ArrayList<>();
@@ -372,8 +372,8 @@ class PredictionServiceTest {
         when(matchParticipantRepository.findByMatchIdInWithPlayerAndMatch(anyList())).thenReturn(participants);
         when(matchPredictionRepository.findByMatchIdIn(anyList()))
             .thenReturn(List.of(prediction(12L, ADMIN, "HOME"), prediction(13L, ADMIN, "HOME")));
-        when(matchPredictionRepository.summarizeResolved(ADMIN)).thenReturn(record(2, 2));
-        when(accessControlService.resolveDisplayNicknames(any())).thenReturn(new java.util.HashMap<>());
+        when(matchPredictionRepository.summarizeResolved(java.util.Set.of(ADMIN))).thenReturn(record(2, 2));
+        when(accessControlService.resolvePersonNames(any())).thenReturn(new java.util.HashMap<>());
 
         PredictionBoardResponse board = service.board(1L, ADMIN, null);
 
