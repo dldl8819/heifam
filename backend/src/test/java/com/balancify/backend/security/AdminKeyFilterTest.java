@@ -4018,6 +4018,46 @@ class AdminKeyFilterTest {
     }
 
     @Test
+    void keepsTheAccessListsWithSuperAdminsAsThePagesDo() throws Exception {
+        AccessControlService.AllowedEmailSnapshot allowed = new AccessControlService.AllowedEmailSnapshot(List.of());
+        when(accessControlService.getAdminEmailSnapshot())
+            .thenReturn(new AccessControlService.AdminEmailSnapshot(List.of(), List.of()));
+        when(accessControlService.getAllowedEmailSnapshot()).thenReturn(allowed);
+        when(accessControlService.addAllowedUserEmail(any(), any(), any())).thenReturn(allowed);
+        when(accessControlService.removeAllowedUserEmail(any(), any())).thenReturn(allowed);
+        when(accessControlService.updateAllowedUserEmailNickname(any(), any(), any())).thenReturn(allowed);
+
+        for (String email : new String[] {"", "member@hei.gg", "admin@hei.gg", "ops@hei.gg"}) {
+            mockMvc.perform(get("/api/access/admins").header("X-USER-EMAIL", email)).andExpect(status().isForbidden());
+            mockMvc.perform(get("/api/access/allowed-users").header("X-USER-EMAIL", email)).andExpect(status().isForbidden());
+            mockMvc
+                .perform(post("/api/access/allowed-users").header("X-USER-EMAIL", email)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"email\":\"YOUR_USERNAME@hei.gg\",\"nickname\":\"YOUR_USERNAME\"}"))
+                .andExpect(status().isForbidden());
+            mockMvc
+                .perform(delete("/api/access/allowed-users/member%40hei.gg").header("X-USER-EMAIL", email))
+                .andExpect(status().isForbidden());
+            mockMvc
+                .perform(put("/api/access/allowed-users/member%40hei.gg/nickname").header("X-USER-EMAIL", email)
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"nickname\":\"YOUR_USERNAME\"}"))
+                .andExpect(status().isForbidden());
+        }
+        verify(accessControlService, never()).addAllowedUserEmail(any(), any(), any());
+        verify(accessControlService, never()).removeAllowedUserEmail(any(), any());
+        verify(accessControlService, never()).updateAllowedUserEmailNickname(any(), any(), any());
+
+        mockMvc.perform(get("/api/access/admins").header("X-USER-EMAIL", "superadmin@hei.gg")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/access/allowed-users").header("X-USER-EMAIL", "superadmin@hei.gg")).andExpect(status().isOk());
+        mockMvc
+            .perform(post("/api/access/allowed-users").header("X-USER-EMAIL", "superadmin@hei.gg")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"YOUR_USERNAME@hei.gg\",\"nickname\":\"YOUR_USERNAME\"}"))
+            .andExpect(status().isOk());
+        verify(accessControlService).addAllowedUserEmail(eq("superadmin@hei.gg"), eq("YOUR_USERNAME@hei.gg"), eq("YOUR_USERNAME"));
+    }
+
+    @Test
     void doesNotRequireAdminKeyForHealthEndpoint() throws Exception {
         mockMvc
             .perform(get("/api/health"))
