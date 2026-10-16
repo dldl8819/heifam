@@ -1221,6 +1221,13 @@ export const apiClient = {
     apiRequest<CaptainDraftListResponse>(`/api/groups/${groupId}/captain-drafts`, undefined, {
       includeUserEmail: true,
     }),
+  // Removes a draft with its teams, sets and results (admins only); answers with the records left.
+  deleteCaptainDraft: (groupId: number, draftId: number) =>
+    apiRequest<CaptainDraftListResponse>(
+      `/api/groups/${groupId}/captain-drafts/${draftId}`,
+      { method: 'DELETE' },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
   getLatestCaptainDraft: (groupId: number) =>
     apiRequest<CaptainDraftResponse>(`/api/groups/${groupId}/captain-drafts/latest`, undefined, {
       includeUserEmail: true,

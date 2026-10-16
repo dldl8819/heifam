@@ -4,6 +4,7 @@ import com.balancify.backend.domain.CaptainDraftParticipant;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -30,4 +31,8 @@ public interface CaptainDraftParticipantRepository extends JpaRepository<Captain
         group by participant.draft.id
         """)
     List<DraftParticipantCount> countByDraftIds(@Param("draftIds") Collection<Long> draftIds);
+
+    @Modifying(flushAutomatically = true)
+    @Query("delete from CaptainDraftParticipant participant where participant.draft.id = :draftId")
+    int deleteByDraftId(@Param("draftId") Long draftId);
 }

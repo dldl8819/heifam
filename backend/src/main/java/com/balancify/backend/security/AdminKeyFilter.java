@@ -135,6 +135,11 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             AuthType.ADMIN_EMAIL
         ),
         new ProtectedRoute(
+            "DELETE",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/captain-drafts/{draftId}"),
+            AuthType.ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
             "PUT",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/captain-drafts/{draftId}/entries"),
             AuthType.ADMIN_EMAIL

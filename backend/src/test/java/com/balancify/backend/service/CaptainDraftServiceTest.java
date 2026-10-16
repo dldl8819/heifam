@@ -4,6 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.balancify.backend.api.group.dto.CaptainDraftCreateRequest;
@@ -29,10 +33,12 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -54,6 +60,9 @@ class CaptainDraftServiceTest {
     @Mock
     private CaptainDraftEntryRepository captainDraftEntryRepository;
 
+    @Mock
+    private OperationAuditLogService operationAuditLogService;
+
     private CaptainDraftService captainDraftService;
 
     @BeforeEach
@@ -63,7 +72,8 @@ class CaptainDraftServiceTest {
             playerRepository,
             captainDraftRepository,
             captainDraftParticipantRepository,
-            captainDraftEntryRepository
+            captainDraftEntryRepository,
+            operationAuditLogService
         );
     }
 
@@ -262,6 +272,39 @@ class CaptainDraftServiceTest {
         when(captainDraftRepository.findRecentWithCaptains(eq(1L), any())).thenReturn(List.of());
 
         assertThat(captainDraftService.listDrafts(1L).drafts()).isEmpty();
+    }
+
+    @Test
+    void deletesADraftWithItsSetsAndParticipantsAndLogsWhoDidIt() {
+        Group group = group(1L);
+        CaptainDraft draft = draft(group, 100L, "READY", 2, null, 1L, 2L);
+        when(captainDraftRepository.findByIdAndGroup_Id(100L, 1L)).thenReturn(Optional.of(draft));
+        when(captainDraftEntryRepository.deleteByDraftId(100L)).thenReturn(8);
+        when(captainDraftParticipantRepository.deleteByDraftId(100L)).thenReturn(10);
+        when(captainDraftRepository.findRecentWithCaptains(eq(1L), any())).thenReturn(List.of());
+
+        CaptainDraftListResponse response = captainDraftService.deleteDraft(1L, 100L, "admin@hei.gg", "Ops");
+
+        assertThat(response.drafts()).isEmpty();
+        InOrder order = inOrder(captainDraftEntryRepository, captainDraftParticipantRepository, captainDraftRepository);
+        order.verify(captainDraftEntryRepository).deleteByDraftId(100L);
+        order.verify(captainDraftParticipantRepository).deleteByDraftId(100L);
+        order.verify(captainDraftRepository).deleteDraft(100L);
+        verify(operationAuditLogService).recordCaptainDraftDeleted(
+            "admin@hei.gg", "Ops", 1L, 100L, "정기 감전", "participants=10, sets=8"
+        );
+    }
+
+    @Test
+    void deletesNothingForADraftOfAnotherGroup() {
+        when(captainDraftRepository.findByIdAndGroup_Id(100L, 2L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> captainDraftService.deleteDraft(2L, 100L, "admin@hei.gg", "Ops"))
+            .isInstanceOf(NoSuchElementException.class);
+        verify(captainDraftEntryRepository, never()).deleteByDraftId(any());
+        verify(captainDraftParticipantRepository, never()).deleteByDraftId(any());
+        verify(captainDraftRepository, never()).deleteDraft(any());
+        verifyNoInteractions(operationAuditLogService);
     }
 
     @Test

@@ -4,6 +4,7 @@ import com.balancify.backend.domain.CaptainDraftEntry;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -26,4 +27,9 @@ public interface CaptainDraftEntryRepository extends JpaRepository<CaptainDraftE
         where entry.draft.id in :draftIds
         """)
     List<CaptainDraftEntry> findByDraftIds(@Param("draftIds") Collection<Long> draftIds);
+
+    // A draft removed takes its sets with it; their players go by the foreign key's cascade (V79).
+    @Modifying(flushAutomatically = true)
+    @Query("delete from CaptainDraftEntry entry where entry.draft.id = :draftId")
+    int deleteByDraftId(@Param("draftId") Long draftId);
 }

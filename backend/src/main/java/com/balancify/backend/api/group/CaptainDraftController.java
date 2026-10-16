@@ -6,9 +6,13 @@ import com.balancify.backend.api.group.dto.CaptainDraftListResponse;
 import com.balancify.backend.api.group.dto.CaptainDraftPickRequest;
 import com.balancify.backend.api.group.dto.CaptainDraftResponse;
 import com.balancify.backend.api.group.dto.CaptainDraftUnpickRequest;
+import com.balancify.backend.security.AuthenticatedRequestResolver;
+import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.CaptainDraftService;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.NoSuchElementException;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,9 +27,17 @@ import org.springframework.web.server.ResponseStatusException;
 public class CaptainDraftController {
 
     private final CaptainDraftService captainDraftService;
+    private final AccessControlService accessControlService;
+    private final AuthenticatedRequestResolver authenticatedRequestResolver;
 
-    public CaptainDraftController(CaptainDraftService captainDraftService) {
+    public CaptainDraftController(
+        CaptainDraftService captainDraftService,
+        AccessControlService accessControlService,
+        AuthenticatedRequestResolver authenticatedRequestResolver
+    ) {
         this.captainDraftService = captainDraftService;
+        this.accessControlService = accessControlService;
+        this.authenticatedRequestResolver = authenticatedRequestResolver;
     }
 
     @PostMapping("/{groupId}/captain-drafts")
@@ -75,6 +87,28 @@ public class CaptainDraftController {
     ) {
         try {
             return captainDraftService.getDraft(groupId, draftId);
+        } catch (NoSuchElementException noSuchElementException) {
+            throw new ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                noSuchElementException.getMessage(),
+                noSuchElementException
+            );
+        }
+    }
+
+    // Admins only (AdminKeyFilter); the operation log names who removed it.
+    @DeleteMapping("/{groupId}/captain-drafts/{draftId}")
+    public CaptainDraftListResponse deleteDraft(
+        @PathVariable Long groupId,
+        @PathVariable Long draftId,
+        HttpServletRequest request
+    ) {
+        String email = authenticatedRequestResolver.resolve(request).email();
+        if (email.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Valid Supabase bearer token is required");
+        }
+        try {
+            return captainDraftService.deleteDraft(groupId, draftId, email, accessControlService.resolveDisplayNickname(email));
         } catch (NoSuchElementException noSuchElementException) {
             throw new ResponseStatusException(
                 HttpStatus.NOT_FOUND,
