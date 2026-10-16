@@ -1057,6 +1057,7 @@ export type LedgerImportResponse = {
 
 export type PointReason =
   | 'DAILY_LOGIN'
+  | 'MENU_VISIT'
   | 'MATCH_RESULT'
   | 'MATCH_RESULT_REVERSED'
   | 'ADJUSTMENT'
@@ -1082,7 +1083,8 @@ export type PointPolicyCapped = {
 }
 
 export type PointPolicyResponse = {
-  dailyLogin: number
+  // Missing while a backend from before menu attendance is still answering.
+  menuVisit?: PointPolicyCapped
   matchResult: PointPolicyCapped
   matchConfirm: PointPolicyCapped
   matchConfirmWindowHours: number
@@ -1137,10 +1139,21 @@ export type PointHistoryItem = {
   createdAt: string | null
 }
 
+/** After an attendance menu is opened: whether it paid now, and the day's count against the cap. */
+export type PointMenuVisitResponse = {
+  earned: boolean
+  menusToday: number
+  dailyCap: number
+}
+
 export type PointSummaryResponse = {
   balance: number
-  dailyLoginEarnedToday: boolean
-  dailyLoginPoints: number
+  // Menu attendance; missing while a backend from before it is still answering.
+  menuVisitsToday?: number
+  menuVisitDailyCap?: number
+  menuVisitPoints?: number
+  // The attendance menus that paid today, by key (AttendanceMenu on the backend).
+  menusVisitedToday?: string[]
   matchResultsToday: number
   matchResultDailyCap: number
   matchResultPoints: number

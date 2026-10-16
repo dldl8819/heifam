@@ -9,7 +9,9 @@ public class PointProperties {
 
     // Points are tried out by admins first; until this is on, members neither earn nor see them.
     private boolean membersEnabled = false;
-    private int dailyLogin = 1;
+    // Opening each of the ten attendance menus (AttendanceMenu), once a menu a day.
+    private int menuVisit = 1;
+    private int menuVisitDailyCap = 10;
     private int matchResult = 1;
     private int matchResultDailyCap = 10;
     private int predictionHit = 1;
@@ -41,12 +43,20 @@ public class PointProperties {
         this.membersEnabled = membersEnabled;
     }
 
-    public int getDailyLogin() {
-        return dailyLogin;
+    public int getMenuVisit() {
+        return menuVisit;
     }
 
-    public void setDailyLogin(int dailyLogin) {
-        this.dailyLogin = Math.max(0, dailyLogin);
+    public void setMenuVisit(int menuVisit) {
+        this.menuVisit = Math.max(0, menuVisit);
+    }
+
+    public int getMenuVisitDailyCap() {
+        return menuVisitDailyCap;
+    }
+
+    public void setMenuVisitDailyCap(int menuVisitDailyCap) {
+        this.menuVisitDailyCap = Math.max(0, menuVisitDailyCap);
     }
 
     public int getMatchResult() {

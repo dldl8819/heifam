@@ -97,9 +97,11 @@ import com.balancify.backend.api.tournament.TeamTournamentController;
 import com.balancify.backend.api.tournament.dto.TeamScoreBoardResponse;
 import com.balancify.backend.api.tournament.dto.TeamTournamentResponse;
 import com.balancify.backend.api.points.dto.PointSummaryResponse;
+import com.balancify.backend.api.points.dto.PointMenuVisitResponse;
 import com.balancify.backend.api.points.dto.MatchConfirmationListResponse;
 import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.AccountDeletionService;
+import com.balancify.backend.service.AttendanceMenu;
 import com.balancify.backend.service.CaptainDraftService;
 import com.balancify.backend.service.DashboardQueryService;
 import com.balancify.backend.service.GroupMatchAdminService;
@@ -2322,7 +2324,7 @@ class AdminKeyFilterTest {
         com.balancify.backend.api.points.dto.PointPolicyResponse.Capped tenADay =
             new com.balancify.backend.api.points.dto.PointPolicyResponse.Capped(1, 10);
         when(pointService.getPolicy()).thenReturn(new com.balancify.backend.api.points.dto.PointPolicyResponse(
-            1, tenADay, tenADay, 48, tenADay, 1, tenADay,
+            tenADay, tenADay, tenADay, 48, tenADay, 1, tenADay,
             new com.balancify.backend.api.points.dto.PointPolicyResponse.Capped(1, 3), tenADay, tenADay
         ));
 
@@ -2340,26 +2342,38 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void grantsTheDailyLoginPointWithoutHoldingUpTheAccessCheck() throws Exception {
-        when(pointService.needsDailyLoginPoint("admin@hei.gg")).thenReturn(true);
-        doThrow(new IllegalStateException("ledger unavailable")).when(pointService).grantDailyLoginPoint("admin@hei.gg");
+    void paysAttendanceMenusToMembersAndNothingForOpeningTheSite() throws Exception {
+        when(pointService.grantMenuVisitPoint("member@hei.gg", AttendanceMenu.ANONYMOUS_BOARD))
+            .thenReturn(new PointMenuVisitResponse(true, 1, 10));
 
         mockMvc
-            .perform(get("/api/access/me").header("X-USER-EMAIL", "admin@hei.gg"))
-            .andExpect(status().isOk());
+            .perform(post("/api/points/menu-visits/anonymous-board"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(post("/api/points/menu-visits/anonymous-board").header("X-USER-EMAIL", "stranger@hei.gg"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(post("/api/points/menu-visits/anonymous-board").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.earned").value(true))
+            .andExpect(jsonPath("$.menusToday").value(1))
+            .andExpect(jsonPath("$.dailyCap").value(10));
+        // Only the ten menus pay; any other name is refused.
+        mockMvc
+            .perform(post("/api/points/menu-visits/points").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isBadRequest());
         mockMvc
             .perform(get("/api/access/me").header("X-USER-EMAIL", "member@hei.gg"))
             .andExpect(status().isOk());
 
-        verify(pointService).grantDailyLoginPoint("admin@hei.gg");
-        verify(pointService, never()).grantDailyLoginPoint("member@hei.gg");
+        verify(pointService, times(1)).grantMenuVisitPoint(any(), any());
     }
 
     @Test
     void showsAdminsTheirPoints() throws Exception {
         when(pointService.canUsePoints("admin@hei.gg")).thenReturn(true);
         when(pointService.getSummary("admin@hei.gg"))
-            .thenReturn(new PointSummaryResponse(3L, true, 1, 2, 10, 1, 0, 10, 1, 0, 10, 1, 48, 0, 10, 1, List.of()));
+            .thenReturn(new PointSummaryResponse(3L, 1, 10, 1, List.of("ranking"), 2, 10, 1, 0, 10, 1, 0, 10, 1, 48, 0, 10, 1, List.of()));
 
         mockMvc
             .perform(get("/api/points/me").header("X-USER-EMAIL", "admin@hei.gg"))

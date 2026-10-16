@@ -14,6 +14,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.balancify.backend.api.points.dto.PointHistoryItemResponse;
+import com.balancify.backend.api.points.dto.PointMenuVisitResponse;
 import com.balancify.backend.api.points.dto.PointMonthlyHistoryResponse;
 import com.balancify.backend.api.points.dto.PointPolicyResponse;
 import com.balancify.backend.api.points.dto.PointReasonTotalResponse;
@@ -95,39 +96,54 @@ class PointServiceTest {
     }
 
     @Test
-    void grantsTheDailyLoginPointOncePerKoreanDay() {
+    void paysEachAttendanceMenuOnceAKoreanDay() {
         PointAccount account = stubAccount(ADMIN_EMAIL, 7L);
-        assertThat(pointService.needsDailyLoginPoint(ADMIN_EMAIL)).isTrue();
+        when(pointTransactionRepository.countByAccount_IdAndReasonAndKstDate(7L, PointService.REASON_MENU_VISIT, TODAY))
+            .thenReturn(3L);
 
-        pointService.grantDailyLoginPoint(ADMIN_EMAIL);
+        PointMenuVisitResponse visit = pointService.grantMenuVisitPoint(ADMIN_EMAIL, AttendanceMenu.ANONYMOUS_BOARD);
 
+        assertThat(visit).isEqualTo(new PointMenuVisitResponse(true, 4, 10));
         PointTransaction saved = captureSavedTransaction();
         assertThat(saved.getAccount()).isSameAs(account);
-        assertThat(saved.getReason()).isEqualTo(PointService.REASON_DAILY_LOGIN);
+        assertThat(saved.getReason()).isEqualTo(PointService.REASON_MENU_VISIT);
         assertThat(saved.getAmount()).isEqualTo(1);
-        assertThat(saved.getReferenceKey()).isEqualTo("2026-10-04");
+        // Only the reference names the menu: the reason other members read says nothing of it.
+        assertThat(saved.getReferenceKey()).isEqualTo("menu-visit:2026-10-04:anonymous-board");
         assertThat(saved.getKstDate()).isEqualTo(TODAY);
-        assertThat(pointService.needsDailyLoginPoint(ADMIN_EMAIL)).isFalse();
+        assertThat(saved.getMemo()).isNull();
     }
 
     @Test
-    void skipsTheDailyLoginPointWhenTodaysIsAlreadyRecorded() {
+    void paysNothingForAMenuOpenedAgainTheSameDay() {
         stubAccount(ADMIN_EMAIL, 7L);
+        when(pointTransactionRepository.countByAccount_IdAndReasonAndKstDate(7L, PointService.REASON_MENU_VISIT, TODAY))
+            .thenReturn(1L);
         when(pointTransactionRepository.existsByAccount_IdAndReasonAndReferenceKey(
-            7L, PointService.REASON_DAILY_LOGIN, "2026-10-04"
+            7L, PointService.REASON_MENU_VISIT, "menu-visit:2026-10-04:ranking"
         )).thenReturn(true);
 
-        pointService.grantDailyLoginPoint(ADMIN_EMAIL);
-
+        assertThat(pointService.grantMenuVisitPoint(ADMIN_EMAIL, AttendanceMenu.RANKING))
+            .isEqualTo(new PointMenuVisitResponse(false, 1, 10));
         verify(pointTransactionRepository, never()).save(any());
-        assertThat(pointService.needsDailyLoginPoint(ADMIN_EMAIL)).isFalse();
+    }
+
+    @Test
+    void stopsMenuAttendanceAtTheDailyCap() {
+        pointProperties.setMenuVisitDailyCap(2);
+        stubAccount(ADMIN_EMAIL, 7L);
+        when(pointTransactionRepository.countByAccount_IdAndReasonAndKstDate(7L, PointService.REASON_MENU_VISIT, TODAY))
+            .thenReturn(2L);
+
+        assertThat(pointService.grantMenuVisitPoint(ADMIN_EMAIL, AttendanceMenu.RESULTS))
+            .isEqualTo(new PointMenuVisitResponse(false, 2, 2));
+        verify(pointTransactionRepository, never()).save(any());
     }
 
     @Test
     void membersEarnNothingWhilePointsAreAdminOnly() {
-        assertThat(pointService.needsDailyLoginPoint(MEMBER_EMAIL)).isFalse();
-
-        pointService.grantDailyLoginPoint(MEMBER_EMAIL);
+        assertThat(pointService.grantMenuVisitPoint(MEMBER_EMAIL, AttendanceMenu.NOTICES))
+            .isEqualTo(new PointMenuVisitResponse(false, 0, 10));
 
         verifyNoInteractions(pointAccountRepository, pointTransactionRepository);
     }
@@ -349,7 +365,7 @@ class PointServiceTest {
 
         PointPolicyResponse policy = pointService.getPolicy();
 
-        assertThat(policy.dailyLogin()).isEqualTo(1);
+        assertThat(policy.menuVisit()).isEqualTo(new PointPolicyResponse.Capped(1, 10));
         assertThat(policy.matchResult()).isEqualTo(new PointPolicyResponse.Capped(1, 10));
         assertThat(policy.matchConfirm()).isEqualTo(new PointPolicyResponse.Capped(1, 10));
         assertThat(policy.matchConfirmWindowHours()).isEqualTo(48);
@@ -625,8 +641,10 @@ class PointServiceTest {
         PointSummaryResponse summary = pointService.getSummary(ADMIN_EMAIL);
 
         assertThat(summary.balance()).isZero();
-        assertThat(summary.dailyLoginEarnedToday()).isFalse();
-        assertThat(summary.dailyLoginPoints()).isEqualTo(1);
+        assertThat(summary.menuVisitsToday()).isZero();
+        assertThat(summary.menuVisitDailyCap()).isEqualTo(10);
+        assertThat(summary.menuVisitPoints()).isEqualTo(1);
+        assertThat(summary.menusVisitedToday()).isEmpty();
         assertThat(summary.matchResultsToday()).isZero();
         assertThat(summary.matchResultDailyCap()).isEqualTo(10);
         assertThat(summary.matchResultPoints()).isEqualTo(1);
@@ -649,6 +667,21 @@ class PointServiceTest {
         assertThat(pointService.getSummary(ADMIN_EMAIL).matchConfirmsToday()).isEqualTo(3);
     }
 
+    @Test
+    void tellsTheAccountWhichMenusPaidToday() {
+        existingAccount(ADMIN_EMAIL, 7L);
+        lenient().when(pointTransactionRepository.countByAccount_IdAndReasonAndKstDate(7L, PointService.REASON_MENU_VISIT, TODAY))
+            .thenReturn(2L);
+        when(pointTransactionRepository.findByAccount_IdAndReasonAndKstDate(7L, PointService.REASON_MENU_VISIT, TODAY))
+            .thenReturn(List.of(menuVisit("menu-visit:2026-10-04:ranking"), menuVisit("menu-visit:2026-10-04:free-board")));
+
+        PointSummaryResponse summary = pointService.getSummary(ADMIN_EMAIL);
+
+        assertThat(summary.menuVisitsToday()).isEqualTo(2);
+        assertThat(summary.menuVisitDailyCap()).isEqualTo(10);
+        assertThat(summary.menusVisitedToday()).containsExactly("ranking", "free-board");
+    }
+
     private PointAccount stubAccount(String email, Long id) {
         PointAccount account = new PointAccount();
         account.setNormalizedEmail(email);
@@ -669,6 +702,15 @@ class PointServiceTest {
         ArgumentCaptor<PointTransaction> captor = ArgumentCaptor.forClass(PointTransaction.class);
         verify(pointTransactionRepository).save(captor.capture());
         return captor.getValue();
+    }
+
+    private PointTransaction menuVisit(String referenceKey) {
+        PointTransaction transaction = new PointTransaction();
+        transaction.setReason(PointService.REASON_MENU_VISIT);
+        transaction.setAmount(1);
+        transaction.setReferenceKey(referenceKey);
+        transaction.setKstDate(TODAY);
+        return transaction;
     }
 
     private PointTransaction row(String reason, int amount, String memo) {

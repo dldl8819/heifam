@@ -4,8 +4,11 @@ import java.util.List;
 
 public record PointSummaryResponse(
     long balance,
-    boolean dailyLoginEarnedToday,
-    int dailyLoginPoints,
+    int menuVisitsToday,
+    int menuVisitDailyCap,
+    int menuVisitPoints,
+    // Which attendance menus paid today, by key; this summary is only ever the account's own.
+    List<String> menusVisitedToday,
     int matchResultsToday,
     int matchResultDailyCap,
     int matchResultPoints,

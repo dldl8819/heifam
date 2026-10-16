@@ -14,6 +14,8 @@ public interface PointTransactionRepository extends JpaRepository<PointTransacti
 
     long countByAccount_IdAndReasonAndKstDate(Long accountId, String reason, LocalDate kstDate);
 
+    List<PointTransaction> findByAccount_IdAndReasonAndKstDate(Long accountId, String reason, LocalDate kstDate);
+
     List<PointTransaction> findByReasonAndReferenceKey(String reason, String referenceKey);
 
     List<PointTransaction> findByAccount_IdAndReasonAndReferenceKeyIn(

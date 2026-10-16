@@ -1,4 +1,5 @@
 import { t } from '@/lib/i18n'
+import { ATTENDANCE_MENUS, attendanceMenuLabel } from '@/lib/menu-attendance'
 import type { PointPolicyResponse } from '@/types/api'
 
 export type PointPolicyRow = {
@@ -14,7 +15,7 @@ export type PointPolicyGroup = {
   rows: PointPolicyRow[]
 }
 
-function row(key: string, points: number, params: Record<string, number> = {}): PointPolicyRow {
+function row(key: string, points: number, params: Record<string, string | number> = {}): PointPolicyRow {
   return {
     name: t(`points.policy.items.${key}.name`),
     detail: t(`points.policy.items.${key}.detail`, params),
@@ -25,10 +26,16 @@ function row(key: string, points: number, params: Record<string, number> = {}): 
 
 /** The ways to earn points, grouped as the policy page lists them, with the amounts and caps in force. */
 export function pointPolicyGroups(policy: PointPolicyResponse): PointPolicyGroup[] {
+  const menuVisit = policy.menuVisit ?? { points: 0, dailyCap: 0 }
   return [
     {
       title: t('points.policy.groups.attendance'),
-      rows: [row('dailyLogin', policy.dailyLogin)],
+      rows: [
+        row('menuVisit', menuVisit.points, {
+          cap: menuVisit.dailyCap,
+          menus: ATTENDANCE_MENUS.map(attendanceMenuLabel).join('·'),
+        }),
+      ],
     },
     {
       title: t('points.policy.groups.matches'),

@@ -116,7 +116,11 @@ balancify:
     # Points are open to members (since 2026-10); false keeps earning to admins, which also needs
     # the point routes in AdminKeyFilter and the /points page moved back to admins.
     members-enabled: ${POINTS_MEMBERS_ENABLED:true}
-    daily-login: ${POINTS_DAILY_LOGIN:1}
+    # Attendance: opening each of ten menus (four boards, players, ranking, predictions, partners,
+    # results, point policy) earns this once a menu a day, up to the cap. The day's first visit no
+    # longer earns anything.
+    menu-visit: ${POINTS_MENU_VISIT:1}
+    menu-visit-daily-cap: ${POINTS_MENU_VISIT_DAILY_CAP:10}
     match-result: ${POINTS_MATCH_RESULT:1}
     match-result-daily-cap: ${POINTS_MATCH_RESULT_DAILY_CAP:10}
     prediction-hit: ${POINTS_PREDICTION_HIT:1}

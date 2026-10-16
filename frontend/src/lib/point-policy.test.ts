@@ -3,7 +3,7 @@ import { formatPolicyPoints, pointPolicyGroups } from '@/lib/point-policy'
 import type { PointPolicyResponse } from '@/types/api'
 
 const POLICY: PointPolicyResponse = {
-  dailyLogin: 1,
+  menuVisit: { points: 1, dailyCap: 10 },
   matchResult: { points: 1, dailyCap: 10 },
   matchConfirm: { points: 1, dailyCap: 10 },
   matchConfirmWindowHours: 48,
@@ -36,6 +36,15 @@ describe('point policy', () => {
     ])
     expect(groups[1].rows[1].detail).toContain('48시간')
     expect(groups[2].rows[0].limit).toBe('하루 10p')
+    expect(groups[0].rows.map((row) => [row.name, row.points, row.limit])).toEqual([
+      ['메뉴 출석', 1, '메뉴마다 하루 1번, 하루 10개'],
+    ])
+    expect(groups[0].rows[0].detail).toContain('공지사항·자유게시판·익명게시판·추천영상·선수 관리')
+  })
+
+  it('shows menu attendance as off while an older backend answers without it', () => {
+    const { menuVisit: _menuVisit, ...older } = POLICY
+    expect(pointPolicyGroups(older)[0].rows[0].points).toBe(0)
   })
 
   it('leaves no placeholder unfilled', () => {
