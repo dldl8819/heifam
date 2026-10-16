@@ -4,6 +4,7 @@ import com.balancify.backend.api.group.dto.CaptainDraftCreateRequest;
 import com.balancify.backend.api.group.dto.CaptainDraftEntriesUpdateRequest;
 import com.balancify.backend.api.group.dto.CaptainDraftPickRequest;
 import com.balancify.backend.api.group.dto.CaptainDraftResponse;
+import com.balancify.backend.api.group.dto.CaptainDraftUnpickRequest;
 import com.balancify.backend.service.CaptainDraftService;
 import java.util.NoSuchElementException;
 import org.springframework.http.HttpStatus;
@@ -85,6 +86,29 @@ public class CaptainDraftController {
     ) {
         try {
             return captainDraftService.pickPlayer(groupId, draftId, request);
+        } catch (IllegalArgumentException illegalArgumentException) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                illegalArgumentException.getMessage(),
+                illegalArgumentException
+            );
+        } catch (NoSuchElementException noSuchElementException) {
+            throw new ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                noSuchElementException.getMessage(),
+                noSuchElementException
+            );
+        }
+    }
+
+    @PostMapping("/{groupId}/captain-drafts/{draftId}/unpick")
+    public CaptainDraftResponse unpickPlayer(
+        @PathVariable Long groupId,
+        @PathVariable Long draftId,
+        @RequestBody CaptainDraftUnpickRequest request
+    ) {
+        try {
+            return captainDraftService.unpickPlayer(groupId, draftId, request);
         } catch (IllegalArgumentException illegalArgumentException) {
             throw new ResponseStatusException(
                 HttpStatus.BAD_REQUEST,

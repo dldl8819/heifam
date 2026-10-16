@@ -1597,7 +1597,7 @@
   },
   "captainDraft": {
     "title": "정기 감전 드래프트",
-    "description": "참석자와 감독 2명을 설정하고 실시간 팀 드래프트 및 라운드 엔트리를 운영합니다.",
+    "description": "참석자와 감독 2명을 설정하고, 감독이 부르는 팀원과 라운드 엔트리를 진행자가 입력합니다.",
     "emptyDraft": "아직 생성된 정기 감전 드래프트가 없습니다. 참석자와 감독을 설정해 시작해 주세요.",
     "attendance": {
       "title": "참석 인원 설정",
@@ -1611,9 +1611,7 @@
     "captain": {
       "title": "감독 2명 설정",
       "home": "홈 감독",
-      "away": "어웨이 감독",
-      "acting": "내 감독 선택",
-      "actingHelper": "내 감독을 선택하면 해당 팀 픽/엔트리를 저장할 수 있습니다."
+      "away": "어웨이 감독"
     },
     "settings": {
       "title": "라운드 설정",
@@ -1625,48 +1623,38 @@
       "create": "드래프트 시작",
       "creating": "생성 중...",
       "refresh": "새로고침",
-      "pick": "팀원 선택",
-      "picking": "선택 중...",
-      "saveEntries": "내 엔트리 저장",
+      "saveEntries": "엔트리 저장",
       "savingEntries": "저장 중..."
     },
     "status": {
       "label": "진행 상태",
       "drafting": "드래프트 진행 중",
-      "ready": "팀 구성 완료",
-      "turn": "현재 선택 턴",
-      "none": "없음"
+      "ready": "팀 구성 완료"
     },
     "teams": {
-      "home": "홈 팀",
-      "away": "어웨이 팀",
       "unassigned": "미선택 참석자",
       "captainBadge": "감독",
-      "emptyHome": "아직 홈 팀 선수가 없습니다.",
-      "emptyAway": "아직 어웨이 팀 선수가 없습니다.",
-      "emptyUnassigned": "미선택 참석자가 없습니다.",
-      "emptyOpponent": "상대 팀 정보가 없습니다."
-    },
-    "pick": {
-      "title": "감독 픽 진행",
-      "helper": "현재 턴인 감독만 팀원을 선택할 수 있습니다.",
-      "turnTeam": "현재 선택 팀",
-      "selectPlayer": "선택할 팀원"
+      "unassignedTier": "배정 필요",
+      "memberCount": "{count}명",
+      "setWins": "{count}승",
+      "remaining": "남은 참석자 {count}명",
+      "allPicked": "모든 참석자가 팀에 들어갔습니다.",
+      "assign": "{nickname} 선수를 {team}에 넣기",
+      "unpick": "{nickname} 선수를 팀에서 빼기"
     },
     "pickLog": {
       "title": "드래프트 진행 기록",
       "empty": "아직 선택된 팀원이 없습니다."
     },
     "scoreboard": {
-      "title": "팀 현황 및 세트 승수",
-      "helper": "팀별 총 세트 승수와 선수별 세트 승수를 함께 확인합니다.",
+      "title": "팀 현황",
+      "helper": "감독이 부른 선수를 남은 참석자에서 청팀·백팀 버튼으로 넣으면 감독 밑에 표시됩니다. 한 번에 여러 명을 넣어도 되고, 잘못 넣은 선수는 ×로 뺄 수 있습니다.",
       "homeHeader": "청팀",
-      "awayHeader": "백팀",
-      "setWinsShort": "승"
+      "awayHeader": "백팀"
     },
     "entry": {
       "title": "라운드 엔트리 설정",
-      "helper": "감독은 자기 팀 엔트리만 수정할 수 있고 상대 팀 엔트리는 실시간으로 확인할 수 있습니다.",
+      "helper": "진행자가 청팀·백팀 엔트리와 세트 결과를 함께 입력하고 저장합니다.",
       "round": "{round} Round {code}",
       "roundOnly": "{round}Round",
       "roundLabel": "라운드",
@@ -1680,11 +1668,8 @@
       "awayWin": "백팀 승",
       "set": "{set}세트",
       "setLabel": "세트",
-      "homePlayer": "홈 엔트리",
-      "awayPlayer": "어웨이 엔트리",
       "notSet": "미설정",
-      "opponentVisibleTitle": "상대 팀 확인",
-      "opponentVisibleHelper": "상대 팀 구성은 항상 확인할 수 있습니다."
+      "unsaved": "저장하지 않은 세트 {count}개"
     },
     "messages": {
       "createSuccess": "정기 감전 드래프트가 생성되었습니다.",
@@ -1696,13 +1681,11 @@
       "needTwoCaptains": "감독은 2명을 선택해야 합니다.",
       "captainMustBeParticipant": "감독은 참석자 명단에서 선택해야 합니다.",
       "selectDraftFirst": "드래프트 세션을 먼저 생성해 주세요.",
-      "selectActingCaptain": "내 감독을 먼저 선택해 주세요.",
-      "selectPlayerToPick": "선택할 팀원을 지정해 주세요.",
-      "notYourTurn": "현재 내 팀 턴이 아닙니다.",
       "loadFailed": "드래프트 정보를 불러오지 못했습니다.",
       "createFailed": "드래프트 생성에 실패했습니다.",
       "pickFailed": "팀원 선택에 실패했습니다.",
-      "saveEntryFailed": "엔트리 저장에 실패했습니다."
+      "saveEntryFailed": "엔트리 저장에 실패했습니다.",
+      "unpickFailed": "선수를 팀에서 빼지 못했습니다."
     }
   },
   "results": {

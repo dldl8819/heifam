@@ -4232,9 +4232,26 @@ class AdminKeyFilterTest {
             .andExpect(status().isForbidden());
         mockMvc
             .perform(
+                post("/api/groups/1/captain-drafts/5/unpick")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"playerId\":3}")
+            )
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(
                 get("/api/groups/1/captain-drafts/latest")
                     .header("X-USER-EMAIL", "admin@hei.gg")
             )
             .andExpect(status().isOk());
+        mockMvc
+            .perform(
+                post("/api/groups/1/captain-drafts/5/unpick")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"playerId\":3}")
+            )
+            .andExpect(status().isOk());
+        verify(captainDraftService).unpickPlayer(eq(1L), eq(5L), any());
     }
 }

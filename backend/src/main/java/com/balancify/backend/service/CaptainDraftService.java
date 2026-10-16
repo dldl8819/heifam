@@ -8,6 +8,7 @@ import com.balancify.backend.api.group.dto.CaptainDraftParticipantResponse;
 import com.balancify.backend.api.group.dto.CaptainDraftPickLogResponse;
 import com.balancify.backend.api.group.dto.CaptainDraftPickRequest;
 import com.balancify.backend.api.group.dto.CaptainDraftResponse;
+import com.balancify.backend.api.group.dto.CaptainDraftUnpickRequest;
 import com.balancify.backend.domain.CaptainDraft;
 import com.balancify.backend.domain.CaptainDraftEntry;
 import com.balancify.backend.domain.CaptainDraftParticipant;
@@ -195,10 +196,9 @@ public class CaptainDraftService {
             throw new IllegalArgumentException("Invalid captain player ID");
         }
 
+        // The host enters what the captains call out, and a captain may take more than one player
+        // in a row, so picks are not held to alternating turns.
         String captainTeam = normalizeTeam(captain.getTeam());
-        if (!captainTeam.equals(safeTrim(draft.getCurrentTurnTeam()))) {
-            throw new IllegalArgumentException("It is not this captain's turn");
-        }
 
         CaptainDraftParticipant pickedParticipant = participantsByPlayerId.get(request.pickedPlayerId());
         if (pickedParticipant == null || pickedParticipant.isCaptain()) {
@@ -230,16 +230,68 @@ public class CaptainDraftService {
         return toResponse(draft, participants, entries);
     }
 
+    /**
+     * Takes a picked player back out of their team, for a pick entered by mistake. Entries that
+     * named them lose them and their result, and a finished draft is open again.
+     */
+    @Transactional
+    public CaptainDraftResponse unpickPlayer(Long groupId, Long draftId, CaptainDraftUnpickRequest request) {
+        if (request == null || request.playerId() == null) {
+            throw new IllegalArgumentException("playerId is required");
+        }
+
+        CaptainDraft draft = loadDraft(groupId, draftId);
+        List<CaptainDraftParticipant> participants =
+            captainDraftParticipantRepository.findByDraftIdWithPlayer(draft.getId());
+        requireActiveDraftParticipants(participants);
+        CaptainDraftParticipant participant = participants
+            .stream()
+            .filter(candidate -> request.playerId().equals(candidate.getPlayer().getId()))
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("Player is not a participant of this draft"));
+        if (participant.isCaptain()) {
+            throw new IllegalArgumentException("A captain cannot be taken out of their team");
+        }
+        String team = normalizeTeam(participant.getTeam());
+        if (TEAM_UNASSIGNED.equals(team)) {
+            throw new IllegalArgumentException("Player is not picked");
+        }
+
+        participant.setTeam(null);
+        participant.setPickOrder(null);
+        captainDraftParticipantRepository.save(participant);
+
+        List<CaptainDraftEntry> entries = captainDraftEntryRepository.findByDraftIdWithPlayers(draft.getId());
+        for (CaptainDraftEntry entry : entries) {
+            if (TEAM_HOME.equals(team) && isPlayer(entry.getHomePlayer(), request.playerId())) {
+                entry.setHomePlayer(null);
+                entry.setWinnerTeam(null);
+            } else if (TEAM_AWAY.equals(team) && isPlayer(entry.getAwayPlayer(), request.playerId())) {
+                entry.setAwayPlayer(null);
+                entry.setWinnerTeam(null);
+            }
+        }
+        captainDraftEntryRepository.saveAll(entries);
+
+        if (STATUS_READY.equalsIgnoreCase(safeTrim(draft.getStatus()))) {
+            draft.setStatus(STATUS_DRAFTING);
+            draft.setCurrentTurnTeam(team);
+            captainDraftRepository.save(draft);
+        }
+        return toResponse(draft, participants, entries);
+    }
+
+    /**
+     * Saves the round entries. Without a captain, the host sets both teams' players and the results
+     * at once; with one, as before, only that captain's team is set.
+     */
     @Transactional
     public CaptainDraftResponse updateEntries(
         Long groupId,
         Long draftId,
         CaptainDraftEntriesUpdateRequest request
     ) {
-        if (request == null || request.captainPlayerId() == null) {
-            throw new IllegalArgumentException("captainPlayerId is required");
-        }
-        if (request.entries() == null || request.entries().isEmpty()) {
+        if (request == null || request.entries() == null || request.entries().isEmpty()) {
             throw new IllegalArgumentException("entries are required");
         }
 
@@ -252,21 +304,20 @@ public class CaptainDraftService {
             .stream()
             .collect(Collectors.toMap(participant -> participant.getPlayer().getId(), participant -> participant));
 
-        CaptainDraftParticipant captain = participantsByPlayerId.get(request.captainPlayerId());
-        if (captain == null || !captain.isCaptain()) {
-            throw new IllegalArgumentException("Invalid captain player ID");
+        String captainTeam = null;
+        if (request.captainPlayerId() != null) {
+            CaptainDraftParticipant captain = participantsByPlayerId.get(request.captainPlayerId());
+            if (captain == null || !captain.isCaptain()) {
+                throw new IllegalArgumentException("Invalid captain player ID");
+            }
+            captainTeam = normalizeTeam(captain.getTeam());
+            if (TEAM_UNASSIGNED.equals(captainTeam)) {
+                throw new IllegalArgumentException("Captain team is not assigned");
+            }
         }
 
-        String captainTeam = normalizeTeam(captain.getTeam());
-        if (TEAM_UNASSIGNED.equals(captainTeam)) {
-            throw new IllegalArgumentException("Captain team is not assigned");
-        }
-
-        Set<Long> captainTeamPlayerIds = participants
-            .stream()
-            .filter(participant -> captainTeam.equals(normalizeTeam(participant.getTeam())))
-            .map(participant -> participant.getPlayer().getId())
-            .collect(Collectors.toSet());
+        Set<Long> homePlayerIds = teamPlayerIds(participants, TEAM_HOME);
+        Set<Long> awayPlayerIds = teamPlayerIds(participants, TEAM_AWAY);
 
         List<CaptainDraftEntry> entries = captainDraftEntryRepository.findByDraftIdWithPlayers(draft.getId());
         Map<String, CaptainDraftEntry> entriesByKey = new HashMap<>();
@@ -298,23 +349,13 @@ public class CaptainDraftService {
                 throw new IllegalArgumentException("Invalid round/set combination");
             }
 
-            Long playerId = updateItem.playerId();
-            Player selectedPlayer = null;
-            if (playerId != null) {
-                if (!captainTeamPlayerIds.contains(playerId)) {
-                    throw new IllegalArgumentException("Entry player must belong to captain's team");
-                }
-                CaptainDraftParticipant selectedParticipant = participantsByPlayerId.get(playerId);
-                if (selectedParticipant == null) {
-                    throw new IllegalArgumentException("Entry player not found in draft participants");
-                }
-                selectedPlayer = selectedParticipant.getPlayer();
-            }
-
-            if (TEAM_HOME.equals(captainTeam)) {
-                targetEntry.setHomePlayer(selectedPlayer);
+            if (captainTeam == null) {
+                targetEntry.setHomePlayer(entryPlayer(updateItem.homePlayerId(), homePlayerIds, participantsByPlayerId));
+                targetEntry.setAwayPlayer(entryPlayer(updateItem.awayPlayerId(), awayPlayerIds, participantsByPlayerId));
+            } else if (TEAM_HOME.equals(captainTeam)) {
+                targetEntry.setHomePlayer(entryPlayer(updateItem.playerId(), homePlayerIds, participantsByPlayerId));
             } else {
-                targetEntry.setAwayPlayer(selectedPlayer);
+                targetEntry.setAwayPlayer(entryPlayer(updateItem.playerId(), awayPlayerIds, participantsByPlayerId));
             }
 
             String winnerTeam = normalizeWinnerTeam(updateItem.winnerTeam());
@@ -327,6 +368,33 @@ public class CaptainDraftService {
 
         captainDraftEntryRepository.saveAll(entries);
         return toResponse(draft, participants, entries);
+    }
+
+    private Set<Long> teamPlayerIds(List<CaptainDraftParticipant> participants, String team) {
+        return participants
+            .stream()
+            .filter(participant -> team.equals(normalizeTeam(participant.getTeam())))
+            .map(participant -> participant.getPlayer().getId())
+            .collect(Collectors.toSet());
+    }
+
+    // The player an entry names for one team: none, or one of that team's players.
+    private Player entryPlayer(
+        Long playerId,
+        Set<Long> teamPlayerIds,
+        Map<Long, CaptainDraftParticipant> participantsByPlayerId
+    ) {
+        if (playerId == null) {
+            return null;
+        }
+        if (!teamPlayerIds.contains(playerId)) {
+            throw new IllegalArgumentException("Entry player must belong to captain's team");
+        }
+        return participantsByPlayerId.get(playerId).getPlayer();
+    }
+
+    private boolean isPlayer(Player player, Long playerId) {
+        return player != null && playerId.equals(player.getId());
     }
 
     private CaptainDraft loadDraft(Long groupId, Long draftId) {
