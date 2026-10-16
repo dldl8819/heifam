@@ -71,6 +71,7 @@ public class OperationAuditLogService {
     public static final String ACTION_PRIZE_EVENT_CANCELLED = "PRIZE_EVENT_CANCELLED";
     public static final String ACTION_PRIZE_DRAW_SAVED = "PRIZE_DRAW_SAVED";
     public static final String ACTION_PRIZE_DRAW_DELETED = "PRIZE_DRAW_DELETED";
+    public static final String ACTION_CAPTAIN_DRAFT_DELETED = "CAPTAIN_DRAFT_DELETED";
     public static final String ACTION_ACCESS_PEOPLE_GROUPED = "ACCESS_PEOPLE_GROUPED";
     public static final String ACTION_ACCESS_PEOPLE_RENAMED = "ACCESS_PEOPLE_RENAMED";
     public static final String ACTION_ACCESS_PEOPLE_UNGROUPED = "ACCESS_PEOPLE_UNGROUPED";
@@ -574,6 +575,24 @@ public class OperationAuditLogService {
     ) {
         OperationAuditLog log = baseLog(actorEmail, actorNickname, action, "PRIZE_DRAW", drawId, title, groupId);
         log.setSummary(ACTION_PRIZE_DRAW_DELETED.equals(action) ? "추첨 기록 삭제" : "추첨 결과 저장");
+        log.setDetails(details);
+        operationAuditLogRepository.save(log);
+    }
+
+    /** An admin removed a regular draft (정기 감전) and its record; details say how many players and sets. */
+    @Transactional
+    public void recordCaptainDraftDeleted(
+        String actorEmail,
+        String actorNickname,
+        Long groupId,
+        Long draftId,
+        String title,
+        String details
+    ) {
+        OperationAuditLog log = baseLog(
+            actorEmail, actorNickname, ACTION_CAPTAIN_DRAFT_DELETED, "CAPTAIN_DRAFT", draftId, title, groupId
+        );
+        log.setSummary("정기 감전 기록 삭제");
         log.setDetails(details);
         operationAuditLogRepository.save(log);
     }

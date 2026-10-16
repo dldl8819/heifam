@@ -981,7 +981,8 @@
       "prizeEventConfirmed": "상품 이벤트 확정",
       "prizeEventCancelled": "상품 이벤트 취소",
       "prizeDrawSaved": "추첨 결과 저장",
-      "prizeDrawDeleted": "추첨 기록 삭제"
+      "prizeDrawDeleted": "추첨 기록 삭제",
+      "captainDraftDeleted": "정기 감전 기록 삭제"
     },
     "pagination": {
       "status": "현재 {shown} / {max}건 표시",
@@ -1743,6 +1744,12 @@
       "sets": "세트 {home} : {away}",
       "open": "열기",
       "viewing": "보는 중",
+      "delete": "삭제",
+      "deleting": "삭제 중...",
+      "deleteLabel": "{title} 기록 삭제",
+      "deleteConfirm": "'{title}' 기록을 삭제할까요? 팀 구성, 세트 엔트리, 결과가 모두 지워지고 되돌릴 수 없습니다.",
+      "deleted": "'{title}' 기록을 삭제했습니다.",
+      "deleteError": "기록을 삭제하지 못했습니다.",
       "state": {
         "drafting": "팀 구성 중",
         "playing": "진행 중 {decided}/{total}세트",

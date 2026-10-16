@@ -4260,4 +4260,23 @@ class AdminKeyFilterTest {
             .andExpect(status().isOk());
         verify(captainDraftService).unpickPlayer(eq(1L), eq(5L), any());
     }
+
+    @Test
+    void letsOnlyAdminsDeleteACaptainDraft() throws Exception {
+        mockMvc
+            .perform(
+                delete("/api/groups/1/captain-drafts/5")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+            )
+            .andExpect(status().isForbidden());
+        verify(captainDraftService, never()).deleteDraft(any(), any(), any(), any());
+
+        mockMvc
+            .perform(
+                delete("/api/groups/1/captain-drafts/5")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+            )
+            .andExpect(status().isOk());
+        verify(captainDraftService).deleteDraft(eq(1L), eq(5L), eq("admin@hei.gg"), any());
+    }
 }

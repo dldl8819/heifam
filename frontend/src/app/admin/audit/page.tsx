@@ -36,6 +36,7 @@ const AUDIT_ACTION_FILTER_OPTIONS = [
   'PRIZE_EVENT_CANCELLED',
   'PRIZE_DRAW_SAVED',
   'PRIZE_DRAW_DELETED',
+  'CAPTAIN_DRAFT_DELETED',
   'ACCESS_PEOPLE_GROUPED',
   'ACCESS_PEOPLE_RENAMED',
   'ACCESS_PEOPLE_UNGROUPED',
@@ -156,6 +157,8 @@ function getActionLabel(action: string): string {
       return t('audit.actions.prizeDrawSaved')
     case 'PRIZE_DRAW_DELETED':
       return t('audit.actions.prizeDrawDeleted')
+    case 'CAPTAIN_DRAFT_DELETED':
+      return t('audit.actions.captainDraftDeleted')
     default:
       return action
   }

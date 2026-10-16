@@ -10,7 +10,10 @@ type CaptainDraftRecordsProps = {
   loading: boolean
   error: string | null
   currentDraftId: number | null
+  // The draft being removed, while its request is out; every delete button waits for it.
+  deletingDraftId: number | null
   onOpen: (draftId: number) => void
+  onDelete: (record: CaptainDraftSummary) => void
 }
 
 const STATE_STYLES: Record<DraftRecordState, string> = {
@@ -21,9 +24,18 @@ const STATE_STYLES: Record<DraftRecordState, string> = {
 
 /**
  * The regular drafts played so far, newest first, with each one's score. Their results are kept
- * here only: a regular draft is not balanced, so it never moves anyone's MMR.
+ * here only: a regular draft is not balanced, so it never moves anyone's MMR. A draft made by
+ * mistake or to try the page out can be removed, with everything in it.
  */
-export function CaptainDraftRecords({ records, loading, error, currentDraftId, onOpen }: CaptainDraftRecordsProps) {
+export function CaptainDraftRecords({
+  records,
+  loading,
+  error,
+  currentDraftId,
+  deletingDraftId,
+  onOpen,
+  onDelete,
+}: CaptainDraftRecordsProps) {
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
       <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('captainDraft.records.title')}</h3>
@@ -76,6 +88,15 @@ export function CaptainDraftRecords({ records, loading, error, currentDraftId, o
                   className="shrink-0 rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-default disabled:border-transparent disabled:bg-slate-100 disabled:text-slate-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 dark:disabled:bg-slate-800"
                 >
                   {current ? t('captainDraft.records.viewing') : t('captainDraft.records.open')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDelete(record)}
+                  disabled={deletingDraftId !== null}
+                  aria-label={t('captainDraft.records.deleteLabel', { title: record.title })}
+                  className="shrink-0 rounded-md border border-rose-300 px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/40"
+                >
+                  {deletingDraftId === record.draftId ? t('captainDraft.records.deleting') : t('captainDraft.records.delete')}
                 </button>
               </li>
             )

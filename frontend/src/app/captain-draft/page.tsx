@@ -103,6 +103,7 @@ export default function CaptainDraftPage() {
   const [records, setRecords] = useState<CaptainDraftSummary[] | null>(null)
   const [recordsLoading, setRecordsLoading] = useState<boolean>(true)
   const [recordsError, setRecordsError] = useState<string | null>(null)
+  const [deletingDraftId, setDeletingDraftId] = useState<number | null>(null)
   const [draftLoading, setDraftLoading] = useState<boolean>(true)
 
   const [entryEdits, setEntryEdits] = useState<EntryEdits>({})
@@ -433,10 +434,7 @@ export default function CaptainDraftPage() {
 
   // A clean screen for the next draft: attendance, captains, sets, the team status and the round
   // entries all go. The draft shown stays saved and can be opened again from the records.
-  const handleResetDraftSetup = () => {
-    if (unsavedCount > 0 && !window.confirm(t('captainDraft.actions.resetConfirm', { count: unsavedCount }))) {
-      return
-    }
+  const clearScreen = () => {
     moveToNewView()
     setParticipantSlots(createParticipantSlots(MINIMUM_PARTICIPANT_SLOTS))
     setHomeCaptainId(null)
@@ -447,8 +445,40 @@ export default function CaptainDraftPage() {
     setDraft(null)
     setDraftLoading(false)
     setEntryEdits({})
+  }
+
+  const handleResetDraftSetup = () => {
+    if (unsavedCount > 0 && !window.confirm(t('captainDraft.actions.resetConfirm', { count: unsavedCount }))) {
+      return
+    }
+    clearScreen()
     setError(null)
     setMessage(null)
+  }
+
+  // A draft made by mistake or to try the page out goes from the records with everything in it.
+  // When it is the one on screen, the screen is cleared as by 초기화.
+  const handleDeleteRecord = async (record: CaptainDraftSummary) => {
+    if (!window.confirm(t('captainDraft.records.deleteConfirm', { title: record.title }))) {
+      return
+    }
+    setError(null)
+    setMessage(null)
+    setDeletingDraftId(record.draftId)
+    const shownDraftId = draft?.draftId ?? null
+    const view = draftViewRef.current
+    try {
+      const remaining = await apiClient.deleteCaptainDraft(TEMP_GROUP_ID, record.draftId)
+      setRecords(remaining.drafts)
+      if (shownDraftId === record.draftId && view === draftViewRef.current) {
+        clearScreen()
+      }
+      setMessage(t('captainDraft.records.deleted', { title: record.title }))
+    } catch (deleteError) {
+      setError(errorWithReason('captainDraft.records.deleteError', deleteError))
+    } finally {
+      setDeletingDraftId(null)
+    }
   }
 
   const showDraft = (shown: CaptainDraftResponse) => {
@@ -815,7 +845,9 @@ export default function CaptainDraftPage() {
         loading={recordsLoading}
         error={recordsError}
         currentDraftId={draft?.draftId ?? null}
+        deletingDraftId={deletingDraftId}
         onOpen={(draftId) => void handleOpenRecord(draftId)}
+        onDelete={(record) => void handleDeleteRecord(record)}
       />
     </section>
   )

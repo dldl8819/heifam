@@ -63,19 +63,22 @@ public class CaptainDraftService {
     private final CaptainDraftRepository captainDraftRepository;
     private final CaptainDraftParticipantRepository captainDraftParticipantRepository;
     private final CaptainDraftEntryRepository captainDraftEntryRepository;
+    private final OperationAuditLogService operationAuditLogService;
 
     public CaptainDraftService(
         GroupRepository groupRepository,
         PlayerRepository playerRepository,
         CaptainDraftRepository captainDraftRepository,
         CaptainDraftParticipantRepository captainDraftParticipantRepository,
-        CaptainDraftEntryRepository captainDraftEntryRepository
+        CaptainDraftEntryRepository captainDraftEntryRepository,
+        OperationAuditLogService operationAuditLogService
     ) {
         this.groupRepository = groupRepository;
         this.playerRepository = playerRepository;
         this.captainDraftRepository = captainDraftRepository;
         this.captainDraftParticipantRepository = captainDraftParticipantRepository;
         this.captainDraftEntryRepository = captainDraftEntryRepository;
+        this.operationAuditLogService = operationAuditLogService;
     }
 
     @Transactional
@@ -209,6 +212,26 @@ public class CaptainDraftService {
                 participantCounts.getOrDefault(draft.getId(), 0L)
             ))
             .toList());
+    }
+
+    /**
+     * Removes a draft with its participants, its sets and their players, such as one made to try
+     * the page out. A draft never made a match, so no MMR, point or ranking changes with it. The
+     * operation log keeps who removed which, with how many players and sets it had. Answers with
+     * the records as they now are.
+     */
+    @Transactional
+    public CaptainDraftListResponse deleteDraft(Long groupId, Long draftId, String actorEmail, String actorNickname) {
+        CaptainDraft draft = loadDraft(groupId, draftId);
+        Long id = draft.getId();
+        String title = draft.getTitle();
+        int sets = captainDraftEntryRepository.deleteByDraftId(id);
+        int participants = captainDraftParticipantRepository.deleteByDraftId(id);
+        captainDraftRepository.deleteDraft(id);
+        operationAuditLogService.recordCaptainDraftDeleted(
+            actorEmail, actorNickname, groupId, id, title, "participants=" + participants + ", sets=" + sets
+        );
+        return listDrafts(groupId);
     }
 
     @Transactional(readOnly = true)
