@@ -46,12 +46,20 @@ function storeItems(text: string) {
   }
 }
 
+/** Names handed to the quick cannon as its items; a new version replaces the list again. */
+export type QuickCannonPreset = { names: string[]; version: number }
+
+type QuickCannonProps = {
+  // Names to draw among, such as the players of the latest regular draft loaded in the setup above.
+  preset?: QuickCannonPreset | null
+}
+
 /**
  * The quick cannon draw on the prize draw page, for anyone: a number from 1 to a last number, or
  * one of a list of items written down, such as the race matchups of an ace match. Runs in the
  * browser only and keeps nothing on the server; the results stay on this screen until it is left.
  */
-export function QuickCannon() {
+export function QuickCannon({ preset = null }: QuickCannonProps) {
   const [mode, setMode] = useState<CannonMode>('number')
   const [lastText, setLastText] = useState<string>(String(CANNON_DEFAULT_LAST))
   const [itemsText, setItemsText] = useState<string>('')
@@ -64,6 +72,17 @@ export function QuickCannon() {
   useEffect(() => {
     setItemsText(readStoredItems())
   }, [])
+
+  // Names handed in from the setup become the items, after the stored list so they win over it.
+  // They are not stored: the list written on this device is kept for the next ace match.
+  useEffect(() => {
+    if (!preset || preset.names.length === 0) {
+      return
+    }
+    setMode('items')
+    setItemsText(preset.names.join('\n'))
+    setShot(null)
+  }, [preset])
 
   const last = parseLastNumber(lastText)
   const items = useMemo(() => parseCannonItems(itemsText), [itemsText])

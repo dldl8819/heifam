@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { apiClient, isApiNotFoundError } from '@/lib/api'
 import { CannonPrizeStage } from '@/components/cannon-prize-stage'
 import { PinballStage } from '@/components/pinball-stage'
-import { QuickCannon } from '@/components/quick-cannon'
+import { QuickCannon, type QuickCannonPreset } from '@/components/quick-cannon'
 import { winnersOf, type DrawMode } from '@/lib/pinball/engine'
 import {
   PRIZE_DRAW_MAX_ENTRANTS,
@@ -60,6 +60,8 @@ export function PrizeDrawPanel({ groupId, onSaved }: PrizeDrawPanelProps) {
   const [formError, setFormError] = useState<string | null>(null)
   const [draftLoading, setDraftLoading] = useState<boolean>(false)
   const [draftNote, setDraftNote] = useState<{ ok: boolean; text: string } | null>(null)
+  // The latest regular draft's players, by nickname, for the quick cannon's items.
+  const [cannonNames, setCannonNames] = useState<QuickCannonPreset | null>(null)
 
   // What the stage runs on: fixed when the stage is opened, so typing elsewhere cannot restart a draw.
   const [stageEntrants, setStageEntrants] = useState<DrawEntrant[]>([])
@@ -125,11 +127,16 @@ export function PrizeDrawPanel({ groupId, onSaved }: PrizeDrawPanelProps) {
       const { ids, missing } = draftEntrantIds(draft.participants, players)
       setSelected(new Set(ids))
       setSearch('')
+      // The same players, in the draft's order, become the quick cannon's items.
+      const nicknames = new Map(players.map((player) => [player.id, player.nickname]))
+      const names = ids.map((id) => nicknames.get(id) ?? '').filter((name) => name.length > 0)
+      setCannonNames((previous) => ({ names, version: (previous?.version ?? 0) + 1 }))
       setDraftNote({
         ok: true,
         text:
           t('prizeDraw.draftPlayersLoaded', { title: draft.title, count: ids.length }) +
-          (missing > 0 ? t('prizeDraw.draftPlayersMissing', { count: missing }) : ''),
+          (missing > 0 ? t('prizeDraw.draftPlayersMissing', { count: missing }) : '') +
+          (method === 'CANNON' && names.length > 0 ? t('prizeDraw.draftPlayersToCannon') : ''),
       })
     } catch (error) {
       setDraftNote({ ok: false, text: t(isApiNotFoundError(error) ? 'prizeDraw.draftNone' : 'prizeDraw.draftLoadError') })
@@ -417,7 +424,7 @@ export function PrizeDrawPanel({ groupId, onSaved }: PrizeDrawPanelProps) {
         <p className="text-xs text-slate-500 dark:text-slate-400">{t('prizeDraw.setupHint')}</p>
       </form>
       {/* Outside the form: its buttons must not submit the setup. */}
-      {method === 'CANNON' && <QuickCannon />}
+      {method === 'CANNON' && <QuickCannon preset={cannonNames} />}
     </>
   )
 }
