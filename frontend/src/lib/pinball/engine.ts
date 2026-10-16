@@ -1,8 +1,10 @@
 /**
- * The physics of the prize draw: balls falling through a course of pegs, walls and spinning bars
- * to a goal line. It knows nothing of names or of drawing on a screen; it only says in which order
- * the balls arrive. It runs in fixed ticks, so a draw plays the same at any frame rate and can be
- * run to its end in one go. One seed gives one run.
+ * The physics of the prize draw: balls falling through a course of pegs, walls, spinning bars and
+ * windmills to a goal line, now and then one of them setting off a shockwave that throws its
+ * neighbours aside. It knows nothing of names or of drawing on a screen; it only says in which
+ * order the balls arrive, and what happened on the way for the screen to show. It runs in fixed
+ * ticks, so a draw plays the same at any frame rate and can be run to its end in one go. One seed
+ * gives one run.
  */
 
 export const BALL_RADIUS = 7
@@ -23,6 +25,12 @@ const BAND_HEIGHT = 64
 // A ball that has not come this much closer to the goal in this many ticks is given a push.
 const STUCK_TICKS = TICKS_PER_SECOND * 2
 const STUCK_PROGRESS = 4
+// Every so often a ball picked at random sets off a shockwave that throws the balls around it aside.
+export const SHOCKWAVE_INTERVAL = Math.round(TICKS_PER_SECOND * 2.5)
+export const SHOCKWAVE_RADIUS = 70
+const SHOCKWAVE_PUSH = 4.2
+// What happened on the way is kept this long, for the screen to show.
+const EFFECTS_KEPT = 40
 
 export type Peg = { x: number; y: number; r: number; bounce: number }
 export type Wall = { x1: number; y1: number; x2: number; y2: number }
@@ -52,6 +60,9 @@ export type Ball = {
   checkY: number
 }
 
+/** A shockwave set off by a ball at a tick, where it was then. */
+export type Shockwave = { ballId: number; x: number; y: number; tick: number }
+
 export type World = {
   course: Course
   balls: Ball[]
@@ -62,6 +73,10 @@ export type World = {
   forced: boolean
   /** How many pushes stuck balls were given; a healthy course needs few. */
   kicks: number
+  /** The latest shockwaves, oldest first. */
+  shockwaves: Shockwave[]
+  /** For each peg, the last tick a ball hit it (-1 for never), so the screen can light it up. */
+  pegHitTicks: number[]
   random: () => number
   pegBands: number[][]
   wallBands: number[][]
@@ -135,7 +150,18 @@ export function createWorld(course: Course, ballCount: number, seed: number): Wo
     const y = course.startY - row * (BALL_RADIUS * 2 + 6)
     balls.push({ id, x: Math.min(course.width - BALL_RADIUS, Math.max(BALL_RADIUS, x)), y, vx: (random() - 0.5) * 0.6, vy: 0, finished: false, checkY: y })
   }
-  return { course, balls, tick: 0, finishedOrder: [], forced: false, kicks: 0, random, ...bandsFor(course) }
+  return {
+    course,
+    balls,
+    tick: 0,
+    finishedOrder: [],
+    forced: false,
+    kicks: 0,
+    shockwaves: [],
+    pegHitTicks: course.pegs.map(() => -1),
+    random,
+    ...bandsFor(course),
+  }
 }
 
 export function isWorldDone(world: World): boolean {
@@ -267,6 +293,7 @@ export function stepWorld(world: World): void {
       if (bounceOff(ball, peg.x, peg.y, peg.r + BALL_RADIUS, peg.bounce, 0, 0)) {
         // A nudge to one side, so a ball never comes to rest balanced on a peg.
         ball.vx += (random() - 0.5) * 0.3
+        world.pegHitTicks[index] = world.tick
       }
     }
     for (const index of world.wallBands[band]) {
@@ -323,6 +350,10 @@ export function stepWorld(world: World): void {
     }
   }
 
+  if (world.tick % SHOCKWAVE_INTERVAL === 0) {
+    setOffShockwave(world)
+  }
+
   if (world.tick % STUCK_TICKS === 0) {
     for (const ball of balls) {
       if (ball.finished) {
@@ -336,6 +367,36 @@ export function stepWorld(world: World): void {
       }
       ball.checkY = Math.max(ball.checkY, ball.y)
     }
+  }
+}
+
+/**
+ * A ball still running, picked at random, throws every other running ball within reach away from
+ * it, the nearer the harder. Any ball can be picked, so it favours nobody; it only stirs the field.
+ */
+function setOffShockwave(world: World): void {
+  const running = world.balls.filter((ball) => !ball.finished)
+  if (running.length < 2) {
+    return
+  }
+  const source = running[Math.floor(world.random() * running.length)]
+  for (const ball of running) {
+    if (ball === source) {
+      continue
+    }
+    const dx = ball.x - source.x
+    const dy = ball.y - source.y
+    const distance = Math.sqrt(dx * dx + dy * dy)
+    if (distance >= SHOCKWAVE_RADIUS || distance < 1e-6) {
+      continue
+    }
+    const push = SHOCKWAVE_PUSH * (1 - distance / SHOCKWAVE_RADIUS)
+    ball.vx += (dx / distance) * push
+    ball.vy += (dy / distance) * push
+  }
+  world.shockwaves.push({ ballId: source.id, x: source.x, y: source.y, tick: world.tick })
+  if (world.shockwaves.length > EFFECTS_KEPT) {
+    world.shockwaves.shift()
   }
 }
 

@@ -4,7 +4,10 @@ const WIDTH = 420
 const PEG_RADIUS = 5
 const PEG_BOUNCE = 0.5
 const BUMPER_RADIUS = 13
-const BUMPER_BOUNCE = 0.95
+// A bumper throws a ball back harder than it came; the speed limit keeps that in bounds.
+const BUMPER_BOUNCE = 1.15
+// Everything under the windmills sits this much lower than it did before they were added.
+const WINDMILL_ZONE = 320
 
 /** Rows of pegs, every other row set half a step aside, so a ball is turned left or right at each. */
 function pegField(top: number, rows: number, rowGap: number): Peg[] {
@@ -53,35 +56,52 @@ function zigzag(top: number, count: number, rowGap: number, drop: number, gap: n
   return walls
 }
 
+/** Two bars crossing at their middles and turning together. */
+function windmill(x: number, y: number, halfLength: number, speed: number, phase: number): Spinner[] {
+  return [
+    { x, y, halfLength, speed, phase },
+    { x, y, halfLength, speed, phase: phase + Math.PI / 2 },
+  ]
+}
+
 /**
  * The course of the prize draw, top to bottom: a field of pegs, a funnel onto a spinning bar,
- * shelves that send the balls from side to side, a field of bumpers with two more bars, and a last
- * funnel into the chute that ends at the goal. Nothing in it is level and no gap is narrow enough
- * for balls to wedge in, so every ball gets through.
+ * shelves that send the balls from side to side, three windmills among a few pegs, a field of
+ * bumpers with two more bars, and a last funnel into the chute that ends at the goal. Nothing in it
+ * is level and no gap is narrow enough for balls to wedge in, so every ball gets through.
  */
 export function createCourse(): Course {
-  const pegs: Peg[] = [...pegField(310, 12, 50), ...bumperField(1790, 8, 90)]
+  const low = WINDMILL_ZONE
+  const pegs: Peg[] = [...pegField(310, 12, 50), ...bumperField(1790 + low, 8, 90)]
+  // Pegs around the windmills, so no ball drops between them untouched.
+  for (const [x, y] of [[40, 1790], [210, 1785], [380, 1790], [60, 1960], [360, 1960], [150, 2045], [270, 2045]] as const) {
+    pegs.push({ x, y, r: PEG_RADIUS, bounce: PEG_BOUNCE })
+  }
   // A few pegs in the chute, so the last stretch is not a straight fall.
-  for (const [x, y] of [[196, 2790], [224, 2830], [196, 2870]] as const) {
+  for (const [x, y] of [[196, 2790 + low], [224, 2830 + low], [196, 2870 + low]] as const) {
     pegs.push({ x, y, r: 3, bounce: PEG_BOUNCE })
   }
 
   const walls: Wall[] = [
     ...funnel(940, 1060, 120),
     ...zigzag(1220, 4, 130, 80, 115),
-    ...funnel(2560, 2740, 64),
+    ...funnel(2560 + low, 2740 + low, 64),
     // The chute under the last funnel.
-    { x1: 178, y1: 2740, x2: 178, y2: 2920 },
-    { x1: 242, y1: 2740, x2: 242, y2: 2920 },
+    { x1: 178, y1: 2740 + low, x2: 178, y2: 2920 + low },
+    { x1: 242, y1: 2740 + low, x2: 242, y2: 2920 + low },
   ]
 
   const spinners: Spinner[] = [
     { x: 210, y: 1130, halfLength: 55, speed: 0.035, phase: 0 },
-    { x: 115, y: 2530, halfLength: 42, speed: -0.04, phase: 0.6 },
-    { x: 305, y: 2530, halfLength: 42, speed: 0.04, phase: 0 },
+    // The windmills: two turning against each other, then one in the middle under them.
+    ...windmill(115, 1870, 50, 0.03, 0),
+    ...windmill(305, 1870, 50, -0.03, 0.4),
+    ...windmill(210, 1985, 42, 0.04, 0.2),
+    { x: 115, y: 2530 + low, halfLength: 42, speed: -0.04, phase: 0.6 },
+    { x: 305, y: 2530 + low, halfLength: 42, speed: 0.04, phase: 0 },
     // Stirs the mouth of the last funnel, where the balls queue.
-    { x: 210, y: 2672, halfLength: 22, speed: 0.05, phase: 0.3 },
+    { x: 210, y: 2672 + low, halfLength: 22, speed: 0.05, phase: 0.3 },
   ]
 
-  return { width: WIDTH, height: 2960, goalY: 2910, startY: 240, pegs, walls, spinners }
+  return { width: WIDTH, height: 2960 + low, goalY: 2910 + low, startY: 240, pegs, walls, spinners }
 }
