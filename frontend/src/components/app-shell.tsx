@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import Image from 'next/image'
 import { AuthControls } from '@/components/auth-controls'
 import { AccessGate } from '@/components/access-gate'
+import { MenuAttendance } from '@/components/menu-attendance'
 import { NotificationBell } from '@/components/notification-bell'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { SiteFooter } from '@/components/site-footer'
@@ -63,6 +64,7 @@ export function AppShell({ children }: AppShellProps) {
         </main>
         <SiteFooter />
         <UserRaceSetupModal />
+        <MenuAttendance />
       </div>
     </MmrVisibilityProvider>
   )

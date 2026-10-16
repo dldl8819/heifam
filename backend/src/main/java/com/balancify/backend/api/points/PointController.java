@@ -1,10 +1,12 @@
 package com.balancify.backend.api.points;
 
+import com.balancify.backend.api.points.dto.PointMenuVisitResponse;
 import com.balancify.backend.api.points.dto.PointMonthlyHistoryResponse;
 import com.balancify.backend.api.points.dto.PointPolicyResponse;
 import com.balancify.backend.api.points.dto.PointRankingResponse;
 import com.balancify.backend.api.points.dto.PointSummaryResponse;
 import com.balancify.backend.security.AuthenticatedRequestResolver;
+import com.balancify.backend.service.AttendanceMenu;
 import com.balancify.backend.service.PointService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.YearMonth;
@@ -13,6 +15,7 @@ import java.util.NoSuchElementException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -66,6 +69,18 @@ public class PointController {
         } catch (NoSuchElementException exception) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, exception.getMessage(), exception);
         }
+    }
+
+    /**
+     * The pages call this once a menu a day when an attendance menu is opened. An account points are
+     * not open to is answered that nothing was earned, as is a menu that already paid today.
+     */
+    @PostMapping("/api/points/menu-visits/{menu}")
+    public PointMenuVisitResponse recordMenuVisit(@PathVariable String menu, HttpServletRequest request) {
+        String requestEmail = requireRequestEmail(request);
+        AttendanceMenu attendanceMenu = AttendanceMenu.fromKey(menu)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Not an attendance menu"));
+        return pointService.grantMenuVisitPoint(requestEmail, attendanceMenu);
     }
 
     private void requirePointAccess(String email) {

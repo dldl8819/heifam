@@ -6,6 +6,7 @@ import { apiClient, isApiForbiddenError } from '@/lib/api'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { POINT_CARD_CLASS, PointErrorAlert, PointPageHeader } from '@/components/point-page-parts'
 import { t } from '@/lib/i18n'
+import { attendanceMenuLabel, menusLeft } from '@/lib/menu-attendance'
 import { formatPointAmount, pointReasonKey } from '@/lib/points'
 import type { PointSummaryResponse } from '@/types/api'
 
@@ -15,6 +16,33 @@ function SummaryStat({ label, value }: { label: string; value: string }) {
       <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
       <p className="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">{value}</p>
     </div>
+  )
+}
+
+/** The attendance menus still to open today, as links; nothing once the day's attendance is full. */
+function MenusLeft({ visited, full }: { visited: string[]; full: boolean }) {
+  const left = full ? [] : menusLeft(visited)
+  return (
+    <p className="text-xs text-slate-600 dark:text-slate-300">
+      {left.length === 0 ? (
+        t('points.summary.menusDone')
+      ) : (
+        <>
+          {t('points.summary.menusLeft')}{' '}
+          {left.map((menu, index) => (
+            <span key={menu.key}>
+              {index > 0 && ' · '}
+              <Link
+                href={menu.href}
+                className="font-semibold text-slate-900 underline decoration-slate-300 underline-offset-4 transition-colors hover:text-amber-700 hover:decoration-amber-500 dark:text-slate-100 dark:decoration-slate-600 dark:hover:text-amber-300"
+              >
+                {attendanceMenuLabel(menu)}
+              </Link>
+            </span>
+          ))}
+        </>
+      )}
+    </p>
   )
 }
 
@@ -52,12 +80,11 @@ export default function MyPointsPage() {
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
               <SummaryStat label={t('points.summary.balance')} value={`${summary.balance.toLocaleString('ko-KR')}p`} />
               <SummaryStat
-                label={t('points.summary.dailyLogin')}
-                value={
-                  summary.dailyLoginEarnedToday
-                    ? t('points.summary.dailyLoginDone', { points: summary.dailyLoginPoints })
-                    : t('points.summary.dailyLoginPending')
-                }
+                label={t('points.summary.menuVisits')}
+                value={t('points.summary.menuVisitsValue', {
+                  points: (summary.menuVisitsToday ?? 0) * (summary.menuVisitPoints ?? 0),
+                  max: (summary.menuVisitDailyCap ?? 0) * (summary.menuVisitPoints ?? 0),
+                })}
               />
               <SummaryStat
                 label={t('points.summary.matchResults')}
@@ -81,6 +108,13 @@ export default function MyPointsPage() {
                 })}
               />
             </div>
+
+            {summary.menusVisitedToday && (
+              <MenusLeft
+                visited={summary.menusVisitedToday}
+                full={(summary.menuVisitsToday ?? 0) >= (summary.menuVisitDailyCap ?? 0)}
+              />
+            )}
 
             <p className="text-xs text-slate-600 dark:text-slate-300">
               {t('points.policyLink.text')}{' '}

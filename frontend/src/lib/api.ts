@@ -66,6 +66,7 @@ import type {
   PointMonthlyHistory,
   PointPolicyResponse,
   PointRankingResponse,
+  PointMenuVisitResponse,
   PointSummaryResponse,
   LatestTeamTournamentResponse,
   BalanceSeriesLineup,
@@ -1822,6 +1823,12 @@ export const apiClient = {
       requireUserEmail: true,
       includeUserEmail: true,
     }),
+  recordMenuVisit: (menu: string) =>
+    apiRequest<PointMenuVisitResponse>(
+      `/api/points/menu-visits/${encodeURIComponent(menu)}`,
+      { method: 'POST' },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
   getPointPolicy: () =>
     apiRequest<PointPolicyResponse>('/api/points/policy', undefined, {
       requireUserEmail: true,

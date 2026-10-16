@@ -2,7 +2,7 @@ package com.balancify.backend.api.points.dto;
 
 /** What each activity earns and how often a day, as configured; the points policy page shows it. */
 public record PointPolicyResponse(
-    int dailyLogin,
+    Capped menuVisit,
     Capped matchResult,
     Capped matchConfirm,
     int matchConfirmWindowHours,

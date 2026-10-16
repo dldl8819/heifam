@@ -1,6 +1,7 @@
 package com.balancify.backend.service;
 
 import com.balancify.backend.api.points.dto.PointHistoryItemResponse;
+import com.balancify.backend.api.points.dto.PointMenuVisitResponse;
 import com.balancify.backend.api.points.dto.PointMonthlyHistoryResponse;
 import com.balancify.backend.api.points.dto.PointPolicyResponse;
 import com.balancify.backend.api.points.dto.PointReasonTotalResponse;
@@ -28,14 +29,10 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Points members earn for activity. Every change is a new row in an append-only ledger, and
@@ -44,7 +41,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Service
 public class PointService {
 
+    // The day's first visit earned this until menu attendance took its place (2026-10-17); old rows keep it.
     public static final String REASON_DAILY_LOGIN = "DAILY_LOGIN";
+    public static final String REASON_MENU_VISIT = "MENU_VISIT";
     public static final String REASON_MATCH_RESULT = "MATCH_RESULT";
     public static final String REASON_MATCH_RESULT_REVERSED = "MATCH_RESULT_REVERSED";
     public static final String REASON_ADJUSTMENT = "ADJUSTMENT";
@@ -72,8 +71,6 @@ public class PointService {
     private final AccessControlService accessControlService;
     private final PointProperties pointProperties;
     private final Clock clock;
-    // /api/access/me runs on every page load; this keeps it from touching the ledger once a day is done.
-    private final ConcurrentMap<String, LocalDate> dailyLoginGrantedOn = new ConcurrentHashMap<>();
 
     @Autowired
     public PointService(
@@ -116,29 +113,33 @@ public class PointService {
             : accessControlService.isAdminEmail(normalizedEmail);
     }
 
-    public boolean needsDailyLoginPoint(String email) {
-        String normalizedEmail = normalizeEmail(email);
-        return !normalizedEmail.isEmpty()
-            && !today().equals(dailyLoginGrantedOn.get(normalizedEmail))
-            && canUsePoints(normalizedEmail);
-    }
-
+    /**
+     * Opening one of the attendance menus earns a point the first time each day, up to a daily cap
+     * (a point a menu, ten menus). The row does not say which menu: other members read the reasons
+     * on the ranking's history, and opening the anonymous board must look like opening any other
+     * menu. The reference key keeps the menu, so each menu pays once a day.
+     */
     @Transactional
-    public void grantDailyLoginPoint(String email) {
+    public PointMenuVisitResponse grantMenuVisitPoint(String email, AttendanceMenu menu) {
         String normalizedEmail = normalizeEmail(email);
-        if (!canUsePoints(normalizedEmail)) {
-            return;
+        int amount = pointProperties.getMenuVisit();
+        int dailyCap = pointProperties.getMenuVisitDailyCap();
+        if (menu == null || amount <= 0 || !canUsePoints(normalizedEmail)) {
+            return new PointMenuVisitResponse(false, 0, dailyCap);
         }
 
         LocalDate today = today();
-        String referenceKey = today.toString();
         PointAccount account = lockAccount(normalizedEmail);
-        if (!pointTransactionRepository.existsByAccount_IdAndReasonAndReferenceKey(
-            account.getId(), REASON_DAILY_LOGIN, referenceKey
-        )) {
-            record(account, REASON_DAILY_LOGIN, pointProperties.getDailyLogin(), referenceKey, today, null, null);
+        long menusToday = pointTransactionRepository.countByAccount_IdAndReasonAndKstDate(
+            account.getId(), REASON_MENU_VISIT, today
+        );
+        String referenceKey = menuVisitReference(today, menu);
+        if (menusToday >= dailyCap
+            || pointTransactionRepository.existsByAccount_IdAndReasonAndReferenceKey(account.getId(), REASON_MENU_VISIT, referenceKey)) {
+            return new PointMenuVisitResponse(false, (int) menusToday, dailyCap);
         }
-        rememberDailyLoginAfterCommit(normalizedEmail, today);
+        record(account, REASON_MENU_VISIT, amount, referenceKey, today, null, null);
+        return new PointMenuVisitResponse(true, (int) menusToday + 1, dailyCap);
     }
 
     /** A first result entry for a balanced 3v3 match; the recorder earns a point, up to a daily cap. */
@@ -374,7 +375,7 @@ public class PointService {
     /** Every amount, cap and window in force, for the page that explains the rules. */
     public PointPolicyResponse getPolicy() {
         return new PointPolicyResponse(
-            pointProperties.getDailyLogin(),
+            new PointPolicyResponse.Capped(pointProperties.getMenuVisit(), pointProperties.getMenuVisitDailyCap()),
             new PointPolicyResponse.Capped(pointProperties.getMatchResult(), pointProperties.getMatchResultDailyCap()),
             new PointPolicyResponse.Capped(pointProperties.getMatchConfirm(), pointProperties.getMatchConfirmDailyCap()),
             pointProperties.getMatchConfirmWindowHours(),
@@ -461,8 +462,10 @@ public class PointService {
         if (account.isEmpty()) {
             return new PointSummaryResponse(
                 0L,
-                false,
-                pointProperties.getDailyLogin(),
+                0,
+                pointProperties.getMenuVisitDailyCap(),
+                pointProperties.getMenuVisit(),
+                List.of(),
                 0,
                 pointProperties.getMatchResultDailyCap(),
                 pointProperties.getMatchResult(),
@@ -491,12 +494,13 @@ public class PointService {
                 transaction.getCreatedAt()
             ))
             .toList();
+        List<String> menusVisited = menusVisitedOn(accountId, today);
         return new PointSummaryResponse(
             pointTransactionRepository.sumAmountByAccountId(accountId),
-            pointTransactionRepository.existsByAccount_IdAndReasonAndReferenceKey(
-                accountId, REASON_DAILY_LOGIN, today.toString()
-            ),
-            pointProperties.getDailyLogin(),
+            (int) pointTransactionRepository.countByAccount_IdAndReasonAndKstDate(accountId, REASON_MENU_VISIT, today),
+            pointProperties.getMenuVisitDailyCap(),
+            pointProperties.getMenuVisit(),
+            menusVisited,
             (int) pointTransactionRepository.countByAccount_IdAndReasonAndKstDate(accountId, REASON_MATCH_RESULT, today),
             pointProperties.getMatchResultDailyCap(),
             pointProperties.getMatchResult(),
@@ -631,18 +635,21 @@ public class PointService {
         pointTransactionRepository.save(transaction);
     }
 
-    // Remembered only after the commit, so a rolled-back grant is tried again on the next page load.
-    private void rememberDailyLoginAfterCommit(String normalizedEmail, LocalDate day) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            dailyLoginGrantedOn.put(normalizedEmail, day);
-            return;
-        }
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                dailyLoginGrantedOn.put(normalizedEmail, day);
-            }
-        });
+    private static String menuVisitReference(LocalDate day, AttendanceMenu menu) {
+        return "menu-visit:" + day + ":" + menu.key();
+    }
+
+    // The menus that paid on a day, read back from their reference keys; shown to the account itself only.
+    private List<String> menusVisitedOn(Long accountId, LocalDate day) {
+        String prefix = "menu-visit:" + day + ":";
+        return pointTransactionRepository.findByAccount_IdAndReasonAndKstDate(accountId, REASON_MENU_VISIT, day).stream()
+            .map(PointTransaction::getReferenceKey)
+            .filter(key -> key != null && key.startsWith(prefix))
+            .map(key -> AttendanceMenu.fromKey(key.substring(prefix.length())))
+            .flatMap(Optional::stream)
+            .map(AttendanceMenu::key)
+            .distinct()
+            .toList();
     }
 
     /**

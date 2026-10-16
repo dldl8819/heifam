@@ -5,6 +5,7 @@ const KST_OFFSET_MS = 9 * 60 * 60 * 1000
 
 const REASON_KEYS: Record<PointReason, string> = {
   DAILY_LOGIN: 'points.reasons.dailyLogin',
+  MENU_VISIT: 'points.reasons.menuVisit',
   MATCH_RESULT: 'points.reasons.matchResult',
   MATCH_RESULT_REVERSED: 'points.reasons.matchResultReversed',
   ADJUSTMENT: 'points.reasons.adjustment',

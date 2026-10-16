@@ -102,6 +102,11 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             PathPatternParser.defaultInstance.parse("/api/points/ranking/{accountId}"),
             AuthType.SERVICE_ACCESS
         ),
+        new ProtectedRoute(
+            "POST",
+            PathPatternParser.defaultInstance.parse("/api/points/menu-visits/{menu}"),
+            AuthType.SERVICE_ACCESS
+        ),
         // Players confirm the results of their matches for a point; MatchConfirmationController checks the points flag.
         new ProtectedRoute(
             "GET",
