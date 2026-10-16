@@ -1,6 +1,6 @@
 import { t } from '@/lib/i18n'
 import { toTierOrder } from '@/lib/player-tier'
-import type { CaptainDraftEntry, CaptainDraftSummary, PlayerRosterItem, TeamSide } from '@/types/api'
+import type { CaptainDraftEntry, CaptainDraftResponse, CaptainDraftSummary, PlayerRosterItem, TeamSide } from '@/types/api'
 
 export type DraftWinnerSelection = '' | TeamSide
 
@@ -267,6 +267,32 @@ export function draftPlayerTags(player: PlayerRosterItem | undefined, fallbackRa
     tier: tier === null ? null : tier === 'UNASSIGNED' ? t('captainDraft.teams.unassignedTier') : tier,
     races: player?.race ?? fallbackRace ?? null,
   }
+}
+
+/**
+ * Whether the attendance or the captains on the screen are something other than the draft shown
+ * (any at all, when none is shown): typed for the next draft and not saved anywhere yet, so
+ * loading a draft over them loses them.
+ */
+export function setupDiffersFromDraft(
+  shown: Pick<CaptainDraftResponse, 'participants' | 'homeCaptainPlayerId' | 'awayCaptainPlayerId'> | null,
+  selectedIds: readonly number[],
+  homeCaptainId: number | null,
+  awayCaptainId: number | null,
+): boolean {
+  if (!shown) {
+    return selectedIds.length > 0 || homeCaptainId !== null || awayCaptainId !== null
+  }
+  const drafted = new Set(
+    shown.participants.map((participant) => participant.playerId).filter((id): id is number => typeof id === 'number'),
+  )
+  const selected = new Set(selectedIds)
+  return (
+    drafted.size !== selected.size ||
+    [...selected].some((id) => !drafted.has(id)) ||
+    homeCaptainId !== shown.homeCaptainPlayerId ||
+    awayCaptainId !== shown.awayCaptainPlayerId
+  )
 }
 
 /**

@@ -1657,7 +1657,8 @@
       "resetConfirm": "저장하지 않은 엔트리 변경 {count}건이 사라집니다. 초기화할까요?",
       "create": "드래프트 시작",
       "creating": "생성 중...",
-      "refresh": "새로고침",
+      "loadLatest": "최근 감전 불러오기",
+      "loadLatestConfirm": "지금 화면에 입력한 참석 인원·감독이나 저장하지 않은 엔트리 변경이 최근 감전 내용으로 바뀝니다. 불러올까요?",
       "saveEntries": "엔트리 저장",
       "savingEntries": "저장 중..."
     },

@@ -21,6 +21,7 @@ import {
   setLayoutSummary,
   setSizeChoices,
   setTeamSizes,
+  setupDiffersFromDraft,
   sortByTier,
   withSlot,
 } from '@/lib/captain-draft'
@@ -181,6 +182,26 @@ describe('captain draft sets', () => {
     )
 
     expect(sorted.map((item) => item.nickname)).toEqual(['마', '나', '가', '다', '라', '탈퇴'])
+  })
+
+  it('tells when the attendance or captains on screen are not the draft shown, before loading over them', () => {
+    const shown = {
+      participants: [{ playerId: 1 }, { playerId: 2 }, { playerId: 3 }, { playerId: null }].map((participant) => ({
+        ...participant, nickname: 'n', race: 'P' as const, team: 'UNASSIGNED' as const, captain: false, pickOrder: null,
+      })),
+      homeCaptainPlayerId: 1,
+      awayCaptainPlayerId: 2,
+    }
+
+    // The draft as loaded, in any order: nothing typed to lose.
+    expect(setupDiffersFromDraft(shown, [3, 2, 1], 1, 2)).toBe(false)
+    // A player added or dropped, or another captain: typed for the next draft.
+    expect(setupDiffersFromDraft(shown, [1, 2, 3, 4], 1, 2)).toBe(true)
+    expect(setupDiffersFromDraft(shown, [1, 2], 1, 2)).toBe(true)
+    expect(setupDiffersFromDraft(shown, [1, 2, 3], 3, 2)).toBe(true)
+    // No draft shown: anything typed at all.
+    expect(setupDiffersFromDraft(null, [], null, null)).toBe(false)
+    expect(setupDiffersFromDraft(null, [5], null, null)).toBe(true)
   })
 })
 

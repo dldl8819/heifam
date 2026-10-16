@@ -21,6 +21,7 @@ import {
   effectiveEntry,
   roundComposition,
   setComposition,
+  setupDiffersFromDraft,
   type EffectiveEntry,
   type EntryEdit,
   type EntryEdits,
@@ -478,7 +479,14 @@ export default function CaptainDraftPage() {
     }
   }
 
+  // 최근 감전 불러오기: the latest draft saved, over whatever the screen shows. Attendance or
+  // captains typed for the next draft and unsaved entry changes would be lost, so ask first.
   const handleRefreshDraft = async () => {
+    const wouldOverwrite =
+      unsavedCount > 0 || setupDiffersFromDraft(draft, selectedParticipantIds, homeCaptainId, awayCaptainId)
+    if (wouldOverwrite && !window.confirm(t('captainDraft.actions.loadLatestConfirm'))) {
+      return
+    }
     setError(null)
     setMessage(null)
     setDraftLoading(true)
@@ -728,7 +736,7 @@ export default function CaptainDraftPage() {
                 disabled={draftLoading}
                 className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 dark:disabled:border-slate-700 dark:disabled:text-slate-500"
               >
-                {t('captainDraft.actions.refresh')}
+                {t('captainDraft.actions.loadLatest')}
               </button>
             </div>
 
