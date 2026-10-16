@@ -4,9 +4,11 @@ import {
   canonicalComposition,
   compositionsOfSize,
   countSetWins,
+  defaultDraftTitle,
   defaultSetSizes,
   draftLayout,
   draftPlayerOptionLabel,
+  draftRecordState,
   draftPlayerTags,
   dropEditsNaming,
   effectiveEntry,
@@ -160,5 +162,24 @@ describe('captain draft sets', () => {
     expect(draftPlayerTags(rosterPlayer({ tier: 'UNASSIGNED' })).tier).toBe('배정 필요')
     expect(draftPlayerTags(undefined, 'Z')).toEqual({ tier: null, races: 'Z' })
     expect(draftPlayerOptionLabel('Ace', { tier: 'A+', races: 'PT' })).toBe('Ace · A+ · PT')
+  })
+})
+
+describe('captain draft records', () => {
+  const summary = {
+    draftId: 1, title: 't', createdAt: '2026-10-17T11:00:00Z', status: 'READY', homeCaptainNickname: 'A', awayCaptainNickname: 'B',
+    participantCount: 10, roundCount: 4, setsPerRound: 2, homeRoundWins: 2, awayRoundWins: 1, homeSetWins: 5, awaySetWins: 3,
+    decidedSets: 8, totalSets: 8,
+  }
+
+  it('tells a draft still picking teams, being played, and finished', () => {
+    expect(draftRecordState({ ...summary, status: 'DRAFTING' })).toBe('drafting')
+    expect(draftRecordState({ ...summary, decidedSets: 5 })).toBe('playing')
+    expect(draftRecordState(summary)).toBe('finished')
+  })
+
+  it('titles a new draft by the Korean date', () => {
+    // 15:30 UTC on the 17th is already past midnight of the 18th in Korea.
+    expect(defaultDraftTitle(new Date('2026-10-17T15:30:00Z'))).toBe('10월 18일 정기 감전')
   })
 })

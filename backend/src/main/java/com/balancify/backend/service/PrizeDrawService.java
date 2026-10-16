@@ -35,6 +35,8 @@ public class PrizeDrawService {
 
     public static final String MODE_FIRST = "FIRST";
     public static final String MODE_LAST = "LAST";
+    // Drawn with the cannon, one winner a shot, instead of by the order the pinball balls arrived in.
+    public static final String MODE_CANNON = "CANNON";
 
     static final int MAX_TITLE_LENGTH = 100;
     static final int MIN_ENTRANTS = 2;
@@ -106,8 +108,8 @@ public class PrizeDrawService {
         }
         String title = requireText(request.title(), MAX_TITLE_LENGTH, "추첨 제목은 1~" + MAX_TITLE_LENGTH + "자로 입력해 주세요.");
         String mode = request.mode() == null ? "" : request.mode().trim().toUpperCase(Locale.ROOT);
-        if (!MODE_FIRST.equals(mode) && !MODE_LAST.equals(mode)) {
-            throw new IllegalArgumentException("당첨 방식은 FIRST 또는 LAST여야 합니다.");
+        if (!MODE_FIRST.equals(mode) && !MODE_LAST.equals(mode) && !MODE_CANNON.equals(mode)) {
+            throw new IllegalArgumentException("당첨 방식은 FIRST, LAST 또는 CANNON이어야 합니다.");
         }
         int entrantCount = request.entrantCount() == null ? 0 : request.entrantCount();
         if (entrantCount < MIN_ENTRANTS || entrantCount > MAX_ENTRANTS) {

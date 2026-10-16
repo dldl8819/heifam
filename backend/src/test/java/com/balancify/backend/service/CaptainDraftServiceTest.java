@@ -3,13 +3,16 @@ package com.balancify.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import com.balancify.backend.api.group.dto.CaptainDraftCreateRequest;
 import com.balancify.backend.api.group.dto.CaptainDraftEntriesUpdateRequest;
 import com.balancify.backend.api.group.dto.CaptainDraftEntryUpdateItemRequest;
+import com.balancify.backend.api.group.dto.CaptainDraftListResponse;
 import com.balancify.backend.api.group.dto.CaptainDraftPickRequest;
 import com.balancify.backend.api.group.dto.CaptainDraftResponse;
+import com.balancify.backend.api.group.dto.CaptainDraftSummaryResponse;
 import com.balancify.backend.api.group.dto.CaptainDraftUnpickRequest;
 import com.balancify.backend.domain.CaptainDraft;
 import com.balancify.backend.domain.CaptainDraftEntry;
@@ -212,6 +215,53 @@ class CaptainDraftServiceTest {
         assertThat(CaptainDraftService.setComposition("PPR", 2)).isEqualTo("PR");
         assertThat(CaptainDraftService.setComposition("RRR", 2)).isEqualTo("RR");
         assertThat(CaptainDraftService.setComposition("PRR", 1)).isEqualTo("R");
+    }
+
+    @Test
+    void listsDraftsNewestFirstWithTheirRoundAndSetScores() {
+        Group group = group(1L);
+        CaptainDraft played = draft(group, 100L, "READY", 2, "UNASSIGNED", 1L, 2L);
+        CaptainDraft running = draft(group, 101L, "DRAFTING", 1, "HOME", 3L, 4L);
+        // Round 1 goes to home (2:0), round 2 is level (1:1), round 3 still waits for a result.
+        List<CaptainDraftEntry> entries = List.of(
+            result(entry(played, 1, "PPP", 1, 3), "HOME"),
+            result(entry(played, 1, "P", 2, 1), "HOME"),
+            result(entry(played, 2, "PPT", 1, 3), "HOME"),
+            result(entry(played, 2, "P", 2, 1), "AWAY"),
+            result(entry(played, 3, "PPZ", 1, 3), "AWAY"),
+            entry(played, 3, "P", 2, 1),
+            entry(running, 1, "PPP", 1, 3)
+        );
+
+        when(captainDraftRepository.findRecentWithCaptains(eq(1L), any())).thenReturn(List.of(running, played));
+        when(captainDraftEntryRepository.findByDraftIds(List.of(101L, 100L))).thenReturn(entries);
+        when(captainDraftParticipantRepository.countByDraftIds(List.of(101L, 100L)))
+            .thenReturn(List.of(new ParticipantCount(100L, 10L), new ParticipantCount(101L, 8L)));
+
+        CaptainDraftListResponse response = captainDraftService.listDrafts(1L);
+
+        assertThat(response.drafts()).extracting(CaptainDraftSummaryResponse::draftId).containsExactly(101L, 100L);
+        assertThat(response.drafts().get(1)).satisfies(summary -> {
+            assertThat(summary.homeCaptainNickname()).isEqualTo("P1");
+            assertThat(summary.awayCaptainNickname()).isEqualTo("P2");
+            assertThat(summary.participantCount()).isEqualTo(10);
+            assertThat(summary.roundCount()).isEqualTo(3);
+            assertThat(List.of(summary.homeRoundWins(), summary.awayRoundWins())).containsExactly(1, 0);
+            assertThat(List.of(summary.homeSetWins(), summary.awaySetWins())).containsExactly(3, 2);
+            assertThat(List.of(summary.decidedSets(), summary.totalSets())).containsExactly(5, 6);
+        });
+        assertThat(response.drafts().get(0)).satisfies(summary -> {
+            assertThat(summary.status()).isEqualTo("DRAFTING");
+            assertThat(summary.participantCount()).isEqualTo(8);
+            assertThat(summary.decidedSets()).isZero();
+        });
+    }
+
+    @Test
+    void listsNoDraftsForAGroupWithoutAny() {
+        when(captainDraftRepository.findRecentWithCaptains(eq(1L), any())).thenReturn(List.of());
+
+        assertThat(captainDraftService.listDrafts(1L).drafts()).isEmpty();
     }
 
     @Test
@@ -596,6 +646,15 @@ class CaptainDraftServiceTest {
             participant(draft, player(group, 5L), false, "HOME", 3),
             participant(draft, player(group, 6L), false, "AWAY", 4)
         );
+    }
+
+    private CaptainDraftEntry result(CaptainDraftEntry entry, String winnerTeam) {
+        entry.setWinnerTeam(winnerTeam);
+        return entry;
+    }
+
+    private record ParticipantCount(Long getDraftId, Long getParticipants)
+        implements CaptainDraftParticipantRepository.DraftParticipantCount {
     }
 
     private void assertRefused(CaptainDraftEntryUpdateItemRequest item, String message) {

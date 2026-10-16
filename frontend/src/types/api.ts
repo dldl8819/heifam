@@ -471,6 +471,29 @@ export type CaptainDraftEntriesUpdateRequest = {
   entries: CaptainDraftEntryUpdateItem[]
 }
 
+// A past or running draft in the list of records. Its results stay with the draft and never move MMR.
+export type CaptainDraftSummary = {
+  draftId: number
+  title: string
+  createdAt: string
+  status: 'DRAFTING' | 'READY' | string
+  homeCaptainNickname: string
+  awayCaptainNickname: string
+  participantCount: number
+  roundCount: number
+  setsPerRound: number
+  homeRoundWins: number
+  awayRoundWins: number
+  homeSetWins: number
+  awaySetWins: number
+  decidedSets: number
+  totalSets: number
+}
+
+export type CaptainDraftListResponse = {
+  drafts: CaptainDraftSummary[]
+}
+
 export type CaptainDraftUnpickRequest = {
   playerId: number
 }
@@ -516,6 +539,7 @@ export type CaptainDraftResponse = {
   draftId: number
   groupId: number
   title: string
+  createdAt: string
   status: 'DRAFTING' | 'READY' | string
   setsPerRound: number
   participantCount: number
@@ -820,7 +844,8 @@ export type BoardSearchResult = {
   pageSize: number
 }
 
-export type PrizeDrawMode = 'FIRST' | 'LAST'
+// FIRST/LAST: by the order the pinball balls arrived in. CANNON: one winner a cannon shot.
+export type PrizeDrawMode = 'FIRST' | 'LAST' | 'CANNON'
 
 export type PrizeDrawWinner = {
   place: number
@@ -832,7 +857,7 @@ export type PrizeDrawWinner = {
 export type PrizeDraw = {
   id: number
   title: string
-  // FIRST: the first balls to arrive won. LAST: the last ones did.
+  // FIRST: the first balls to arrive won. LAST: the last ones did. CANNON: drawn shot by shot.
   mode: PrizeDrawMode
   entrantCount: number
   createdAt: string

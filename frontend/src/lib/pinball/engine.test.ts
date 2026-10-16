@@ -3,6 +3,8 @@ import { createCourse } from './course'
 import {
   BALL_RADIUS,
   MAX_TICKS,
+  SHOCKWAVE_INTERVAL,
+  SHOCKWAVE_RADIUS,
   TICKS_PER_SECOND,
   createRandom,
   createWorld,
@@ -86,6 +88,44 @@ describe('a draw on the course', () => {
   it('plays the same for the same seed and differently for another', () => {
     expect(run(25, 2026).finishedOrder).toEqual(run(25, 2026).finishedOrder)
     expect(run(25, 2026).finishedOrder).not.toEqual(run(25, 2027).finishedOrder)
+  })
+
+  it('sets off a shockwave now and then, from a running ball, and keeps only the latest', () => {
+    const world = run(30, 4242)
+
+    expect(world.shockwaves.length).toBeGreaterThan(0)
+    for (const wave of world.shockwaves) {
+      expect(wave.tick % SHOCKWAVE_INTERVAL).toBe(0)
+      expect(wave.ballId).toBeGreaterThanOrEqual(0)
+      expect(wave.ballId).toBeLessThan(30)
+    }
+    const ticks = world.shockwaves.map((wave) => wave.tick)
+    expect([...ticks].sort((left, right) => left - right)).toEqual(ticks)
+    expect(run(30, 4242).shockwaves).toEqual(world.shockwaves)
+  })
+
+  it('throws the balls near a shockwave away from where it went off', () => {
+    const world = createWorld(course, 2, 1)
+    const [first, second] = world.balls
+    Object.assign(first, { x: 200, y: 1500, vx: 0, vy: 0 })
+    Object.assign(second, { x: 200 + SHOCKWAVE_RADIUS / 2, y: 1500, vx: 0, vy: 0 })
+    world.tick = SHOCKWAVE_INTERVAL - 1
+    stepWorld(world)
+
+    const wave = world.shockwaves[0]
+    const other = wave.ballId === first.id ? second : first
+    expect(Math.sign(other.vx)).toBe(Math.sign(other.x - wave.x))
+    expect(Math.abs(other.vx)).toBeGreaterThan(1)
+  })
+
+  it('remembers when each peg was last hit', () => {
+    const world = run(20, 9)
+
+    expect(world.pegHitTicks).toHaveLength(course.pegs.length)
+    expect(world.pegHitTicks.some((tick) => tick > 0)).toBe(true)
+    for (const tick of world.pegHitTicks) {
+      expect(tick).toBeLessThanOrEqual(world.tick)
+    }
   })
 
   it('gives every entrant about the same chance of winning', () => {
