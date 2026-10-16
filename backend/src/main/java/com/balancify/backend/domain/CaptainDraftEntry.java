@@ -1,5 +1,6 @@
 package com.balancify.backend.domain;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -8,12 +9,20 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
+/**
+ * One set of a round of the regular draft: a team game of team size a side (3:3 or 2:2; sets
+ * written before V79 were one against one), with its players per side and its result.
+ */
 @Entity
 @Table(
     name = "captain_draft_entries",
@@ -38,13 +47,16 @@ public class CaptainDraftEntry {
     @Column(nullable = false)
     private Integer setNumber;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "home_player_id")
-    private Player homePlayer;
+    @Column(nullable = false)
+    private Integer teamSize = 3;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "away_player_id")
-    private Player awayPlayer;
+    // A note on the tiers the set asks for, such as 상위 3 or 핫티어 1; not enforced.
+    @Column(length = 30)
+    private String requiredTier;
+
+    @OneToMany(mappedBy = "entry", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("team asc, slot asc")
+    private List<CaptainDraftEntryPlayer> players = new ArrayList<>();
 
     @Column(length = 10)
     private String winnerTeam;
@@ -98,20 +110,73 @@ public class CaptainDraftEntry {
         this.setNumber = setNumber;
     }
 
-    public Player getHomePlayer() {
-        return homePlayer;
+    public Integer getTeamSize() {
+        return teamSize;
     }
 
-    public void setHomePlayer(Player homePlayer) {
-        this.homePlayer = homePlayer;
+    public void setTeamSize(Integer teamSize) {
+        this.teamSize = teamSize;
     }
 
-    public Player getAwayPlayer() {
-        return awayPlayer;
+    public String getRequiredTier() {
+        return requiredTier;
     }
 
-    public void setAwayPlayer(Player awayPlayer) {
-        this.awayPlayer = awayPlayer;
+    public void setRequiredTier(String requiredTier) {
+        this.requiredTier = requiredTier;
+    }
+
+    public List<CaptainDraftEntryPlayer> getPlayers() {
+        return players;
+    }
+
+    /** The players of one side, slot by slot: index 0 is slot 1, null where the slot is empty. */
+    public List<Player> sidePlayers(String team) {
+        int size = teamSize == null || teamSize < 1 ? 1 : teamSize;
+        List<Player> side = new ArrayList<>();
+        for (int index = 0; index < size; index++) {
+            side.add(null);
+        }
+        for (CaptainDraftEntryPlayer slotted : players) {
+            if (team.equals(slotted.getTeam()) && slotted.getSlot() != null
+                && slotted.getSlot() >= 1 && slotted.getSlot() <= size) {
+                side.set(slotted.getSlot() - 1, slotted.getPlayer());
+            }
+        }
+        return side;
+    }
+
+    /**
+     * Sets one side to these players, slot by slot (index 0 is slot 1, null leaves it empty). A slot
+     * that keeps a row has its player changed in place rather than being removed and inserted
+     * again, so the flush never meets the (entry, team, slot) unique key twice.
+     */
+    public void setSidePlayers(String team, List<Player> side) {
+        for (int index = 0; index < side.size(); index++) {
+            int slot = index + 1;
+            Player player = side.get(index);
+            CaptainDraftEntryPlayer existing = players
+                .stream()
+                .filter(candidate -> team.equals(candidate.getTeam()) && Integer.valueOf(slot).equals(candidate.getSlot()))
+                .findFirst()
+                .orElse(null);
+            if (player == null) {
+                if (existing != null) {
+                    players.remove(existing);
+                }
+            } else if (existing != null) {
+                existing.setPlayer(player);
+            } else {
+                CaptainDraftEntryPlayer added = new CaptainDraftEntryPlayer();
+                added.setEntry(this);
+                added.setTeam(team);
+                added.setSlot(slot);
+                added.setPlayer(player);
+                players.add(added);
+            }
+        }
+        players.removeIf(candidate -> team.equals(candidate.getTeam())
+            && (candidate.getSlot() == null || candidate.getSlot() > side.size()));
     }
 
     public String getWinnerTeam() {

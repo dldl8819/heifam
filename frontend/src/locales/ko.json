@@ -1616,7 +1616,10 @@
     "settings": {
       "title": "라운드 설정",
       "setsPerRound": "라운드당 세트 수",
-      "helper": "기본은 4세트이며 참석 인원에 맞게 조정할 수 있습니다."
+      "helper": "참석 인원에 맞는 세트 수만 고를 수 있습니다. 3:3을 먼저 채우고, 남는 인원은 2:2로 하거나 쉽니다.",
+      "option": "{sets}세트 · {games}",
+      "optionResting": "{sets}세트 · {games} ({resting}명씩 휴식)",
+      "needAttendance": "참석자를 짝수로 8명 이상 정하면 고를 수 있습니다."
     },
     "actions": {
       "reset": "초기화",
@@ -1642,10 +1645,6 @@
       "assign": "{nickname} 선수를 {team}에 넣기",
       "unpick": "{nickname} 선수를 팀에서 빼기"
     },
-    "pickLog": {
-      "title": "드래프트 진행 기록",
-      "empty": "아직 선택된 팀원이 없습니다."
-    },
     "scoreboard": {
       "title": "팀 현황",
       "helper": "감독이 부른 선수를 남은 참석자에서 청팀·백팀 버튼으로 넣으면 감독 밑에 표시됩니다. 한 번에 여러 명을 넣어도 되고, 잘못 넣은 선수는 ×로 뺄 수 있습니다.",
@@ -1654,8 +1653,7 @@
     },
     "entry": {
       "title": "라운드 엔트리 설정",
-      "helper": "진행자가 청팀·백팀 엔트리와 세트 결과를 함께 입력하고 저장합니다.",
-      "round": "{round} Round {code}",
+      "helper": "진행자가 세트마다 청팀·백팀 선수를 한 줄로 입력하고 결과와 함께 저장합니다. 라운드 종족전은 라운드 이름 아래에서 바꿀 수 있고, 필수티어는 \"상위 3\", \"핫티어 1\"처럼 적어 둡니다.",
       "roundOnly": "{round}Round",
       "roundLabel": "라운드",
       "raceLabel": "종족",
@@ -1666,10 +1664,22 @@
       "finalWinLabel": "최종 승",
       "homeWin": "청팀 승",
       "awayWin": "백팀 승",
-      "set": "{set}세트",
       "setLabel": "세트",
       "notSet": "미설정",
-      "unsaved": "저장하지 않은 세트 {count}개"
+      "unsaved": "저장하지 않은 변경 {count}건",
+      "setCell": "{set}세트",
+      "teamSize": "{size}:{size}",
+      "roundCodeLabel": "{round}라운드 종족전",
+      "slotLabel": "{team} {set}세트 {slot}번",
+      "requiredTierPlaceholder": "예: 핫티어 1",
+      "tierPresets": {
+        "top3": "상위 3",
+        "top2": "상위 2",
+        "top1": "상위 1",
+        "hot1": "핫티어 1",
+        "hot2": "핫티어 2",
+        "hot3": "핫티어 3"
+      }
     },
     "messages": {
       "createSuccess": "정기 감전 드래프트가 생성되었습니다.",

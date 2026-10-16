@@ -9,10 +9,10 @@ import org.springframework.data.repository.query.Param;
 public interface CaptainDraftEntryRepository extends JpaRepository<CaptainDraftEntry, Long> {
 
     @Query("""
-        select entry
+        select distinct entry
         from CaptainDraftEntry entry
-        left join fetch entry.homePlayer homePlayer
-        left join fetch entry.awayPlayer awayPlayer
+        left join fetch entry.players slotted
+        left join fetch slotted.player
         where entry.draft.id = :draftId
         order by entry.roundNumber asc, entry.setNumber asc
         """)

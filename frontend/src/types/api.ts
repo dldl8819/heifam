@@ -453,17 +453,23 @@ export type CaptainDraftPickRequest = {
   pickedPlayerId: number
 }
 
-// The host sets both teams' players of a set; the backend still takes a captain's own sheet
-// (captainPlayerId with playerId), which this page no longer sends.
+// One set as the host fills it in: each side slot by slot (null leaves a slot empty).
 export type CaptainDraftEntryUpdateItem = {
   roundNumber: number
   setNumber: number
-  homePlayerId: number | null
-  awayPlayerId: number | null
+  homePlayerIds: Array<number | null>
+  awayPlayerIds: Array<number | null>
+  requiredTier: string | null
   winnerTeam: TeamSide | null
 }
 
+export type CaptainDraftRoundUpdate = {
+  roundNumber: number
+  roundCode: string
+}
+
 export type CaptainDraftEntriesUpdateRequest = {
+  rounds: CaptainDraftRoundUpdate[]
   entries: CaptainDraftEntryUpdateItem[]
 }
 
@@ -489,14 +495,21 @@ export type CaptainDraftPickLog = {
   team: CaptainDraftTeam
 }
 
+export type CaptainDraftEntryPlayer = {
+  playerId: number | null
+  nickname: string
+}
+
+// A set: a team game of teamSize a side (3:3 or 2:2; 1 for sets written before team games), each
+// side slot by slot with null where a slot is empty.
 export type CaptainDraftEntry = {
   roundNumber: number
   roundCode: string
   setNumber: number
-  homePlayerId: number | null
-  homePlayerNickname: string | null
-  awayPlayerId: number | null
-  awayPlayerNickname: string | null
+  teamSize: number
+  requiredTier: string | null
+  homePlayers: Array<CaptainDraftEntryPlayer | null>
+  awayPlayers: Array<CaptainDraftEntryPlayer | null>
   winnerTeam: TeamSide | null
 }
 

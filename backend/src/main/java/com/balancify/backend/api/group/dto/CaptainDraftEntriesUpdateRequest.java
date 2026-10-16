@@ -2,9 +2,9 @@ package com.balancify.backend.api.group.dto;
 
 import java.util.List;
 
-/** The round entries; without a captain, the host sets both teams at once. */
+/** The round compositions and the sets, as the host saves them in one go. */
 public record CaptainDraftEntriesUpdateRequest(
-    Long captainPlayerId,
+    List<CaptainDraftRoundUpdateRequest> rounds,
     List<CaptainDraftEntryUpdateItemRequest> entries
 ) {
 }
