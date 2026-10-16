@@ -1,23 +1,47 @@
 import { describe, expect, it } from 'vitest'
 import {
+  canAddSet,
+  canonicalComposition,
+  compositionsOfSize,
   countSetWins,
+  defaultSetSizes,
+  draftLayout,
   draftPlayerOptionLabel,
   draftPlayerTags,
   dropEditsNaming,
   effectiveEntry,
   entryKey,
+  nextSetSize,
+  playersInRound,
+  requiredTierPresets,
+  roundComposition,
+  setComposition,
+  setLayoutSummary,
+  setSizeChoices,
+  setTeamSizes,
+  withSlot,
 } from '@/lib/captain-draft'
 import type { CaptainDraftEntry, PlayerRosterItem } from '@/types/api'
 
-function entry(setNumber: number, home: number | null, away: number | null, winner: 'HOME' | 'AWAY' | null): CaptainDraftEntry {
+function slot(playerId: number | null) {
+  return playerId === null ? null : { playerId, nickname: `P${playerId}` }
+}
+
+function entry(
+  roundNumber: number,
+  setNumber: number,
+  home: Array<number | null>,
+  away: Array<number | null>,
+  winner: 'HOME' | 'AWAY' | null = null,
+): CaptainDraftEntry {
   return {
-    roundNumber: 1,
+    roundNumber,
     roundCode: 'PPP',
     setNumber,
-    homePlayerId: home,
-    homePlayerNickname: null,
-    awayPlayerId: away,
-    awayPlayerNickname: null,
+    teamSize: home.length,
+    requiredTier: null,
+    homePlayers: home.map(slot),
+    awayPlayers: away.map(slot),
     winnerTeam: winner,
   }
 }
@@ -26,47 +50,115 @@ function rosterPlayer(overrides: Partial<PlayerRosterItem>): PlayerRosterItem {
   return { id: 3, nickname: 'Ace', race: 'PT', tier: 'A', wins: 0, losses: 0, games: 0, ...overrides }
 }
 
-describe('captain draft sheet', () => {
+describe('captain draft sets', () => {
   it('keeps the host\'s unsaved changes over the saved values, field by field', () => {
-    const saved = entry(1, 3, 4, 'HOME')
+    const saved = entry(1, 1, [1, 3, 5], [2, 4, 6], 'HOME')
 
-    expect(effectiveEntry(saved, undefined)).toEqual({ key: '1-1', homePlayerId: 3, awayPlayerId: 4, winnerTeam: 'HOME' })
-    expect(effectiveEntry(saved, { awayPlayerId: 6 })).toEqual({ key: '1-1', homePlayerId: 3, awayPlayerId: 6, winnerTeam: 'HOME' })
-    // Clearing a player or the result is a change too.
-    expect(effectiveEntry(saved, { homePlayerId: null, winnerTeam: '' })).toEqual({
+    expect(effectiveEntry(saved, undefined)).toMatchObject({
       key: '1-1',
-      homePlayerId: null,
-      awayPlayerId: 4,
+      teamSize: 3,
+      raceCode: 'PPP',
+      homePlayerIds: [1, 3, 5],
+      awayPlayerIds: [2, 4, 6],
+      requiredTier: '',
+      winnerTeam: 'HOME',
+    })
+    expect(
+      effectiveEntry(saved, { raceCode: 'PRR', awayPlayerIds: [2, null, 6], requiredTier: '핫티어 1', winnerTeam: '' }),
+    ).toMatchObject({
+      raceCode: 'PRR',
+      homePlayerIds: [1, 3, 5],
+      awayPlayerIds: [2, null, 6],
+      requiredTier: '핫티어 1',
       winnerTeam: '',
     })
+    // A saved side shorter than the set fills its empty slots.
+    expect(effectiveEntry({ ...saved, homePlayers: [slot(1)] }, undefined).homePlayerIds).toEqual([1, null, null])
+    expect(withSlot([1, null, 5], 1, 7)).toEqual([1, 7, 5])
     expect(entryKey({ roundNumber: 2, setNumber: 3 })).toBe('2-3')
   })
 
-  it('counts set wins for each team and each winning player', () => {
+  it('counts set wins for each team and for every player on the winning side', () => {
     const wins = countSetWins([
-      effectiveEntry(entry(1, 3, 4, 'HOME'), undefined),
-      effectiveEntry(entry(2, 3, 5, 'HOME'), undefined),
-      effectiveEntry(entry(3, 7, 5, 'AWAY'), undefined),
-      effectiveEntry(entry(4, 7, null, null), undefined),
+      effectiveEntry(entry(1, 1, [1, 3, 5], [2, 4, 6], 'HOME'), undefined),
+      effectiveEntry(entry(1, 2, [7], [8], 'AWAY'), undefined),
+      effectiveEntry(entry(2, 1, [1, 3, 5], [2, 4, 6], null), undefined),
     ])
 
-    expect([wins.home, wins.away]).toEqual([2, 1])
-    expect(Object.fromEntries(wins.byPlayer)).toEqual({ 3: 2, 5: 1 })
+    expect([wins.home, wins.away]).toEqual([1, 1])
+    expect(Object.fromEntries(wins.byPlayer)).toEqual({ 1: 1, 3: 1, 5: 1, 8: 1 })
   })
 
-  it('drops unsaved changes that name a player taken out of their team', () => {
-    expect(dropEditsNaming({ '1-1': { homePlayerId: 3 }, '1-2': { awayPlayerId: 4 }, '1-3': { winnerTeam: 'HOME' } }, 3)).toEqual({
-      '1-2': { awayPlayerId: 4 },
-      '1-3': { winnerTeam: 'HOME' },
+  it('knows who is already placed in a round', () => {
+    const sheet = [
+      effectiveEntry(entry(1, 1, [1, null, 5], [2, 4, 6]), undefined),
+      effectiveEntry(entry(1, 2, [7, null], [null, null]), undefined),
+      effectiveEntry(entry(2, 1, [3, 9, 11], [8, 10, 12]), undefined),
+    ]
+
+    expect([...playersInRound(sheet, 1)].sort((a, b) => a - b)).toEqual([1, 2, 4, 5, 6, 7])
+  })
+
+  it('takes a player taken out of their team off the unsaved changes', () => {
+    expect(dropEditsNaming({ '1-1': { homePlayerIds: [3, 5, null], requiredTier: '상위 3' }, '1-2': { winnerTeam: 'HOME' } }, 3)).toEqual({
+      '1-1': { homePlayerIds: [null, 5, null], requiredTier: '상위 3' },
+      '1-2': { winnerTeam: 'HOME' },
     })
+  })
+
+  it('sizes a round\'s sets from the players of a team, as the backend does', () => {
+    expect(setTeamSizes(5, 1)).toEqual([3])
+    expect(setTeamSizes(5, 2)).toEqual([3, 2])
+    expect(setTeamSizes(4, 2)).toEqual([2, 2])
+    expect(setTeamSizes(9, 3)).toEqual([3, 3, 3])
+    expect([defaultSetSizes(4), defaultSetSizes(5), defaultSetSizes(9)]).toEqual([[2, 2], [3, 2], [3, 3, 3]])
+  })
+
+  it('lays out a round from 3:3, 2:2 and 1:1 sets within what a team can field', () => {
+    // Five a side: 3:3 + 1:1 leaves one resting; a third set fits only as 1:1.
+    expect(setLayoutSummary([3, 1], 5)).toEqual({ playing: 4, resting: 1 })
+    expect(setLayoutSummary([3, 1, 1], 5)).toEqual({ playing: 5, resting: 0 })
+    expect(setLayoutSummary([3], 5)).toEqual({ playing: 3, resting: 2 })
+    expect(setSizeChoices([3, 1], 1, 5)).toEqual([2, 1])
+    expect(setSizeChoices([3, 2], 0, 5)).toEqual([3, 2, 1])
+    expect([canAddSet([3, 1], 5), canAddSet([3, 2], 5), canAddSet([3], 5)]).toEqual([true, false, true])
+    expect([nextSetSize([3], 5), nextSetSize([3, 1], 5)]).toEqual([2, 1])
+  })
+
+  it('reads the layout and rounds back from a started draft', () => {
+    const entries = [entry(1, 1, [1, 3, 5], [2, 4, 6]), entry(1, 2, [7], [8]), entry(2, 1, [1, 3, 5], [2, 4, 6]), entry(2, 2, [7], [8])]
+    expect(draftLayout(entries)).toEqual({ setSizes: [3, 1], roundCount: 2 })
+  })
+
+  it('offers every race composition, the usual ones and random ones first', () => {
+    expect(compositionsOfSize(3).slice(0, 7)).toEqual(['PPP', 'PPT', 'PPZ', 'PTZ', 'PPR', 'PRR', 'RRR'])
+    expect(compositionsOfSize(3)).toHaveLength(20)
+    expect(new Set(compositionsOfSize(3)).size).toBe(20)
+    expect(compositionsOfSize(2)).toHaveLength(10)
+    expect(compositionsOfSize(1)).toEqual(['P', 'T', 'Z', 'R'])
+    expect(canonicalComposition('rpr')).toBe('PRR')
+  })
+
+  it('starts 2:2 and 1:1 sets from the round\'s races as the clan plays them', () => {
+    expect(['PPP', 'PPT', 'PPZ', 'PTZ'].map((code) => setComposition(code, 2))).toEqual(['PP', 'PT', 'PZ', 'PR'])
+    expect(['PPP', 'PPT', 'PTZ', 'RRR'].map((code) => setComposition(code, 1))).toEqual(['P', 'P', 'P', 'R'])
+    expect([setComposition('PRR', 2), setComposition('PPR', 2), setComposition('PPT', 3)]).toEqual(['RR', 'PR', 'PPT'])
+    expect(requiredTierPresets()).toEqual(['상위 3', '상위 2', '상위 1', '핫티어 1', '핫티어 2', '핫티어 3'])
+  })
+
+  it('shows a round by its biggest set and keeps each set\'s own races', () => {
+    const sets = [
+      effectiveEntry(entry(1, 1, [1, 3, 5], [2, 4, 6]), { raceCode: 'PRR' }),
+      effectiveEntry(entry(1, 2, [7], [8]), undefined),
+    ]
+    expect(roundComposition(sets)).toBe('PRR')
+    expect(sets[1].raceCode).toBe('PPP')
   })
 
   it('shows the live tier and the playable races beside a nickname', () => {
     expect(draftPlayerTags(rosterPlayer({ liveTier: 'A+' }))).toEqual({ tier: 'A+', races: 'PT' })
     expect(draftPlayerTags(rosterPlayer({ tier: 'UNASSIGNED' })).tier).toBe('배정 필요')
-    // A player missing from the roster keeps the draft's race and shows no tier.
     expect(draftPlayerTags(undefined, 'Z')).toEqual({ tier: null, races: 'Z' })
     expect(draftPlayerOptionLabel('Ace', { tier: 'A+', races: 'PT' })).toBe('Ace · A+ · PT')
-    expect(draftPlayerOptionLabel('Ace', { tier: null, races: null })).toBe('Ace')
   })
 })

@@ -1,15 +1,18 @@
 package com.balancify.backend.api.group.dto;
 
+import java.util.List;
+
 /**
- * One set of a round. The host sends both teams' players (homePlayerId, awayPlayerId); a request
- * naming a captain sends that captain's player alone (playerId).
+ * One set as the host fills it in: its race composition (P, T, Z and R for random; left out, kept),
+ * each side's players slot by slot (null leaves a slot empty), the tiers it asks for, and the winner.
  */
 public record CaptainDraftEntryUpdateItemRequest(
     Integer roundNumber,
     Integer setNumber,
-    Long playerId,
-    String winnerTeam,
-    Long homePlayerId,
-    Long awayPlayerId
+    String raceCode,
+    List<Long> homePlayerIds,
+    List<Long> awayPlayerIds,
+    String requiredTier,
+    String winnerTeam
 ) {
 }

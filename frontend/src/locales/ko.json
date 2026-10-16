@@ -1615,8 +1615,18 @@
     },
     "settings": {
       "title": "라운드 설정",
-      "setsPerRound": "라운드당 세트 수",
-      "helper": "기본은 4세트이며 참석 인원에 맞게 조정할 수 있습니다."
+      "helper": "3:3·2:2·1:1 세트를 섞어 구성합니다. 한 팀이 출전하는 인원은 팀 인원을 넘을 수 없습니다.",
+      "needAttendance": "참석자를 짝수로 8명 이상 정하면 세트를 구성할 수 있습니다.",
+      "roundCount": "라운드 수",
+      "roundOption": "{count}라운드",
+      "roundHelper": "기본은 4라운드(PPP·PPT·PPZ·PTZ)입니다. 시간이 없으면 3라운드, 청백전 5판 3선승이면 5라운드처럼 고르면 됩니다.",
+      "layout": "세트 구성 (라운드마다 같음)",
+      "setLabel": "{set}세트",
+      "sizeOption": "{size}:{size}",
+      "addSet": "+ 세트 추가",
+      "removeSet": "{set}세트 빼기",
+      "summaryAll": "팀마다 {playing}명 모두 출전",
+      "summaryResting": "팀마다 {playing}명 출전 · {resting}명 휴식"
     },
     "actions": {
       "reset": "초기화",
@@ -1642,10 +1652,6 @@
       "assign": "{nickname} 선수를 {team}에 넣기",
       "unpick": "{nickname} 선수를 팀에서 빼기"
     },
-    "pickLog": {
-      "title": "드래프트 진행 기록",
-      "empty": "아직 선택된 팀원이 없습니다."
-    },
     "scoreboard": {
       "title": "팀 현황",
       "helper": "감독이 부른 선수를 남은 참석자에서 청팀·백팀 버튼으로 넣으면 감독 밑에 표시됩니다. 한 번에 여러 명을 넣어도 되고, 잘못 넣은 선수는 ×로 뺄 수 있습니다.",
@@ -1654,8 +1660,7 @@
     },
     "entry": {
       "title": "라운드 엔트리 설정",
-      "helper": "진행자가 청팀·백팀 엔트리와 세트 결과를 함께 입력하고 저장합니다.",
-      "round": "{round} Round {code}",
+      "helper": "진행자가 세트마다 청팀·백팀 선수를 한 줄로 입력하고 결과와 함께 저장합니다. 라운드 이름 아래에서 그 라운드의 종족전을 고르면 세트마다 맞춰지고, 세트별 종족은 종족 칸에서 따로 바꿀 수 있습니다(R은 랜덤). 필수티어는 \"상위 3\", \"핫티어 1\"처럼 적어 둡니다.",
       "roundOnly": "{round}Round",
       "roundLabel": "라운드",
       "raceLabel": "종족",
@@ -1666,10 +1671,23 @@
       "finalWinLabel": "최종 승",
       "homeWin": "청팀 승",
       "awayWin": "백팀 승",
-      "set": "{set}세트",
       "setLabel": "세트",
       "notSet": "미설정",
-      "unsaved": "저장하지 않은 세트 {count}개"
+      "unsaved": "저장하지 않은 변경 {count}건",
+      "setCell": "{set}세트",
+      "teamSize": "{size}:{size}",
+      "roundCodeLabel": "{round}라운드 종족전",
+      "slotLabel": "{team} {set}세트 {slot}번",
+      "requiredTierPlaceholder": "예: 핫티어 1",
+      "tierPresets": {
+        "top3": "상위 3",
+        "top2": "상위 2",
+        "top1": "상위 1",
+        "hot1": "핫티어 1",
+        "hot2": "핫티어 2",
+        "hot3": "핫티어 3"
+      },
+      "raceCodeLabel": "{round}라운드 {set}세트 종족"
     },
     "messages": {
       "createSuccess": "정기 감전 드래프트가 생성되었습니다.",

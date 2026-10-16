@@ -446,6 +446,9 @@ export type CaptainDraftCreateRequest = {
   participantPlayerIds: number[]
   captainPlayerIds: number[]
   setsPerRound?: number
+  // How many rounds (1 to 7, four if left out), and each set's team size (3, 2 or 1) in play order.
+  roundCount?: number
+  setSizes?: number[]
 }
 
 export type CaptainDraftPickRequest = {
@@ -453,13 +456,14 @@ export type CaptainDraftPickRequest = {
   pickedPlayerId: number
 }
 
-// The host sets both teams' players of a set; the backend still takes a captain's own sheet
-// (captainPlayerId with playerId), which this page no longer sends.
+// One set as the host fills it in: its races, and each side slot by slot (null leaves a slot empty).
 export type CaptainDraftEntryUpdateItem = {
   roundNumber: number
   setNumber: number
-  homePlayerId: number | null
-  awayPlayerId: number | null
+  raceCode: string | null
+  homePlayerIds: Array<number | null>
+  awayPlayerIds: Array<number | null>
+  requiredTier: string | null
   winnerTeam: TeamSide | null
 }
 
@@ -489,14 +493,22 @@ export type CaptainDraftPickLog = {
   team: CaptainDraftTeam
 }
 
+export type CaptainDraftEntryPlayer = {
+  playerId: number | null
+  nickname: string
+}
+
+// A set: a team game of teamSize a side (3:3 or 2:2; 1 for sets written before team games), each
+// side slot by slot with null where a slot is empty.
 export type CaptainDraftEntry = {
   roundNumber: number
+  // The set's own races (P, T, Z, R for random), e.g. PPT for a 3:3 game, PT for a 2:2 one.
   roundCode: string
   setNumber: number
-  homePlayerId: number | null
-  homePlayerNickname: string | null
-  awayPlayerId: number | null
-  awayPlayerNickname: string | null
+  teamSize: number
+  requiredTier: string | null
+  homePlayers: Array<CaptainDraftEntryPlayer | null>
+  awayPlayers: Array<CaptainDraftEntryPlayer | null>
   winnerTeam: TeamSide | null
 }
 
