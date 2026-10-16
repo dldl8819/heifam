@@ -55,6 +55,8 @@ public class CaptainDraftService {
     private static final int MAX_ROUND_COUNT = 7;
     private static final int MAX_SETS_PER_ROUND = 10;
     private static final int MAX_REQUIRED_TIER_LENGTH = 30;
+    // captain_drafts.title is varchar(120).
+    private static final int MAX_TITLE_LENGTH = 120;
     // Drafts listed as records; older ones stay in the database.
     private static final int RECORD_LIMIT = 30;
 
@@ -87,6 +89,7 @@ public class CaptainDraftService {
             throw new IllegalArgumentException("Request is required");
         }
 
+        String title = resolveTitle(request.title());
         List<Long> participantPlayerIds = normalizeDistinctPlayerIds(request.participantPlayerIds());
         List<Long> captainPlayerIds = normalizeDistinctPlayerIds(request.captainPlayerIds());
 
@@ -126,7 +129,7 @@ public class CaptainDraftService {
 
         CaptainDraft draft = new CaptainDraft();
         draft.setGroup(group);
-        draft.setTitle(resolveTitle(request.title()));
+        draft.setTitle(title);
         draft.setStatus(STATUS_DRAFTING);
         int playersPerTeam = participantPlayerIds.size() / 2;
         List<Integer> teamSizes = resolveSetSizes(request.setSizes(), request.setsPerRound(), playersPerTeam);
@@ -603,8 +606,12 @@ public class CaptainDraftService {
             .orElseThrow(() -> new NoSuchElementException("Draft not found: " + draftId));
     }
 
+    // A title longer than its column is refused here (400), not left to fail in the database (500).
     private String resolveTitle(String title) {
         String normalized = safeTrim(title);
+        if (normalized.length() > MAX_TITLE_LENGTH) {
+            throw new IllegalArgumentException("title must be at most " + MAX_TITLE_LENGTH + " characters");
+        }
         return normalized.isEmpty() ? "정기 감전 드래프트" : normalized;
     }
 
