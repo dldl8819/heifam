@@ -453,16 +453,22 @@ export type CaptainDraftPickRequest = {
   pickedPlayerId: number
 }
 
+// The host sets both teams' players of a set; the backend still takes a captain's own sheet
+// (captainPlayerId with playerId), which this page no longer sends.
 export type CaptainDraftEntryUpdateItem = {
   roundNumber: number
   setNumber: number
-  playerId: number | null
+  homePlayerId: number | null
+  awayPlayerId: number | null
   winnerTeam: TeamSide | null
 }
 
 export type CaptainDraftEntriesUpdateRequest = {
-  captainPlayerId: number
   entries: CaptainDraftEntryUpdateItem[]
+}
+
+export type CaptainDraftUnpickRequest = {
+  playerId: number
 }
 
 export type CaptainDraftParticipant = {

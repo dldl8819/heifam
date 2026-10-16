@@ -11,6 +11,7 @@ import type {
   CaptainDraftEntriesUpdateRequest,
   CaptainDraftPickRequest,
   CaptainDraftResponse,
+  CaptainDraftUnpickRequest,
   GroupDashboardResponse,
   GroupDormantPlayerItem,
   GroupPlayerLastParticipationResponse,
@@ -1230,6 +1231,19 @@ export const apiClient = {
   ) =>
     apiRequest<CaptainDraftResponse>(
       `/api/groups/${groupId}/captain-drafts/${draftId}/pick`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      { includeUserEmail: true }
+    ),
+  unpickCaptainDraftPlayer: (
+    groupId: number,
+    draftId: number,
+    payload: CaptainDraftUnpickRequest
+  ) =>
+    apiRequest<CaptainDraftResponse>(
+      `/api/groups/${groupId}/captain-drafts/${draftId}/unpick`,
       {
         method: 'POST',
         body: JSON.stringify(payload),

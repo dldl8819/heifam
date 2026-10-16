@@ -4,9 +4,20 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { apiClient, isApiNotFoundError } from '@/lib/api'
 import { useAdminAuth } from '@/lib/admin-auth'
 import { TierParticipantBoard } from '@/components/tier-participant-board'
+import { CaptainDraftTeamBoard } from '@/components/captain-draft-team-board'
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
+import {
+  countSetWins,
+  draftPlayerOptionLabel,
+  draftPlayerTags,
+  dropEditsNaming,
+  effectiveEntry,
+  type DraftWinnerSelection,
+  type EntryEdit,
+  type EntryEdits,
+} from '@/lib/captain-draft'
 import { startVisiblePolling } from '@/lib/visible-polling'
 import {
   autocompleteParticipantSlot,
@@ -22,6 +33,7 @@ import type {
   CaptainDraftResponse,
   CaptainDraftTeam,
   PlayerRosterItem,
+  TeamSide,
 } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
@@ -30,7 +42,6 @@ const winnerTeamOptions = [
   { value: 'HOME' as const, label: 'captainDraft.entry.homeWin' },
   { value: 'AWAY' as const, label: 'captainDraft.entry.awayWin' },
 ]
-type DraftWinnerSelection = '' | 'HOME' | 'AWAY'
 
 type IdentifiedCaptainDraftParticipant = CaptainDraftParticipant & { playerId: number }
 
@@ -55,10 +66,10 @@ function createParticipantSlotsFromDraft(draft: CaptainDraftResponse): Participa
 
 function teamLabel(team: CaptainDraftTeam): string {
   if (team === 'HOME') {
-    return t('captainDraft.teams.home')
+    return t('captainDraft.scoreboard.homeHeader')
   }
   if (team === 'AWAY') {
-    return t('captainDraft.teams.away')
+    return t('captainDraft.scoreboard.awayHeader')
   }
   return t('captainDraft.teams.unassigned')
 }
@@ -68,6 +79,14 @@ function normalizeSelectionValue(value: string): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null
 }
 
+function errorWithReason(key: string, caught: unknown): string {
+  return caught instanceof Error && caught.message.trim().length > 0 ? `${t(key)} (${caught.message})` : t(key)
+}
+
+/**
+ * The regular draft (정기 감전), run by the host: attendance and two captains, then the players each
+ * captain calls out are put into their team, in any order, and both teams' round entries are set.
+ */
 export default function CaptainDraftPage() {
   const { canViewMmr } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
@@ -80,18 +99,15 @@ export default function CaptainDraftPage() {
   )
   const [homeCaptainId, setHomeCaptainId] = useState<number | null>(null)
   const [awayCaptainId, setAwayCaptainId] = useState<number | null>(null)
-  const [actingCaptainId, setActingCaptainId] = useState<number | null>(null)
   const [setsPerRound, setSetsPerRound] = useState<number>(4)
 
   const [draft, setDraft] = useState<CaptainDraftResponse | null>(null)
   const [draftLoading, setDraftLoading] = useState<boolean>(true)
 
-  const [selectedPickPlayerId, setSelectedPickPlayerId] = useState<number | null>(null)
-  const [entrySelections, setEntrySelections] = useState<Record<string, number | ''>>({})
-  const [entryWinnerSelections, setEntryWinnerSelections] = useState<Record<string, DraftWinnerSelection>>({})
+  const [entryEdits, setEntryEdits] = useState<EntryEdits>({})
 
   const [isCreatingDraft, setIsCreatingDraft] = useState<boolean>(false)
-  const [isPicking, setIsPicking] = useState<boolean>(false)
+  const [isChangingTeams, setIsChangingTeams] = useState<boolean>(false)
   const [isSavingEntries, setIsSavingEntries] = useState<boolean>(false)
 
   const [error, setError] = useState<string | null>(null)
@@ -135,128 +151,36 @@ export default function CaptainDraftPage() {
     [homeCaptainId, selectedParticipants],
   )
 
-  const actingCaptainTeam: CaptainDraftTeam = useMemo(() => {
-    if (!draft || !actingCaptainId) {
-      return 'UNASSIGNED'
-    }
-    const participant = draft.participants.find((item) => item.playerId === actingCaptainId)
-    return participant?.team ?? 'UNASSIGNED'
-  }, [draft, actingCaptainId])
-
-  const homeTeamParticipants = useMemo(
-    () => (draft?.participants ?? []).filter((participant) => participant.team === 'HOME'),
-    [draft],
-  )
-
-  const awayTeamParticipants = useMemo(
-    () => (draft?.participants ?? []).filter((participant) => participant.team === 'AWAY'),
-    [draft],
-  )
-
-  const unassignedParticipants = useMemo(
-    () => (draft?.participants ?? []).filter((participant) => participant.team === 'UNASSIGNED'),
-    [draft],
-  )
-
-  const availablePickParticipants = useMemo(
-    () => unassignedParticipants
-      .filter(hasPlayerId)
-      .filter((participant) => !participant.captain),
-    [unassignedParticipants],
-  )
-
-  const actingTeamParticipants = useMemo(
-    () =>
-      (draft?.participants ?? []).filter(hasPlayerId).filter(
-        (participant) => participant.team === actingCaptainTeam,
-      ),
-    [draft, actingCaptainTeam],
-  )
-
-  const canPick =
-    Boolean(draft) &&
-    draft?.status === 'DRAFTING' &&
-    actingCaptainTeam !== 'UNASSIGNED' &&
-    actingCaptainTeam === draft?.currentTurnTeam &&
-    Boolean(selectedPickPlayerId) &&
-    !isPicking
-
-  const roundGroups = useMemo(() => {
-    const groups = new Map<string, CaptainDraftResponse['entries']>()
-    for (const entry of draft?.entries ?? []) {
-      const key = `${entry.roundNumber}-${entry.roundCode}`
-      if (!groups.has(key)) {
-        groups.set(key, [])
+  const teamMembers = useMemo(() => {
+    const members: Record<TeamSide, IdentifiedCaptainDraftParticipant[]> = { HOME: [], AWAY: [] }
+    for (const participant of (draft?.participants ?? []).filter(hasPlayerId)) {
+      if (participant.team === 'HOME' || participant.team === 'AWAY') {
+        members[participant.team].push(participant)
       }
-      groups.get(key)?.push(entry)
     }
-    return Array.from(groups.entries()).map(([key, entries]) => ({
-      key,
-      roundNumber: entries[0]?.roundNumber ?? 0,
-      roundCode: entries[0]?.roundCode ?? '',
-      entries: entries.sort((a, b) => a.setNumber - b.setNumber),
-    }))
+    return members
   }, [draft])
 
-  const homePlayerSetWins = useMemo(() => {
-    const wins = new Map<number, number>()
-    for (const entry of draft?.entries ?? []) {
-      const key = `${entry.roundNumber}-${entry.setNumber}`
-      const winnerTeam = entryWinnerSelections[key] === ''
-        ? entry.winnerTeam
-        : entryWinnerSelections[key]
-      if (winnerTeam === 'HOME' && typeof entry.homePlayerId === 'number') {
-        wins.set(entry.homePlayerId, (wins.get(entry.homePlayerId) ?? 0) + 1)
-      }
-    }
-    return wins
-  }, [draft, entryWinnerSelections])
-
-  const awayPlayerSetWins = useMemo(() => {
-    const wins = new Map<number, number>()
-    for (const entry of draft?.entries ?? []) {
-      const key = `${entry.roundNumber}-${entry.setNumber}`
-      const winnerTeam = entryWinnerSelections[key] === ''
-        ? entry.winnerTeam
-        : entryWinnerSelections[key]
-      if (winnerTeam === 'AWAY' && typeof entry.awayPlayerId === 'number') {
-        wins.set(entry.awayPlayerId, (wins.get(entry.awayPlayerId) ?? 0) + 1)
-      }
-    }
-    return wins
-  }, [draft, entryWinnerSelections])
-
-  const homeTeamSetWins = useMemo(
-    () =>
-      (draft?.entries ?? []).filter((entry) => {
-        const key = `${entry.roundNumber}-${entry.setNumber}`
-        const winnerTeam = entryWinnerSelections[key] === ''
-          ? entry.winnerTeam
-          : entryWinnerSelections[key]
-        return winnerTeam === 'HOME'
-      }).length,
-    [draft, entryWinnerSelections],
+  // The sheet as shown: saved sets with the host's unsaved changes laid over them.
+  const sheet = useMemo(
+    () => (draft?.entries ?? []).map((entry) => effectiveEntry(entry, entryEdits[`${entry.roundNumber}-${entry.setNumber}`])),
+    [draft, entryEdits],
   )
+  const setWins = useMemo(() => countSetWins(sheet), [sheet])
+  const unsavedCount = Object.keys(entryEdits).length
 
-  const awayTeamSetWins = useMemo(
-    () =>
-      (draft?.entries ?? []).filter((entry) => {
-        const key = `${entry.roundNumber}-${entry.setNumber}`
-        const winnerTeam = entryWinnerSelections[key] === ''
-          ? entry.winnerTeam
-          : entryWinnerSelections[key]
-        return winnerTeam === 'AWAY'
-      }).length,
-    [draft, entryWinnerSelections],
-  )
+  const roundGroups = useMemo(() => {
+    const groups = new Map<string, { roundNumber: number; roundCode: string; keys: string[] }>()
+    for (const entry of draft?.entries ?? []) {
+      const groupKey = `${entry.roundNumber}-${entry.roundCode}`
+      const group = groups.get(groupKey) ?? { roundNumber: entry.roundNumber, roundCode: entry.roundCode, keys: [] }
+      group.keys.push(`${entry.roundNumber}-${entry.setNumber}`)
+      groups.set(groupKey, group)
+    }
+    return Array.from(groups.values())
+  }, [draft])
 
-  const compactTeamRows = useMemo(() => {
-    const rowCount = Math.max(homeTeamParticipants.length, awayTeamParticipants.length)
-    return Array.from({ length: rowCount }, (_, index) => ({
-      home: homeTeamParticipants[index] ?? null,
-      away: awayTeamParticipants[index] ?? null,
-    }))
-  }, [awayTeamParticipants, homeTeamParticipants])
+  const sheetByKey = useMemo(() => new Map(sheet.map((entry) => [entry.key, entry])), [sheet])
 
   useEffect(() => {
     let mounted = true
@@ -294,7 +218,6 @@ export default function CaptainDraftPage() {
         setParticipantSlots(createParticipantSlotsFromDraft(response))
         setHomeCaptainId(response.homeCaptainPlayerId)
         setAwayCaptainId(response.awayCaptainPlayerId)
-        setActingCaptainId((current) => current ?? response.homeCaptainPlayerId)
         setSetsPerRound(response.setsPerRound)
       } catch (latestDraftError) {
         if (!mounted) {
@@ -345,28 +268,6 @@ export default function CaptainDraftPage() {
   }, [draft?.draftId])
 
   useEffect(() => {
-    if (!draft || actingCaptainTeam === 'UNASSIGNED') {
-      return
-    }
-
-    const nextSelections: Record<string, number | ''> = {}
-    const nextWinnerSelections: Record<string, DraftWinnerSelection> = {}
-    for (const entry of draft.entries) {
-      const key = `${entry.roundNumber}-${entry.setNumber}`
-      nextSelections[key] =
-        actingCaptainTeam === 'HOME'
-          ? (entry.homePlayerId ?? '')
-          : (entry.awayPlayerId ?? '')
-      nextWinnerSelections[key] =
-        entry.winnerTeam === 'HOME' || entry.winnerTeam === 'AWAY'
-          ? entry.winnerTeam
-          : ''
-    }
-    setEntrySelections(nextSelections)
-    setEntryWinnerSelections(nextWinnerSelections)
-  }, [draft, actingCaptainTeam])
-
-  useEffect(() => {
     if (draft) {
       return
     }
@@ -395,10 +296,7 @@ export default function CaptainDraftPage() {
     if (awayCaptainId != null && !selectedParticipantIds.includes(awayCaptainId)) {
       setAwayCaptainId(null)
     }
-    if (actingCaptainId != null && !selectedParticipantIds.includes(actingCaptainId)) {
-      setActingCaptainId(null)
-    }
-  }, [actingCaptainId, awayCaptainId, homeCaptainId, selectedParticipantIds])
+  }, [awayCaptainId, homeCaptainId, selectedParticipantIds])
 
   const handleParticipantSlotInputChange = (index: number, value: string) => {
     setMessage(null)
@@ -487,14 +385,10 @@ export default function CaptainDraftPage() {
         setsPerRound,
       })
       setDraft(created)
-      setActingCaptainId(created.homeCaptainPlayerId)
+      setEntryEdits({})
       setMessage(t('captainDraft.messages.createSuccess'))
     } catch (createError) {
-      if (createError instanceof Error && createError.message.trim().length > 0) {
-        setError(`${t('captainDraft.validation.createFailed')} (${createError.message})`)
-      } else {
-        setError(t('captainDraft.validation.createFailed'))
-      }
+      setError(errorWithReason('captainDraft.validation.createFailed', createError))
     } finally {
       setIsCreatingDraft(false)
     }
@@ -504,13 +398,10 @@ export default function CaptainDraftPage() {
     setParticipantSlots(createParticipantSlots(MINIMUM_PARTICIPANT_SLOTS))
     setHomeCaptainId(null)
     setAwayCaptainId(null)
-    setActingCaptainId(null)
     setSetsPerRound(4)
     setDraft(null)
     setDraftLoading(false)
-    setSelectedPickPlayerId(null)
-    setEntrySelections({})
-    setEntryWinnerSelections({})
+    setEntryEdits({})
     setError(null)
     setMessage(null)
   }
@@ -525,21 +416,15 @@ export default function CaptainDraftPage() {
       setParticipantSlots(createParticipantSlotsFromDraft(refreshed))
       setHomeCaptainId(refreshed.homeCaptainPlayerId)
       setAwayCaptainId(refreshed.awayCaptainPlayerId)
-      setActingCaptainId(refreshed.homeCaptainPlayerId)
-      setSelectedPickPlayerId(null)
       setSetsPerRound(refreshed.setsPerRound)
-      setEntrySelections({})
-      setEntryWinnerSelections({})
+      setEntryEdits({})
     } catch (refreshError) {
       if (isApiNotFoundError(refreshError)) {
         setDraft(null)
         setParticipantSlots(createParticipantSlots(MINIMUM_PARTICIPANT_SLOTS))
         setHomeCaptainId(null)
         setAwayCaptainId(null)
-        setActingCaptainId(null)
-        setSelectedPickPlayerId(null)
-        setEntrySelections({})
-        setEntryWinnerSelections({})
+        setEntryEdits({})
         setSetsPerRound(4)
       } else {
         setError(t('captainDraft.validation.loadFailed'))
@@ -549,58 +434,45 @@ export default function CaptainDraftPage() {
     }
   }
 
-  const handlePickPlayer = async () => {
-    setMessage(null)
-    setError(null)
-
-    if (!draft?.draftId) {
+  // The host puts the player a captain called out into that captain's team.
+  const handlePick = async (team: TeamSide, playerId: number) => {
+    const captainPlayerId = team === 'HOME' ? draft?.homeCaptainPlayerId : draft?.awayCaptainPlayerId
+    if (!draft?.draftId || typeof captainPlayerId !== 'number') {
       setError(t('captainDraft.validation.selectDraftFirst'))
       return
     }
-    if (!actingCaptainId) {
-      setError(t('captainDraft.validation.selectActingCaptain'))
-      return
-    }
-    if (!selectedPickPlayerId) {
-      setError(t('captainDraft.validation.selectPlayerToPick'))
-      return
-    }
-    if (draft.currentTurnTeam !== actingCaptainTeam) {
-      setError(t('captainDraft.validation.notYourTurn'))
-      return
-    }
-
-    setIsPicking(true)
+    setMessage(null)
+    setError(null)
+    setIsChangingTeams(true)
     try {
-      const next = await apiClient.pickCaptainDraftPlayer(TEMP_GROUP_ID, draft.draftId, {
-        captainPlayerId: actingCaptainId,
-        pickedPlayerId: selectedPickPlayerId,
-      })
-      setDraft(next)
-      setSelectedPickPlayerId(null)
+      setDraft(await apiClient.pickCaptainDraftPlayer(TEMP_GROUP_ID, draft.draftId, { captainPlayerId, pickedPlayerId: playerId }))
     } catch (pickError) {
-      if (pickError instanceof Error && pickError.message.trim().length > 0) {
-        setError(`${t('captainDraft.validation.pickFailed')} (${pickError.message})`)
-      } else {
-        setError(t('captainDraft.validation.pickFailed'))
-      }
+      setError(errorWithReason('captainDraft.validation.pickFailed', pickError))
     } finally {
-      setIsPicking(false)
+      setIsChangingTeams(false)
     }
   }
 
-  const handleEntrySelectionChange = (key: string, playerId: number | null) => {
-    setEntrySelections((previous) => ({
-      ...previous,
-      [key]: playerId ?? '',
-    }))
+  // A pick made by mistake goes back to the remaining players, out of any entry that named them.
+  const handleUnpick = async (playerId: number) => {
+    if (!draft?.draftId) {
+      return
+    }
+    setMessage(null)
+    setError(null)
+    setIsChangingTeams(true)
+    try {
+      setDraft(await apiClient.unpickCaptainDraftPlayer(TEMP_GROUP_ID, draft.draftId, { playerId }))
+      setEntryEdits((previous) => dropEditsNaming(previous, playerId))
+    } catch (unpickError) {
+      setError(errorWithReason('captainDraft.validation.unpickFailed', unpickError))
+    } finally {
+      setIsChangingTeams(false)
+    }
   }
 
-  const handleEntryWinnerChange = (key: string, winnerTeam: DraftWinnerSelection) => {
-    setEntryWinnerSelections((previous) => ({
-      ...previous,
-      [key]: winnerTeam,
-    }))
+  const editEntry = (key: string, change: EntryEdit) => {
+    setEntryEdits((previous) => ({ ...previous, [key]: { ...previous[key], ...change } }))
   }
 
   const handleSaveEntries = async () => {
@@ -611,40 +483,37 @@ export default function CaptainDraftPage() {
       setError(t('captainDraft.validation.selectDraftFirst'))
       return
     }
-    if (!actingCaptainId || actingCaptainTeam === 'UNASSIGNED') {
-      setError(t('captainDraft.validation.selectActingCaptain'))
-      return
-    }
-
-    const payloadEntries = draft.entries.map((entry) => {
-      const key = `${entry.roundNumber}-${entry.setNumber}`
-      const selected = entrySelections[key]
-      return {
-        roundNumber: entry.roundNumber,
-        setNumber: entry.setNumber,
-        playerId: typeof selected === 'number' ? selected : null,
-        winnerTeam: entryWinnerSelections[key] === '' ? null : entryWinnerSelections[key],
-      }
-    })
 
     setIsSavingEntries(true)
     try {
       const next = await apiClient.updateCaptainDraftEntries(TEMP_GROUP_ID, draft.draftId, {
-        captainPlayerId: actingCaptainId,
-        entries: payloadEntries,
+        entries: draft.entries.map((entry) => {
+          const shown = sheetByKey.get(`${entry.roundNumber}-${entry.setNumber}`)
+          return {
+            roundNumber: entry.roundNumber,
+            setNumber: entry.setNumber,
+            homePlayerId: shown?.homePlayerId ?? null,
+            awayPlayerId: shown?.awayPlayerId ?? null,
+            winnerTeam: shown?.winnerTeam ? shown.winnerTeam : null,
+          }
+        }),
       })
       setDraft(next)
+      setEntryEdits({})
       setMessage(t('captainDraft.messages.entriesSaved'))
     } catch (saveError) {
-      if (saveError instanceof Error && saveError.message.trim().length > 0) {
-        setError(`${t('captainDraft.validation.saveEntryFailed')} (${saveError.message})`)
-      } else {
-        setError(t('captainDraft.validation.saveEntryFailed'))
-      }
+      setError(errorWithReason('captainDraft.validation.saveEntryFailed', saveError))
     } finally {
       setIsSavingEntries(false)
     }
   }
+
+  const playerOptions = (team: TeamSide, key: string) =>
+    teamMembers[team].map((participant) => (
+      <option key={`${team}-entry-${key}-${participant.playerId}`} value={participant.playerId}>
+        {draftPlayerOptionLabel(participant.nickname, draftPlayerTags(playerMap.get(participant.playerId), participant.race))}
+      </option>
+    ))
 
   return (
     <section className="space-y-6">
@@ -688,480 +557,258 @@ export default function CaptainDraftPage() {
           />
         </div>
 
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('captainDraft.captain.title')}</h3>
+        <div className="space-y-4">
+          <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('captainDraft.captain.title')}</h3>
 
-          <div className="mt-3 space-y-2">
+            <div className="mt-3 space-y-2">
               <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">
-              {t('captainDraft.captain.home')}
-              <select
-                value={homeCaptainId ?? ''}
-                onChange={(event) => handleHomeCaptainChange(event.target.value)}
+                {t('captainDraft.captain.home')}
+                <select
+                  value={homeCaptainId ?? ''}
+                  onChange={(event) => handleHomeCaptainChange(event.target.value)}
                   className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
-              >
-                <option value="">-</option>
-                {homeCaptainOptions.map((participant) => (
-                  <option key={`home-cap-${participant.id}`} value={participant.id}>
-                    {participant.nickname} ({participant.race})
-                  </option>
-                ))}
-              </select>
-            </label>
+                >
+                  <option value="">-</option>
+                  {homeCaptainOptions.map((participant) => (
+                    <option key={`home-cap-${participant.id}`} value={participant.id}>
+                      {participant.nickname} ({participant.race})
+                    </option>
+                  ))}
+                </select>
+              </label>
 
               <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">
-              {t('captainDraft.captain.away')}
-              <select
-                value={awayCaptainId ?? ''}
-                onChange={(event) => handleAwayCaptainChange(event.target.value)}
+                {t('captainDraft.captain.away')}
+                <select
+                  value={awayCaptainId ?? ''}
+                  onChange={(event) => handleAwayCaptainChange(event.target.value)}
                   className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                >
+                  <option value="">-</option>
+                  {awayCaptainOptions.map((participant) => (
+                    <option key={`away-cap-${participant.id}`} value={participant.id}>
+                      {participant.nickname} ({participant.race})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="mt-4">
+              <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-300">{t('captainDraft.settings.title')}</h4>
+              <label className="mt-2 block text-xs font-medium text-slate-500 dark:text-slate-400">
+                {t('captainDraft.settings.setsPerRound')}
+                <input
+                  type="number"
+                  min={1}
+                  max={8}
+                  value={setsPerRound}
+                  onChange={(event) => {
+                    const value = Number(event.target.value)
+                    if (!Number.isFinite(value)) {
+                      return
+                    }
+                    setSetsPerRound(Math.max(1, Math.min(8, value)))
+                  }}
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                />
+              </label>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('captainDraft.settings.helper')}</p>
+            </div>
+
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={handleResetDraftSetup}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
               >
-                <option value="">-</option>
-                {awayCaptainOptions.map((participant) => (
-                  <option key={`away-cap-${participant.id}`} value={participant.id}>
-                    {participant.nickname} ({participant.race})
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+                {t('captainDraft.actions.reset')}
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateDraft}
+                disabled={isCreatingDraft}
+                className="flex-1 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
+              >
+                {isCreatingDraft ? t('captainDraft.actions.creating') : t('captainDraft.actions.create')}
+              </button>
+              <button
+                type="button"
+                onClick={handleRefreshDraft}
+                disabled={draftLoading}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 dark:disabled:border-slate-700 dark:disabled:text-slate-500"
+              >
+                {t('captainDraft.actions.refresh')}
+              </button>
+            </div>
 
-          <div className="mt-4">
-            <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-300">{t('captainDraft.settings.title')}</h4>
-            <label className="mt-2 block text-xs font-medium text-slate-500 dark:text-slate-400">
-              {t('captainDraft.settings.setsPerRound')}
-              <input
-                type="number"
-                min={1}
-                max={8}
-                value={setsPerRound}
-                onChange={(event) => {
-                  const value = Number(event.target.value)
-                  if (!Number.isFinite(value)) {
-                    return
-                  }
-                  setSetsPerRound(Math.max(1, Math.min(8, value)))
-                }}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
-              />
-            </label>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('captainDraft.settings.helper')}</p>
-          </div>
-
-          <div className="mt-4 flex gap-2">
-            <button
-              type="button"
-              onClick={handleResetDraftSetup}
-              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-            >
-              {t('captainDraft.actions.reset')}
-            </button>
-            <button
-              type="button"
-              onClick={handleCreateDraft}
-              disabled={isCreatingDraft}
-              className="flex-1 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
-            >
-              {isCreatingDraft ? t('captainDraft.actions.creating') : t('captainDraft.actions.create')}
-            </button>
-            <button
-              type="button"
-              onClick={handleRefreshDraft}
-              disabled={draftLoading}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 dark:disabled:border-slate-700 dark:disabled:text-slate-500"
-            >
-              {t('captainDraft.actions.refresh')}
-            </button>
-          </div>
+            {draft && (
+              <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                {t('captainDraft.status.label')}:{' '}
+                {draft.status === 'READY' ? t('captainDraft.status.ready') : t('captainDraft.status.drafting')}
+              </p>
+            )}
+          </article>
 
           {draft && (
-            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
-              <p>
-                {t('captainDraft.status.label')}:{' '}
-                {draft.status === 'READY'
-                  ? t('captainDraft.status.ready')
-                  : t('captainDraft.status.drafting')}
-              </p>
-              <p className="mt-1">
-                {t('captainDraft.status.turn')}:{' '}
-                {draft.currentTurnTeam === 'UNASSIGNED'
-                  ? t('captainDraft.status.none')
-                  : teamLabel(draft.currentTurnTeam)}
-              </p>
-            </div>
+            <CaptainDraftTeamBoard
+              draft={draft}
+              playerMap={playerMap}
+              setWins={setWins}
+              busy={isChangingTeams}
+              onPick={(team, playerId) => void handlePick(team, playerId)}
+              onUnpick={(playerId) => void handleUnpick(playerId)}
+            />
           )}
-        </article>
+        </div>
       </div>
 
       {draft && (
         <>
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('captainDraft.captain.acting')}</h3>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('captainDraft.captain.actingHelper')}</p>
-              </div>
-              <select
-                value={actingCaptainId ?? ''}
-                onChange={(event) => setActingCaptainId(normalizeSelectionValue(event.target.value))}
-              className="w-full max-w-sm rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
-              >
-                <option value="">-</option>
-                {typeof draft.homeCaptainPlayerId === 'number' && (
-                  <option value={draft.homeCaptainPlayerId}>
-                    {draft.homeCaptainNickname} ({t('captainDraft.teams.home')})
-                  </option>
-                )}
-                {typeof draft.awayCaptainPlayerId === 'number' && (
-                  <option value={draft.awayCaptainPlayerId}>
-                    {draft.awayCaptainNickname} ({t('captainDraft.teams.away')})
-                  </option>
-                )}
-              </select>
-            </div>
-          </article>
-
-          <div className="grid gap-4 xl:grid-cols-3">
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 xl:col-span-2">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('captainDraft.pick.title')}</h3>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('captainDraft.pick.helper')}</p>
-
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">
-                  {t('captainDraft.pick.turnTeam')}
-                  <input
-                    type="text"
-                    value={teamLabel(draft.currentTurnTeam)}
-                    disabled
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                  />
-                </label>
-            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">
-                  {t('captainDraft.pick.selectPlayer')}
-                  <select
-                    value={selectedPickPlayerId ?? ''}
-                    onChange={(event) =>
-                      setSelectedPickPlayerId(normalizeSelectionValue(event.target.value))
-                    }
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
-                  >
-                    <option value="">-</option>
-                    {availablePickParticipants.map((participant) => (
-                      <option key={`pick-${participant.playerId}`} value={participant.playerId}>
-                        {participant.nickname} ({participant.race})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              <div className="mt-3">
-                <button
-                  type="button"
-                  onClick={handlePickPlayer}
-                  disabled={!canPick}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
-                >
-                  {isPicking ? t('captainDraft.actions.picking') : t('captainDraft.actions.pick')}
-                </button>
-              </div>
-            </article>
-
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('captainDraft.pickLog.title')}</h3>
-              <div className="mt-3 space-y-2">
-                {draft.picks.map((pick) => (
-                  <div
-                    key={`pick-log-${pick.pickOrder}`}
-                  className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                  >
-                    <p className="font-medium">#{pick.pickOrder}</p>
-                    <p className="mt-1 text-xs">
-                      {pick.captainNickname} -&gt; {pick.pickedPlayerNickname} ({teamLabel(pick.team)})
-                    </p>
-                  </div>
-                ))}
-                {draft.picks.length === 0 && (
-              <div className="rounded-lg border border-dashed border-slate-200 px-3 py-6 text-center text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                    {t('captainDraft.pickLog.empty')}
-                  </div>
-                )}
-              </div>
-            </article>
-          </div>
-
-      <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('captainDraft.scoreboard.title')}</h3>
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('captainDraft.scoreboard.helper')}</p>
-
-        <div className="mt-4 overflow-x-auto rounded-xl border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-950">
-              <table className="min-w-[520px] table-fixed border-collapse text-sm">
-                <thead>
-              <tr className="bg-white dark:bg-slate-900">
-                <th className="border border-slate-400 px-3 py-2 text-center text-lg font-semibold text-sky-700 dark:border-slate-600 dark:text-sky-300">
-                      {t('captainDraft.scoreboard.homeHeader')}
-                    </th>
-                <th className="w-16 border border-slate-400 px-2 py-2 text-center text-xs font-semibold text-slate-500 dark:border-slate-600 dark:text-slate-400">
-                      {t('captainDraft.scoreboard.setWinsShort')}
-                    </th>
-                <th className="border border-slate-400 px-3 py-2 text-center text-lg font-semibold text-rose-700 dark:border-slate-600 dark:text-rose-300">
-                      {t('captainDraft.scoreboard.awayHeader')}
-                    </th>
-                <th className="w-16 border border-slate-400 px-2 py-2 text-center text-xs font-semibold text-slate-500 dark:border-slate-600 dark:text-slate-400">
-                      {t('captainDraft.scoreboard.setWinsShort')}
-                    </th>
-                  </tr>
-              <tr className="bg-slate-50 dark:bg-slate-800">
-                <th className="border border-slate-400 px-3 py-3 text-center text-4xl font-bold text-slate-900 dark:border-slate-600 dark:text-slate-100">
-                      {homeTeamSetWins}
-                    </th>
-                <th className="border border-slate-400 px-2 py-3 text-center text-xs font-semibold text-slate-500 dark:border-slate-600 dark:text-slate-400">
-                      &nbsp;
-                    </th>
-                <th className="border border-slate-400 px-3 py-3 text-center text-4xl font-bold text-slate-900 dark:border-slate-600 dark:text-slate-100">
-                      {awayTeamSetWins}
-                    </th>
-                <th className="border border-slate-400 px-2 py-3 text-center text-xs font-semibold text-slate-500 dark:border-slate-600 dark:text-slate-400">
-                      &nbsp;
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {compactTeamRows.map((row, index) => (
-                <tr key={`scoreboard-row-${index}`} className="bg-white dark:bg-slate-900">
-                  <td className="border border-slate-300 px-3 py-2 text-center font-medium text-slate-800 dark:border-slate-700 dark:text-slate-200">
-                        {row.home ? (
-                          <span>
-                            {row.home.nickname}
-                            {row.home.captain ? ` ${t('captainDraft.teams.captainBadge')}` : ''}
-                          </span>
-                        ) : (
-                      <span className="text-slate-400 dark:text-slate-500">-</span>
-                        )}
-                      </td>
-                  <td className="border border-slate-300 px-2 py-2 text-center font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-300">
-                        {row.home && typeof row.home.playerId === 'number'
-                          ? (homePlayerSetWins.get(row.home.playerId) ?? 0)
-                          : 0}
-                      </td>
-                  <td className="border border-slate-300 px-3 py-2 text-center font-medium text-slate-800 dark:border-slate-700 dark:text-slate-200">
-                        {row.away ? (
-                          <span>
-                            {row.away.nickname}
-                            {row.away.captain ? ` ${t('captainDraft.teams.captainBadge')}` : ''}
-                          </span>
-                        ) : (
-                      <span className="text-slate-400 dark:text-slate-500">-</span>
-                        )}
-                      </td>
-                  <td className="border border-slate-300 px-2 py-2 text-center font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-300">
-                        {row.away && typeof row.away.playerId === 'number'
-                          ? (awayPlayerSetWins.get(row.away.playerId) ?? 0)
-                          : 0}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {unassignedParticipants.length > 0 && (
-        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
-          <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('captainDraft.teams.unassigned')}</h4>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {unassignedParticipants.map((participant) => (
-                    <span
-                      key={`unassigned-chip-${participant.playerId}`}
-                className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
-                    >
-                      {participant.nickname} ({participant.race})
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </article>
-
-      <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('captainDraft.entry.title')}</h3>
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('captainDraft.entry.helper')}</p>
+          <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('captainDraft.entry.title')}</h3>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('captainDraft.entry.helper')}</p>
 
             <div className="mt-4 space-y-4">
-          <div className="overflow-x-auto rounded-xl border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-950">
+              <div className="overflow-x-auto rounded-xl border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-950">
                 <table className="min-w-[980px] table-fixed border-collapse text-sm">
                   <thead>
-                <tr className="bg-[#f4eadf] text-slate-900 dark:bg-[#5b4438] dark:text-slate-100">
-                  <th className="w-24 border border-slate-400 px-3 py-2 text-center font-semibold dark:border-slate-600">
+                    <tr className="bg-[#f4eadf] text-slate-900 dark:bg-[#5b4438] dark:text-slate-100">
+                      <th className="w-24 border border-slate-400 px-3 py-2 text-center font-semibold dark:border-slate-600">
                         {t('captainDraft.entry.roundLabel')}
                       </th>
-                  <th className="w-24 border border-slate-400 px-3 py-2 text-center font-semibold dark:border-slate-600">
+                      <th className="w-24 border border-slate-400 px-3 py-2 text-center font-semibold dark:border-slate-600">
                         {t('captainDraft.entry.raceLabel')}
                       </th>
-                  <th className="w-24 border border-slate-400 px-3 py-2 text-center font-semibold dark:border-slate-600">
+                      <th className="w-24 border border-slate-400 px-3 py-2 text-center font-semibold dark:border-slate-600">
                         {t('captainDraft.entry.requiredTierLabel')}
                       </th>
-                  <th className="w-56 border border-slate-400 px-3 py-2 text-center font-semibold text-sky-700 dark:border-slate-600 dark:text-sky-300">
+                      <th className="w-56 border border-slate-400 px-3 py-2 text-center font-semibold text-sky-700 dark:border-slate-600 dark:text-sky-300">
                         {t('captainDraft.entry.homeSheetLabel')}
                       </th>
-                  <th className="w-56 border border-slate-400 px-3 py-2 text-center font-semibold text-rose-700 dark:border-slate-600 dark:text-rose-300">
+                      <th className="w-56 border border-slate-400 px-3 py-2 text-center font-semibold text-rose-700 dark:border-slate-600 dark:text-rose-300">
                         {t('captainDraft.entry.awaySheetLabel')}
                       </th>
-                  <th className="w-24 border border-slate-400 px-3 py-2 text-center font-semibold dark:border-slate-600">
+                      <th className="w-24 border border-slate-400 px-3 py-2 text-center font-semibold dark:border-slate-600">
                         {t('captainDraft.entry.resultLabel')}
                       </th>
-                  <th className="w-24 border border-slate-400 px-3 py-2 text-center font-semibold dark:border-slate-600">
+                      <th className="w-24 border border-slate-400 px-3 py-2 text-center font-semibold dark:border-slate-600">
                         {t('captainDraft.entry.finalWinLabel')}
                       </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {roundGroups.map((roundGroup, roundIndex) =>
-                      roundGroup.entries.map((entry, entryIndex) => {
-                        const key = `${entry.roundNumber}-${entry.setNumber}`
-                        const selectedPlayerId = entrySelections[key]
-                        const selectedWinnerTeam = entryWinnerSelections[key] ?? ''
-                        const dividerClass =
-                          roundIndex > 0 && entryIndex === 0
-                            ? 'border-t-[3px] border-t-slate-800'
-                            : ''
-                        const roundHomeWins = roundGroup.entries.filter(
-                          (roundEntry) => {
-                            const roundKey = `${roundEntry.roundNumber}-${roundEntry.setNumber}`
-                            const winnerTeam = entryWinnerSelections[roundKey] === ''
-                              ? roundEntry.winnerTeam
-                              : entryWinnerSelections[roundKey]
-                            return winnerTeam === 'HOME'
-                          },
-                        ).length
-                        const roundAwayWins = roundGroup.entries.filter(
-                          (roundEntry) => {
-                            const roundKey = `${roundEntry.roundNumber}-${roundEntry.setNumber}`
-                            const winnerTeam = entryWinnerSelections[roundKey] === ''
-                              ? roundEntry.winnerTeam
-                              : entryWinnerSelections[roundKey]
-                            return winnerTeam === 'AWAY'
-                          },
-                        ).length
+                    {roundGroups.map((roundGroup, roundIndex) => {
+                      const roundEntries = roundGroup.keys
+                        .map((key) => sheetByKey.get(key))
+                        .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
+                      const roundHomeWins = roundEntries.filter((entry) => entry.winnerTeam === 'HOME').length
+                      const roundAwayWins = roundEntries.filter((entry) => entry.winnerTeam === 'AWAY').length
 
+                      return roundEntries.map((entry, entryIndex) => {
+                        const dividerClass = roundIndex > 0 && entryIndex === 0 ? 'border-t-[3px] border-t-slate-800' : ''
                         return (
-                          <tr
-                            key={`entry-${key}`}
-                    className={`bg-white dark:bg-slate-900 ${dividerClass}`.trim()}
-                          >
+                          <tr key={`entry-${entry.key}`} className={`bg-white dark:bg-slate-900 ${dividerClass}`.trim()}>
                             {entryIndex === 0 && (
                               <th
-                                rowSpan={roundGroup.entries.length}
-                      className={`border border-slate-400 bg-white px-3 py-2 text-center align-middle text-base font-semibold text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 ${dividerClass}`.trim()}
+                                rowSpan={roundEntries.length}
+                                className={`border border-slate-400 bg-white px-3 py-2 text-center align-middle text-base font-semibold text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 ${dividerClass}`.trim()}
                               >
                                 {t('captainDraft.entry.roundOnly', { round: roundGroup.roundNumber })}
                               </th>
                             )}
-                    <td className={`border border-slate-300 bg-slate-50 px-3 py-2 text-center font-medium text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 ${dividerClass}`.trim()}>
-                              {entry.roundCode}
+                            <td className={`border border-slate-300 bg-slate-50 px-3 py-2 text-center font-medium text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 ${dividerClass}`.trim()}>
+                              {roundGroup.roundCode}
                             </td>
-                    <td className={`border border-slate-300 px-3 py-2 text-center text-slate-500 dark:border-slate-700 dark:text-slate-400 ${dividerClass}`.trim()}>
+                            <td className={`border border-slate-300 px-3 py-2 text-center text-slate-500 dark:border-slate-700 dark:text-slate-400 ${dividerClass}`.trim()}>
                               &nbsp;
                             </td>
-                    <td className={`border border-slate-300 px-2 py-1 dark:border-slate-700 ${dividerClass}`.trim()}>
-                              {actingCaptainTeam === 'HOME' ? (
-                                <select
-                                  value={selectedPlayerId === '' ? '' : selectedPlayerId ?? ''}
-                                  onChange={(event) =>
-                                    handleEntrySelectionChange(
-                                      key,
-                                      normalizeSelectionValue(event.target.value),
-                                    )
-                                  }
-                        className="w-full border-0 bg-transparent px-2 py-2 text-sm font-medium text-sky-700 outline-none focus:bg-sky-50 dark:text-sky-300 dark:focus:bg-sky-950/50"
-                                >
-                                  <option value="">{t('captainDraft.entry.notSet')}</option>
-                                  {actingTeamParticipants.map((participant) => (
-                                    <option
-                                      key={`home-entry-${key}-${participant.playerId}`}
-                                      value={participant.playerId}
-                                    >
-                                      {participant.nickname}
-                                    </option>
-                                  ))}
-                                </select>
-                              ) : (
-                        <div className="px-2 py-2 text-sm font-medium text-sky-700 dark:text-sky-300">
-                                  {entry.homePlayerNickname ?? t('captainDraft.entry.notSet')}
-                                </div>
-                              )}
-                            </td>
-                    <td className={`border border-slate-300 px-2 py-1 dark:border-slate-700 ${dividerClass}`.trim()}>
-                              {actingCaptainTeam === 'AWAY' ? (
-                                <select
-                                  value={selectedPlayerId === '' ? '' : selectedPlayerId ?? ''}
-                                  onChange={(event) =>
-                                    handleEntrySelectionChange(
-                                      key,
-                                      normalizeSelectionValue(event.target.value),
-                                    )
-                                  }
-                        className="w-full border-0 bg-transparent px-2 py-2 text-sm font-medium text-rose-700 outline-none focus:bg-rose-50 dark:text-rose-300 dark:focus:bg-rose-950/50"
-                                >
-                                  <option value="">{t('captainDraft.entry.notSet')}</option>
-                                  {actingTeamParticipants.map((participant) => (
-                                    <option
-                                      key={`away-entry-${key}-${participant.playerId}`}
-                                      value={participant.playerId}
-                                    >
-                                      {participant.nickname}
-                                    </option>
-                                  ))}
-                                </select>
-                              ) : (
-                        <div className="px-2 py-2 text-sm font-medium text-rose-700 dark:text-rose-300">
-                                  {entry.awayPlayerNickname ?? t('captainDraft.entry.notSet')}
-                                </div>
-                              )}
-                            </td>
-                    <td className={`border border-slate-300 px-2 py-1 text-center dark:border-slate-700 ${dividerClass}`.trim()}>
+                            <td className={`border border-slate-300 px-2 py-1 dark:border-slate-700 ${dividerClass}`.trim()}>
                               <select
-                                value={selectedWinnerTeam}
-                                onChange={(event) =>
-                                  handleEntryWinnerChange(
-                                    key,
-                                    event.target.value as DraftWinnerSelection,
-                                  )
-                                }
-                        className="w-full border-0 bg-transparent px-2 py-2 text-sm font-medium text-slate-700 outline-none focus:bg-slate-50 dark:text-slate-200 dark:focus:bg-slate-800"
+                                value={entry.homePlayerId ?? ''}
+                                onChange={(event) => editEntry(entry.key, { homePlayerId: normalizeSelectionValue(event.target.value) })}
+                                aria-label={`${t('captainDraft.entry.homeSheetLabel')} ${entry.key}`}
+                                className="w-full border-0 bg-transparent px-2 py-2 text-sm font-medium text-sky-700 outline-none focus:bg-sky-50 dark:text-sky-300 dark:focus:bg-sky-950/50"
+                              >
+                                <option value="">{t('captainDraft.entry.notSet')}</option>
+                                {playerOptions('HOME', entry.key)}
+                              </select>
+                            </td>
+                            <td className={`border border-slate-300 px-2 py-1 dark:border-slate-700 ${dividerClass}`.trim()}>
+                              <select
+                                value={entry.awayPlayerId ?? ''}
+                                onChange={(event) => editEntry(entry.key, { awayPlayerId: normalizeSelectionValue(event.target.value) })}
+                                aria-label={`${t('captainDraft.entry.awaySheetLabel')} ${entry.key}`}
+                                className="w-full border-0 bg-transparent px-2 py-2 text-sm font-medium text-rose-700 outline-none focus:bg-rose-50 dark:text-rose-300 dark:focus:bg-rose-950/50"
+                              >
+                                <option value="">{t('captainDraft.entry.notSet')}</option>
+                                {playerOptions('AWAY', entry.key)}
+                              </select>
+                            </td>
+                            <td className={`border border-slate-300 px-2 py-1 text-center dark:border-slate-700 ${dividerClass}`.trim()}>
+                              <select
+                                value={entry.winnerTeam}
+                                onChange={(event) => editEntry(entry.key, { winnerTeam: event.target.value as DraftWinnerSelection })}
+                                aria-label={`${t('captainDraft.entry.resultLabel')} ${entry.key}`}
+                                className="w-full border-0 bg-transparent px-2 py-2 text-sm font-medium text-slate-700 outline-none focus:bg-slate-50 dark:text-slate-200 dark:focus:bg-slate-800"
                               >
                                 <option value="">{t('captainDraft.entry.notSet')}</option>
                                 {winnerTeamOptions.map((option) => (
-                                  <option key={`${key}-${option.value}`} value={option.value}>
+                                  <option key={`${entry.key}-${option.value}`} value={option.value}>
                                     {t(option.label)}
                                   </option>
                                 ))}
                               </select>
                             </td>
-                    <td className={`border border-slate-300 px-3 py-2 text-center text-slate-700 dark:border-slate-700 dark:text-slate-300 ${dividerClass}`.trim()}>
-                              {entryIndex === 0
-                                ? `${roundHomeWins} : ${roundAwayWins}`
-                                : ''}
+                            <td className={`border border-slate-300 px-3 py-2 text-center text-slate-700 dark:border-slate-700 dark:text-slate-300 ${dividerClass}`.trim()}>
+                              {entryIndex === 0 ? `${roundHomeWins} : ${roundAwayWins}` : ''}
                             </td>
                           </tr>
                         )
-                      }),
-                    )}
+                      })
+                    })}
                   </tbody>
                 </table>
               </div>
 
-              <div className="flex justify-end">
+              <div className="flex flex-wrap items-center justify-end gap-3">
+                {unsavedCount > 0 && (
+                  <span className="text-xs text-amber-700 dark:text-amber-300">
+                    {t('captainDraft.entry.unsaved', { count: unsavedCount })}
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={handleSaveEntries}
-                  disabled={isSavingEntries || !actingCaptainId || actingCaptainTeam === 'UNASSIGNED'}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
+                  disabled={isSavingEntries}
+                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
                 >
-                  {isSavingEntries
-                    ? t('captainDraft.actions.savingEntries')
-                    : t('captainDraft.actions.saveEntries')}
+                  {isSavingEntries ? t('captainDraft.actions.savingEntries') : t('captainDraft.actions.saveEntries')}
                 </button>
               </div>
             </div>
+          </article>
+
+          <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('captainDraft.pickLog.title')}</h3>
+            {draft.picks.length === 0 ? (
+              <p className="mt-3 rounded-lg border border-dashed border-slate-200 px-3 py-6 text-center text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                {t('captainDraft.pickLog.empty')}
+              </p>
+            ) : (
+              <ol className="mt-3 flex flex-wrap gap-2">
+                {draft.picks.map((pick) => (
+                  <li
+                    key={`pick-log-${pick.pickOrder}`}
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  >
+                    <span className="font-semibold">#{pick.pickOrder}</span> {pick.captainNickname} → {pick.pickedPlayerNickname} (
+                    {teamLabel(pick.team)})
+                  </li>
+                ))}
+              </ol>
+            )}
           </article>
         </>
       )}

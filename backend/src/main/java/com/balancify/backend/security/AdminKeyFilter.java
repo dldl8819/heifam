@@ -139,6 +139,11 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/captain-drafts/{draftId}/pick"),
             AuthType.ADMIN_EMAIL
         ),
+        new ProtectedRoute(
+            "POST",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/captain-drafts/{draftId}/unpick"),
+            AuthType.ADMIN_EMAIL
+        ),
         // Prize events: admins see them while points are tried out, super admins run them.
         new ProtectedRoute(
             "GET",
