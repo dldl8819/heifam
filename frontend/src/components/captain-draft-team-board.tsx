@@ -1,7 +1,7 @@
 'use client'
 
 import { t } from '@/lib/i18n'
-import { draftPlayerTags, type DraftPlayerTags, type SetWins } from '@/lib/captain-draft'
+import { draftPlayerTags, sortByTier, type DraftPlayerTags, type SetWins } from '@/lib/captain-draft'
 import { cn } from '@/lib/utils'
 import type { CaptainDraftParticipant, CaptainDraftResponse, PlayerRosterItem, TeamSide } from '@/types/api'
 
@@ -55,6 +55,7 @@ function playerTags(participant: CaptainDraftParticipant, playerMap: Map<number,
 /**
  * Who is on which team, captain first, with each player's tier, races and set wins. The host puts
  * the players the captains call out into a team, in any order, and takes back a pick made by mistake.
+ * Teams and the players left are listed by tier, highest first, which is how captains pick.
  */
 export function CaptainDraftTeamBoard({ draft, playerMap, setWins, busy, onPick, onUnpick }: CaptainDraftTeamBoardProps) {
   const teams: { side: TeamSide; label: string; wins: number; members: CaptainDraftParticipant[] }[] = [
@@ -62,16 +63,19 @@ export function CaptainDraftTeamBoard({ draft, playerMap, setWins, busy, onPick,
       side: 'HOME',
       label: t('captainDraft.scoreboard.homeHeader'),
       wins: setWins.home,
-      members: draft.participants.filter((participant) => participant.team === 'HOME'),
+      members: sortByTier(draft.participants.filter((participant) => participant.team === 'HOME'), playerMap),
     },
     {
       side: 'AWAY',
       label: t('captainDraft.scoreboard.awayHeader'),
       wins: setWins.away,
-      members: draft.participants.filter((participant) => participant.team === 'AWAY'),
+      members: sortByTier(draft.participants.filter((participant) => participant.team === 'AWAY'), playerMap),
     },
   ]
-  const remaining = draft.participants.filter((participant) => participant.team === 'UNASSIGNED' && !participant.captain)
+  const remaining = sortByTier(
+    draft.participants.filter((participant) => participant.team === 'UNASSIGNED' && !participant.captain),
+    playerMap,
+  )
 
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">

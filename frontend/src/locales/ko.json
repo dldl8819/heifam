@@ -1654,6 +1654,7 @@
     },
     "actions": {
       "reset": "초기화",
+      "resetConfirm": "저장하지 않은 엔트리 변경 {count}건이 사라집니다. 초기화할까요?",
       "create": "드래프트 시작",
       "creating": "생성 중...",
       "refresh": "새로고침",

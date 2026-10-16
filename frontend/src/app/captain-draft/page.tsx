@@ -113,6 +113,13 @@ export default function CaptainDraftPage() {
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const participantInputRefs = useRef<Array<HTMLInputElement | null>>([])
+  // Which draft the screen is on. It moves on whenever the host resets the screen or another draft
+  // is shown, and a reply sent for the screen before (a poll, a pick, a load) is then dropped:
+  // otherwise a poll answered after 초기화 put the old teams and entries back.
+  const draftViewRef = useRef<number>(0)
+  const moveToNewView = () => {
+    draftViewRef.current += 1
+  }
 
   const playerMap = useMemo(() => {
     const map = new Map<number, PlayerRosterItem>()
@@ -214,9 +221,11 @@ export default function CaptainDraftPage() {
 
     const loadLatestDraft = async () => {
       setDraftLoading(true)
+      const view = draftViewRef.current
       try {
         const response = await apiClient.getLatestCaptainDraft(TEMP_GROUP_ID)
-        if (!mounted) {
+        // The host may have reset the screen or opened a record while this loaded.
+        if (!mounted || view !== draftViewRef.current) {
           return
         }
         setDraft(response)
@@ -280,14 +289,23 @@ export default function CaptainDraftPage() {
     }
 
     const draftId = draft.draftId
-    return startVisiblePolling(async () => {
+    let active = true
+    const stop = startVisiblePolling(async () => {
+      const view = draftViewRef.current
       try {
         const refreshed = await apiClient.getCaptainDraft(TEMP_GROUP_ID, draftId)
-        setDraft(refreshed)
+        // A reply landing after polling stopped or the screen moved on is for a draft no longer shown.
+        if (active && view === draftViewRef.current) {
+          setDraft(refreshed)
+        }
       } catch {
         // Keep current snapshot on polling failure.
       }
     }, 3000)
+    return () => {
+      active = false
+      stop()
+    }
   }, [draft?.draftId])
 
   // Until a draft is started, the sets follow the attendance: enough for everyone to play a round.
@@ -400,6 +418,7 @@ export default function CaptainDraftPage() {
         roundCount,
         setSizes,
       })
+      moveToNewView()
       setDraft(created)
       setEntryEdits({})
       setMessage(t('captainDraft.messages.createSuccess'))
@@ -411,12 +430,19 @@ export default function CaptainDraftPage() {
     }
   }
 
+  // A clean screen for the next draft: attendance, captains, sets, the team status and the round
+  // entries all go. The draft shown stays saved and can be opened again from the records.
   const handleResetDraftSetup = () => {
+    if (unsavedCount > 0 && !window.confirm(t('captainDraft.actions.resetConfirm', { count: unsavedCount }))) {
+      return
+    }
+    moveToNewView()
     setParticipantSlots(createParticipantSlots(MINIMUM_PARTICIPANT_SLOTS))
     setHomeCaptainId(null)
     setAwayCaptainId(null)
     setSetSizes([])
     setRoundCount(DEFAULT_ROUND_COUNT)
+    setDraftTitle(defaultDraftTitle())
     setDraft(null)
     setDraftLoading(false)
     setEntryEdits({})
@@ -425,6 +451,7 @@ export default function CaptainDraftPage() {
   }
 
   const showDraft = (shown: CaptainDraftResponse) => {
+    moveToNewView()
     setDraft(shown)
     setParticipantSlots(createParticipantSlotsFromDraft(shown))
     setHomeCaptainId(shown.homeCaptainPlayerId)
@@ -438,8 +465,13 @@ export default function CaptainDraftPage() {
   const handleOpenRecord = async (draftId: number) => {
     setError(null)
     setMessage(null)
+    const view = draftViewRef.current
     try {
-      showDraft(await apiClient.getCaptainDraft(TEMP_GROUP_ID, draftId))
+      const opened = await apiClient.getCaptainDraft(TEMP_GROUP_ID, draftId)
+      if (view !== draftViewRef.current) {
+        return
+      }
+      showDraft(opened)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch {
       setError(t('captainDraft.validation.loadFailed'))
@@ -450,11 +482,20 @@ export default function CaptainDraftPage() {
     setError(null)
     setMessage(null)
     setDraftLoading(true)
+    const view = draftViewRef.current
     try {
-      showDraft(await apiClient.getLatestCaptainDraft(TEMP_GROUP_ID))
+      const latest = await apiClient.getLatestCaptainDraft(TEMP_GROUP_ID)
+      if (view !== draftViewRef.current) {
+        return
+      }
+      showDraft(latest)
       void loadRecords()
     } catch (refreshError) {
+      if (view !== draftViewRef.current) {
+        return
+      }
       if (isApiNotFoundError(refreshError)) {
+        moveToNewView()
         setDraft(null)
         setParticipantSlots(createParticipantSlots(MINIMUM_PARTICIPANT_SLOTS))
         setHomeCaptainId(null)
@@ -480,8 +521,12 @@ export default function CaptainDraftPage() {
     setMessage(null)
     setError(null)
     setIsChangingTeams(true)
+    const view = draftViewRef.current
     try {
-      setDraft(await apiClient.pickCaptainDraftPlayer(TEMP_GROUP_ID, draft.draftId, { captainPlayerId, pickedPlayerId: playerId }))
+      const picked = await apiClient.pickCaptainDraftPlayer(TEMP_GROUP_ID, draft.draftId, { captainPlayerId, pickedPlayerId: playerId })
+      if (view === draftViewRef.current) {
+        setDraft(picked)
+      }
     } catch (pickError) {
       setError(errorWithReason('captainDraft.validation.pickFailed', pickError))
     } finally {
@@ -497,9 +542,13 @@ export default function CaptainDraftPage() {
     setMessage(null)
     setError(null)
     setIsChangingTeams(true)
+    const view = draftViewRef.current
     try {
-      setDraft(await apiClient.unpickCaptainDraftPlayer(TEMP_GROUP_ID, draft.draftId, { playerId }))
-      setEntryEdits((previous) => dropEditsNaming(previous, playerId))
+      const unpicked = await apiClient.unpickCaptainDraftPlayer(TEMP_GROUP_ID, draft.draftId, { playerId })
+      if (view === draftViewRef.current) {
+        setDraft(unpicked)
+        setEntryEdits((previous) => dropEditsNaming(previous, playerId))
+      }
     } catch (unpickError) {
       setError(errorWithReason('captainDraft.validation.unpickFailed', unpickError))
     } finally {
@@ -521,6 +570,7 @@ export default function CaptainDraftPage() {
     }
 
     setIsSavingEntries(true)
+    const view = draftViewRef.current
     try {
       const next = await apiClient.updateCaptainDraftEntries(TEMP_GROUP_ID, draft.draftId, {
         entries: sheet.map((set) => ({
@@ -533,10 +583,13 @@ export default function CaptainDraftPage() {
           winnerTeam: set.winnerTeam ? set.winnerTeam : null,
         })),
       })
+      void loadRecords()
+      if (view !== draftViewRef.current) {
+        return
+      }
       setDraft(next)
       setEntryEdits({})
       setMessage(t('captainDraft.messages.entriesSaved'))
-      void loadRecords()
     } catch (saveError) {
       setError(errorWithReason('captainDraft.validation.saveEntryFailed', saveError))
     } finally {

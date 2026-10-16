@@ -1,4 +1,5 @@
 import { t } from '@/lib/i18n'
+import { toTierOrder } from '@/lib/player-tier'
 import type { CaptainDraftEntry, CaptainDraftSummary, PlayerRosterItem, TeamSide } from '@/types/api'
 
 export type DraftWinnerSelection = '' | TeamSide
@@ -266,6 +267,27 @@ export function draftPlayerTags(player: PlayerRosterItem | undefined, fallbackRa
     tier: tier === null ? null : tier === 'UNASSIGNED' ? t('captainDraft.teams.unassignedTier') : tier,
     races: player?.race ?? fallbackRace ?? null,
   }
+}
+
+/**
+ * Draft players in the order a captain picks by: captains first, then the highest tier (live tier
+ * as on the tier board) down to unassigned, then those no longer on the roster; by nickname within
+ * a tier.
+ */
+export function sortByTier<T extends { playerId: number | null; nickname: string; captain: boolean }>(
+  participants: readonly T[],
+  playerMap: ReadonlyMap<number, PlayerRosterItem>,
+): T[] {
+  const rank = (participant: T): number => {
+    const player = typeof participant.playerId === 'number' ? playerMap.get(participant.playerId) : undefined
+    return player ? toTierOrder(player.liveTier ?? player.tier ?? 'UNASSIGNED') : Number.MAX_SAFE_INTEGER
+  }
+  return [...participants].sort(
+    (left, right) =>
+      Number(right.captain) - Number(left.captain) ||
+      rank(left) - rank(right) ||
+      left.nickname.localeCompare(right.nickname, 'ko'),
+  )
 }
 
 /** A player in a select: the nickname with their tier and races, so a set can be filled by race. */
