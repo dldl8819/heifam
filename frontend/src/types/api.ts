@@ -446,6 +446,9 @@ export type CaptainDraftCreateRequest = {
   participantPlayerIds: number[]
   captainPlayerIds: number[]
   setsPerRound?: number
+  // How many rounds (1 to 7, four if left out), and each set's team size (3, 2 or 1) in play order.
+  roundCount?: number
+  setSizes?: number[]
 }
 
 export type CaptainDraftPickRequest = {
@@ -453,23 +456,18 @@ export type CaptainDraftPickRequest = {
   pickedPlayerId: number
 }
 
-// One set as the host fills it in: each side slot by slot (null leaves a slot empty).
+// One set as the host fills it in: its races, and each side slot by slot (null leaves a slot empty).
 export type CaptainDraftEntryUpdateItem = {
   roundNumber: number
   setNumber: number
+  raceCode: string | null
   homePlayerIds: Array<number | null>
   awayPlayerIds: Array<number | null>
   requiredTier: string | null
   winnerTeam: TeamSide | null
 }
 
-export type CaptainDraftRoundUpdate = {
-  roundNumber: number
-  roundCode: string
-}
-
 export type CaptainDraftEntriesUpdateRequest = {
-  rounds: CaptainDraftRoundUpdate[]
   entries: CaptainDraftEntryUpdateItem[]
 }
 
@@ -504,6 +502,7 @@ export type CaptainDraftEntryPlayer = {
 // side slot by slot with null where a slot is empty.
 export type CaptainDraftEntry = {
   roundNumber: number
+  // The set's own races (P, T, Z, R for random), e.g. PPT for a 3:3 game, PT for a 2:2 one.
   roundCode: string
   setNumber: number
   teamSize: number

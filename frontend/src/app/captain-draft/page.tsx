@@ -5,16 +5,20 @@ import { apiClient, isApiNotFoundError } from '@/lib/api'
 import { useAdminAuth } from '@/lib/admin-auth'
 import { TierParticipantBoard } from '@/components/tier-participant-board'
 import { CaptainDraftEntrySheet } from '@/components/captain-draft-entry-sheet'
+import { CaptainDraftRoundSettings } from '@/components/captain-draft-round-settings'
 import { CaptainDraftTeamBoard } from '@/components/captain-draft-team-board'
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
 import {
+  DEFAULT_ROUND_COUNT,
   countSetWins,
-  defaultSetsPerRound,
+  defaultSetSizes,
+  draftLayout,
   dropEditsNaming,
   effectiveEntry,
-  setsPerRoundOptions,
+  roundComposition,
+  setComposition,
   type EffectiveEntry,
   type EntryEdit,
   type EntryEdits,
@@ -85,14 +89,14 @@ export default function CaptainDraftPage() {
   )
   const [homeCaptainId, setHomeCaptainId] = useState<number | null>(null)
   const [awayCaptainId, setAwayCaptainId] = useState<number | null>(null)
-  const [setsPerRound, setSetsPerRound] = useState<number>(4)
+  // Each set's team size in play order, and how many rounds, for the next draft started.
+  const [setSizes, setSetSizes] = useState<number[]>([])
+  const [roundCount, setRoundCount] = useState<number>(DEFAULT_ROUND_COUNT)
 
   const [draft, setDraft] = useState<CaptainDraftResponse | null>(null)
   const [draftLoading, setDraftLoading] = useState<boolean>(true)
 
   const [entryEdits, setEntryEdits] = useState<EntryEdits>({})
-  // Round compositions the host changed and has not saved yet, by round number.
-  const [roundEdits, setRoundEdits] = useState<Record<number, string>>({})
 
   const [isCreatingDraft, setIsCreatingDraft] = useState<boolean>(false)
   const [isChangingTeams, setIsChangingTeams] = useState<boolean>(false)
@@ -155,31 +159,25 @@ export default function CaptainDraftPage() {
     [draft, entryEdits],
   )
   const setWins = useMemo(() => countSetWins(sheet), [sheet])
-  const unsavedCount = Object.keys(entryEdits).length + Object.keys(roundEdits).length
+  const unsavedCount = Object.keys(entryEdits).length
 
-  // The rounds in order, each with its composition as shown and its sets.
+  // The rounds in order, each with its sets and the composition of its biggest set.
   const roundGroups = useMemo(() => {
-    const groups = new Map<number, { roundNumber: number; savedCode: string; sets: EffectiveEntry[] }>()
-    for (const entry of draft?.entries ?? []) {
-      const group = groups.get(entry.roundNumber) ?? { roundNumber: entry.roundNumber, savedCode: entry.roundCode, sets: [] }
-      groups.set(entry.roundNumber, group)
-    }
+    const groups = new Map<number, EffectiveEntry[]>()
     for (const set of sheet) {
-      groups.get(set.roundNumber)?.sets.push(set)
+      groups.set(set.roundNumber, [...(groups.get(set.roundNumber) ?? []), set])
     }
-    return Array.from(groups.values())
-      .sort((left, right) => left.roundNumber - right.roundNumber)
-      .map((group) => ({
-        ...group,
-        roundCode: roundEdits[group.roundNumber] ?? group.savedCode,
-        sets: group.sets.sort((left, right) => left.setNumber - right.setNumber),
-      }))
-  }, [draft, roundEdits, sheet])
+    return Array.from(groups.entries())
+      .sort(([left], [right]) => left - right)
+      .map(([roundNumber, sets]) => {
+        const ordered = [...sets].sort((left, right) => left.setNumber - right.setNumber)
+        return { roundNumber, roundCode: roundComposition(ordered), sets: ordered }
+      })
+  }, [sheet])
 
   const playersPerTeam = selectedParticipantIds.length >= 8 && selectedParticipantIds.length % 2 === 0
     ? selectedParticipantIds.length / 2
     : null
-  const setsOptions = useMemo(() => (playersPerTeam === null ? [] : setsPerRoundOptions(playersPerTeam)), [playersPerTeam])
 
   useEffect(() => {
     let mounted = true
@@ -217,7 +215,9 @@ export default function CaptainDraftPage() {
         setParticipantSlots(createParticipantSlotsFromDraft(response))
         setHomeCaptainId(response.homeCaptainPlayerId)
         setAwayCaptainId(response.awayCaptainPlayerId)
-        setSetsPerRound(response.setsPerRound)
+        const layout = draftLayout(response.entries)
+        setSetSizes(layout.setSizes)
+        setRoundCount(layout.roundCount || DEFAULT_ROUND_COUNT)
       } catch (latestDraftError) {
         if (!mounted) {
           return
@@ -271,7 +271,7 @@ export default function CaptainDraftPage() {
     if (draft || playersPerTeam === null) {
       return
     }
-    setSetsPerRound(defaultSetsPerRound(playersPerTeam))
+    setSetSizes(defaultSetSizes(playersPerTeam))
   }, [playersPerTeam, draft])
 
   useEffect(() => {
@@ -373,11 +373,11 @@ export default function CaptainDraftPage() {
         title: '토요 정기 감전',
         participantPlayerIds: selectedParticipantIds,
         captainPlayerIds: [homeCaptainId, awayCaptainId],
-        setsPerRound,
+        roundCount,
+        setSizes,
       })
       setDraft(created)
       setEntryEdits({})
-      setRoundEdits({})
       setMessage(t('captainDraft.messages.createSuccess'))
     } catch (createError) {
       setError(errorWithReason('captainDraft.validation.createFailed', createError))
@@ -390,11 +390,11 @@ export default function CaptainDraftPage() {
     setParticipantSlots(createParticipantSlots(MINIMUM_PARTICIPANT_SLOTS))
     setHomeCaptainId(null)
     setAwayCaptainId(null)
-    setSetsPerRound(4)
+    setSetSizes([])
+    setRoundCount(DEFAULT_ROUND_COUNT)
     setDraft(null)
     setDraftLoading(false)
     setEntryEdits({})
-    setRoundEdits({})
     setError(null)
     setMessage(null)
   }
@@ -409,9 +409,10 @@ export default function CaptainDraftPage() {
       setParticipantSlots(createParticipantSlotsFromDraft(refreshed))
       setHomeCaptainId(refreshed.homeCaptainPlayerId)
       setAwayCaptainId(refreshed.awayCaptainPlayerId)
-      setSetsPerRound(refreshed.setsPerRound)
+      const layout = draftLayout(refreshed.entries)
+      setSetSizes(layout.setSizes)
+      setRoundCount(layout.roundCount || DEFAULT_ROUND_COUNT)
       setEntryEdits({})
-      setRoundEdits({})
     } catch (refreshError) {
       if (isApiNotFoundError(refreshError)) {
         setDraft(null)
@@ -419,8 +420,8 @@ export default function CaptainDraftPage() {
         setHomeCaptainId(null)
         setAwayCaptainId(null)
         setEntryEdits({})
-      setRoundEdits({})
-        setSetsPerRound(4)
+        setSetSizes([])
+        setRoundCount(DEFAULT_ROUND_COUNT)
       } else {
         setError(t('captainDraft.validation.loadFailed'))
       }
@@ -482,10 +483,10 @@ export default function CaptainDraftPage() {
     setIsSavingEntries(true)
     try {
       const next = await apiClient.updateCaptainDraftEntries(TEMP_GROUP_ID, draft.draftId, {
-        rounds: roundGroups.map((round) => ({ roundNumber: round.roundNumber, roundCode: round.roundCode })),
         entries: sheet.map((set) => ({
           roundNumber: set.roundNumber,
           setNumber: set.setNumber,
+          raceCode: set.raceCode,
           homePlayerIds: set.homePlayerIds,
           awayPlayerIds: set.awayPlayerIds,
           requiredTier: set.requiredTier.trim() || null,
@@ -494,7 +495,6 @@ export default function CaptainDraftPage() {
       })
       setDraft(next)
       setEntryEdits({})
-      setRoundEdits({})
       setMessage(t('captainDraft.messages.entriesSaved'))
     } catch (saveError) {
       setError(errorWithReason('captainDraft.validation.saveEntryFailed', saveError))
@@ -503,13 +503,12 @@ export default function CaptainDraftPage() {
     }
   }
 
-  const changeRoundCode = (roundNumber: number, savedCode: string, code: string) => {
-    setRoundEdits((previous) => {
+  // A round's composition sets every set of it: the biggest plays it, smaller ones a cut-down version.
+  const changeRoundCode = (roundNumber: number, code: string) => {
+    setEntryEdits((previous) => {
       const next = { ...previous }
-      if (code === savedCode) {
-        delete next[roundNumber]
-      } else {
-        next[roundNumber] = code
+      for (const set of sheet.filter((candidate) => candidate.roundNumber === roundNumber)) {
+        next[set.key] = { ...next[set.key], raceCode: setComposition(code, set.teamSize) }
       }
       return next
     })
@@ -595,31 +594,13 @@ export default function CaptainDraftPage() {
               </label>
             </div>
 
-            <div className="mt-4">
-              <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-300">{t('captainDraft.settings.title')}</h4>
-              <label className="mt-2 block text-xs font-medium text-slate-500 dark:text-slate-400">
-                {t('captainDraft.settings.setsPerRound')}
-                <select
-                  value={setsPerRound}
-                  onChange={(event) => setSetsPerRound(Number(event.target.value))}
-                  disabled={setsOptions.length === 0}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700 dark:disabled:bg-slate-800"
-                >
-                  {setsOptions.length === 0 && <option value={setsPerRound}>-</option>}
-                  {setsOptions.length > 0 && !setsOptions.some((option) => option.sets === setsPerRound) && (
-                    <option value={setsPerRound}>{t('captainDraft.entry.setCell', { set: setsPerRound })}</option>
-                  )}
-                  {setsOptions.map((option) => (
-                    <option key={`sets-${option.sets}`} value={option.sets}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                {setsOptions.length === 0 ? t('captainDraft.settings.needAttendance') : t('captainDraft.settings.helper')}
-              </p>
-            </div>
+            <CaptainDraftRoundSettings
+              playersPerTeam={playersPerTeam}
+              setSizes={setSizes}
+              roundCount={roundCount}
+              onSetSizesChange={setSetSizes}
+              onRoundCountChange={setRoundCount}
+            />
 
             <div className="mt-4 flex gap-2">
               <button

@@ -10,7 +10,6 @@ import com.balancify.backend.api.group.dto.CaptainDraftEntriesUpdateRequest;
 import com.balancify.backend.api.group.dto.CaptainDraftEntryUpdateItemRequest;
 import com.balancify.backend.api.group.dto.CaptainDraftPickRequest;
 import com.balancify.backend.api.group.dto.CaptainDraftResponse;
-import com.balancify.backend.api.group.dto.CaptainDraftRoundUpdateRequest;
 import com.balancify.backend.api.group.dto.CaptainDraftUnpickRequest;
 import com.balancify.backend.domain.CaptainDraft;
 import com.balancify.backend.domain.CaptainDraftEntry;
@@ -89,6 +88,8 @@ class CaptainDraftServiceTest {
                 "토요 정기 감전",
                 List.of(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L),
                 List.of(1L, 2L),
+                null,
+                null,
                 null
             )
         );
@@ -104,7 +105,7 @@ class CaptainDraftServiceTest {
         assertThat(response.entries()).hasSize(8);
         assertThat(response.entries())
             .extracting(entry -> entry.roundNumber() + entry.roundCode() + ":" + entry.teamSize())
-            .containsExactly("1PPP:2", "1PPP:2", "2PPT:2", "2PPT:2", "3PPZ:2", "3PPZ:2", "4PTZ:2", "4PTZ:2");
+            .containsExactly("1PP:2", "1PP:2", "2PT:2", "2PT:2", "3PZ:2", "3PZ:2", "4PR:2", "4PR:2");
         assertThat(response.entries()).allSatisfy(entry -> {
             assertThat(entry.winnerTeam()).isNull();
             assertThat(entry.homePlayers()).containsExactly(null, null);
@@ -133,10 +134,84 @@ class CaptainDraftServiceTest {
         // Teams of four field two sets at most (2:2 and 2:2).
         assertThatThrownBy(() -> captainDraftService.createDraft(
             1L,
-            new CaptainDraftCreateRequest("정기 감전", List.of(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L), List.of(1L, 2L), 3)
+            new CaptainDraftCreateRequest("정기 감전", List.of(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L), List.of(1L, 2L), 3, null, null)
         ))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("setsPerRound must be between 1 and 2");
+    }
+
+    @Test
+    void createsTheHostsLayoutOfSetsForTheRoundsAsked() {
+        Group group = group(1L);
+        List<Long> ten = List.of(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L);
+        when(groupRepository.findById(1L)).thenReturn(Optional.of(group));
+        when(playerRepository.findByGroup_IdAndIdIn(1L, ten))
+            .thenReturn(players(group, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L));
+        when(captainDraftRepository.save(any(CaptainDraft.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(captainDraftParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(captainDraftEntryRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Five a side: a 3:3 and two 1:1 games, over five rounds (best of five).
+        CaptainDraftResponse response = captainDraftService.createDraft(
+            1L,
+            new CaptainDraftCreateRequest("청백전", ten, List.of(1L, 2L), null, 5, List.of(3, 1, 1))
+        );
+
+        assertThat(response.setsPerRound()).isEqualTo(3);
+        assertThat(response.entries())
+            .extracting(entry -> entry.roundNumber() + "-" + entry.setNumber() + ":" + entry.teamSize() + entry.roundCode())
+            .containsExactly(
+                "1-1:3PPP", "1-2:1P", "1-3:1P",
+                "2-1:3PPT", "2-2:1P", "2-3:1P",
+                "3-1:3PPZ", "3-2:1P", "3-3:1P",
+                "4-1:3PTZ", "4-2:1P", "4-3:1P",
+                "5-1:3PPP", "5-2:1P", "5-3:1P"
+            );
+
+        // Three rounds of one 3:3 game, two a side resting.
+        CaptainDraftResponse shortDraft = captainDraftService.createDraft(
+            1L,
+            new CaptainDraftCreateRequest("짧게", ten, List.of(1L, 2L), null, 3, List.of(3))
+        );
+        assertThat(shortDraft.entries()).extracting(entry -> entry.roundCode()).containsExactly("PPP", "PPT", "PPZ");
+    }
+
+    @Test
+    void refusesALayoutTheTeamsCannotFill() {
+        Group group = group(1L);
+        List<Long> ten = List.of(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L);
+        when(groupRepository.findById(1L)).thenReturn(Optional.of(group));
+        when(playerRepository.findByGroup_IdAndIdIn(1L, ten))
+            .thenReturn(players(group, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L));
+
+        assertThatThrownBy(() -> captainDraftService.createDraft(
+            1L, new CaptainDraftCreateRequest("t", ten, List.of(1L, 2L), null, null, List.of(3, 3))
+        ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("The sets need 6 players a team, but a team has 5");
+        assertThatThrownBy(() -> captainDraftService.createDraft(
+            1L, new CaptainDraftCreateRequest("t", ten, List.of(1L, 2L), null, null, List.of(4))
+        ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Each set is 3:3, 2:2 or 1:1");
+        assertThatThrownBy(() -> captainDraftService.createDraft(
+            1L, new CaptainDraftCreateRequest("t", ten, List.of(1L, 2L), null, 8, List.of(3))
+        ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("roundCount must be between 1 and 7");
+    }
+
+    @Test
+    void playsSmallerSetsWithTheRoundsRacesCutDown() {
+        assertThat(CaptainDraftService.setComposition("PPP", 3)).isEqualTo("PPP");
+        assertThat(CaptainDraftService.setComposition("PPT", 2)).isEqualTo("PT");
+        assertThat(CaptainDraftService.setComposition("PPT", 1)).isEqualTo("P");
+        assertThat(CaptainDraftService.setComposition("PTZ", 2)).isEqualTo("PR");
+        assertThat(CaptainDraftService.setComposition("PTZ", 1)).isEqualTo("P");
+        assertThat(CaptainDraftService.setComposition("PPZ", 2)).isEqualTo("PZ");
+        assertThat(CaptainDraftService.setComposition("PPR", 2)).isEqualTo("PR");
+        assertThat(CaptainDraftService.setComposition("RRR", 2)).isEqualTo("RR");
+        assertThat(CaptainDraftService.setComposition("PRR", 1)).isEqualTo("R");
     }
 
     @Test
@@ -220,14 +295,14 @@ class CaptainDraftServiceTest {
             1L,
             100L,
             new CaptainDraftEntriesUpdateRequest(
-                List.of(new CaptainDraftRoundUpdateRequest(1, "ppz")),
                 List.of(
-                    new CaptainDraftEntryUpdateItemRequest(1, 1, List.of(1L, 3L, 5L), List.of(2L, 4L, 6L), " 핫티어 1 ", "AWAY"),
-                    new CaptainDraftEntryUpdateItemRequest(2, 1, Arrays.asList(5L, null, 3L), List.of(), "", null)
+                    new CaptainDraftEntryUpdateItemRequest(1, 1, "zpp", List.of(1L, 3L, 5L), List.of(2L, 4L, 6L), " 핫티어 1 ", "AWAY"),
+                    new CaptainDraftEntryUpdateItemRequest(2, 1, null, Arrays.asList(5L, null, 3L), List.of(), "", null)
                 )
             )
         );
 
+        // Races given are put in P, T, Z, R order; races left out are kept.
         assertThat(response.entries()).extracting(entry -> entry.roundCode()).containsExactly("PPZ", "PPT");
         assertThat(response.entries().get(0)).satisfies(set -> {
             assertThat(set.teamSize()).isEqualTo(3);
@@ -255,46 +330,48 @@ class CaptainDraftServiceTest {
             .thenAnswer(invocation -> List.of(entry(draft, 1, "PPP", 1, 3), entry(draft, 1, "PPP", 2, 2)));
 
         assertRefused(
-            new CaptainDraftEntryUpdateItemRequest(1, 1, List.of(4L), List.of(), null, null),
+            new CaptainDraftEntryUpdateItemRequest(1, 1, null, List.of(4L), List.of(), null, null),
             "Entry player must belong to that side's team"
         );
         assertRefused(
-            new CaptainDraftEntryUpdateItemRequest(1, 1, List.of(3L, 3L), List.of(), null, null),
+            new CaptainDraftEntryUpdateItemRequest(1, 1, null, List.of(3L, 3L), List.of(), null, null),
             "A player can take only one slot of a set"
         );
         assertRefused(
-            new CaptainDraftEntryUpdateItemRequest(1, 2, List.of(1L, 3L, 5L), List.of(), null, null),
+            new CaptainDraftEntryUpdateItemRequest(1, 2, null, List.of(1L, 3L, 5L), List.of(), null, null),
             "A side of this set takes at most 2 players"
         );
         assertRefused(
-            new CaptainDraftEntryUpdateItemRequest(1, 1, List.of(1L, 3L), List.of(2L, 4L, 6L), null, "HOME"),
+            new CaptainDraftEntryUpdateItemRequest(1, 1, null, List.of(1L, 3L), List.of(2L, 4L, 6L), null, "HOME"),
             "Winner team requires both home and away players"
         );
         assertRefused(
-            new CaptainDraftEntryUpdateItemRequest(1, 1, null, null, null, null),
+            new CaptainDraftEntryUpdateItemRequest(1, 1, null, null, null, null, null),
             "Each set needs both sides' player lists; reload the page"
         );
         // One player in both sets of the same round.
         assertThatThrownBy(() -> captainDraftService.updateEntries(
             1L,
             100L,
-            new CaptainDraftEntriesUpdateRequest(null, List.of(
-                new CaptainDraftEntryUpdateItemRequest(1, 1, List.of(1L, 3L), List.of(), null, null),
-                new CaptainDraftEntryUpdateItemRequest(1, 2, List.of(3L, 5L), List.of(), null, null)
+            new CaptainDraftEntriesUpdateRequest(List.of(
+                new CaptainDraftEntryUpdateItemRequest(1, 1, null, List.of(1L, 3L), List.of(), null, null),
+                new CaptainDraftEntryUpdateItemRequest(1, 2, null, List.of(3L, 5L), List.of(), null, null)
             ))
         ))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("A player can play only one set a round");
-        assertThatThrownBy(() -> captainDraftService.updateEntries(
-            1L,
-            100L,
-            new CaptainDraftEntriesUpdateRequest(
-                List.of(new CaptainDraftRoundUpdateRequest(1, "TTT")),
-                List.of(new CaptainDraftEntryUpdateItemRequest(1, 1, List.of(), List.of(), null, null))
-            )
-        ))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("roundCode must be one of PPP, PPT, PPZ, PTZ");
+        assertRefused(
+            new CaptainDraftEntryUpdateItemRequest(1, 1, "PX", List.of(), List.of(), null, null),
+            "raceCode must be one to three of P, T, Z and R"
+        );
+        assertRefused(
+            new CaptainDraftEntryUpdateItemRequest(1, 1, "PPTZ", List.of(), List.of(), null, null),
+            "raceCode must be one to three of P, T, Z and R"
+        );
+        assertRefused(
+            new CaptainDraftEntryUpdateItemRequest(9, 1, null, List.of(), List.of(), null, null),
+            "Invalid round/set combination"
+        );
     }
 
     @Test
@@ -525,7 +602,7 @@ class CaptainDraftServiceTest {
         assertThatThrownBy(() -> captainDraftService.updateEntries(
             1L,
             100L,
-            new CaptainDraftEntriesUpdateRequest(null, List.of(item))
+            new CaptainDraftEntriesUpdateRequest(List.of(item))
         ))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage(message);

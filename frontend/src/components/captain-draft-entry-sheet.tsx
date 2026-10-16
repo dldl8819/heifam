@@ -2,12 +2,11 @@
 
 import { t } from '@/lib/i18n'
 import {
-  ROUND_CODES,
+  compositionsOfSize,
   draftPlayerOptionLabel,
   draftPlayerTags,
   playersInRound,
   requiredTierPresets,
-  setComposition,
   withSlot,
   type DraftWinnerSelection,
   type EffectiveEntry,
@@ -27,8 +26,7 @@ const TEAM_LABELS: Record<TeamSide, string> = {
 
 export type EntrySheetRound = {
   roundNumber: number
-  savedCode: string
-  // The composition as shown: the host's unsaved choice, or the saved one.
+  // The composition of the round's biggest set, as shown.
   roundCode: string
   sets: EffectiveEntry[]
 }
@@ -41,7 +39,13 @@ type CaptainDraftEntrySheetProps = {
   teamMembers: Record<TeamSide, EntrySheetMember[]>
   playerMap: Map<number, PlayerRosterItem>
   onEditEntry: (key: string, change: EntryEdit) => void
-  onChangeRoundCode: (roundNumber: number, savedCode: string, code: string) => void
+  onChangeRoundCode: (roundNumber: number, code: string) => void
+}
+
+// The compositions a set of this size can take, with the current one kept even if unusual.
+function compositionOptions(size: number, current: string): string[] {
+  const options = compositionsOfSize(size)
+  return current && !options.includes(current) ? [current, ...options] : options
 }
 
 function selectedPlayerId(value: string): number | null {
@@ -91,7 +95,7 @@ export function CaptainDraftEntrySheet({
             <th className="w-20 border border-slate-400 px-2 py-2 text-center font-semibold dark:border-slate-600">
               {t('captainDraft.entry.setLabel')}
             </th>
-            <th className="w-16 border border-slate-400 px-2 py-2 text-center font-semibold dark:border-slate-600">
+            <th className="w-20 border border-slate-400 px-2 py-2 text-center font-semibold dark:border-slate-600">
               {t('captainDraft.entry.raceLabel')}
             </th>
             <th className="w-32 border border-slate-400 px-2 py-2 text-center font-semibold dark:border-slate-600">
@@ -113,6 +117,7 @@ export function CaptainDraftEntrySheet({
         </thead>
         <tbody>
           {rounds.map((round, roundIndex) => {
+            const biggestSize = Math.max(...round.sets.map((set) => set.teamSize))
             const roundHomeWins = round.sets.filter((set) => set.winnerTeam === 'HOME').length
             const roundAwayWins = round.sets.filter((set) => set.winnerTeam === 'AWAY').length
 
@@ -128,11 +133,11 @@ export function CaptainDraftEntrySheet({
                       <span className="block text-base">{t('captainDraft.entry.roundOnly', { round: round.roundNumber })}</span>
                       <select
                         value={round.roundCode}
-                        onChange={(event) => onChangeRoundCode(round.roundNumber, round.savedCode, event.target.value)}
+                        onChange={(event) => onChangeRoundCode(round.roundNumber, event.target.value)}
                         aria-label={t('captainDraft.entry.roundCodeLabel', { round: round.roundNumber })}
                         className="mt-1 w-full rounded-md border border-slate-300 bg-white px-1 py-1 text-sm font-semibold text-slate-800 outline-none focus:border-slate-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
                       >
-                        {ROUND_CODES.map((code) => (
+                        {compositionOptions(biggestSize, round.roundCode).map((code) => (
                           <option key={`round-${round.roundNumber}-${code}`} value={code}>
                             {code}
                           </option>
@@ -146,8 +151,19 @@ export function CaptainDraftEntrySheet({
                       {t('captainDraft.entry.teamSize', { size: set.teamSize })}
                     </span>
                   </td>
-                  <td className={`border border-slate-300 bg-slate-50 px-2 py-2 text-center font-medium text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 ${dividerClass}`.trim()}>
-                    {setComposition(round.roundCode, set.teamSize)}
+                  <td className={`border border-slate-300 bg-slate-50 px-1 py-1 text-center dark:border-slate-700 dark:bg-slate-800 ${dividerClass}`.trim()}>
+                    <select
+                      value={set.raceCode}
+                      onChange={(event) => onEditEntry(set.key, { raceCode: event.target.value })}
+                      aria-label={t('captainDraft.entry.raceCodeLabel', { round: round.roundNumber, set: set.setNumber })}
+                      className="w-full rounded-md border border-transparent bg-transparent px-1 py-1.5 text-center text-sm font-medium text-slate-800 outline-none focus:border-slate-300 dark:text-slate-200 dark:focus:border-slate-600"
+                    >
+                      {compositionOptions(set.teamSize, set.raceCode).map((code) => (
+                        <option key={`${set.key}-race-${code}`} value={code}>
+                          {code}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td className={`border border-slate-300 px-1 py-1 dark:border-slate-700 ${dividerClass}`.trim()}>
                     <input

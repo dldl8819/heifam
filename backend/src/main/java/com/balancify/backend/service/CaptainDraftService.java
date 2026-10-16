@@ -9,7 +9,6 @@ import com.balancify.backend.api.group.dto.CaptainDraftParticipantResponse;
 import com.balancify.backend.api.group.dto.CaptainDraftPickLogResponse;
 import com.balancify.backend.api.group.dto.CaptainDraftPickRequest;
 import com.balancify.backend.api.group.dto.CaptainDraftResponse;
-import com.balancify.backend.api.group.dto.CaptainDraftRoundUpdateRequest;
 import com.balancify.backend.api.group.dto.CaptainDraftUnpickRequest;
 import com.balancify.backend.domain.CaptainDraft;
 import com.balancify.backend.domain.CaptainDraftEntry;
@@ -43,7 +42,14 @@ public class CaptainDraftService {
     private static final String TEAM_UNASSIGNED = "UNASSIGNED";
     private static final String STATUS_DRAFTING = "DRAFTING";
     private static final String STATUS_READY = "READY";
-    private static final List<String> ROUND_CODES = List.of("PPP", "PPT", "PPZ", "PTZ");
+    // Rounds take these compositions in turn unless the host picks others.
+    private static final List<String> DEFAULT_ROUND_CODES = List.of("PPP", "PPT", "PPZ", "PTZ");
+    private static final String RACE_ORDER = "PTZR";
+    // The 2:2 game each usual round composition is played with, as the clan plays them.
+    private static final Map<String, String> TWO_A_SIDE = Map.of("PPP", "PP", "PPT", "PT", "PPZ", "PZ", "PTZ", "PR");
+    private static final int DEFAULT_ROUND_COUNT = 4;
+    private static final int MAX_ROUND_COUNT = 7;
+    private static final int MAX_SETS_PER_ROUND = 10;
     private static final int MAX_REQUIRED_TIER_LENGTH = 30;
 
     private final GroupRepository groupRepository;
@@ -114,7 +120,9 @@ public class CaptainDraftService {
         draft.setTitle(resolveTitle(request.title()));
         draft.setStatus(STATUS_DRAFTING);
         int playersPerTeam = participantPlayerIds.size() / 2;
-        draft.setSetsPerRound(resolveSetsPerRound(request.setsPerRound(), playersPerTeam));
+        List<Integer> teamSizes = resolveSetSizes(request.setSizes(), request.setsPerRound(), playersPerTeam);
+        int roundCount = resolveRoundCount(request.roundCount());
+        draft.setSetsPerRound(teamSizes.size());
         draft.setCurrentTurnTeam(TEAM_HOME);
         draft.setHomeCaptain(homeCaptain);
         draft.setAwayCaptain(awayCaptain);
@@ -141,18 +149,18 @@ public class CaptainDraftService {
         }
         captainDraftParticipantRepository.saveAll(participants);
 
-        List<Integer> teamSizes = setTeamSizes(playersPerTeam, savedDraft.getSetsPerRound());
         List<CaptainDraftEntry> entries = new ArrayList<>();
-        for (int roundIndex = 0; roundIndex < ROUND_CODES.size(); roundIndex++) {
+        for (int roundIndex = 0; roundIndex < roundCount; roundIndex++) {
             int roundNumber = roundIndex + 1;
-            String roundCode = ROUND_CODES.get(roundIndex);
+            String roundCode = DEFAULT_ROUND_CODES.get(roundIndex % DEFAULT_ROUND_CODES.size());
             for (int setNumber = 1; setNumber <= teamSizes.size(); setNumber++) {
+                int teamSize = teamSizes.get(setNumber - 1);
                 CaptainDraftEntry entry = new CaptainDraftEntry();
                 entry.setDraft(savedDraft);
                 entry.setRoundNumber(roundNumber);
-                entry.setRoundCode(roundCode);
+                entry.setRoundCode(setComposition(roundCode, teamSize));
                 entry.setSetNumber(setNumber);
-                entry.setTeamSize(teamSizes.get(setNumber - 1));
+                entry.setTeamSize(teamSize);
                 entries.add(entry);
             }
         }
@@ -295,7 +303,7 @@ public class CaptainDraftService {
     }
 
     /**
-     * Saves the round compositions and the sets as the host fills them in. Each side of a set takes
+     * Saves the sets as the host fills them in, each with its race composition. Each side of a set takes
      * up to its team size of its own team's players, a player plays at most one set a round, and a
      * set gets a winner only with both sides full.
      */
@@ -328,25 +336,11 @@ public class CaptainDraftService {
             entriesByKey.put(entryKey(entry.getRoundNumber(), entry.getSetNumber()), entry);
         }
 
-        if (request.rounds() != null) {
-            for (CaptainDraftRoundUpdateRequest round : request.rounds()) {
-                if (round == null) {
-                    continue;
-                }
-                int roundNumber = requireRoundNumber(round.roundNumber());
-                String roundCode = normalizeRoundCode(round.roundCode());
-                entries.stream()
-                    .filter(entry -> entry.getRoundNumber() != null && entry.getRoundNumber() == roundNumber)
-                    .forEach(entry -> entry.setRoundCode(roundCode));
-            }
-        }
-
         for (CaptainDraftEntryUpdateItemRequest updateItem : request.entries()) {
             if (updateItem == null) {
                 continue;
             }
-            int roundNumber = requireRoundNumber(updateItem.roundNumber());
-            CaptainDraftEntry targetEntry = entriesByKey.get(entryKey(roundNumber, updateItem.setNumber()));
+            CaptainDraftEntry targetEntry = entriesByKey.get(entryKey(updateItem.roundNumber(), updateItem.setNumber()));
             if (targetEntry == null) {
                 throw new IllegalArgumentException("Invalid round/set combination");
             }
@@ -364,6 +358,9 @@ public class CaptainDraftService {
                 ));
             }
             targetEntry.setRequiredTier(normalizeRequiredTier(updateItem.requiredTier()));
+            if (updateItem.raceCode() != null) {
+                targetEntry.setRoundCode(normalizeRaceCode(updateItem.raceCode()));
+            }
 
             String winnerTeam = normalizeWinnerTeam(updateItem.winnerTeam());
             if (winnerTeam != null && (!isSideFull(targetEntry, TEAM_HOME) || !isSideFull(targetEntry, TEAM_AWAY))) {
@@ -447,19 +444,41 @@ public class CaptainDraftService {
         }
     }
 
-    private int requireRoundNumber(Integer roundNumber) {
-        if (roundNumber == null || roundNumber < 1 || roundNumber > ROUND_CODES.size()) {
-            throw new IllegalArgumentException("roundNumber must be between 1 and " + ROUND_CODES.size());
+    /**
+     * The races a set smaller than its round's composition starts with; the host can change them. A
+     * 2:2 game plays PPP as PP, PPT as PT, PPZ as PZ and PTZ as PR, any other composition less one
+     * Protoss (PRR -> RR, RRR -> RR); a 1:1 game the first race of that.
+     */
+    static String setComposition(String roundCode, int teamSize) {
+        if (roundCode.length() <= teamSize) {
+            return roundCode;
         }
-        return roundNumber;
+        if (teamSize <= 1) {
+            return setComposition(roundCode, 2).substring(0, 1);
+        }
+        String known = teamSize == 2 ? TWO_A_SIDE.get(roundCode) : null;
+        if (known != null) {
+            return known;
+        }
+        String code = roundCode;
+        while (code.length() > teamSize) {
+            int protoss = code.indexOf('P');
+            code = protoss >= 0 ? code.substring(0, protoss) + code.substring(protoss + 1) : code.substring(1);
+        }
+        return code;
     }
 
-    private String normalizeRoundCode(String roundCode) {
-        String normalized = safeTrim(roundCode).toUpperCase();
-        if (!ROUND_CODES.contains(normalized)) {
-            throw new IllegalArgumentException("roundCode must be one of " + String.join(", ", ROUND_CODES));
+    // One to three races out of P, T, Z and R (random), kept in that order: "rpr" becomes "PRR".
+    private String normalizeRaceCode(String raceCode) {
+        String normalized = safeTrim(raceCode).toUpperCase();
+        if (normalized.isEmpty() || normalized.length() > 3 || !normalized.chars().allMatch(race -> RACE_ORDER.indexOf(race) >= 0)) {
+            throw new IllegalArgumentException("raceCode must be one to three of P, T, Z and R");
         }
-        return normalized;
+        return normalized
+            .chars()
+            .mapToObj(race -> String.valueOf((char) race))
+            .sorted(Comparator.comparingInt(RACE_ORDER::indexOf))
+            .collect(Collectors.joining());
     }
 
     private String normalizeRequiredTier(String requiredTier) {
@@ -485,18 +504,45 @@ public class CaptainDraftService {
     }
 
     /**
-     * Sets a round: from one 3:3 game up to all 2:2 games. Left open, enough sets that everyone plays
-     * each round, as many of them 3:3 as the players allow.
+     * The team size of each set of a round, as the host lays them out: 3:3, 2:2 and 1:1 games in any
+     * mix that a team's players can fill, the rest sitting the round out. Without a layout, a number
+     * of sets (3:3 first, then 2:2), or enough sets for everyone to play.
      */
-    private int resolveSetsPerRound(Integer requestedSetsPerRound, int playersPerTeam) {
-        int maximum = Math.max(1, playersPerTeam / 2);
-        if (requestedSetsPerRound == null) {
-            return Math.min(maximum, (playersPerTeam + 2) / 3);
+    private List<Integer> resolveSetSizes(List<Integer> requestedSizes, Integer requestedSets, int playersPerTeam) {
+        if (requestedSizes != null && !requestedSizes.isEmpty()) {
+            if (requestedSizes.size() > MAX_SETS_PER_ROUND) {
+                throw new IllegalArgumentException("A round has at most " + MAX_SETS_PER_ROUND + " sets");
+            }
+            int players = 0;
+            for (Integer size : requestedSizes) {
+                if (size == null || size < 1 || size > 3) {
+                    throw new IllegalArgumentException("Each set is 3:3, 2:2 or 1:1");
+                }
+                players += size;
+            }
+            if (players > playersPerTeam) {
+                throw new IllegalArgumentException("The sets need " + players + " players a team, but a team has " + playersPerTeam);
+            }
+            return List.copyOf(requestedSizes);
         }
-        if (requestedSetsPerRound < 1 || requestedSetsPerRound > maximum) {
+        int maximum = Math.max(1, playersPerTeam / 2);
+        if (requestedSets == null) {
+            return setTeamSizes(playersPerTeam, Math.min(maximum, (playersPerTeam + 2) / 3));
+        }
+        if (requestedSets < 1 || requestedSets > maximum) {
             throw new IllegalArgumentException("setsPerRound must be between 1 and " + maximum);
         }
-        return requestedSetsPerRound;
+        return setTeamSizes(playersPerTeam, requestedSets);
+    }
+
+    private int resolveRoundCount(Integer requestedRounds) {
+        if (requestedRounds == null) {
+            return DEFAULT_ROUND_COUNT;
+        }
+        if (requestedRounds < 1 || requestedRounds > MAX_ROUND_COUNT) {
+            throw new IllegalArgumentException("roundCount must be between 1 and " + MAX_ROUND_COUNT);
+        }
+        return requestedRounds;
     }
 
     private List<Long> normalizeDistinctPlayerIds(List<Long> playerIds) {

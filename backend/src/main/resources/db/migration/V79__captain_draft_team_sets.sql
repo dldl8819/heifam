@@ -1,5 +1,5 @@
--- A set of the regular draft becomes a team game: 3:3, or 2:2 when the players of a round run out.
--- Each set keeps its team size, an optional note on the tiers it asks for (상위 3, 핫티어 1, ...),
+-- A set of the regular draft becomes a team game: 3:3, 2:2 or 1:1, laid out by the host to fit the
+-- players of a team. Each set keeps its team size, its races, an optional note on the tiers it asks for
 -- and its players per side in captain_draft_entry_players. Sets written before were one against
 -- one; they stay as sets of one, their players copied over as slot 1. The old home_player_id and
 -- away_player_id columns are left in place, no longer written.
