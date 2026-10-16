@@ -21,6 +21,8 @@ import {
   setLayoutSummary,
   setSizeChoices,
   setTeamSizes,
+  setupDiffersFromDraft,
+  sortByTier,
   withSlot,
 } from '@/lib/captain-draft'
 import type { CaptainDraftEntry, PlayerRosterItem } from '@/types/api'
@@ -162,6 +164,44 @@ describe('captain draft sets', () => {
     expect(draftPlayerTags(rosterPlayer({ tier: 'UNASSIGNED' })).tier).toBe('배정 필요')
     expect(draftPlayerTags(undefined, 'Z')).toEqual({ tier: null, races: 'Z' })
     expect(draftPlayerOptionLabel('Ace', { tier: 'A+', races: 'PT' })).toBe('Ace · A+ · PT')
+  })
+
+  it('orders players for picking: captains, then the highest live tier down, then off the roster', () => {
+    const roster = new Map<number, PlayerRosterItem>([
+      [1, rosterPlayer({ id: 1, nickname: '다', tier: 'B' })],
+      [2, rosterPlayer({ id: 2, nickname: '나', tier: 'B', liveTier: 'S' })],
+      [3, rosterPlayer({ id: 3, nickname: '가', tier: 'B' })],
+      [4, rosterPlayer({ id: 4, nickname: '라', tier: 'UNASSIGNED' })],
+      [5, rosterPlayer({ id: 5, nickname: '마', tier: 'D-' })],
+    ])
+    const participant = (playerId: number | null, nickname: string, captain = false) => ({ playerId, nickname, captain })
+
+    const sorted = sortByTier(
+      [participant(4, '라'), participant(null, '탈퇴'), participant(1, '다'), participant(5, '마', true), participant(3, '가'), participant(2, '나')],
+      roster,
+    )
+
+    expect(sorted.map((item) => item.nickname)).toEqual(['마', '나', '가', '다', '라', '탈퇴'])
+  })
+
+  it('tells when the attendance or captains on screen are not the draft shown, before loading over them', () => {
+    const shown = {
+      participants: [{ playerId: 1 }, { playerId: 2 }, { playerId: 3 }, { playerId: null }].map((participant) => ({
+        ...participant, nickname: 'n', race: 'P' as const, team: 'UNASSIGNED' as const, captain: false, pickOrder: null,
+      })),
+      homeCaptainPlayerId: 1,
+      awayCaptainPlayerId: 2,
+    }
+
+    // The draft as loaded, in any order: nothing typed to lose.
+    expect(setupDiffersFromDraft(shown, [3, 2, 1], 1, 2)).toBe(false)
+    // A player added or dropped, or another captain: typed for the next draft.
+    expect(setupDiffersFromDraft(shown, [1, 2, 3, 4], 1, 2)).toBe(true)
+    expect(setupDiffersFromDraft(shown, [1, 2], 1, 2)).toBe(true)
+    expect(setupDiffersFromDraft(shown, [1, 2, 3], 3, 2)).toBe(true)
+    // No draft shown: anything typed at all.
+    expect(setupDiffersFromDraft(null, [], null, null)).toBe(false)
+    expect(setupDiffersFromDraft(null, [5], null, null)).toBe(true)
   })
 })
 

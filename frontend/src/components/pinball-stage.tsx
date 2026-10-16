@@ -52,7 +52,8 @@ const ARRIVAL_SHOWN_MS = 1400
 const TRAIL_LENGTH = 7
 const STANDINGS_SHOWN = 5
 const STANDINGS_EVERY_MS = 250
-const BANNER_WINNERS = 3
+// The winner banner lists everyone in one column up to this many, in two beyond.
+const BANNER_ONE_COLUMN = 5
 const CONFETTI_COUNT = 140
 const CONFETTI_GRAVITY = 900
 const CONFETTI_COLORS = ['#f59e0b', '#34d399', '#38bdf8', '#f472b6', '#a78bfa', '#facc15', '#fb7185']
@@ -705,19 +706,15 @@ export function PinballStage({ entrants, winnerCount, mode, onFinished }: Pinbal
             <div className="pointer-events-none absolute inset-x-3 top-3 flex justify-center">
               <div className="rounded-xl bg-slate-950/85 px-5 py-3 text-center shadow-xl ring-1 ring-amber-400/60">
                 <p className="text-xs font-semibold text-amber-300">{t('prizeDraw.stage.finished')}</p>
-                <ol className="mt-1 space-y-0.5">
-                  {winners.slice(0, BANNER_WINNERS).map((ballIndex, place) => (
+                {/* Every place drawn for, in two columns when there are many. */}
+                <ol className={`mt-1 ${winners.length > BANNER_ONE_COLUMN ? 'grid grid-cols-2 gap-x-4 gap-y-0.5 text-left' : 'space-y-0.5'}`}>
+                  {winners.map((ballIndex, place) => (
                     <li key={ballIndex} className="break-all text-sm font-bold text-white">
                       <span className="mr-1.5 text-amber-300">{t('prizeDraw.place', { place: place + 1 })}</span>
                       {entrants[ballIndex]?.name}
                     </li>
                   ))}
                 </ol>
-                {winners.length > BANNER_WINNERS && (
-                  <p className="mt-0.5 text-xs text-slate-300">
-                    {t('prizeDraw.stage.moreWinners', { count: winners.length - BANNER_WINNERS })}
-                  </p>
-                )}
               </div>
             </div>
           )}

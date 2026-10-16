@@ -1,5 +1,6 @@
 import { t } from '@/lib/i18n'
-import type { CaptainDraftEntry, CaptainDraftSummary, PlayerRosterItem, TeamSide } from '@/types/api'
+import { toTierOrder } from '@/lib/player-tier'
+import type { CaptainDraftEntry, CaptainDraftResponse, CaptainDraftSummary, PlayerRosterItem, TeamSide } from '@/types/api'
 
 export type DraftWinnerSelection = '' | TeamSide
 
@@ -266,6 +267,53 @@ export function draftPlayerTags(player: PlayerRosterItem | undefined, fallbackRa
     tier: tier === null ? null : tier === 'UNASSIGNED' ? t('captainDraft.teams.unassignedTier') : tier,
     races: player?.race ?? fallbackRace ?? null,
   }
+}
+
+/**
+ * Whether the attendance or the captains on the screen are something other than the draft shown
+ * (any at all, when none is shown): typed for the next draft and not saved anywhere yet, so
+ * loading a draft over them loses them.
+ */
+export function setupDiffersFromDraft(
+  shown: Pick<CaptainDraftResponse, 'participants' | 'homeCaptainPlayerId' | 'awayCaptainPlayerId'> | null,
+  selectedIds: readonly number[],
+  homeCaptainId: number | null,
+  awayCaptainId: number | null,
+): boolean {
+  if (!shown) {
+    return selectedIds.length > 0 || homeCaptainId !== null || awayCaptainId !== null
+  }
+  const drafted = new Set(
+    shown.participants.map((participant) => participant.playerId).filter((id): id is number => typeof id === 'number'),
+  )
+  const selected = new Set(selectedIds)
+  return (
+    drafted.size !== selected.size ||
+    [...selected].some((id) => !drafted.has(id)) ||
+    homeCaptainId !== shown.homeCaptainPlayerId ||
+    awayCaptainId !== shown.awayCaptainPlayerId
+  )
+}
+
+/**
+ * Draft players in the order a captain picks by: captains first, then the highest tier (live tier
+ * as on the tier board) down to unassigned, then those no longer on the roster; by nickname within
+ * a tier.
+ */
+export function sortByTier<T extends { playerId: number | null; nickname: string; captain: boolean }>(
+  participants: readonly T[],
+  playerMap: ReadonlyMap<number, PlayerRosterItem>,
+): T[] {
+  const rank = (participant: T): number => {
+    const player = typeof participant.playerId === 'number' ? playerMap.get(participant.playerId) : undefined
+    return player ? toTierOrder(player.liveTier ?? player.tier ?? 'UNASSIGNED') : Number.MAX_SAFE_INTEGER
+  }
+  return [...participants].sort(
+    (left, right) =>
+      Number(right.captain) - Number(left.captain) ||
+      rank(left) - rank(right) ||
+      left.nickname.localeCompare(right.nickname, 'ko'),
+  )
 }
 
 /** A player in a select: the nickname with their tier and races, so a set can be filled by race. */

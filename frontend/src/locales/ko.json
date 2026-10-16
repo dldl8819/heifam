@@ -806,7 +806,7 @@
   },
   "prizeDraw": {
     "title": "상품 추첨",
-    "description": "핀볼이나 대포로 상품을 추첨하고 결과를 모아 둡니다. 추첨은 운영진 화면에서 진행하고, 여기에는 결과만 남습니다. 아래 대포 뽑기는 누구나 번호나 항목을 뽑을 때 쓸 수 있습니다.",
+    "description": "핀볼이나 대포로 상품을 추첨하고 결과를 모아 둡니다. 추첨은 운영진 화면에서 진행하고, 여기에는 결과만 남습니다.",
     "loadError": "불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
     "saveError": "저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
     "historyTitle": "추첨 기록",
@@ -835,6 +835,7 @@
     "draftLoading": "불러오는 중…",
     "draftPlayersLoaded": "정기 감전 '{title}' 참가자 {count}명으로 선택을 바꿨습니다.",
     "draftPlayersMissing": " 지금 명단에 없는 {count}명은 빠졌습니다.",
+    "draftPlayersToCannon": " 아래 대포 뽑기 항목에도 같은 닉네임을 넣었습니다.",
     "draftNone": "아직 정기 감전 기록이 없습니다.",
     "draftLoadError": "정기 감전 참가자를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
     "manualLabel": "직접 추가",
@@ -873,14 +874,13 @@
       "placeArrived": "{place}등!",
       "leadersFirst": "실시간 선두",
       "leadersLast": "실시간 꼴찌 · 당첨 후보",
-      "finished": "추첨 완료!",
-      "moreWinners": "외 {count}명"
+      "finished": "추첨 완료!"
     },
     "methodLabel": "추첨 방식",
     "methodPinball": "핀볼",
     "methodCannon": "대포",
     "modeCannon": "대포",
-    "cannonHint": "대포를 쏠 때마다 한 명씩 뽑힙니다. 마지막 등수부터 뽑아서 1등이 맨 마지막에 나옵니다.",
+    "cannonHint": "대포를 쏠 때마다 한 명씩 뽑힙니다. 마지막 등수부터 뽑아서 1등이 맨 마지막에 나옵니다. 번호나 항목만 뽑을 때는 아래 대포 뽑기를 쓰세요(저장되지 않습니다).",
     "cannon": {
       "fire": "{place}등 뽑기",
       "rule": "대포로 {count}명 추첨",
@@ -1654,9 +1654,11 @@
     },
     "actions": {
       "reset": "초기화",
+      "resetConfirm": "저장하지 않은 엔트리 변경 {count}건이 사라집니다. 초기화할까요?",
       "create": "드래프트 시작",
       "creating": "생성 중...",
-      "refresh": "새로고침",
+      "loadLatest": "최근 감전 불러오기",
+      "loadLatestConfirm": "지금 화면에 입력한 참석 인원·감독이나 저장하지 않은 엔트리 변경이 최근 감전 내용으로 바뀝니다. 불러올까요?",
       "saveEntries": "엔트리 저장",
       "savingEntries": "저장 중..."
     },

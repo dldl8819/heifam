@@ -14,8 +14,9 @@ const TEMP_GROUP_ID = 1
 
 /**
  * Prize draws: every member reads the records of draws that were run; admins also run them, with
- * the pinball or the cannon, on their own screen, and only the outcome is kept here. Anyone can use
- * the quick cannon below to draw a number or an item, which keeps nothing.
+ * the pinball or the cannon, on their own screen, and only the outcome is kept here. The quick
+ * cannon, drawing a number or an item and keeping nothing, is shown to members as it is and to
+ * admins when they pick the cannon.
  */
 export default function DrawsPage() {
   const [list, setList] = useState<PrizeDrawList | null>(null)
@@ -85,7 +86,8 @@ export default function DrawsPage() {
         <>
           {list.canRun && <PrizeDrawPanel groupId={TEMP_GROUP_ID} onSaved={setList} />}
 
-          <QuickCannon />
+          {/* Admins get it from the setup, when they pick the cannon; for members it is the only tool here. */}
+          {!list.canRun && <QuickCannon />}
 
           <div className="space-y-2">
             <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('prizeDraw.historyTitle')}</h2>
