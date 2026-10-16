@@ -2,6 +2,7 @@ package com.balancify.backend.api.group;
 
 import com.balancify.backend.api.group.dto.CaptainDraftCreateRequest;
 import com.balancify.backend.api.group.dto.CaptainDraftEntriesUpdateRequest;
+import com.balancify.backend.api.group.dto.CaptainDraftListResponse;
 import com.balancify.backend.api.group.dto.CaptainDraftPickRequest;
 import com.balancify.backend.api.group.dto.CaptainDraftResponse;
 import com.balancify.backend.api.group.dto.CaptainDraftUnpickRequest;
@@ -47,6 +48,11 @@ public class CaptainDraftController {
                 noSuchElementException
             );
         }
+    }
+
+    @GetMapping("/{groupId}/captain-drafts")
+    public CaptainDraftListResponse listDrafts(@PathVariable Long groupId) {
+        return captainDraftService.listDrafts(groupId);
     }
 
     @GetMapping("/{groupId}/captain-drafts/latest")

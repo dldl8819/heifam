@@ -5,10 +5,12 @@ import com.balancify.backend.api.group.dto.CaptainDraftEntriesUpdateRequest;
 import com.balancify.backend.api.group.dto.CaptainDraftEntryPlayerResponse;
 import com.balancify.backend.api.group.dto.CaptainDraftEntryResponse;
 import com.balancify.backend.api.group.dto.CaptainDraftEntryUpdateItemRequest;
+import com.balancify.backend.api.group.dto.CaptainDraftListResponse;
 import com.balancify.backend.api.group.dto.CaptainDraftParticipantResponse;
 import com.balancify.backend.api.group.dto.CaptainDraftPickLogResponse;
 import com.balancify.backend.api.group.dto.CaptainDraftPickRequest;
 import com.balancify.backend.api.group.dto.CaptainDraftResponse;
+import com.balancify.backend.api.group.dto.CaptainDraftSummaryResponse;
 import com.balancify.backend.api.group.dto.CaptainDraftUnpickRequest;
 import com.balancify.backend.domain.CaptainDraft;
 import com.balancify.backend.domain.CaptainDraftEntry;
@@ -30,7 +32,9 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,6 +55,8 @@ public class CaptainDraftService {
     private static final int MAX_ROUND_COUNT = 7;
     private static final int MAX_SETS_PER_ROUND = 10;
     private static final int MAX_REQUIRED_TIER_LENGTH = 30;
+    // Drafts listed as records; older ones stay in the database.
+    private static final int RECORD_LIMIT = 30;
 
     private final GroupRepository groupRepository;
     private final PlayerRepository playerRepository;
@@ -176,6 +182,33 @@ public class CaptainDraftService {
             captainDraftParticipantRepository.findByDraftIdWithPlayer(draft.getId());
         List<CaptainDraftEntry> entries = captainDraftEntryRepository.findByDraftIdWithPlayers(draft.getId());
         return toResponse(draft, participants, entries);
+    }
+
+    /**
+     * The latest drafts with how each went, newest first. A draft's results are kept with it only;
+     * they are never matches and never move anyone's MMR.
+     */
+    @Transactional(readOnly = true)
+    public CaptainDraftListResponse listDrafts(Long groupId) {
+        List<CaptainDraft> drafts = captainDraftRepository.findRecentWithCaptains(groupId, PageRequest.of(0, RECORD_LIMIT));
+        if (drafts.isEmpty()) {
+            return new CaptainDraftListResponse(List.of());
+        }
+        List<Long> draftIds = drafts.stream().map(CaptainDraft::getId).toList();
+        Map<Long, List<CaptainDraftEntry>> entriesByDraft = captainDraftEntryRepository.findByDraftIds(draftIds)
+            .stream()
+            .collect(Collectors.groupingBy(entry -> entry.getDraft().getId()));
+        Map<Long, Long> participantCounts = new HashMap<>();
+        captainDraftParticipantRepository.countByDraftIds(draftIds)
+            .forEach(row -> participantCounts.put(row.getDraftId(), row.getParticipants()));
+        return new CaptainDraftListResponse(drafts
+            .stream()
+            .map(draft -> summarize(
+                draft,
+                entriesByDraft.getOrDefault(draft.getId(), List.of()),
+                participantCounts.getOrDefault(draft.getId(), 0L)
+            ))
+            .toList());
     }
 
     @Transactional(readOnly = true)
@@ -493,6 +526,55 @@ public class CaptainDraftService {
         return player != null && playerId.equals(player.getId());
     }
 
+    // A round goes to the team that won more of its sets once every set has a result.
+    private CaptainDraftSummaryResponse summarize(CaptainDraft draft, List<CaptainDraftEntry> entries, long participants) {
+        Map<Integer, List<CaptainDraftEntry>> rounds = entries
+            .stream()
+            .collect(Collectors.groupingBy(CaptainDraftEntry::getRoundNumber, TreeMap::new, Collectors.toList()));
+        int homeRoundWins = 0;
+        int awayRoundWins = 0;
+        int homeSetWins = 0;
+        int awaySetWins = 0;
+        for (List<CaptainDraftEntry> sets : rounds.values()) {
+            int home = 0;
+            int away = 0;
+            for (CaptainDraftEntry set : sets) {
+                String winner = normalizeWinnerTeam(set.getWinnerTeam());
+                if (TEAM_HOME.equals(winner)) {
+                    home++;
+                } else if (TEAM_AWAY.equals(winner)) {
+                    away++;
+                }
+            }
+            homeSetWins += home;
+            awaySetWins += away;
+            if (home + away == sets.size() && home != away) {
+                if (home > away) {
+                    homeRoundWins++;
+                } else {
+                    awayRoundWins++;
+                }
+            }
+        }
+        return new CaptainDraftSummaryResponse(
+            draft.getId(),
+            draft.getTitle(),
+            draft.getCreatedAt(),
+            safeTrim(draft.getStatus()),
+            responseNickname(draft.getHomeCaptain()),
+            responseNickname(draft.getAwayCaptain()),
+            (int) participants,
+            rounds.size(),
+            safeInt(draft.getSetsPerRound()),
+            homeRoundWins,
+            awayRoundWins,
+            homeSetWins,
+            awaySetWins,
+            homeSetWins + awaySetWins,
+            entries.size()
+        );
+    }
+
     private CaptainDraft loadDraft(Long groupId, Long draftId) {
         return captainDraftRepository.findByIdAndGroup_Id(draftId, groupId)
             .orElseThrow(() -> new NoSuchElementException("Draft not found: " + draftId));
@@ -651,6 +733,7 @@ public class CaptainDraftService {
             draft.getId(),
             draft.getGroup().getId(),
             draft.getTitle(),
+            draft.getCreatedAt(),
             safeTrim(draft.getStatus()),
             safeInt(draft.getSetsPerRound()),
             participants.size(),

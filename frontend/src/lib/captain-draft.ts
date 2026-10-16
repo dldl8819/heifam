@@ -1,5 +1,5 @@
 import { t } from '@/lib/i18n'
-import type { CaptainDraftEntry, PlayerRosterItem, TeamSide } from '@/types/api'
+import type { CaptainDraftEntry, CaptainDraftSummary, PlayerRosterItem, TeamSide } from '@/types/api'
 
 export type DraftWinnerSelection = '' | TeamSide
 
@@ -271,4 +271,24 @@ export function draftPlayerTags(player: PlayerRosterItem | undefined, fallbackRa
 /** A player in a select: the nickname with their tier and races, so a set can be filled by race. */
 export function draftPlayerOptionLabel(nickname: string, tags: DraftPlayerTags): string {
   return [nickname, tags.tier, tags.races].filter((part): part is string => Boolean(part)).join(' · ')
+}
+
+export type DraftRecordState = 'drafting' | 'playing' | 'finished'
+
+/** Where a recorded draft stands: still picking teams, playing (some sets left), or every set decided. */
+export function draftRecordState(summary: CaptainDraftSummary): DraftRecordState {
+  if (summary.status !== 'READY') {
+    return 'drafting'
+  }
+  return summary.totalSets > 0 && summary.decidedSets === summary.totalSets ? 'finished' : 'playing'
+}
+
+const KST_MONTH_DAY = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric' })
+
+/** The title a new draft starts with, by the Korean date: "10월 18일 정기 감전". */
+export function defaultDraftTitle(now: Date = new Date()): string {
+  const parts = KST_MONTH_DAY.formatToParts(now)
+  const month = parts.find((part) => part.type === 'month')?.value ?? ''
+  const day = parts.find((part) => part.type === 'day')?.value ?? ''
+  return t('captainDraft.records.defaultTitle', { month, day })
 }

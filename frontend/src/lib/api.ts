@@ -9,6 +9,7 @@ import type {
   CreateGroupMatchResponse,
   CaptainDraftCreateRequest,
   CaptainDraftEntriesUpdateRequest,
+  CaptainDraftListResponse,
   CaptainDraftPickRequest,
   CaptainDraftResponse,
   CaptainDraftUnpickRequest,
@@ -1216,6 +1217,10 @@ export const apiClient = {
       method: 'POST',
       body: JSON.stringify(payload),
     }, { includeUserEmail: true }),
+  listCaptainDrafts: (groupId: number) =>
+    apiRequest<CaptainDraftListResponse>(`/api/groups/${groupId}/captain-drafts`, undefined, {
+      includeUserEmail: true,
+    }),
   getLatestCaptainDraft: (groupId: number) =>
     apiRequest<CaptainDraftResponse>(`/api/groups/${groupId}/captain-drafts/latest`, undefined, {
       includeUserEmail: true,

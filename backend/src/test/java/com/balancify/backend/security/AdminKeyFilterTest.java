@@ -4218,6 +4218,12 @@ class AdminKeyFilterTest {
     void keepsCaptainDraftsToAdmins() throws Exception {
         mockMvc
             .perform(
+                get("/api/groups/1/captain-drafts")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+            )
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(
                 post("/api/groups/1/captain-drafts")
                     .header("X-USER-EMAIL", "member@hei.gg")
                     .contentType(MediaType.APPLICATION_JSON)

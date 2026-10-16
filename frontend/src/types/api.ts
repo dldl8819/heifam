@@ -471,6 +471,29 @@ export type CaptainDraftEntriesUpdateRequest = {
   entries: CaptainDraftEntryUpdateItem[]
 }
 
+// A past or running draft in the list of records. Its results stay with the draft and never move MMR.
+export type CaptainDraftSummary = {
+  draftId: number
+  title: string
+  createdAt: string
+  status: 'DRAFTING' | 'READY' | string
+  homeCaptainNickname: string
+  awayCaptainNickname: string
+  participantCount: number
+  roundCount: number
+  setsPerRound: number
+  homeRoundWins: number
+  awayRoundWins: number
+  homeSetWins: number
+  awaySetWins: number
+  decidedSets: number
+  totalSets: number
+}
+
+export type CaptainDraftListResponse = {
+  drafts: CaptainDraftSummary[]
+}
+
 export type CaptainDraftUnpickRequest = {
   playerId: number
 }
@@ -516,6 +539,7 @@ export type CaptainDraftResponse = {
   draftId: number
   groupId: number
   title: string
+  createdAt: string
   status: 'DRAFTING' | 'READY' | string
   setsPerRound: number
   participantCount: number

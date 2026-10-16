@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { apiClient, isApiNotFoundError } from '@/lib/api'
 import { useAdminAuth } from '@/lib/admin-auth'
 import { TierParticipantBoard } from '@/components/tier-participant-board'
 import { CaptainDraftEntrySheet } from '@/components/captain-draft-entry-sheet'
+import { CaptainDraftRecords } from '@/components/captain-draft-records'
 import { CaptainDraftRoundSettings } from '@/components/captain-draft-round-settings'
 import { CaptainDraftTeamBoard } from '@/components/captain-draft-team-board'
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
@@ -13,6 +14,7 @@ import { useMmrVisibility } from '@/lib/mmr-visibility'
 import {
   DEFAULT_ROUND_COUNT,
   countSetWins,
+  defaultDraftTitle,
   defaultSetSizes,
   draftLayout,
   dropEditsNaming,
@@ -33,9 +35,11 @@ import {
   type ParticipantSlotState,
   updateParticipantSlotInput,
 } from '@/lib/participant-slots'
+import { formatKstDateTime } from '@/lib/kst-time'
 import type {
   CaptainDraftParticipant,
   CaptainDraftResponse,
+  CaptainDraftSummary,
   PlayerRosterItem,
   TeamSide,
 } from '@/types/api'
@@ -93,7 +97,11 @@ export default function CaptainDraftPage() {
   const [setSizes, setSetSizes] = useState<number[]>([])
   const [roundCount, setRoundCount] = useState<number>(DEFAULT_ROUND_COUNT)
 
+  const [draftTitle, setDraftTitle] = useState<string>(() => defaultDraftTitle())
   const [draft, setDraft] = useState<CaptainDraftResponse | null>(null)
+  const [records, setRecords] = useState<CaptainDraftSummary[] | null>(null)
+  const [recordsLoading, setRecordsLoading] = useState<boolean>(true)
+  const [recordsError, setRecordsError] = useState<string | null>(null)
   const [draftLoading, setDraftLoading] = useState<boolean>(true)
 
   const [entryEdits, setEntryEdits] = useState<EntryEdits>({})
@@ -240,6 +248,22 @@ export default function CaptainDraftPage() {
     }
   }, [])
 
+  const loadRecords = useCallback(async () => {
+    setRecordsLoading(true)
+    setRecordsError(null)
+    try {
+      setRecords((await apiClient.listCaptainDrafts(TEMP_GROUP_ID)).drafts)
+    } catch {
+      setRecordsError(t('captainDraft.records.loadError'))
+    } finally {
+      setRecordsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadRecords()
+  }, [loadRecords])
+
   useEffect(() => {
     if (players.length === 0) {
       return
@@ -370,7 +394,7 @@ export default function CaptainDraftPage() {
     setIsCreatingDraft(true)
     try {
       const created = await apiClient.createCaptainDraft(TEMP_GROUP_ID, {
-        title: '토요 정기 감전',
+        title: draftTitle.trim() || defaultDraftTitle(),
         participantPlayerIds: selectedParticipantIds,
         captainPlayerIds: [homeCaptainId, awayCaptainId],
         roundCount,
@@ -379,6 +403,7 @@ export default function CaptainDraftPage() {
       setDraft(created)
       setEntryEdits({})
       setMessage(t('captainDraft.messages.createSuccess'))
+      void loadRecords()
     } catch (createError) {
       setError(errorWithReason('captainDraft.validation.createFailed', createError))
     } finally {
@@ -399,20 +424,35 @@ export default function CaptainDraftPage() {
     setMessage(null)
   }
 
+  const showDraft = (shown: CaptainDraftResponse) => {
+    setDraft(shown)
+    setParticipantSlots(createParticipantSlotsFromDraft(shown))
+    setHomeCaptainId(shown.homeCaptainPlayerId)
+    setAwayCaptainId(shown.awayCaptainPlayerId)
+    const layout = draftLayout(shown.entries)
+    setSetSizes(layout.setSizes)
+    setRoundCount(layout.roundCount || DEFAULT_ROUND_COUNT)
+    setEntryEdits({})
+  }
+
+  const handleOpenRecord = async (draftId: number) => {
+    setError(null)
+    setMessage(null)
+    try {
+      showDraft(await apiClient.getCaptainDraft(TEMP_GROUP_ID, draftId))
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } catch {
+      setError(t('captainDraft.validation.loadFailed'))
+    }
+  }
+
   const handleRefreshDraft = async () => {
     setError(null)
     setMessage(null)
     setDraftLoading(true)
     try {
-      const refreshed = await apiClient.getLatestCaptainDraft(TEMP_GROUP_ID)
-      setDraft(refreshed)
-      setParticipantSlots(createParticipantSlotsFromDraft(refreshed))
-      setHomeCaptainId(refreshed.homeCaptainPlayerId)
-      setAwayCaptainId(refreshed.awayCaptainPlayerId)
-      const layout = draftLayout(refreshed.entries)
-      setSetSizes(layout.setSizes)
-      setRoundCount(layout.roundCount || DEFAULT_ROUND_COUNT)
-      setEntryEdits({})
+      showDraft(await apiClient.getLatestCaptainDraft(TEMP_GROUP_ID))
+      void loadRecords()
     } catch (refreshError) {
       if (isApiNotFoundError(refreshError)) {
         setDraft(null)
@@ -496,6 +536,7 @@ export default function CaptainDraftPage() {
       setDraft(next)
       setEntryEdits({})
       setMessage(t('captainDraft.messages.entriesSaved'))
+      void loadRecords()
     } catch (saveError) {
       setError(errorWithReason('captainDraft.validation.saveEntryFailed', saveError))
     } finally {
@@ -561,6 +602,16 @@ export default function CaptainDraftPage() {
             <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('captainDraft.captain.title')}</h3>
 
             <div className="mt-3 space-y-2">
+              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">
+                {t('captainDraft.records.titleLabel')}
+                <input
+                  value={draftTitle}
+                  onChange={(event) => setDraftTitle(event.target.value)}
+                  maxLength={120}
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                />
+              </label>
+
               <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">
                 {t('captainDraft.captain.home')}
                 <select
@@ -629,10 +680,16 @@ export default function CaptainDraftPage() {
             </div>
 
             {draft && (
-              <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                {t('captainDraft.status.label')}:{' '}
-                {draft.status === 'READY' ? t('captainDraft.status.ready') : t('captainDraft.status.drafting')}
-              </p>
+              <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                <p className="font-semibold">
+                  {draft.title}
+                  <span className="ml-2 font-normal text-slate-500 dark:text-slate-400">{formatKstDateTime(draft.createdAt)}</span>
+                </p>
+                <p className="mt-1">
+                  {t('captainDraft.status.label')}:{' '}
+                  {draft.status === 'READY' ? t('captainDraft.status.ready') : t('captainDraft.status.drafting')}
+                </p>
+              </div>
             )}
           </article>
 
@@ -691,6 +748,14 @@ export default function CaptainDraftPage() {
           {t('captainDraft.emptyDraft')}
         </article>
       )}
+
+      <CaptainDraftRecords
+        records={records}
+        loading={recordsLoading}
+        error={recordsError}
+        currentDraftId={draft?.draftId ?? null}
+        onOpen={(draftId) => void handleOpenRecord(draftId)}
+      />
     </section>
   )
 }
