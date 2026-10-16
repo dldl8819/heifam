@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { apiClient, isApiNotFoundError } from '@/lib/api'
+import { CannonPrizeStage } from '@/components/cannon-prize-stage'
 import { PinballStage } from '@/components/pinball-stage'
 import { winnersOf, type DrawMode } from '@/lib/pinball/engine'
 import {
@@ -24,6 +25,8 @@ type PrizeDrawPanelProps = {
 }
 
 type Step = 'compose' | 'stage'
+// How the winners are drawn: by the order the pinball balls arrive in, or one a cannon shot.
+type Method = 'PINBALL' | 'CANNON'
 
 const fieldClass = 'w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900'
 const primaryButtonClass =
@@ -35,8 +38,9 @@ const errorClass =
 
 /**
  * Where an admin sets a prize draw up and runs it: who takes part (ticked on the roster, or typed
- * in), how many win and what, and whether the first or the last balls win. The draw runs on this
- * screen only; when it is over the admin saves its outcome to the records, or runs it again.
+ * in), how many win and what, and whether the pinball (the first or the last balls win) or the
+ * cannon (one winner a shot) draws them. The draw runs on this screen only; when it is over the
+ * admin saves its outcome to the records, or runs it again.
  */
 export function PrizeDrawPanel({ groupId, onSaved }: PrizeDrawPanelProps) {
   const [step, setStep] = useState<Step>('compose')
@@ -45,6 +49,7 @@ export function PrizeDrawPanel({ groupId, onSaved }: PrizeDrawPanelProps) {
 
   const [title, setTitle] = useState<string>('')
   const [winnerCount, setWinnerCount] = useState<number>(1)
+  const [method, setMethod] = useState<Method>('PINBALL')
   const [mode, setMode] = useState<DrawMode>('FIRST')
   const [prizes, setPrizes] = useState<string[]>([''])
   const [selected, setSelected] = useState<Set<number>>(new Set())
@@ -155,7 +160,7 @@ export function PrizeDrawPanel({ groupId, onSaved }: PrizeDrawPanelProps) {
     setRun((previous) => previous + 1)
   }
 
-  const winners = finishedOrder ? winnersOf(finishedOrder, winnerCount, mode) : []
+  const winners = !finishedOrder ? [] : method === 'CANNON' ? finishedOrder : winnersOf(finishedOrder, winnerCount, mode)
 
   const save = async () => {
     if (!finishedOrder) {
@@ -166,7 +171,7 @@ export function PrizeDrawPanel({ groupId, onSaved }: PrizeDrawPanelProps) {
     try {
       const list = await apiClient.savePrizeDraw(groupId, {
         title: title.trim(),
-        mode,
+        mode: method === 'CANNON' ? 'CANNON' : mode,
         entrantCount: stageEntrants.length,
         winners: winners.map((ballIndex, index) => ({
           place: index + 1,
@@ -200,7 +205,11 @@ export function PrizeDrawPanel({ groupId, onSaved }: PrizeDrawPanelProps) {
           </button>
         </div>
 
-        <PinballStage key={run} entrants={stageEntrants} winnerCount={winnerCount} mode={mode} onFinished={handleFinished} />
+        {method === 'CANNON' ? (
+          <CannonPrizeStage key={run} entrants={stageEntrants} winnerCount={winnerCount} onFinished={handleFinished} />
+        ) : (
+          <PinballStage key={run} entrants={stageEntrants} winnerCount={winnerCount} mode={mode} onFinished={handleFinished} />
+        )}
 
         {finishedOrder && (
           <div className="space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950/30">
@@ -268,16 +277,28 @@ export function PrizeDrawPanel({ groupId, onSaved }: PrizeDrawPanelProps) {
             className="w-16 rounded-md border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-900"
           />
         </label>
-        <div className="flex items-center gap-3" role="radiogroup" aria-label={t('prizeDraw.modeLabel')}>
-          <span>{t('prizeDraw.modeLabel')}</span>
-          {(['FIRST', 'LAST'] as const).map((option) => (
+        <div className="flex items-center gap-3" role="radiogroup" aria-label={t('prizeDraw.methodLabel')}>
+          <span>{t('prizeDraw.methodLabel')}</span>
+          {(['PINBALL', 'CANNON'] as const).map((option) => (
             <label key={option} className="flex items-center gap-1.5">
-              <input type="radio" name="prize-draw-mode" checked={mode === option} onChange={() => setMode(option)} />
-              {t(option === 'FIRST' ? 'prizeDraw.modeFirst' : 'prizeDraw.modeLast')}
+              <input type="radio" name="prize-draw-method" checked={method === option} onChange={() => setMethod(option)} />
+              {t(option === 'CANNON' ? 'prizeDraw.methodCannon' : 'prizeDraw.methodPinball')}
             </label>
           ))}
         </div>
+        {method === 'PINBALL' && (
+          <div className="flex items-center gap-3" role="radiogroup" aria-label={t('prizeDraw.modeLabel')}>
+            <span>{t('prizeDraw.modeLabel')}</span>
+            {(['FIRST', 'LAST'] as const).map((option) => (
+              <label key={option} className="flex items-center gap-1.5">
+                <input type="radio" name="prize-draw-mode" checked={mode === option} onChange={() => setMode(option)} />
+                {t(option === 'FIRST' ? 'prizeDraw.modeFirst' : 'prizeDraw.modeLast')}
+              </label>
+            ))}
+          </div>
+        )}
       </div>
+      {method === 'CANNON' && <p className="text-xs text-slate-500 dark:text-slate-400">{t('prizeDraw.cannonHint')}</p>}
 
       <div className="space-y-2">
         <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">{t('prizeDraw.prizesLabel')}</p>

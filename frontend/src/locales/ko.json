@@ -806,7 +806,7 @@
   },
   "prizeDraw": {
     "title": "상품 추첨",
-    "description": "핀볼로 진행한 상품 추첨의 결과를 모아 둔 곳입니다. 추첨은 운영진 화면에서 진행되고, 여기에는 결과만 남습니다.",
+    "description": "핀볼이나 대포로 상품을 추첨하고 결과를 모아 둡니다. 추첨은 운영진 화면에서 진행하고, 여기에는 결과만 남습니다. 아래 대포 뽑기는 누구나 번호나 항목을 뽑을 때 쓸 수 있습니다.",
     "loadError": "불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
     "saveError": "저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
     "historyTitle": "추첨 기록",
@@ -864,11 +864,24 @@
       "progress": "도착 {arrived}/{total} · 남은 공 {remaining}개",
       "arrivals": "도착 순서",
       "noArrivals": "아직 도착한 공이 없습니다."
+    },
+    "methodLabel": "추첨 방식",
+    "methodPinball": "핀볼",
+    "methodCannon": "대포",
+    "modeCannon": "대포",
+    "cannonHint": "대포를 쏠 때마다 한 명씩 뽑힙니다. 마지막 등수부터 뽑아서 1등이 맨 마지막에 나옵니다.",
+    "cannon": {
+      "fire": "{place}등 뽑기",
+      "rule": "대포로 {count}명 추첨",
+      "progress": "{done}/{count}명 뽑음 · 남은 참가자 {remaining}명",
+      "range": "남은 참가자 {count}명 중 한 명",
+      "pending": "?",
+      "landed": "{place}등 {name}"
     }
   },
   "cannonDraw": {
-    "title": "대포 뽑기",
-    "description": "대포를 쏘면 1번부터 마지막 번호까지 중 하나가 무작위로 나옵니다. 항목을 고르면 직접 적어 둔 것 중 하나가 나와서, 에결 종족전 같은 것도 고를 수 있습니다. 결과는 어디에도 저장되지 않습니다.",
+    "title": "대포 뽑기 (번호·항목)",
+    "description": "누구나 쓸 수 있는 간단 뽑기입니다. 1번부터 마지막 번호까지 중 하나, 또는 직접 적은 항목 중 하나(에결 종족전 등)가 나옵니다. 결과는 저장되지 않습니다.",
     "modeLabel": "뽑을 것",
     "modeNumber": "번호",
     "modeItems": "항목",

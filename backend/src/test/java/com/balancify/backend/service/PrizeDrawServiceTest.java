@@ -98,6 +98,13 @@ class PrizeDrawServiceTest {
     }
 
     @Test
+    void savesADrawRunWithTheCannon() {
+        prizeDrawService.save(1L, ADMIN, "OpsUser", draw("Cannon draw", " cannon ", 12, winner(1, "a", null, null), winner(2, "b", null, null)));
+
+        verify(prizeDrawRepository).insertDraw(1L, "Cannon draw", "CANNON", 12, ADMIN);
+    }
+
+    @Test
     void letsOnlyAdminsSaveADraw() {
         assertThatThrownBy(() -> prizeDrawService.save(1L, MEMBER, "YOUR_USERNAME", draw("t", "FIRST", 5, winner(1, "a", null, null))))
             .isInstanceOf(BoardForbiddenException.class);

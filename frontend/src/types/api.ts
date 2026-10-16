@@ -844,7 +844,8 @@ export type BoardSearchResult = {
   pageSize: number
 }
 
-export type PrizeDrawMode = 'FIRST' | 'LAST'
+// FIRST/LAST: by the order the pinball balls arrived in. CANNON: one winner a cannon shot.
+export type PrizeDrawMode = 'FIRST' | 'LAST' | 'CANNON'
 
 export type PrizeDrawWinner = {
   place: number
@@ -856,7 +857,7 @@ export type PrizeDrawWinner = {
 export type PrizeDraw = {
   id: number
   title: string
-  // FIRST: the first balls to arrive won. LAST: the last ones did.
+  // FIRST: the first balls to arrive won. LAST: the last ones did. CANNON: drawn shot by shot.
   mode: PrizeDrawMode
   entrantCount: number
   createdAt: string

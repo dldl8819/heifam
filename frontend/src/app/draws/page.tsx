@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { apiClient } from '@/lib/api'
 import { PrizeDrawPanel } from '@/components/prize-draw-panel'
+import { QuickCannon } from '@/components/quick-cannon'
 import { Alert, AlertContent, AlertDescription, AlertIcon } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { formatKstFullDateTime } from '@/lib/kst-time'
@@ -12,8 +13,9 @@ import type { PrizeDraw, PrizeDrawList } from '@/types/api'
 const TEMP_GROUP_ID = 1
 
 /**
- * Prize draws: every member reads the records of draws that were run; admins also get the pinball
- * to run one on. A draw is watched on the admin's own screen and only its outcome is kept here.
+ * Prize draws: every member reads the records of draws that were run; admins also run them, with
+ * the pinball or the cannon, on their own screen, and only the outcome is kept here. Anyone can use
+ * the quick cannon below to draw a number or an item, which keeps nothing.
  */
 export default function DrawsPage() {
   const [list, setList] = useState<PrizeDrawList | null>(null)
@@ -83,6 +85,8 @@ export default function DrawsPage() {
         <>
           {list.canRun && <PrizeDrawPanel groupId={TEMP_GROUP_ID} onSaved={setList} />}
 
+          <QuickCannon />
+
           <div className="space-y-2">
             <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('prizeDraw.historyTitle')}</h2>
             {actionError && (
@@ -103,7 +107,7 @@ export default function DrawsPage() {
                           <p className="text-xs text-slate-500 dark:text-slate-400">
                             {formatKstFullDateTime(draw.createdAt) || draw.createdAt}
                             {` · ${t('prizeDraw.historyEntrants', { count: draw.entrantCount })}`}
-                            {` · ${t(draw.mode === 'LAST' ? 'prizeDraw.modeLast' : 'prizeDraw.modeFirst')}`}
+                            {` · ${t(draw.mode === 'CANNON' ? 'prizeDraw.modeCannon' : draw.mode === 'LAST' ? 'prizeDraw.modeLast' : 'prizeDraw.modeFirst')}`}
                             {draw.savedByNickname ? ` · ${t('prizeDraw.historySavedBy', { name: draw.savedByNickname })}` : ''}
                           </p>
                         </div>
