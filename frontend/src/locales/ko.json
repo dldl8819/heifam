@@ -1677,7 +1677,8 @@
       "remaining": "남은 참석자 {count}명",
       "allPicked": "모든 참석자가 팀에 들어갔습니다.",
       "assign": "{nickname} 선수를 {team}에 넣기",
-      "unpick": "{nickname} 선수를 팀에서 빼기"
+      "unpick": "{nickname} 선수를 팀에서 빼기",
+      "unpickAfterResults": "결과가 하나라도 입력된 정기 감전은 팀 배치를 되돌릴 수 없습니다."
     },
     "scoreboard": {
       "title": "팀 현황",
@@ -1714,7 +1715,10 @@
         "hot2": "핫티어 2",
         "hot3": "핫티어 3"
       },
-      "raceCodeLabel": "{round}라운드 {set}세트 종족"
+      "raceCodeLabel": "{round}라운드 {set}세트 종족",
+      "lockedBadge": "결과 입력됨",
+      "lockedHint": "결과가 입력된 세트는 운영진과 경기 결과 수정 권한자만 고칠 수 있습니다.",
+      "recordedBy": "입력 {nickname}"
     },
     "messages": {
       "createSuccess": "정기 감전 드래프트가 생성되었습니다.",
@@ -1730,7 +1734,8 @@
       "createFailed": "드래프트 생성에 실패했습니다.",
       "pickFailed": "팀원 선택에 실패했습니다.",
       "saveEntryFailed": "엔트리 저장에 실패했습니다.",
-      "unpickFailed": "선수를 팀에서 빼지 못했습니다."
+      "unpickFailed": "선수를 팀에서 빼지 못했습니다.",
+      "resultLocked": "이미 결과가 입력된 세트는 운영진과 경기 결과 수정 권한자만 고칠 수 있습니다. 최근 감전 불러오기로 최신 내용을 확인해 주세요."
     },
     "records": {
       "title": "정기 감전 기록",
@@ -1754,7 +1759,8 @@
         "drafting": "팀 구성 중",
         "playing": "진행 중 {decided}/{total}세트",
         "finished": "완료"
-      }
+      },
+      "startedBy": "{nickname} 시작"
     }
   },
   "results": {

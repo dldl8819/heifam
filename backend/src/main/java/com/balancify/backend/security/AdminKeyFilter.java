@@ -118,26 +118,29 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/match-confirmations/{matchId}"),
             AuthType.SERVICE_ACCESS
         ),
-        // Captain drafts are run from an admin-only screen, and these calls change draft data.
+        // Regular drafts (정기 감전) are open to members with access: reading, starting one, teams,
+        // taking a pick back, and the sets with a set's first result. Changing a result already in is
+        // held to admins and match result editors by CaptainDraftController and CaptainDraftService;
+        // removing a draft stays with admins.
         new ProtectedRoute(
             "POST",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/captain-drafts"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SERVICE_ACCESS
         ),
         new ProtectedRoute(
             "GET",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/captain-drafts"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SERVICE_ACCESS
         ),
         new ProtectedRoute(
             "GET",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/captain-drafts/latest"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SERVICE_ACCESS
         ),
         new ProtectedRoute(
             "GET",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/captain-drafts/{draftId}"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SERVICE_ACCESS
         ),
         new ProtectedRoute(
             "DELETE",
@@ -147,17 +150,17 @@ public class AdminKeyFilter extends OncePerRequestFilter {
         new ProtectedRoute(
             "PUT",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/captain-drafts/{draftId}/entries"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SERVICE_ACCESS
         ),
         new ProtectedRoute(
             "POST",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/captain-drafts/{draftId}/pick"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SERVICE_ACCESS
         ),
         new ProtectedRoute(
             "POST",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/captain-drafts/{draftId}/unpick"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SERVICE_ACCESS
         ),
         // Prize events: admins see them while points are tried out, super admins run them.
         new ProtectedRoute(

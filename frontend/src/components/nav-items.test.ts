@@ -64,8 +64,8 @@ describe('navigation items', () => {
     }
   })
 
-  it('puts the matches under one menu: balance, multi-balance and the draws (pinball and cannon) for members, tournaments and the draft for admins too', () => {
-    expect(menu(getVisibleNavItems(MEMBER), '/matches')).toEqual(['/balance', '/balance/multi', '/draws'])
+  it('puts the matches under one menu: balance, multi-balance, the regular draft and the draws for members, tournaments for admins too', () => {
+    expect(menu(getVisibleNavItems(MEMBER), '/matches')).toEqual(['/balance', '/balance/multi', '/captain-draft', '/draws'])
     for (const context of [ADMIN, SUPER_ADMIN]) {
       expect(menu(getVisibleNavItems(context), '/matches')).toEqual([
         '/balance',
@@ -119,7 +119,7 @@ describe('navigation items', () => {
       expect(new Set(hrefs).size).toBe(hrefs.length)
     }
     const memberHrefs = linkHrefs(getVisibleNavItems(MEMBER))
-    for (const adminOnly of ['/tournaments', '/captain-draft', '/points/events', '/admin/audit', '/admin/access/admins']) {
+    for (const adminOnly of ['/tournaments', '/points/events', '/admin/audit', '/admin/access/admins']) {
       expect(memberHrefs).not.toContain(adminOnly)
     }
     expect(linkHrefs(getVisibleNavItems(MEMBER))).not.toContain('/dashboard')

@@ -488,6 +488,8 @@ export type CaptainDraftSummary = {
   awaySetWins: number
   decidedSets: number
   totalSets: number
+  // Who started it, by nickname as it was then; none for drafts from before that was kept.
+  createdByNickname?: string | null
 }
 
 export type CaptainDraftListResponse = {
@@ -533,6 +535,9 @@ export type CaptainDraftEntry = {
   homePlayers: Array<CaptainDraftEntryPlayer | null>
   awayPlayers: Array<CaptainDraftEntryPlayer | null>
   winnerTeam: TeamSide | null
+  // With a result: who put it in (nickname as it was then) and when; none for older results.
+  resultRecordedByNickname?: string | null
+  resultRecordedAt?: string | null
 }
 
 export type CaptainDraftResponse = {
@@ -540,6 +545,7 @@ export type CaptainDraftResponse = {
   groupId: number
   title: string
   createdAt: string
+  createdByNickname?: string | null
   status: 'DRAFTING' | 'READY' | string
   setsPerRound: number
   participantCount: number

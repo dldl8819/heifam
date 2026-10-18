@@ -61,6 +61,16 @@ public class CaptainDraftEntry {
     @Column(length = 10)
     private String winnerTeam;
 
+    // Who put the result in, and when: the email stays on the server, the nickname is shown.
+    @Column(length = 320)
+    private String resultRecordedByEmail;
+
+    @Column(length = 100)
+    private String resultRecordedByNickname;
+
+    @Column
+    private OffsetDateTime resultRecordedAt;
+
     @Column(nullable = false)
     private OffsetDateTime updatedAt = OffsetDateTime.now();
 
@@ -185,6 +195,25 @@ public class CaptainDraftEntry {
 
     public void setWinnerTeam(String winnerTeam) {
         this.winnerTeam = winnerTeam;
+    }
+
+    public String getResultRecordedByEmail() {
+        return resultRecordedByEmail;
+    }
+
+    public String getResultRecordedByNickname() {
+        return resultRecordedByNickname;
+    }
+
+    public OffsetDateTime getResultRecordedAt() {
+        return resultRecordedAt;
+    }
+
+    /** Names who put the result in and when; all null when the result is taken out. */
+    public void setResultRecordedBy(String email, String nickname, OffsetDateTime recordedAt) {
+        this.resultRecordedByEmail = email;
+        this.resultRecordedByNickname = nickname;
+        this.resultRecordedAt = recordedAt;
     }
 
     public OffsetDateTime getUpdatedAt() {

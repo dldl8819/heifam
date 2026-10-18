@@ -38,6 +38,8 @@ type CaptainDraftEntrySheetProps = {
   sheet: EffectiveEntry[]
   teamMembers: Record<TeamSide, EntrySheetMember[]>
   playerMap: Map<number, PlayerRosterItem>
+  // Sets this viewer may only read: a result is saved and they may not edit results.
+  lockedKeys: ReadonlySet<string>
   onEditEntry: (key: string, change: EntryEdit) => void
   onChangeRoundCode: (roundNumber: number, code: string) => void
 }
@@ -55,13 +57,15 @@ function selectedPlayerId(value: string): number | null {
 
 /**
  * The round sheet of the regular draft: a row per set with each side's players on one line, the
- * round's race composition under its name, the tiers a set asks for, and the results.
+ * round's race composition under its name, the tiers a set asks for, and the results. A set whose
+ * result is saved is read-only to those who may not edit results.
  */
 export function CaptainDraftEntrySheet({
   rounds,
   sheet,
   teamMembers,
   playerMap,
+  lockedKeys,
   onEditEntry,
   onChangeRoundCode,
 }: CaptainDraftEntrySheetProps) {
@@ -120,9 +124,11 @@ export function CaptainDraftEntrySheet({
             const biggestSize = Math.max(...round.sets.map((set) => set.teamSize))
             const roundHomeWins = round.sets.filter((set) => set.winnerTeam === 'HOME').length
             const roundAwayWins = round.sets.filter((set) => set.winnerTeam === 'AWAY').length
+            const roundLocked = round.sets.every((set) => lockedKeys.has(set.key))
 
             return round.sets.map((set, setIndex) => {
               const dividerClass = roundIndex > 0 && setIndex === 0 ? 'border-t-[3px] border-t-slate-800' : ''
+              const locked = lockedKeys.has(set.key)
               return (
                 <tr key={`entry-${set.key}`} className={`bg-white dark:bg-slate-900 ${dividerClass}`.trim()}>
                   {setIndex === 0 && (
@@ -134,6 +140,7 @@ export function CaptainDraftEntrySheet({
                       <select
                         value={round.roundCode}
                         onChange={(event) => onChangeRoundCode(round.roundNumber, event.target.value)}
+                        disabled={roundLocked}
                         aria-label={t('captainDraft.entry.roundCodeLabel', { round: round.roundNumber })}
                         className="mt-1 w-full rounded-md border border-slate-300 bg-white px-1 py-1 text-sm font-semibold text-slate-800 outline-hidden focus:border-slate-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
                       >
@@ -150,11 +157,20 @@ export function CaptainDraftEntrySheet({
                     <span className="block text-xs text-slate-500 dark:text-slate-400">
                       {t('captainDraft.entry.teamSize', { size: set.teamSize })}
                     </span>
+                    {locked && (
+                      <span
+                        title={t('captainDraft.entry.lockedHint')}
+                        className="mt-1 inline-block rounded-sm bg-slate-200 px-1 text-[11px] font-semibold text-slate-600 dark:bg-slate-700 dark:text-slate-300"
+                      >
+                        {t('captainDraft.entry.lockedBadge')}
+                      </span>
+                    )}
                   </td>
                   <td className={`border border-slate-300 bg-slate-50 px-1 py-1 text-center dark:border-slate-700 dark:bg-slate-800 ${dividerClass}`.trim()}>
                     <select
                       value={set.raceCode}
                       onChange={(event) => onEditEntry(set.key, { raceCode: event.target.value })}
+                      disabled={locked}
                       aria-label={t('captainDraft.entry.raceCodeLabel', { round: round.roundNumber, set: set.setNumber })}
                       className="w-full rounded-md border border-transparent bg-transparent px-1 py-1.5 text-center text-sm font-medium text-slate-800 outline-hidden focus:border-slate-300 dark:text-slate-200 dark:focus:border-slate-600"
                     >
@@ -169,6 +185,7 @@ export function CaptainDraftEntrySheet({
                     <input
                       value={set.requiredTier}
                       onChange={(event) => onEditEntry(set.key, { requiredTier: event.target.value })}
+                      disabled={locked}
                       list={TIER_PRESET_LIST_ID}
                       maxLength={30}
                       placeholder={t('captainDraft.entry.requiredTierPlaceholder')}
@@ -184,6 +201,7 @@ export function CaptainDraftEntrySheet({
                             key={`${set.key}-${team}-${slot}`}
                             value={playerId ?? ''}
                             onChange={(event) => changeSlot(set, team, slot, event.target.value)}
+                            disabled={locked}
                             aria-label={t('captainDraft.entry.slotLabel', {
                               team: t(TEAM_LABELS[team]),
                               set: `${round.roundNumber}-${set.setNumber}`,
@@ -206,6 +224,8 @@ export function CaptainDraftEntrySheet({
                     <select
                       value={set.winnerTeam}
                       onChange={(event) => onEditEntry(set.key, { winnerTeam: event.target.value as DraftWinnerSelection })}
+                      disabled={locked}
+                      title={locked ? t('captainDraft.entry.lockedHint') : undefined}
                       aria-label={`${t('captainDraft.entry.resultLabel')} ${t('captainDraft.entry.roundOnly', { round: round.roundNumber })} ${t('captainDraft.entry.setCell', { set: set.setNumber })}`}
                       className="w-full border-0 bg-transparent px-1 py-2 text-sm font-medium text-slate-700 outline-hidden focus:bg-slate-50 dark:text-slate-200 dark:focus:bg-slate-800"
                     >
@@ -216,6 +236,11 @@ export function CaptainDraftEntrySheet({
                         </option>
                       ))}
                     </select>
+                    {set.resultRecordedBy && (
+                      <span className="block truncate px-1 text-[11px] text-slate-500 dark:text-slate-400" title={set.resultRecordedBy}>
+                        {t('captainDraft.entry.recordedBy', { nickname: set.resultRecordedBy })}
+                      </span>
+                    )}
                   </td>
                   {setIndex === 0 && (
                     <td

@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
@@ -148,6 +149,7 @@ import com.balancify.backend.service.RatingRecalculationService;
 import com.balancify.backend.service.TeamBalancingService;
 import com.balancify.backend.service.exception.MatchEditQuotaExceededException;
 import com.balancify.backend.service.exception.BoardForbiddenException;
+import com.balancify.backend.service.exception.CaptainDraftResultLockedException;
 import com.balancify.backend.service.exception.BoardLimitException;
 import com.balancify.backend.service.exception.CommentLimitException;
 import com.balancify.backend.service.exception.NicknameRequestConflictException;
@@ -159,6 +161,7 @@ import java.net.URI;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Locale;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import jakarta.servlet.http.HttpServletRequest;
@@ -4228,51 +4231,102 @@ class AdminKeyFilterTest {
             .andExpect(status().isForbidden());
     }
 
+    // Every regular-draft call, as a fresh request each time (a builder is used once).
+    private List<MockHttpServletRequestBuilder> captainDraftCalls() {
+        return List.of(
+            get("/api/groups/1/captain-drafts"),
+            get("/api/groups/1/captain-drafts/latest"),
+            get("/api/groups/1/captain-drafts/5"),
+            post("/api/groups/1/captain-drafts").contentType(MediaType.APPLICATION_JSON).content("{}"),
+            post("/api/groups/1/captain-drafts/5/pick")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"captainPlayerId\":1,\"pickedPlayerId\":3}"),
+            post("/api/groups/1/captain-drafts/5/unpick").contentType(MediaType.APPLICATION_JSON).content("{\"playerId\":3}"),
+            put("/api/groups/1/captain-drafts/5/entries").contentType(MediaType.APPLICATION_JSON).content("{\"entries\":[]}"),
+            delete("/api/groups/1/captain-drafts/5")
+        );
+    }
+
     @Test
-    void keepsCaptainDraftsToAdmins() throws Exception {
+    void keepsRegularDraftsFromVisitorsAndAccountsWithoutAccess() throws Exception {
+        for (MockHttpServletRequestBuilder call : captainDraftCalls()) {
+            mockMvc.perform(call).andExpect(status().isForbidden());
+        }
+        for (MockHttpServletRequestBuilder call : captainDraftCalls()) {
+            mockMvc.perform(call.header("X-USER-EMAIL", "stranger@hei.gg")).andExpect(status().isForbidden());
+        }
+        verifyNoInteractions(captainDraftService);
+    }
+
+    @Test
+    void letsMembersReadStartArrangeAndSaveRegularDraftsButNotRemoveThem() throws Exception {
+        List<MockHttpServletRequestBuilder> calls = captainDraftCalls();
+        for (MockHttpServletRequestBuilder call : calls.subList(0, calls.size() - 1)) {
+            mockMvc.perform(call.header("X-USER-EMAIL", "member@hei.gg")).andExpect(status().isOk());
+        }
         mockMvc
-            .perform(
-                get("/api/groups/1/captain-drafts")
-                    .header("X-USER-EMAIL", "member@hei.gg")
-            )
+            .perform(calls.get(calls.size() - 1).header("X-USER-EMAIL", "member@hei.gg"))
             .andExpect(status().isForbidden());
-        mockMvc
-            .perform(
-                post("/api/groups/1/captain-drafts")
-                    .header("X-USER-EMAIL", "member@hei.gg")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{}")
-            )
-            .andExpect(status().isForbidden());
-        mockMvc
-            .perform(
-                get("/api/groups/1/captain-drafts/latest")
-                    .header("X-USER-EMAIL", "member@hei.gg")
-            )
-            .andExpect(status().isForbidden());
-        mockMvc
-            .perform(
-                post("/api/groups/1/captain-drafts/5/unpick")
-                    .header("X-USER-EMAIL", "member@hei.gg")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"playerId\":3}")
-            )
-            .andExpect(status().isForbidden());
-        mockMvc
-            .perform(
-                get("/api/groups/1/captain-drafts/latest")
-                    .header("X-USER-EMAIL", "admin@hei.gg")
-            )
-            .andExpect(status().isOk());
-        mockMvc
-            .perform(
-                post("/api/groups/1/captain-drafts/5/unpick")
-                    .header("X-USER-EMAIL", "admin@hei.gg")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"playerId\":3}")
-            )
-            .andExpect(status().isOk());
+
+        verify(captainDraftService).listDrafts(1L);
+        verify(captainDraftService).getLatestDraft(1L);
+        verify(captainDraftService).getDraft(1L, 5L);
+        // Starting a draft and saving its sets name who did it.
+        verify(captainDraftService).createDraft(eq(1L), any(), eq("member@hei.gg"), any());
+        verify(captainDraftService).pickPlayer(eq(1L), eq(5L), any());
         verify(captainDraftService).unpickPlayer(eq(1L), eq(5L), any());
+        // A member saves the sets without the right to change a result already in.
+        verify(captainDraftService).updateEntries(eq(1L), eq(5L), any(), eq(false), eq("member@hei.gg"), any());
+        verify(captainDraftService, never()).deleteDraft(any(), any(), any(), any());
+    }
+
+    @Test
+    void letsAdminsAndMatchResultEditorsChangeResultsAlreadyIn() throws Exception {
+        mockMvc
+            .perform(
+                put("/api/groups/1/captain-drafts/5/entries")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"entries\":[]}")
+            )
+            .andExpect(status().isOk());
+        verify(captainDraftService).updateEntries(eq(1L), eq(5L), any(), eq(true), eq("admin@hei.gg"), any());
+
+        when(accessControlService.isMatchResultEditor("member@hei.gg")).thenReturn(true);
+        mockMvc
+            .perform(
+                put("/api/groups/1/captain-drafts/5/entries")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"entries\":[]}")
+            )
+            .andExpect(status().isOk());
+        verify(captainDraftService).updateEntries(eq(1L), eq(5L), any(), eq(true), eq("member@hei.gg"), any());
+    }
+
+    @Test
+    void refusesAMembersChangeToAResultWith403AndATakeBackAfterResultsWith409() throws Exception {
+        when(captainDraftService.updateEntries(any(), any(), any(), anyBoolean(), any(), any()))
+            .thenThrow(new CaptainDraftResultLockedException("Round 1 set 1 already has a result"));
+        when(captainDraftService.unpickPlayer(any(), any(), any()))
+            .thenThrow(new IllegalStateException("A pick cannot be taken back once a set has a result"));
+
+        mockMvc
+            .perform(
+                put("/api/groups/1/captain-drafts/5/entries")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"entries\":[]}")
+            )
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(
+                post("/api/groups/1/captain-drafts/5/unpick")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"playerId\":3}")
+            )
+            .andExpect(status().isConflict());
     }
 
     @Test

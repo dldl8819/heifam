@@ -10,6 +10,8 @@ type CaptainDraftRecordsProps = {
   loading: boolean
   error: string | null
   currentDraftId: number | null
+  // Admins only: removing a record. Members see no delete button (the backend refuses them too).
+  canDelete: boolean
   // The draft being removed, while its request is out; every delete button waits for it.
   deletingDraftId: number | null
   onOpen: (draftId: number) => void
@@ -25,13 +27,14 @@ const STATE_STYLES: Record<DraftRecordState, string> = {
 /**
  * The regular drafts played so far, newest first, with each one's score. Their results are kept
  * here only: a regular draft is not balanced, so it never moves anyone's MMR. A draft made by
- * mistake or to try the page out can be removed, with everything in it.
+ * mistake or to try the page out can be removed by an admin, with everything in it.
  */
 export function CaptainDraftRecords({
   records,
   loading,
   error,
   currentDraftId,
+  canDelete,
   deletingDraftId,
   onOpen,
   onDelete,
@@ -71,6 +74,7 @@ export function CaptainDraftRecords({
                       away: record.awayCaptainNickname,
                       count: record.participantCount,
                     })}
+                    {record.createdByNickname && ` · ${t('captainDraft.records.startedBy', { nickname: record.createdByNickname })}`}
                   </p>
                 </div>
                 <p className="text-sm text-slate-700 dark:text-slate-200">
@@ -89,15 +93,17 @@ export function CaptainDraftRecords({
                 >
                   {current ? t('captainDraft.records.viewing') : t('captainDraft.records.open')}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => onDelete(record)}
-                  disabled={deletingDraftId !== null}
-                  aria-label={t('captainDraft.records.deleteLabel', { title: record.title })}
-                  className="shrink-0 rounded-md border border-rose-300 px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/40"
-                >
-                  {deletingDraftId === record.draftId ? t('captainDraft.records.deleting') : t('captainDraft.records.delete')}
-                </button>
+                {canDelete && (
+                  <button
+                    type="button"
+                    onClick={() => onDelete(record)}
+                    disabled={deletingDraftId !== null}
+                    aria-label={t('captainDraft.records.deleteLabel', { title: record.title })}
+                    className="shrink-0 rounded-md border border-rose-300 px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/40"
+                  >
+                    {deletingDraftId === record.draftId ? t('captainDraft.records.deleting') : t('captainDraft.records.delete')}
+                  </button>
+                )}
               </li>
             )
           })}
