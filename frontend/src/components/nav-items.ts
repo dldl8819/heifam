@@ -9,9 +9,9 @@ type NavVisibilityContext = {
 }
 
 /**
- * The matches: setting one up and the draws (pinball and cannon) for members, and the
- * tournaments and regular draft for admins. Prizes are drawn mostly among the players of a
- * regular draft, so the draws sit with the matches.
+ * The matches: setting one up, the regular draft and the draws (pinball and cannon) for members,
+ * and the tournaments for admins. Prizes are drawn mostly among the players of a regular draft, so
+ * the draws sit with the matches.
  * Its links share no path; "/matches" only names the menu.
  */
 function matchesMenu(isAdmin: boolean): NavItem {
@@ -21,12 +21,8 @@ function matchesMenu(isAdmin: boolean): NavItem {
     children: [
       { label: t('nav.balance'), href: '/balance' },
       { label: t('nav.multiBalance'), href: '/balance/multi' },
-      ...(isAdmin
-        ? [
-            { label: t('nav.tournaments'), href: '/tournaments' },
-            { label: t('nav.captainDraft'), href: '/captain-draft' },
-          ]
-        : []),
+      ...(isAdmin ? [{ label: t('nav.tournaments'), href: '/tournaments' }] : []),
+      { label: t('nav.captainDraft'), href: '/captain-draft' },
       // Members read the records of prize draws there; admins also run the draws.
       { label: t('nav.draws'), href: '/draws' },
     ],

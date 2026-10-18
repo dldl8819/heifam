@@ -29,6 +29,7 @@ import com.balancify.backend.repository.CaptainDraftParticipantRepository;
 import com.balancify.backend.repository.CaptainDraftRepository;
 import com.balancify.backend.repository.GroupRepository;
 import com.balancify.backend.repository.PlayerRepository;
+import com.balancify.backend.service.exception.CaptainDraftResultLockedException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -38,12 +39,17 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class CaptainDraftServiceTest {
+
+    // Whoever starts a draft or saves its sets; placeholders, as in every example of the repo.
+    private static final String ACTOR_EMAIL = "YOUR_USERNAME@example.com";
+    private static final String ACTOR_NICKNAME = "YOUR_USERNAME";
 
     @Mock
     private GroupRepository groupRepository;
@@ -78,6 +84,63 @@ class CaptainDraftServiceTest {
     }
 
     @Test
+    void keepsWhoStartedADraftShowingTheNicknameOnly() {
+        Group group = group(1L);
+        List<Long> eight = List.of(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L);
+        when(groupRepository.findById(1L)).thenReturn(Optional.of(group));
+        when(playerRepository.findByGroup_IdAndIdIn(1L, eight)).thenReturn(players(group, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L));
+        when(captainDraftRepository.save(any(CaptainDraft.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(captainDraftParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(captainDraftEntryRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CaptainDraftResponse response = captainDraftService.createDraft(
+            1L, new CaptainDraftCreateRequest("정기 감전", eight, List.of(1L, 2L), null, null, null), " YOUR_USERNAME@Example.com ", " YOUR_USERNAME "
+        );
+
+        ArgumentCaptor<CaptainDraft> saved = ArgumentCaptor.forClass(CaptainDraft.class);
+        verify(captainDraftRepository).save(saved.capture());
+        assertThat(saved.getValue().getCreatedByEmail()).isEqualTo("your_username@example.com");
+        assertThat(saved.getValue().getCreatedByNickname()).isEqualTo("YOUR_USERNAME");
+        assertThat(response.createdByNickname()).isEqualTo("YOUR_USERNAME");
+    }
+
+    @Test
+    void namesWhoPutEachResultInAndWhenAndNobodyOnceItIsTakenOut() {
+        Group group = group(1L);
+        CaptainDraft draft = draft(group, 100L, "READY", 1, "UNASSIGNED", 1L, 2L);
+        List<CaptainDraftParticipant> participants = teamsOfThree(draft, group);
+        // Both sides full and no result yet; the same set is read each time, as one row would be.
+        CaptainDraftEntry set = decidedSet(draft, participants, null);
+        when(captainDraftRepository.findByIdAndGroup_Id(100L, 1L)).thenReturn(Optional.of(draft));
+        when(captainDraftParticipantRepository.findByDraftIdWithPlayer(100L)).thenReturn(participants);
+        when(captainDraftEntryRepository.findByDraftIdWithPlayers(100L)).thenReturn(List.of(set));
+
+        CaptainDraftResponse first = captainDraftService.updateEntries(
+            1L, 100L, resultRequest("HOME"), false, " YOUR_USERNAME@Example.com ", "YOUR_USERNAME"
+        );
+        assertThat(first.entries().get(0).resultRecordedByNickname()).isEqualTo("YOUR_USERNAME");
+        assertThat(first.entries().get(0).resultRecordedAt()).isNotNull();
+        assertThat(set.getResultRecordedByEmail()).isEqualTo("your_username@example.com");
+
+        // Saved again as it is, by someone else: the result keeps who put it in.
+        captainDraftService.updateEntries(1L, 100L, resultRequest("HOME"), false, "YOUR_OTHER@example.com", "YOUR_OTHER");
+        assertThat(set.getResultRecordedByNickname()).isEqualTo("YOUR_USERNAME");
+
+        // Changed by one who may edit results: now theirs.
+        captainDraftService.updateEntries(1L, 100L, resultRequest("AWAY"), true, "YOUR_EDITOR@example.com", "YOUR_EDITOR");
+        assertThat(set.getResultRecordedByNickname()).isEqualTo("YOUR_EDITOR");
+        assertThat(set.getResultRecordedByEmail()).isEqualTo("your_editor@example.com");
+
+        // Taken out: nobody.
+        CaptainDraftResponse cleared = captainDraftService.updateEntries(
+            1L, 100L, resultRequest(null), true, "YOUR_EDITOR@example.com", "YOUR_EDITOR"
+        );
+        assertThat(cleared.entries().get(0).resultRecordedByNickname()).isNull();
+        assertThat(cleared.entries().get(0).resultRecordedAt()).isNull();
+        assertThat(set.getResultRecordedByEmail()).isNull();
+    }
+
+    @Test
     void createDraftBuildsInitialDraftState() {
         Group group = group(1L);
         List<Player> players = players(group, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L);
@@ -104,7 +167,7 @@ class CaptainDraftServiceTest {
                 null,
                 null,
                 null
-            )
+            ), ACTOR_EMAIL, ACTOR_NICKNAME
         );
 
         assertThat(response.draftId()).isEqualTo(100L);
@@ -147,7 +210,7 @@ class CaptainDraftServiceTest {
         // Teams of four field two sets at most (2:2 and 2:2).
         assertThatThrownBy(() -> captainDraftService.createDraft(
             1L,
-            new CaptainDraftCreateRequest("정기 감전", List.of(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L), List.of(1L, 2L), 3, null, null)
+            new CaptainDraftCreateRequest("정기 감전", List.of(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L), List.of(1L, 2L), 3, null, null), ACTOR_EMAIL, ACTOR_NICKNAME
         ))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("setsPerRound must be between 1 and 2");
@@ -159,7 +222,7 @@ class CaptainDraftServiceTest {
 
         assertThatThrownBy(() -> captainDraftService.createDraft(
             1L,
-            new CaptainDraftCreateRequest("가".repeat(121), eight, List.of(1L, 2L), null, null, null)
+            new CaptainDraftCreateRequest("가".repeat(121), eight, List.of(1L, 2L), null, null, null), ACTOR_EMAIL, ACTOR_NICKNAME
         ))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("title must be at most 120 characters");
@@ -180,7 +243,7 @@ class CaptainDraftServiceTest {
         // Five a side: a 3:3 and two 1:1 games, over five rounds (best of five).
         CaptainDraftResponse response = captainDraftService.createDraft(
             1L,
-            new CaptainDraftCreateRequest("청백전", ten, List.of(1L, 2L), null, 5, List.of(3, 1, 1))
+            new CaptainDraftCreateRequest("청백전", ten, List.of(1L, 2L), null, 5, List.of(3, 1, 1)), ACTOR_EMAIL, ACTOR_NICKNAME
         );
 
         assertThat(response.setsPerRound()).isEqualTo(3);
@@ -197,7 +260,7 @@ class CaptainDraftServiceTest {
         // Three rounds of one 3:3 game, two a side resting.
         CaptainDraftResponse shortDraft = captainDraftService.createDraft(
             1L,
-            new CaptainDraftCreateRequest("짧게", ten, List.of(1L, 2L), null, 3, List.of(3))
+            new CaptainDraftCreateRequest("짧게", ten, List.of(1L, 2L), null, 3, List.of(3)), ACTOR_EMAIL, ACTOR_NICKNAME
         );
         assertThat(shortDraft.entries()).extracting(entry -> entry.roundCode()).containsExactly("PPP", "PPT", "PPZ");
     }
@@ -211,17 +274,17 @@ class CaptainDraftServiceTest {
             .thenReturn(players(group, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L));
 
         assertThatThrownBy(() -> captainDraftService.createDraft(
-            1L, new CaptainDraftCreateRequest("t", ten, List.of(1L, 2L), null, null, List.of(3, 3))
+            1L, new CaptainDraftCreateRequest("t", ten, List.of(1L, 2L), null, null, List.of(3, 3)), ACTOR_EMAIL, ACTOR_NICKNAME
         ))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("The sets need 6 players a team, but a team has 5");
         assertThatThrownBy(() -> captainDraftService.createDraft(
-            1L, new CaptainDraftCreateRequest("t", ten, List.of(1L, 2L), null, null, List.of(4))
+            1L, new CaptainDraftCreateRequest("t", ten, List.of(1L, 2L), null, null, List.of(4)), ACTOR_EMAIL, ACTOR_NICKNAME
         ))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Each set is 3:3, 2:2 or 1:1");
         assertThatThrownBy(() -> captainDraftService.createDraft(
-            1L, new CaptainDraftCreateRequest("t", ten, List.of(1L, 2L), null, 8, List.of(3))
+            1L, new CaptainDraftCreateRequest("t", ten, List.of(1L, 2L), null, 8, List.of(3)), ACTOR_EMAIL, ACTOR_NICKNAME
         ))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("roundCount must be between 1 and 7");
@@ -405,7 +468,8 @@ class CaptainDraftServiceTest {
                     new CaptainDraftEntryUpdateItemRequest(1, 1, "zpp", List.of(1L, 3L, 5L), List.of(2L, 4L, 6L), " 핫티어 1 ", "AWAY"),
                     new CaptainDraftEntryUpdateItemRequest(2, 1, null, Arrays.asList(5L, null, 3L), List.of(), "", null)
                 )
-            )
+            ),
+            false, ACTOR_EMAIL, ACTOR_NICKNAME
         );
 
         // Races given are put in P, T, Z, R order; races left out are kept.
@@ -462,7 +526,8 @@ class CaptainDraftServiceTest {
             new CaptainDraftEntriesUpdateRequest(List.of(
                 new CaptainDraftEntryUpdateItemRequest(1, 1, null, List.of(1L, 3L), List.of(), null, null),
                 new CaptainDraftEntryUpdateItemRequest(1, 2, null, List.of(3L, 5L), List.of(), null, null)
-            ))
+            )),
+            true, ACTOR_EMAIL, ACTOR_NICKNAME
         ))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("A player can play only one set a round");
@@ -519,10 +584,11 @@ class CaptainDraftServiceTest {
             participant(draft, picked, false, "HOME", 1),
             participant(draft, opponent, false, "AWAY", 2)
         );
+        // No set has a result yet: the games have not begun.
         CaptainDraftEntry named = entry(draft, 1, "PPP", 1, 2);
         named.setSidePlayers("HOME", Arrays.asList(player(group, 1L), picked));
         named.setSidePlayers("AWAY", Arrays.asList(player(group, 2L), opponent));
-        named.setWinnerTeam("HOME");
+        named.setWinnerTeam(null);
         CaptainDraftEntry other = entry(draft, 2, "PPT", 1, 2);
         other.setSidePlayers("AWAY", Arrays.asList(opponent, null));
         other.setWinnerTeam(null);
@@ -560,6 +626,87 @@ class CaptainDraftServiceTest {
             .hasMessage("Player is not picked");
         assertThatThrownBy(() -> captainDraftService.unpickPlayer(1L, 100L, new CaptainDraftUnpickRequest(99L)))
             .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void takesNoPickBackOnceAnySetHasAResultWhoeverAsks() {
+        Group group = group(1L);
+        CaptainDraft draft = draft(group, 100L, "READY", 1, "UNASSIGNED", 1L, 2L);
+        List<CaptainDraftParticipant> participants = teamsOfThree(draft, group);
+        // The set with the result does not even name player 3.
+        CaptainDraftEntry played = result(entry(draft, 1, "PPP", 1, 1), "HOME");
+        played.setSidePlayers("HOME", List.of(participants.get(0).getPlayer()));
+        played.setSidePlayers("AWAY", List.of(participants.get(1).getPlayer()));
+        CaptainDraftEntry later = entry(draft, 2, "PPT", 1, 1);
+        later.setSidePlayers("HOME", List.of(participants.get(2).getPlayer()));
+
+        when(captainDraftRepository.findByIdAndGroup_Id(100L, 1L)).thenReturn(Optional.of(draft));
+        when(captainDraftParticipantRepository.findByDraftIdWithPlayer(100L)).thenReturn(participants);
+        when(captainDraftEntryRepository.findByDraftIdWithPlayers(100L)).thenReturn(List.of(played, later));
+
+        assertThatThrownBy(() -> captainDraftService.unpickPlayer(1L, 100L, new CaptainDraftUnpickRequest(3L)))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("A pick cannot be taken back once a set has a result");
+        assertThat(participants.get(2).getTeam()).isEqualTo("HOME");
+        assertThat(played.getWinnerTeam()).isEqualTo("HOME");
+        verify(captainDraftParticipantRepository, never()).save(any());
+        verify(captainDraftEntryRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void letsAMemberEnterAFirstResultButNotChangeOrClearOne() {
+        Group group = group(1L);
+        CaptainDraft draft = draft(group, 100L, "READY", 2, "UNASSIGNED", 1L, 2L);
+        List<CaptainDraftParticipant> participants = teamsOfThree(draft, group);
+
+        when(captainDraftRepository.findByIdAndGroup_Id(100L, 1L)).thenReturn(Optional.of(draft));
+        when(captainDraftParticipantRepository.findByDraftIdWithPlayer(100L)).thenReturn(participants);
+        // Fresh sets on every read, as from the database: a refused save leaves nothing behind.
+        when(captainDraftEntryRepository.findByDraftIdWithPlayers(100L)).thenAnswer(invocation -> List.of(
+            decidedSet(draft, participants, "HOME"),
+            entry(draft, 2, "PPT", 1, 3)
+        ));
+
+        // The decided set is sent back exactly as it is, and the open one gets players and a first result.
+        CaptainDraftResponse response = captainDraftService.updateEntries(1L, 100L, new CaptainDraftEntriesUpdateRequest(List.of(
+            new CaptainDraftEntryUpdateItemRequest(1, 1, "PPP", List.of(1L, 3L, 5L), List.of(2L, 4L, 6L), " ", "home"),
+            new CaptainDraftEntryUpdateItemRequest(2, 1, "PPT", List.of(1L, 3L, 5L), List.of(2L, 4L, 6L), null, "AWAY")
+        )), false, ACTOR_EMAIL, ACTOR_NICKNAME);
+        assertThat(response.entries()).extracting(set -> set.winnerTeam()).containsExactly("HOME", "AWAY");
+
+        String locked = "Round 1 set 1 already has a result; only admins and result editors can change it";
+        for (CaptainDraftEntryUpdateItemRequest change : List.of(
+            // another winner, no winner, other players, other races, another tier note
+            new CaptainDraftEntryUpdateItemRequest(1, 1, "PPP", List.of(1L, 3L, 5L), List.of(2L, 4L, 6L), null, "AWAY"),
+            new CaptainDraftEntryUpdateItemRequest(1, 1, "PPP", List.of(1L, 3L, 5L), List.of(2L, 4L, 6L), null, null),
+            new CaptainDraftEntryUpdateItemRequest(1, 1, "PPP", List.of(1L, 5L, 3L), List.of(2L, 4L, 6L), null, "HOME"),
+            new CaptainDraftEntryUpdateItemRequest(1, 1, "PPT", List.of(1L, 3L, 5L), List.of(2L, 4L, 6L), null, "HOME"),
+            new CaptainDraftEntryUpdateItemRequest(1, 1, "PPP", List.of(1L, 3L, 5L), List.of(2L, 4L, 6L), "상위 3", "HOME")
+        )) {
+            assertThatThrownBy(() -> captainDraftService.updateEntries(
+                1L, 100L, new CaptainDraftEntriesUpdateRequest(List.of(change)), false, ACTOR_EMAIL, ACTOR_NICKNAME
+            ))
+                .isInstanceOf(CaptainDraftResultLockedException.class)
+                .hasMessage(locked);
+        }
+    }
+
+    @Test
+    void letsThoseWhoMayEditResultsChangeAResultAlreadyIn() {
+        Group group = group(1L);
+        CaptainDraft draft = draft(group, 100L, "READY", 1, "UNASSIGNED", 1L, 2L);
+        List<CaptainDraftParticipant> participants = teamsOfThree(draft, group);
+
+        when(captainDraftRepository.findByIdAndGroup_Id(100L, 1L)).thenReturn(Optional.of(draft));
+        when(captainDraftParticipantRepository.findByDraftIdWithPlayer(100L)).thenReturn(participants);
+        when(captainDraftEntryRepository.findByDraftIdWithPlayers(100L))
+            .thenReturn(List.of(decidedSet(draft, participants, "HOME")));
+
+        CaptainDraftResponse response = captainDraftService.updateEntries(1L, 100L, new CaptainDraftEntriesUpdateRequest(List.of(
+            new CaptainDraftEntryUpdateItemRequest(1, 1, "PPP", List.of(1L, 3L, 5L), List.of(2L, 4L, 6L), null, "AWAY")
+        )), true, ACTOR_EMAIL, ACTOR_NICKNAME);
+
+        assertThat(response.entries().get(0).winnerTeam()).isEqualTo("AWAY");
     }
 
     @Test
@@ -709,6 +856,21 @@ class CaptainDraftServiceTest {
         return entry;
     }
 
+    // Round 1 set 1 of the teams of three, as decidedSet lays it out, with this result (null for none).
+    private CaptainDraftEntriesUpdateRequest resultRequest(String winnerTeam) {
+        return new CaptainDraftEntriesUpdateRequest(List.of(
+            new CaptainDraftEntryUpdateItemRequest(1, 1, "PPP", List.of(1L, 3L, 5L), List.of(2L, 4L, 6L), null, winnerTeam)
+        ));
+    }
+
+    // Round 1 set 1, a 3:3 of the teams of three (home 1, 3, 5 against away 2, 4, 6), already won.
+    private CaptainDraftEntry decidedSet(CaptainDraft draft, List<CaptainDraftParticipant> participants, String winnerTeam) {
+        CaptainDraftEntry set = entry(draft, 1, "PPP", 1, 3);
+        set.setSidePlayers("HOME", List.of(participants.get(0).getPlayer(), participants.get(2).getPlayer(), participants.get(4).getPlayer()));
+        set.setSidePlayers("AWAY", List.of(participants.get(1).getPlayer(), participants.get(3).getPlayer(), participants.get(5).getPlayer()));
+        return result(set, winnerTeam);
+    }
+
     private record ParticipantCount(Long getDraftId, Long getParticipants)
         implements CaptainDraftParticipantRepository.DraftParticipantCount {
     }
@@ -717,7 +879,8 @@ class CaptainDraftServiceTest {
         assertThatThrownBy(() -> captainDraftService.updateEntries(
             1L,
             100L,
-            new CaptainDraftEntriesUpdateRequest(List.of(item))
+            new CaptainDraftEntriesUpdateRequest(List.of(item)),
+            true, ACTOR_EMAIL, ACTOR_NICKNAME
         ))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage(message);

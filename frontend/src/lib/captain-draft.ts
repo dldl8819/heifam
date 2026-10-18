@@ -38,6 +38,8 @@ export type EffectiveEntry = {
   awayPlayerIds: SidePlayerIds
   requiredTier: string
   winnerTeam: DraftWinnerSelection
+  // Who put the saved result in, while the result shown is that one; null otherwise.
+  resultRecordedBy: string | null
 }
 
 export type SetWins = {
@@ -57,6 +59,8 @@ function savedSide(entry: CaptainDraftEntry, team: TeamSide): SidePlayerIds {
 
 /** A set as the sheet shows it: the host's unsaved changes where there are some, the saved values otherwise. */
 export function effectiveEntry(entry: CaptainDraftEntry, edit: EntryEdit | undefined): EffectiveEntry {
+  const savedWinner: DraftWinnerSelection = entry.winnerTeam ?? ''
+  const winnerTeam = edit && 'winnerTeam' in edit ? (edit.winnerTeam ?? '') : savedWinner
   return {
     key: entryKey(entry),
     roundNumber: entry.roundNumber,
@@ -66,13 +70,32 @@ export function effectiveEntry(entry: CaptainDraftEntry, edit: EntryEdit | undef
     homePlayerIds: edit?.homePlayerIds ?? savedSide(entry, 'HOME'),
     awayPlayerIds: edit?.awayPlayerIds ?? savedSide(entry, 'AWAY'),
     requiredTier: edit && 'requiredTier' in edit ? (edit.requiredTier ?? '') : (entry.requiredTier ?? ''),
-    winnerTeam: edit && 'winnerTeam' in edit ? (edit.winnerTeam ?? '') : (entry.winnerTeam ?? ''),
+    winnerTeam,
+    // A result changed here and not saved yet is nobody's yet.
+    resultRecordedBy: winnerTeam !== '' && winnerTeam === savedWinner ? (entry.resultRecordedByNickname ?? null) : null,
   }
 }
 
 /** One side with one slot changed. */
 export function withSlot(side: SidePlayerIds, index: number, playerId: number | null): SidePlayerIds {
   return side.map((current, slot) => (slot === index ? playerId : current))
+}
+
+function hasSavedResult(entry: CaptainDraftEntry): boolean {
+  return entry.winnerTeam === 'HOME' || entry.winnerTeam === 'AWAY'
+}
+
+/**
+ * The sets this viewer may not change: those whose result is saved already, unless the viewer may
+ * edit results (admins and match result editors). The backend refuses such a change as well.
+ */
+export function lockedSetKeys(entries: readonly CaptainDraftEntry[], canEditResults: boolean): Set<string> {
+  return canEditResults ? new Set() : new Set(entries.filter(hasSavedResult).map(entryKey))
+}
+
+/** Whether any set has a saved result: the games have begun, and no pick can be taken back. */
+export function hasAnyResult(entries: readonly CaptainDraftEntry[]): boolean {
+  return entries.some(hasSavedResult)
 }
 
 /** Sets won by each team, and by each player on the winning side of one. */

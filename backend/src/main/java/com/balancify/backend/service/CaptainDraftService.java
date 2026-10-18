@@ -22,12 +22,15 @@ import com.balancify.backend.repository.CaptainDraftParticipantRepository;
 import com.balancify.backend.repository.CaptainDraftRepository;
 import com.balancify.backend.repository.GroupRepository;
 import com.balancify.backend.repository.PlayerRepository;
+import com.balancify.backend.service.exception.CaptainDraftResultLockedException;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
@@ -57,6 +60,8 @@ public class CaptainDraftService {
     private static final int MAX_REQUIRED_TIER_LENGTH = 30;
     // captain_drafts.title is varchar(120).
     private static final int MAX_TITLE_LENGTH = 120;
+    // created_by_nickname and result_recorded_by_nickname are varchar(100).
+    private static final int MAX_ACTOR_NICKNAME_LENGTH = 100;
     // Drafts listed as records; older ones stay in the database.
     private static final int RECORD_LIMIT = 30;
 
@@ -83,8 +88,14 @@ public class CaptainDraftService {
         this.operationAuditLogService = operationAuditLogService;
     }
 
+    /** Starts a draft; whoever started it is kept with it, the nickname shown and the email not. */
     @Transactional
-    public CaptainDraftResponse createDraft(Long groupId, CaptainDraftCreateRequest request) {
+    public CaptainDraftResponse createDraft(
+        Long groupId,
+        CaptainDraftCreateRequest request,
+        String actorEmail,
+        String actorNickname
+    ) {
         if (request == null) {
             throw new IllegalArgumentException("Request is required");
         }
@@ -138,6 +149,8 @@ public class CaptainDraftService {
         draft.setCurrentTurnTeam(TEAM_HOME);
         draft.setHomeCaptain(homeCaptain);
         draft.setAwayCaptain(awayCaptain);
+        draft.setCreatedByEmail(actorEmailOrNull(actorEmail));
+        draft.setCreatedByNickname(actorNicknameOrNull(actorNickname));
         CaptainDraft savedDraft = captainDraftRepository.save(draft);
 
         List<CaptainDraftParticipant> participants = new ArrayList<>();
@@ -306,8 +319,9 @@ public class CaptainDraftService {
     }
 
     /**
-     * Takes a picked player back out of their team, for a pick entered by mistake. Entries that
-     * named them lose them and their result, and a finished draft is open again.
+     * Takes a picked player back out of their team, for a pick entered by mistake: out of the sets
+     * that named them, and a finished draft is open again. Only before any set has a result: once
+     * the games have begun, taking a pick back would wipe a result, which nobody may do this way.
      */
     @Transactional
     public CaptainDraftResponse unpickPlayer(Long groupId, Long draftId, CaptainDraftUnpickRequest request) {
@@ -331,12 +345,15 @@ public class CaptainDraftService {
         if (TEAM_UNASSIGNED.equals(team)) {
             throw new IllegalArgumentException("Player is not picked");
         }
+        List<CaptainDraftEntry> entries = captainDraftEntryRepository.findByDraftIdWithPlayers(draft.getId());
+        if (entries.stream().anyMatch(entry -> normalizeWinnerTeam(entry.getWinnerTeam()) != null)) {
+            throw new IllegalStateException("A pick cannot be taken back once a set has a result");
+        }
 
         participant.setTeam(null);
         participant.setPickOrder(null);
         captainDraftParticipantRepository.save(participant);
 
-        List<CaptainDraftEntry> entries = captainDraftEntryRepository.findByDraftIdWithPlayers(draft.getId());
         for (CaptainDraftEntry entry : entries) {
             List<Player> side = entry.sidePlayers(team);
             boolean named = false;
@@ -348,7 +365,6 @@ public class CaptainDraftService {
             }
             if (named) {
                 entry.setSidePlayers(team, side);
-                entry.setWinnerTeam(null);
             }
         }
         captainDraftEntryRepository.saveAll(entries);
@@ -365,12 +381,21 @@ public class CaptainDraftService {
      * Saves the sets as the host fills them in, each with its race composition. Each side of a set takes
      * up to its team size of its own team's players, a player plays at most one set a round, and a
      * set gets a winner only with both sides full.
+     *
+     * Any member with access fills in the sets that have no result yet and enters a set's first
+     * result. A set that already has a result is changed (its result, players, races or tier note)
+     * only by those who may edit results: admins and match result editors. Anyone else may send it
+     * back unchanged, as the page sends every set; a change to it is refused, and nothing is saved.
+     * A set whose result is put in or changed names who did it and when; one taken out names nobody.
      */
     @Transactional
     public CaptainDraftResponse updateEntries(
         Long groupId,
         Long draftId,
-        CaptainDraftEntriesUpdateRequest request
+        CaptainDraftEntriesUpdateRequest request,
+        boolean canEditResults,
+        String actorEmail,
+        String actorNickname
     ) {
         if (request == null || request.entries() == null || request.entries().isEmpty()) {
             throw new IllegalArgumentException("entries are required");
@@ -408,24 +433,45 @@ public class CaptainDraftService {
                 throw new IllegalArgumentException("Each set needs both sides' player lists; reload the page");
             }
 
-            for (String team : List.of(TEAM_HOME, TEAM_AWAY)) {
-                targetEntry.setSidePlayers(team, sidePlayers(
-                    TEAM_HOME.equals(team) ? updateItem.homePlayerIds() : updateItem.awayPlayerIds(),
-                    targetEntry.getTeamSize(),
-                    teamPlayerIds.get(team),
-                    participantsByPlayerId
-                ));
-            }
-            targetEntry.setRequiredTier(normalizeRequiredTier(updateItem.requiredTier()));
-            if (updateItem.raceCode() != null) {
-                targetEntry.setRoundCode(normalizeRaceCode(updateItem.raceCode()));
+            List<Player> home = sidePlayers(
+                updateItem.homePlayerIds(), targetEntry.getTeamSize(), teamPlayerIds.get(TEAM_HOME), participantsByPlayerId
+            );
+            List<Player> away = sidePlayers(
+                updateItem.awayPlayerIds(), targetEntry.getTeamSize(), teamPlayerIds.get(TEAM_AWAY), participantsByPlayerId
+            );
+            String requiredTier = normalizeRequiredTier(updateItem.requiredTier());
+            // Races left out are kept.
+            String raceCode = updateItem.raceCode() == null ? targetEntry.getRoundCode() : normalizeRaceCode(updateItem.raceCode());
+            String winnerTeam = normalizeWinnerTeam(updateItem.winnerTeam());
+            String savedWinnerTeam = normalizeWinnerTeam(targetEntry.getWinnerTeam());
+            if (!canEditResults
+                && savedWinnerTeam != null
+                && changesSet(targetEntry, home, away, raceCode, requiredTier, winnerTeam)) {
+                throw new CaptainDraftResultLockedException(
+                    "Round " + targetEntry.getRoundNumber() + " set " + targetEntry.getSetNumber()
+                        + " already has a result; only admins and result editors can change it"
+                );
             }
 
-            String winnerTeam = normalizeWinnerTeam(updateItem.winnerTeam());
+            targetEntry.setSidePlayers(TEAM_HOME, home);
+            targetEntry.setSidePlayers(TEAM_AWAY, away);
+            targetEntry.setRequiredTier(requiredTier);
+            targetEntry.setRoundCode(raceCode);
             if (winnerTeam != null && (!isSideFull(targetEntry, TEAM_HOME) || !isSideFull(targetEntry, TEAM_AWAY))) {
                 throw new IllegalArgumentException("Winner team requires both home and away players");
             }
             targetEntry.setWinnerTeam(winnerTeam);
+            if (!Objects.equals(savedWinnerTeam, winnerTeam)) {
+                if (winnerTeam == null) {
+                    targetEntry.setResultRecordedBy(null, null, null);
+                } else {
+                    targetEntry.setResultRecordedBy(
+                        actorEmailOrNull(actorEmail),
+                        actorNicknameOrNull(actorNickname),
+                        OffsetDateTime.now()
+                    );
+                }
+            }
         }
 
         requireOneSetPerRound(entries);
@@ -486,6 +532,31 @@ public class CaptainDraftService {
 
     private boolean isSideFull(CaptainDraftEntry entry, String team) {
         return entry.sidePlayers(team).stream().allMatch(Objects::nonNull);
+    }
+
+    // Whether saving these values would change a set: its players slot by slot, races, tier note or result.
+    private boolean changesSet(
+        CaptainDraftEntry entry,
+        List<Player> home,
+        List<Player> away,
+        String raceCode,
+        String requiredTier,
+        String winnerTeam
+    ) {
+        return !slotPlayerIds(entry.sidePlayers(TEAM_HOME)).equals(slotPlayerIds(home))
+            || !slotPlayerIds(entry.sidePlayers(TEAM_AWAY)).equals(slotPlayerIds(away))
+            || !Objects.equals(entry.getRoundCode(), raceCode)
+            || !Objects.equals(emptyToNull(entry.getRequiredTier()), requiredTier)
+            || !Objects.equals(normalizeWinnerTeam(entry.getWinnerTeam()), winnerTeam);
+    }
+
+    private List<Long> slotPlayerIds(List<Player> side) {
+        return side.stream().map(player -> player == null ? null : player.getId()).toList();
+    }
+
+    private String emptyToNull(String value) {
+        String trimmed = safeTrim(value);
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     // Everyone plays at most once a round; the rest of a round's players sit it out.
@@ -597,8 +668,23 @@ public class CaptainDraftService {
             homeSetWins,
             awaySetWins,
             homeSetWins + awaySetWins,
-            entries.size()
+            entries.size(),
+            draft.getCreatedByNickname()
         );
+    }
+
+    private String actorEmailOrNull(String email) {
+        String normalized = safeTrim(email).toLowerCase(Locale.ROOT);
+        return normalized.isEmpty() ? null : normalized;
+    }
+
+    // As matches keep a recorder's nickname: at most 100 characters, none when there is none.
+    private String actorNicknameOrNull(String nickname) {
+        String normalized = safeTrim(nickname);
+        if (normalized.isEmpty()) {
+            return null;
+        }
+        return normalized.length() > MAX_ACTOR_NICKNAME_LENGTH ? normalized.substring(0, MAX_ACTOR_NICKNAME_LENGTH) : normalized;
     }
 
     private CaptainDraft loadDraft(Long groupId, Long draftId) {
@@ -755,7 +841,9 @@ public class CaptainDraftService {
                 entry.getRequiredTier(),
                 sideResponse(entry, TEAM_HOME),
                 sideResponse(entry, TEAM_AWAY),
-                normalizeWinnerTeam(entry.getWinnerTeam())
+                normalizeWinnerTeam(entry.getWinnerTeam()),
+                entry.getResultRecordedByNickname(),
+                entry.getResultRecordedAt()
             ))
             .toList();
 
@@ -764,6 +852,7 @@ public class CaptainDraftService {
             draft.getGroup().getId(),
             draft.getTitle(),
             draft.getCreatedAt(),
+            draft.getCreatedByNickname(),
             safeTrim(draft.getStatus()),
             safeInt(draft.getSetsPerRound()),
             participants.size(),

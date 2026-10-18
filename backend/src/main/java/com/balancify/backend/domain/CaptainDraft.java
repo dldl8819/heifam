@@ -51,6 +51,13 @@ public class CaptainDraft {
     @Column(nullable = false)
     private OffsetDateTime updatedAt = OffsetDateTime.now();
 
+    // Who started the draft: the email stays on the server, the nickname is shown.
+    @Column(length = 320)
+    private String createdByEmail;
+
+    @Column(length = 100)
+    private String createdByNickname;
+
     @PrePersist
     @PreUpdate
     private void updateTimestamp() {
@@ -138,5 +145,21 @@ public class CaptainDraft {
 
     public void setUpdatedAt(OffsetDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getCreatedByEmail() {
+        return createdByEmail;
+    }
+
+    public void setCreatedByEmail(String createdByEmail) {
+        this.createdByEmail = createdByEmail;
+    }
+
+    public String getCreatedByNickname() {
+        return createdByNickname;
+    }
+
+    public void setCreatedByNickname(String createdByNickname) {
+        this.createdByNickname = createdByNickname;
     }
 }

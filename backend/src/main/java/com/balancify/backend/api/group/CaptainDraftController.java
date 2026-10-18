@@ -9,6 +9,7 @@ import com.balancify.backend.api.group.dto.CaptainDraftUnpickRequest;
 import com.balancify.backend.security.AuthenticatedRequestResolver;
 import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.CaptainDraftService;
+import com.balancify.backend.service.exception.CaptainDraftResultLockedException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.NoSuchElementException;
 import org.springframework.http.HttpStatus;
@@ -22,6 +23,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+/**
+ * The regular draft (정기 감전), open to members with access (AdminKeyFilter: SERVICE_ACCESS): they
+ * read it, start one, put players in teams, take a pick back before any result, and save the sets
+ * with a set's first result. Changing a result already in is for admins and match result editors
+ * (below and in CaptainDraftService); removing a draft is for admins (AdminKeyFilter).
+ */
 @RestController
 @RequestMapping("/api/groups")
 public class CaptainDraftController {
@@ -43,10 +50,12 @@ public class CaptainDraftController {
     @PostMapping("/{groupId}/captain-drafts")
     public CaptainDraftResponse createDraft(
         @PathVariable Long groupId,
-        @RequestBody CaptainDraftCreateRequest request
+        @RequestBody CaptainDraftCreateRequest request,
+        HttpServletRequest httpRequest
     ) {
+        String email = requireRequestEmail(httpRequest);
         try {
-            return captainDraftService.createDraft(groupId, request);
+            return captainDraftService.createDraft(groupId, request, email, recorderNickname(email));
         } catch (IllegalArgumentException illegalArgumentException) {
             throw new ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
@@ -103,10 +112,7 @@ public class CaptainDraftController {
         @PathVariable Long draftId,
         HttpServletRequest request
     ) {
-        String email = authenticatedRequestResolver.resolve(request).email();
-        if (email.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Valid Supabase bearer token is required");
-        }
+        String email = requireRequestEmail(request);
         try {
             return captainDraftService.deleteDraft(groupId, draftId, email, accessControlService.resolveDisplayNickname(email));
         } catch (NoSuchElementException noSuchElementException) {
@@ -155,6 +161,9 @@ public class CaptainDraftController {
                 illegalArgumentException.getMessage(),
                 illegalArgumentException
             );
+        } catch (IllegalStateException resultsEntered) {
+            // A draft whose games have begun keeps its teams, for everyone.
+            throw new ResponseStatusException(HttpStatus.CONFLICT, resultsEntered.getMessage(), resultsEntered);
         } catch (NoSuchElementException noSuchElementException) {
             throw new ResponseStatusException(
                 HttpStatus.NOT_FOUND,
@@ -164,14 +173,21 @@ public class CaptainDraftController {
         }
     }
 
+    // Members save the sets and a set's first result; changing a result that is in already is for
+    // admins and match result editors, decided here and held to in CaptainDraftService.
     @PutMapping("/{groupId}/captain-drafts/{draftId}/entries")
     public CaptainDraftResponse updateEntries(
         @PathVariable Long groupId,
         @PathVariable Long draftId,
-        @RequestBody CaptainDraftEntriesUpdateRequest request
+        @RequestBody CaptainDraftEntriesUpdateRequest request,
+        HttpServletRequest httpRequest
     ) {
+        String email = requireRequestEmail(httpRequest);
+        boolean canEditResults = accessControlService.isAdminEmail(email) || accessControlService.isMatchResultEditor(email);
         try {
-            return captainDraftService.updateEntries(groupId, draftId, request);
+            return captainDraftService.updateEntries(groupId, draftId, request, canEditResults, email, recorderNickname(email));
+        } catch (CaptainDraftResultLockedException resultLocked) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, resultLocked.getMessage(), resultLocked);
         } catch (IllegalArgumentException illegalArgumentException) {
             throw new ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
@@ -185,5 +201,19 @@ public class CaptainDraftController {
                 noSuchElementException
             );
         }
+    }
+
+    // The name a match result shows for whoever entered it (MatchResultController), for the same here.
+    private String recorderNickname(String email) {
+        String nickname = accessControlService.resolveAccessProfile(email).nickname();
+        return nickname == null || nickname.isBlank() ? null : nickname.trim();
+    }
+
+    private String requireRequestEmail(HttpServletRequest request) {
+        String email = authenticatedRequestResolver.resolve(request).email();
+        if (email.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Valid Supabase bearer token is required");
+        }
+        return email;
     }
 }

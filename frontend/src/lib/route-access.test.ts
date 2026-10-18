@@ -171,6 +171,24 @@ describe('route access', () => {
     expect(isPublicRoute('/cannon')).toBe(false)
   })
 
+  it('opens the regular draft to members but not to visitors or applicants without access', () => {
+    const member = { isLoggedIn: true, canAccess: true, isAdmin: false, isSuperAdmin: false }
+
+    expect(getRouteAccessDecision('/captain-draft', member)).toEqual({ allowed: true, redirectTo: null, blocked: false })
+    expect(getRouteAccessDecision('/captain-draft', { ...member, isAdmin: true }).allowed).toBe(true)
+    expect(getRouteAccessDecision('/captain-draft', { ...member, canAccess: false })).toEqual({
+      allowed: false,
+      redirectTo: null,
+      blocked: true,
+    })
+    expect(getRouteAccessDecision('/captain-draft', { ...member, isLoggedIn: false, canAccess: false })).toEqual({
+      allowed: false,
+      redirectTo: '/',
+      blocked: false,
+    })
+    expect(isPublicRoute('/captain-draft')).toBe(false)
+  })
+
   it('opens a member\'s points and the monthly ranking to members and keeps the prize events with admins', () => {
     const member = { isLoggedIn: true, canAccess: true, isAdmin: false, isSuperAdmin: false }
 

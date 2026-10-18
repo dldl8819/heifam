@@ -178,6 +178,29 @@ class AccountPersonalDataRepositoryTest {
     }
 
     @Test
+    void keepsRegularDraftsAndTheirResultsButNotWhoStartedOrRecordedThem() {
+        AccountPersonalDataRepository repository = new AccountPersonalDataRepository(jdbcTemplate);
+
+        repository.anonymizeHistoricalIdentity("your_username@example.com", List.of(), "탈퇴한 회원");
+        repository.anonymizeHistoricalIdentityInGroup("your_username@example.com", 1L, List.of(), "탈퇴한 회원");
+
+        ArgumentCaptor<String> statements = ArgumentCaptor.forClass(String.class);
+        verify(jdbcTemplate, atLeastOnce()).update(statements.capture(), any(SqlParameterSource.class));
+        List<String> flattened = statements.getAllValues().stream().map(sql -> sql.replaceAll("\\s+", " ").trim()).toList();
+        assertThat(flattened).contains(
+            "UPDATE captain_drafts SET created_by_email = NULL, created_by_nickname = :deletedMemberLabel "
+                + "WHERE LOWER(BTRIM(created_by_email)) = :email",
+            "UPDATE captain_draft_entries SET result_recorded_by_email = NULL, result_recorded_by_nickname = :deletedMemberLabel "
+                + "WHERE LOWER(BTRIM(result_recorded_by_email)) = :email",
+            "UPDATE captain_drafts SET created_by_email = NULL, created_by_nickname = :deletedMemberLabel "
+                + "WHERE group_id = :groupId AND LOWER(BTRIM(created_by_email)) = :email",
+            "UPDATE captain_draft_entries SET result_recorded_by_email = NULL, result_recorded_by_nickname = :deletedMemberLabel "
+                + "WHERE draft_id IN (SELECT id FROM captain_drafts WHERE group_id = :groupId) "
+                + "AND LOWER(BTRIM(result_recorded_by_email)) = :email"
+        );
+    }
+
+    @Test
     void leavesEmailTablesAloneWithoutAnEmail() {
         AccountPersonalDataRepository repository = new AccountPersonalDataRepository(jdbcTemplate);
 

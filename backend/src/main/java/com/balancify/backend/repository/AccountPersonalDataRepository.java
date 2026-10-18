@@ -125,6 +125,25 @@ public class AccountPersonalDataRepository {
             "UPDATE matches SET created_by_email = NULL WHERE LOWER(BTRIM(created_by_email)) = :email",
             identityParameters
         );
+        // Regular drafts they started, and set results they put in, keep the record but not the name.
+        jdbcTemplate.update(
+            """
+            UPDATE captain_drafts
+            SET created_by_email = NULL,
+                created_by_nickname = :deletedMemberLabel
+            WHERE LOWER(BTRIM(created_by_email)) = :email
+            """,
+            identityParameters
+        );
+        jdbcTemplate.update(
+            """
+            UPDATE captain_draft_entries
+            SET result_recorded_by_email = NULL,
+                result_recorded_by_nickname = :deletedMemberLabel
+            WHERE LOWER(BTRIM(result_recorded_by_email)) = :email
+            """,
+            identityParameters
+        );
         jdbcTemplate.update(
             """
             UPDATE operation_audit_logs
@@ -162,6 +181,26 @@ public class AccountPersonalDataRepository {
             jdbcTemplate.update(
                 "UPDATE matches SET created_by_email = NULL "
                     + "WHERE group_id = :groupId AND LOWER(BTRIM(created_by_email)) = :email",
+                identityParameters
+            );
+            jdbcTemplate.update(
+                """
+                UPDATE captain_drafts
+                SET created_by_email = NULL,
+                    created_by_nickname = :deletedMemberLabel
+                WHERE group_id = :groupId
+                  AND LOWER(BTRIM(created_by_email)) = :email
+                """,
+                identityParameters
+            );
+            jdbcTemplate.update(
+                """
+                UPDATE captain_draft_entries
+                SET result_recorded_by_email = NULL,
+                    result_recorded_by_nickname = :deletedMemberLabel
+                WHERE draft_id IN (SELECT id FROM captain_drafts WHERE group_id = :groupId)
+                  AND LOWER(BTRIM(result_recorded_by_email)) = :email
+                """,
                 identityParameters
             );
             jdbcTemplate.update(

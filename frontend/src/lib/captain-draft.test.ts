@@ -13,6 +13,8 @@ import {
   dropEditsNaming,
   effectiveEntry,
   entryKey,
+  hasAnyResult,
+  lockedSetKeys,
   nextSetSize,
   playersInRound,
   requiredTierPresets,
@@ -55,6 +57,30 @@ function rosterPlayer(overrides: Partial<PlayerRosterItem>): PlayerRosterItem {
 }
 
 describe('captain draft sets', () => {
+  it('locks the sets with a saved result for those who may not edit results, and none for those who may', () => {
+    const entries = [entry(1, 1, [1], [2], 'HOME'), entry(1, 2, [3], [4]), entry(2, 1, [1], [2], 'AWAY')]
+
+    expect([...lockedSetKeys(entries, false)]).toEqual(['1-1', '2-1'])
+    expect(lockedSetKeys(entries, true).size).toBe(0)
+    expect(lockedSetKeys([entry(1, 1, [1], [2])], false).size).toBe(0)
+  })
+
+  it('names who put a saved result in, but not for a result changed here and not saved', () => {
+    const saved = { ...entry(1, 1, [1], [2], 'HOME'), resultRecordedByNickname: 'YOUR_USERNAME' }
+
+    expect(effectiveEntry(saved, undefined).resultRecordedBy).toBe('YOUR_USERNAME')
+    expect(effectiveEntry(saved, { requiredTier: '상위 3' }).resultRecordedBy).toBe('YOUR_USERNAME')
+    expect(effectiveEntry(saved, { winnerTeam: 'AWAY' }).resultRecordedBy).toBeNull()
+    expect(effectiveEntry(saved, { winnerTeam: '' }).resultRecordedBy).toBeNull()
+    expect(effectiveEntry(entry(1, 1, [1], [2]), undefined).resultRecordedBy).toBeNull()
+  })
+
+  it('tells whether the games have begun: any set with a saved result', () => {
+    expect(hasAnyResult([entry(1, 1, [1], [2]), entry(1, 2, [3], [4])])).toBe(false)
+    expect(hasAnyResult([entry(1, 1, [1], [2]), entry(2, 1, [3], [4], 'AWAY')])).toBe(true)
+    expect(hasAnyResult([])).toBe(false)
+  })
+
   it('keeps the host\'s unsaved changes over the saved values, field by field', () => {
     const saved = entry(1, 1, [1, 3, 5], [2, 4, 6], 'HOME')
 

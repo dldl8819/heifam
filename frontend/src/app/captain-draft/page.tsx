@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { apiClient, isApiNotFoundError } from '@/lib/api'
+import { apiClient, isApiConflictError, isApiForbiddenError, isApiNotFoundError } from '@/lib/api'
 import { useAdminAuth } from '@/lib/admin-auth'
 import { TierParticipantBoard } from '@/components/tier-participant-board'
 import { CaptainDraftEntrySheet } from '@/components/captain-draft-entry-sheet'
@@ -19,6 +19,8 @@ import {
   draftLayout,
   dropEditsNaming,
   effectiveEntry,
+  hasAnyResult,
+  lockedSetKeys,
   roundComposition,
   setComposition,
   setupDiffersFromDraft,
@@ -83,9 +85,12 @@ function errorWithReason(key: string, caught: unknown): string {
  * captain calls out are put into their team, in any order, and both teams' round entries are set.
  */
 export default function CaptainDraftPage() {
-  const { canViewMmr } = useAdminAuth()
+  const { canViewMmr, isAdmin, isMatchResultEditor } = useAdminAuth()
   const { mmrVisible } = useMmrVisibility()
   const showMmr = canViewMmr && mmrVisible
+  // Members run the draft; a result already in is changed only by admins and match result editors,
+  // and a record removed only by admins. The backend holds to both; this only shapes the screen.
+  const canEditResults = isAdmin || isMatchResultEditor
   const [players, setPlayers] = useState<PlayerRosterItem[]>([])
   const [playersLoading, setPlayersLoading] = useState<boolean>(true)
   const [playersError, setPlayersError] = useState<string | null>(null)
@@ -170,13 +175,22 @@ export default function CaptainDraftPage() {
     return members
   }, [draft])
 
-  // The sheet as shown: saved sets with the host's unsaved changes laid over them.
+  // Sets this viewer may only read: their result is saved, and they may not edit results.
+  const lockedKeys = useMemo(() => lockedSetKeys(draft?.entries ?? [], canEditResults), [draft, canEditResults])
+  const canTakeBack = !hasAnyResult(draft?.entries ?? [])
+
+  // The sheet as shown: saved sets with the host's unsaved changes laid over them. A set that got its
+  // result meanwhile (someone else saved it) shows as saved, and its changes here are dropped.
   const sheet = useMemo(
-    () => (draft?.entries ?? []).map((entry) => effectiveEntry(entry, entryEdits[`${entry.roundNumber}-${entry.setNumber}`])),
-    [draft, entryEdits],
+    () =>
+      (draft?.entries ?? []).map((entry) => {
+        const key = `${entry.roundNumber}-${entry.setNumber}`
+        return effectiveEntry(entry, lockedKeys.has(key) ? undefined : entryEdits[key])
+      }),
+    [draft, entryEdits, lockedKeys],
   )
   const setWins = useMemo(() => countSetWins(sheet), [sheet])
-  const unsavedCount = Object.keys(entryEdits).length
+  const unsavedCount = Object.keys(entryEdits).filter((key) => !lockedKeys.has(key)).length
 
   // The rounds in order, each with its sets and the composition of its biggest set.
   const roundGroups = useMemo(() => {
@@ -588,7 +602,11 @@ export default function CaptainDraftPage() {
         setEntryEdits((previous) => dropEditsNaming(previous, playerId))
       }
     } catch (unpickError) {
-      setError(errorWithReason('captainDraft.validation.unpickFailed', unpickError))
+      setError(
+        isApiConflictError(unpickError)
+          ? t('captainDraft.teams.unpickAfterResults')
+          : errorWithReason('captainDraft.validation.unpickFailed', unpickError),
+      )
     } finally {
       setIsChangingTeams(false)
     }
@@ -629,17 +647,22 @@ export default function CaptainDraftPage() {
       setEntryEdits({})
       setMessage(t('captainDraft.messages.entriesSaved'))
     } catch (saveError) {
-      setError(errorWithReason('captainDraft.validation.saveEntryFailed', saveError))
+      setError(
+        isApiForbiddenError(saveError)
+          ? t('captainDraft.validation.resultLocked')
+          : errorWithReason('captainDraft.validation.saveEntryFailed', saveError),
+      )
     } finally {
       setIsSavingEntries(false)
     }
   }
 
   // A round's composition sets every set of it: the biggest plays it, smaller ones a cut-down version.
+  // Sets this viewer may only read keep theirs.
   const changeRoundCode = (roundNumber: number, code: string) => {
     setEntryEdits((previous) => {
       const next = { ...previous }
-      for (const set of sheet.filter((candidate) => candidate.roundNumber === roundNumber)) {
+      for (const set of sheet.filter((candidate) => candidate.roundNumber === roundNumber && !lockedKeys.has(candidate.key))) {
         next[set.key] = { ...next[set.key], raceCode: setComposition(code, set.teamSize) }
       }
       return next
@@ -774,7 +797,10 @@ export default function CaptainDraftPage() {
               <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
                 <p className="font-semibold">
                   {draft.title}
-                  <span className="ml-2 font-normal text-slate-500 dark:text-slate-400">{formatKstDateTime(draft.createdAt)}</span>
+                  <span className="ml-2 font-normal text-slate-500 dark:text-slate-400">
+                    {formatKstDateTime(draft.createdAt)}
+                    {draft.createdByNickname && ` · ${t('captainDraft.records.startedBy', { nickname: draft.createdByNickname })}`}
+                  </span>
                 </p>
                 <p className="mt-1">
                   {t('captainDraft.status.label')}:{' '}
@@ -790,6 +816,7 @@ export default function CaptainDraftPage() {
               playerMap={playerMap}
               setWins={setWins}
               busy={isChangingTeams}
+              canTakeBack={canTakeBack}
               onPick={(team, playerId) => void handlePick(team, playerId)}
               onUnpick={(playerId) => void handleUnpick(playerId)}
             />
@@ -809,9 +836,13 @@ export default function CaptainDraftPage() {
                 sheet={sheet}
                 teamMembers={teamMembers}
                 playerMap={playerMap}
+                lockedKeys={lockedKeys}
                 onEditEntry={editEntry}
                 onChangeRoundCode={changeRoundCode}
               />
+              {lockedKeys.size > 0 && (
+                <p className="text-xs text-slate-500 dark:text-slate-400">{t('captainDraft.entry.lockedHint')}</p>
+              )}
 
               <div className="flex flex-wrap items-center justify-end gap-3">
                 {unsavedCount > 0 && (
@@ -845,6 +876,7 @@ export default function CaptainDraftPage() {
         loading={recordsLoading}
         error={recordsError}
         currentDraftId={draft?.draftId ?? null}
+        canDelete={isAdmin}
         deletingDraftId={deletingDraftId}
         onOpen={(draftId) => void handleOpenRecord(draftId)}
         onDelete={(record) => void handleDeleteRecord(record)}

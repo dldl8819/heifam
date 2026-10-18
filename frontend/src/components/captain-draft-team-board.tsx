@@ -11,6 +11,8 @@ type CaptainDraftTeamBoardProps = {
   setWins: SetWins
   // A pick or a take-back in flight; every button waits for it.
   busy: boolean
+  // False once any set has a result: the games have begun and the teams stay as they are.
+  canTakeBack: boolean
   onPick: (team: TeamSide, playerId: number) => void
   onUnpick: (playerId: number) => void
 }
@@ -57,7 +59,15 @@ function playerTags(participant: CaptainDraftParticipant, playerMap: Map<number,
  * the players the captains call out into a team, in any order, and takes back a pick made by mistake.
  * Teams and the players left are listed by tier, highest first, which is how captains pick.
  */
-export function CaptainDraftTeamBoard({ draft, playerMap, setWins, busy, onPick, onUnpick }: CaptainDraftTeamBoardProps) {
+export function CaptainDraftTeamBoard({
+  draft,
+  playerMap,
+  setWins,
+  busy,
+  canTakeBack,
+  onPick,
+  onUnpick,
+}: CaptainDraftTeamBoardProps) {
   const teams: { side: TeamSide; label: string; wins: number; members: CaptainDraftParticipant[] }[] = [
     {
       side: 'HOME',
@@ -119,9 +129,13 @@ export function CaptainDraftTeamBoard({ draft, playerMap, setWins, busy, onPick,
                       <button
                         type="button"
                         onClick={() => onUnpick(member.playerId as number)}
-                        disabled={busy}
+                        disabled={busy || !canTakeBack}
                         aria-label={t('captainDraft.teams.unpick', { nickname: member.nickname })}
-                        title={t('captainDraft.teams.unpick', { nickname: member.nickname })}
+                        title={
+                          canTakeBack
+                            ? t('captainDraft.teams.unpick', { nickname: member.nickname })
+                            : t('captainDraft.teams.unpickAfterResults')
+                        }
                         className="shrink-0 rounded-sm px-1 text-xs text-slate-400 hover:bg-slate-100 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-slate-800 dark:hover:text-rose-400"
                       >
                         ×
