@@ -23,11 +23,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The records of prize draws. A draw is run in an admin's browser (the pinball page); what reaches
- * this service is its outcome, which an admin saves: the title, how many took part, and who won
- * which place and prize. Members read the records; a super admin can remove one.
+ * The records of prize draws. A draw is run in the browser of whoever runs it (the pinball or the
+ * cannon); what reaches this service is its outcome, which any member with access saves: the
+ * title, how many took part, and who won which place and prize. Members read the records; a super
+ * admin can remove one.
  *
- * <p>The outcome is taken as the admin sends it: the balls ran where everyone could watch, and the
+ * <p>The outcome is taken as the member sends it: the draw ran where everyone could watch, and the
  * record says who saved it.
  */
 @Service
@@ -93,15 +94,15 @@ public class PrizeDrawService {
                     winners.getOrDefault(draw.id(), List.of())
                 ))
                 .toList(),
-            accessControlService.isAdminEmail(reader)
+            accessControlService.isServiceAccessAllowed(reader)
         );
     }
 
     @Transactional
     public PrizeDrawListResponse save(Long groupId, String email, String actorNickname, PrizeDrawSaveRequest request) {
         String actor = normalizeEmail(email);
-        if (!accessControlService.isAdminEmail(actor)) {
-            throw new BoardForbiddenException("운영진만 추첨 결과를 저장할 수 있습니다.");
+        if (!accessControlService.isServiceAccessAllowed(actor)) {
+            throw new BoardForbiddenException("사이트 이용 권한이 있는 팸원만 추첨 결과를 저장할 수 있습니다.");
         }
         if (request == null) {
             throw new IllegalArgumentException("추첨 결과가 비어 있습니다.");

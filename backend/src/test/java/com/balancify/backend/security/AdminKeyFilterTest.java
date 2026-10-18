@@ -3447,17 +3447,30 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void letsMembersReadThePrizeDrawsAdminsSaveOneAndSuperAdminsRemoveOne() throws Exception {
-        when(prizeDrawService.list(1L, "member@hei.gg")).thenReturn(new PrizeDrawListResponse(List.of(), false));
+    void letsMembersReadAndSavePrizeDrawsAndSuperAdminsRemoveOne() throws Exception {
+        when(prizeDrawService.list(1L, "member@hei.gg")).thenReturn(new PrizeDrawListResponse(List.of(), true));
         String draw = "{\"title\":\"YOUR_TITLE\",\"mode\":\"FIRST\",\"entrantCount\":5,"
             + "\"winners\":[{\"place\":1,\"name\":\"YOUR_USERNAME\",\"playerId\":7,\"prize\":\"mouse\"}]}";
 
         mockMvc
             .perform(get("/api/groups/1/prize-draws").header("X-USER-EMAIL", "member@hei.gg"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.canRun").value(false));
+            .andExpect(jsonPath("$.canRun").value(true));
 
-        // Saving: a member and a visitor are turned back before the service is asked.
+        // Saving: a visitor and an account without access are turned back before the service is asked.
+        mockMvc
+            .perform(post("/api/groups/1/prize-draws").contentType(MediaType.APPLICATION_JSON).content(draw))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(
+                post("/api/groups/1/prize-draws")
+                    .header("X-USER-EMAIL", "blocked@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(draw)
+            )
+            .andExpect(status().isForbidden());
+        verify(prizeDrawService, never()).save(any(), any(), any(), any());
+        // A member saves a draw they ran.
         mockMvc
             .perform(
                 post("/api/groups/1/prize-draws")
@@ -3465,22 +3478,10 @@ class AdminKeyFilterTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(draw)
             )
-            .andExpect(status().isForbidden());
-        mockMvc
-            .perform(post("/api/groups/1/prize-draws").contentType(MediaType.APPLICATION_JSON).content(draw))
-            .andExpect(status().isForbidden());
-        verify(prizeDrawService, never()).save(any(), any(), any(), any());
-        mockMvc
-            .perform(
-                post("/api/groups/1/prize-draws")
-                    .header("X-USER-EMAIL", "admin@hei.gg")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(draw)
-            )
             .andExpect(status().isOk());
         verify(prizeDrawService).save(
             eq(1L),
-            eq("admin@hei.gg"),
+            eq("member@hei.gg"),
             any(),
             argThat(request -> request != null
                 && "YOUR_TITLE".equals(request.title())

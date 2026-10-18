@@ -436,11 +436,11 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             ),
             AuthType.ADMIN_EMAIL
         ),
-        // Members read the records of prize draws; an admin saves one, a super admin removes one.
+        // Members read the records of prize draws and run and save one too; a super admin removes one.
         new ProtectedRoute(
             "POST",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/prize-draws"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SERVICE_ACCESS
         ),
         new ProtectedRoute(
             "DELETE",

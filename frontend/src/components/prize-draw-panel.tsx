@@ -38,11 +38,11 @@ const errorClass =
   'rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300'
 
 /**
- * Where an admin sets a prize draw up and runs it: who takes part (ticked on the roster, or typed
+ * Where a member sets a prize draw up and runs it: who takes part (ticked on the roster, or typed
  * in), how many win and what, and whether the pinball (the first or the last balls win) or the
- * cannon (one winner a shot) draws them. The draw runs on this screen only; when it is over the
- * admin saves its outcome to the records, or runs it again. The quick cannon (a number or an item,
- * nothing kept) shows under the setup only while the cannon is the method chosen.
+ * cannon (one winner a shot) draws them. The draw runs on this screen only; when it is over they
+ * save its outcome to the records, which name who saved it, or run it again. The quick cannon (a
+ * number or an item, nothing kept) shows under the setup only while the cannon is the method chosen.
  */
 export function PrizeDrawPanel({ groupId, onSaved }: PrizeDrawPanelProps) {
   const [step, setStep] = useState<Step>('compose')
