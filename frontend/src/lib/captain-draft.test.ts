@@ -160,12 +160,15 @@ describe('captain draft sets', () => {
     expect(draftLayout(entries)).toEqual({ setSizes: [3, 1], roundCount: 2 })
   })
 
-  it('offers every race composition, the usual ones and random ones first', () => {
-    expect(compositionsOfSize(3).slice(0, 7)).toEqual(['PPP', 'PPT', 'PPZ', 'PTZ', 'PPR', 'PRR', 'RRR'])
-    expect(compositionsOfSize(3)).toHaveLength(20)
-    expect(new Set(compositionsOfSize(3)).size).toBe(20)
-    expect(compositionsOfSize(2)).toHaveLength(10)
+  it('offers only the usual race compositions and the random ones', () => {
+    expect(compositionsOfSize(3)).toEqual(['PPP', 'PPT', 'PPZ', 'PTZ', 'PPR', 'PRR', 'RRR'])
+    expect(compositionsOfSize(2)).toEqual(['PP', 'PT', 'PZ', 'TZ', 'PR', 'RR'])
     expect(compositionsOfSize(1)).toEqual(['P', 'T', 'Z', 'R'])
+    // Every 2:2 and 1:1 a round's composition starts its smaller sets with is still offered.
+    for (const code of compositionsOfSize(3)) {
+      expect(compositionsOfSize(2)).toContain(setComposition(code, 2))
+      expect(compositionsOfSize(1)).toContain(setComposition(code, 1))
+    }
     expect(canonicalComposition('rpr')).toBe('PRR')
   })
 

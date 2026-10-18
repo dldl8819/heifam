@@ -213,29 +213,17 @@ export function canonicalComposition(code: string): string {
     .join('')
 }
 
-const FEATURED: Record<number, string[]> = {
+// The compositions the clan plays, the ones a set is offered. The operator cut the list down to
+// these; a set saved with another one keeps it (the sheet adds the current one to its options).
+const COMPOSITIONS: Record<number, string[]> = {
   3: ['PPP', 'PPT', 'PPZ', 'PTZ', 'PPR', 'PRR', 'RRR'],
   2: ['PP', 'PT', 'PZ', 'TZ', 'PR', 'RR'],
   1: ['P', 'T', 'Z', 'R'],
 }
 
-function allCompositions(size: number, from = 0): string[] {
-  if (size === 0) {
-    return ['']
-  }
-  const codes: string[] = []
-  for (let index = from; index < RACE_ORDER.length; index += 1) {
-    for (const rest of allCompositions(size - 1, index)) {
-      codes.push(RACE_ORDER[index] + rest)
-    }
-  }
-  return codes
-}
-
-/** Every race composition a set of this size can be played with: the usual ones first, then the rest. */
+/** The race compositions offered for a set of this size, the usual ones and random ones. */
 export function compositionsOfSize(size: number): string[] {
-  const featured = FEATURED[size] ?? []
-  return [...featured, ...allCompositions(size).filter((code) => !featured.includes(code))]
+  return [...(COMPOSITIONS[size] ?? [])]
 }
 
 // The 2:2 game each usual round composition is played with, as the clan plays them.
