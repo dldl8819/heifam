@@ -54,6 +54,10 @@ public class CaptainDraftEntry {
     @Column(length = 30)
     private String requiredTier;
 
+    // The set of the extra round played when the regular rounds end level (에이스 결정전, V82).
+    @Column(nullable = false)
+    private boolean aceDecider;
+
     @OneToMany(mappedBy = "entry", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("team asc, slot asc")
     private List<CaptainDraftEntryPlayer> players = new ArrayList<>();
@@ -134,6 +138,14 @@ public class CaptainDraftEntry {
 
     public void setRequiredTier(String requiredTier) {
         this.requiredTier = requiredTier;
+    }
+
+    public boolean isAceDecider() {
+        return aceDecider;
+    }
+
+    public void setAceDecider(boolean aceDecider) {
+        this.aceDecider = aceDecider;
     }
 
     public List<CaptainDraftEntryPlayer> getPlayers() {

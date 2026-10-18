@@ -19,16 +19,21 @@ import {
   draftLayout,
   draftSheet,
   dropEditsNaming,
+  aceDeciderOffer,
+  aceSizeChoices,
   dropLineupEdits,
   hasAnyLineup,
+  hasLoneLineup,
   hasAnyResult,
   isRunByCaptains,
-  lineupRoundsChanged,
   lineupSubmission,
   roundComposition,
-  roundLineups,
   setComposition,
   setupDiffersFromDraft,
+  stageLineups,
+  stageOf,
+  stagesWithLineupEdits,
+  teamSubmitted,
   type DraftViewer,
   type EffectiveEntry,
   type EntryEdit,
@@ -49,6 +54,7 @@ import {
 import { formatKstDateTime } from '@/lib/kst-time'
 import type {
   CaptainDraftEntryMode,
+  CaptainDraftLineupStage,
   CaptainDraftParticipant,
   CaptainDraftResponse,
   CaptainDraftSummary,
@@ -135,7 +141,10 @@ export default function CaptainDraftPage() {
   const [isCreatingDraft, setIsCreatingDraft] = useState<boolean>(false)
   const [isChangingTeams, setIsChangingTeams] = useState<boolean>(false)
   const [isSavingEntries, setIsSavingEntries] = useState<boolean>(false)
-  const [submittingRound, setSubmittingRound] = useState<number | null>(null)
+  const [submittingStage, setSubmittingStage] = useState<CaptainDraftLineupStage | null>(null)
+  const [isChangingMode, setIsChangingMode] = useState<boolean>(false)
+  const [aceSize, setAceSize] = useState<number>(1)
+  const [isAddingAce, setIsAddingAce] = useState<boolean>(false)
 
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
@@ -207,7 +216,7 @@ export default function CaptainDraftPage() {
     }),
     [byCaptains, draft?.viewerTeam, draft?.viewerCaptain, canEditResults],
   )
-  const lineups = useMemo(() => roundLineups(draft), [draft])
+  const lineups = useMemo(() => stageLineups(draft), [draft])
   // The team this viewer hands in: their own, when they captain it.
   const submitTeam = byCaptains && viewer.viewerCaptain ? viewer.viewerTeam : null
   const canTakeBack = !hasAnyResult(draft?.entries ?? []) && !hasAnyLineup(lineups)
@@ -228,14 +237,16 @@ export default function CaptainDraftPage() {
   }, [sheetRows])
   const setWins = useMemo(() => countSetWins(sheet), [sheet])
   const unsavedCount = sheetRows.filter((row) => row.edited).length
-  // Rounds whose line-up on screen differs from the one handed in, not yet shown to everyone.
-  const unsubmittedRounds = useMemo(() => {
+  // Stages this captain has a line-up on screen for that is not handed in yet.
+  const unsubmittedStages = useMemo(() => {
     if (!submitTeam) {
-      return new Set<number>()
+      return new Set<CaptainDraftLineupStage>()
     }
-    const changed = lineupRoundsChanged(lineupEdits, draft?.entries ?? [], submitTeam)
-    return new Set([...changed].filter((round) => !lineups.get(round)?.revealed))
+    const stages = stagesWithLineupEdits(lineupEdits, draft?.entries ?? [])
+    return new Set([...stages].filter((stage) => !teamSubmitted(lineups.get(stage), submitTeam)))
   }, [submitTeam, lineupEdits, draft, lineups])
+  // The rounds ended level with every set played: whoever runs the draft may play an ace decider.
+  const aceOffer = useMemo(() => aceDeciderOffer(draft?.entries ?? []), [draft])
 
   // The rounds in order, each with its sets and the composition of its biggest set.
   const roundGroups = useMemo(() => {
@@ -247,7 +258,7 @@ export default function CaptainDraftPage() {
       .sort(([left], [right]) => left - right)
       .map(([roundNumber, sets]) => {
         const ordered = [...sets].sort((left, right) => left.setNumber - right.setNumber)
-        return { roundNumber, roundCode: roundComposition(ordered), sets: ordered }
+        return { roundNumber, roundCode: roundComposition(ordered), sets: ordered, aceDecider: ordered.some((set) => set.aceDecider) }
       })
   }, [sheet])
 
@@ -512,7 +523,7 @@ export default function CaptainDraftPage() {
   }
 
   // Changes on screen that 초기화 or loading another draft would lose, a captain's line-up included.
-  const pendingCount = unsavedCount + unsubmittedRounds.size
+  const pendingCount = unsavedCount + unsubmittedStages.size
 
   const handleResetDraftSetup = () => {
     if (pendingCount > 0 && !window.confirm(t('captainDraft.actions.resetConfirm', { count: pendingCount }))) {
@@ -668,13 +679,13 @@ export default function CaptainDraftPage() {
     }
   }
 
-  // A captain's own side of a round not shown to everyone yet is their line-up, handed in by round;
+  // A captain's own side of a stage not shown to everyone yet is their line-up, handed in once;
   // everything else is saved with 엔트리 저장.
   const editEntry = (key: string, change: EntryEdit) => {
     const set = sheet.find((candidate) => candidate.key === key)
     const { homePlayerIds, awayPlayerIds, ...rest } = change
     const ownSide = submitTeam === 'HOME' ? homePlayerIds : submitTeam === 'AWAY' ? awayPlayerIds : undefined
-    if (set && submitTeam && !lineups.get(set.roundNumber)?.revealed && ownSide) {
+    if (set && submitTeam && !lineups.get(stageOf(set))?.revealed && ownSide) {
       setLineupEdits((previous) => ({ ...previous, [key]: ownSide }))
       if (Object.keys(rest).length === 0) {
         return
@@ -685,38 +696,100 @@ export default function CaptainDraftPage() {
     setEntryEdits((previous) => ({ ...previous, [key]: { ...previous[key], ...change } }))
   }
 
-  const handleSubmitLineup = async (roundNumber: number) => {
+  // A captain hands in every round of their team at once (or the ace decider), and only once.
+  const handleSubmitLineup = async (stage: CaptainDraftLineupStage) => {
     if (!draft?.draftId || !submitTeam) {
       return
     }
     setMessage(null)
     setError(null)
-    const { request, complete } = lineupSubmission(sheet, roundNumber, submitTeam)
+    const { request, complete } = lineupSubmission(sheet, stage, submitTeam)
     if (!complete) {
-      setError(t('captainDraft.lineup.incomplete', { round: roundNumber }))
+      setError(t(stage === 'ACE' ? 'captainDraft.lineup.incompleteAce' : 'captainDraft.lineup.incomplete'))
       return
     }
-    setSubmittingRound(roundNumber)
+    if (!window.confirm(t(stage === 'ACE' ? 'captainDraft.lineup.confirmAce' : 'captainDraft.lineup.confirm'))) {
+      return
+    }
+    setSubmittingStage(stage)
     const view = draftViewRef.current
     try {
-      const next = await apiClient.submitCaptainDraftLineup(TEMP_GROUP_ID, draft.draftId, roundNumber, request)
+      const next = await apiClient.submitCaptainDraftLineup(TEMP_GROUP_ID, draft.draftId, request)
       if (view !== draftViewRef.current) {
         return
       }
       setDraft(next)
-      setLineupEdits((previous) => dropLineupEdits(previous, next.entries, roundNumber))
-      const revealed = next.lineups?.find((lineup) => lineup.roundNumber === roundNumber)?.revealed
-      setMessage(t(revealed ? 'captainDraft.lineup.revealedNow' : 'captainDraft.lineup.submitted', { round: roundNumber }))
+      setLineupEdits((previous) => dropLineupEdits(previous, next.entries, stage))
+      const revealed = next.lineups?.find((lineup) => lineup.stage === stage)?.revealed
+      setMessage(t(revealed ? 'captainDraft.lineup.revealedNow' : 'captainDraft.lineup.submitted'))
     } catch (submitError) {
       setError(
         isApiForbiddenError(submitError)
           ? t('captainDraft.lineup.notCaptain')
           : isApiConflictError(submitError)
-            ? t('captainDraft.lineup.alreadyRevealed')
+            ? t('captainDraft.lineup.alreadySubmitted')
             : errorWithReason('captainDraft.lineup.submitFailed', submitError),
       )
     } finally {
-      setSubmittingRound(null)
+      setSubmittingStage(null)
+    }
+  }
+
+  // Whoever runs the draft switches between the host filling both teams in and the captains handing
+  // theirs in; the backend refuses a switch that would show or hide what it must not.
+  const handleChangeEntryMode = async (mode: CaptainDraftEntryMode) => {
+    if (!draft?.draftId || mode === (draft.entryMode ?? 'HOST')) {
+      return
+    }
+    if (!window.confirm(t(mode === 'CAPTAINS' ? 'captainDraft.entryMode.toCaptainsConfirm' : 'captainDraft.entryMode.toHostConfirm'))) {
+      return
+    }
+    setMessage(null)
+    setError(null)
+    setIsChangingMode(true)
+    const view = draftViewRef.current
+    try {
+      const next = await apiClient.changeCaptainDraftEntryMode(TEMP_GROUP_ID, draft.draftId, { entryMode: mode })
+      if (view !== draftViewRef.current) {
+        return
+      }
+      setDraft(next)
+      setEntryMode(next.entryMode ?? 'HOST')
+      setLineupEdits({})
+      setMessage(t('captainDraft.entryMode.changed', {
+        mode: t(mode === 'CAPTAINS' ? 'captainDraft.entryMode.captains' : 'captainDraft.entryMode.host'),
+      }))
+    } catch (changeError) {
+      setError(errorWithReason('captainDraft.entryMode.changeFailed', changeError))
+    } finally {
+      setIsChangingMode(false)
+    }
+  }
+
+  // The rounds ended level: one more round, the ace decider, if whoever runs the draft wants it.
+  const handleAddAce = async () => {
+    if (!draft?.draftId || !aceOffer) {
+      return
+    }
+    if (!window.confirm(t('captainDraft.ace.confirm', { size: aceSize }))) {
+      return
+    }
+    setMessage(null)
+    setError(null)
+    setIsAddingAce(true)
+    const view = draftViewRef.current
+    try {
+      const next = await apiClient.addCaptainDraftAceDecider(TEMP_GROUP_ID, draft.draftId, { teamSize: aceSize })
+      void loadRecords()
+      if (view !== draftViewRef.current) {
+        return
+      }
+      setDraft(next)
+      setMessage(t('captainDraft.ace.added'))
+    } catch (aceError) {
+      setError(errorWithReason('captainDraft.ace.addFailed', aceError))
+    } finally {
+      setIsAddingAce(false)
     }
   }
 
@@ -925,11 +998,22 @@ export default function CaptainDraftPage() {
                   {t('captainDraft.status.label')}:{' '}
                   {draft.status === 'READY' ? t('captainDraft.status.ready') : t('captainDraft.status.drafting')}
                 </p>
-                <p className="mt-1">
-                  {t('captainDraft.entryMode.status', {
-                    mode: t(byCaptains ? 'captainDraft.entryMode.captains' : 'captainDraft.entryMode.host'),
-                  })}
-                </p>
+                <label className="mt-1 flex flex-wrap items-center gap-2">
+                  <span>{t('captainDraft.entryMode.label')}:</span>
+                  <select
+                    value={byCaptains ? 'CAPTAINS' : 'HOST'}
+                    onChange={(event) => void handleChangeEntryMode(event.target.value === 'CAPTAINS' ? 'CAPTAINS' : 'HOST')}
+                    disabled={isChangingMode}
+                    aria-label={t('captainDraft.entryMode.changeLabel')}
+                    className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 outline-hidden focus:border-slate-500 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+                  >
+                    <option value="HOST">{t('captainDraft.entryMode.host')}</option>
+                    <option value="CAPTAINS">{t('captainDraft.entryMode.captains')}</option>
+                  </select>
+                </label>
+                {byCaptains && hasLoneLineup(lineups) && (
+                  <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{t('captainDraft.entryMode.loneLineupHint')}</p>
+                )}
                 {byCaptains && viewer.viewerTeam && (
                   <p className="mt-1 font-semibold">
                     {t(viewer.viewerCaptain ? 'captainDraft.entryMode.viewerCaptain' : 'captainDraft.entryMode.viewerMember', {
@@ -964,6 +1048,56 @@ export default function CaptainDraftPage() {
             </p>
 
             <div className="mt-4 space-y-4">
+              {byCaptains &&
+                [...lineups.entries()].map(([stage, lineup]) => (
+                  <div
+                    key={`lineup-${stage}`}
+                    className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800"
+                  >
+                    <span className="font-semibold text-slate-800 dark:text-slate-100">
+                      {t(stage === 'ACE' ? 'captainDraft.lineup.aceStage' : 'captainDraft.lineup.mainStage')}
+                    </span>
+                    {lineup.revealed ? (
+                      <span className="rounded-sm bg-emerald-100 px-1.5 py-0.5 font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                        {t('captainDraft.lineup.revealed')}
+                      </span>
+                    ) : (
+                      (['HOME', 'AWAY'] as const).map((team) => (
+                        <span
+                          key={`lineup-${stage}-${team}`}
+                          className={
+                            teamSubmitted(lineup, team)
+                              ? team === 'HOME'
+                                ? 'font-medium text-sky-700 dark:text-sky-300'
+                                : 'font-medium text-rose-700 dark:text-rose-300'
+                              : 'text-slate-500 dark:text-slate-400'
+                          }
+                        >
+                          {t(teamSubmitted(lineup, team) ? 'captainDraft.lineup.teamIn' : 'captainDraft.lineup.teamPending', {
+                            team: t(TEAM_LABEL_KEYS[team]),
+                          })}
+                        </span>
+                      ))
+                    )}
+                    {submitTeam && !lineup.revealed && !teamSubmitted(lineup, submitTeam) && (
+                      <span className="ml-auto flex items-center gap-2">
+                        {unsubmittedStages.has(stage) && (
+                          <span className="text-amber-700 dark:text-amber-300">{t('captainDraft.lineup.unsubmitted')}</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => void handleSubmitLineup(stage)}
+                          disabled={submittingStage !== null}
+                          className="rounded-md bg-slate-900 px-3 py-1.5 font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
+                        >
+                          {submittingStage === stage
+                            ? t('captainDraft.lineup.submitting')
+                            : t(stage === 'ACE' ? 'captainDraft.lineup.submitAce' : 'captainDraft.lineup.submit')}
+                        </button>
+                      </span>
+                    )}
+                  </div>
+                ))}
               <CaptainDraftEntrySheet
                 rounds={roundGroups}
                 sheet={sheet}
@@ -973,13 +1107,36 @@ export default function CaptainDraftPage() {
                 onEditEntry={editEntry}
                 onChangeRoundCode={changeRoundCode}
                 lineups={byCaptains ? lineups : undefined}
-                submitTeam={submitTeam}
-                unsubmittedRounds={unsubmittedRounds}
-                submittingRound={submittingRound}
-                onSubmitLineup={(roundNumber) => void handleSubmitLineup(roundNumber)}
               />
               {sheetRows.some((row) => row.controls.locked) && (
                 <p className="text-xs text-slate-500 dark:text-slate-400">{t('captainDraft.entry.lockedHint')}</p>
+              )}
+              {aceOffer && (
+                <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                  <span className="font-medium">{t('captainDraft.ace.offer', { home: aceOffer.home, away: aceOffer.away })}</span>
+                  <label className="flex items-center gap-1 text-xs">
+                    {t('captainDraft.ace.sizeLabel')}
+                    <select
+                      value={aceSize}
+                      onChange={(event) => setAceSize(Number(event.target.value))}
+                      className="rounded-md border border-amber-300 bg-white px-1.5 py-1 text-xs text-slate-800 outline-hidden dark:border-amber-800 dark:bg-slate-950 dark:text-slate-100"
+                    >
+                      {aceSizeChoices(teamMembers.HOME.length, teamMembers.AWAY.length).map((size) => (
+                        <option key={`ace-size-${size}`} value={size}>
+                          {t('captainDraft.entry.teamSize', { size })}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => void handleAddAce()}
+                    disabled={isAddingAce}
+                    className="ml-auto rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isAddingAce ? t('captainDraft.ace.adding') : t('captainDraft.ace.add')}
+                  </button>
+                </div>
               )}
 
               <div className="flex flex-wrap items-center justify-end gap-3">
@@ -994,9 +1151,7 @@ export default function CaptainDraftPage() {
                   disabled={isSavingEntries}
                   className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
                 >
-                  {isSavingEntries
-                    ? t('captainDraft.actions.savingEntries')
-                    : t(byCaptains ? 'captainDraft.lineup.saveSets' : 'captainDraft.actions.saveEntries')}
+                  {isSavingEntries ? t('captainDraft.actions.savingEntries') : t('captainDraft.actions.saveEntries')}
                 </button>
               </div>
             </div>

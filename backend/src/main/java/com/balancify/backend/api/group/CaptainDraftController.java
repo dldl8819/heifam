@@ -1,7 +1,9 @@
 package com.balancify.backend.api.group;
 
+import com.balancify.backend.api.group.dto.CaptainDraftAceRequest;
 import com.balancify.backend.api.group.dto.CaptainDraftCreateRequest;
 import com.balancify.backend.api.group.dto.CaptainDraftEntriesUpdateRequest;
+import com.balancify.backend.api.group.dto.CaptainDraftEntryModeRequest;
 import com.balancify.backend.api.group.dto.CaptainDraftLineupRequest;
 import com.balancify.backend.api.group.dto.CaptainDraftListResponse;
 import com.balancify.backend.api.group.dto.CaptainDraftPickRequest;
@@ -33,10 +35,11 @@ import org.springframework.web.server.ResponseStatusException;
  * with a set's first result. Changing a result already in is for admins and match result editors
  * (below and in CaptainDraftService); removing a draft is for admins (AdminKeyFilter).
  *
- * In a draft run by its captains, each captain hands in their own team's line-up a round at a time,
- * and a team's players are shown to the other team only once both are in. Who reads or hands in is
- * the player linked to the verified account of the request (the bearer token), never anything the
- * request says about itself.
+ * In a draft run by its captains, each captain hands in their own team's line-up once (every regular
+ * round together, then the ace decider if one is played), and a team's players are shown to the
+ * other team only once both are in. Who reads or hands in is the player linked to the verified
+ * account of the request (the bearer token), never anything the request says about itself. The way
+ * a draft is run can be changed while it runs, and an ace decider added when the rounds end level.
  */
 @RestController
 @RequestMapping("/api/groups")
@@ -217,18 +220,17 @@ public class CaptainDraftController {
         }
     }
 
-    // A captain hands in their team's line-up for a round; only the captain's own account can (403).
-    @PutMapping("/{groupId}/captain-drafts/{draftId}/rounds/{roundNumber}/lineup")
+    // A captain hands in their team's line-up, once a stage; only the captain's own account can (403).
+    @PutMapping("/{groupId}/captain-drafts/{draftId}/lineup")
     public CaptainDraftResponse submitLineup(
         @PathVariable Long groupId,
         @PathVariable Long draftId,
-        @PathVariable Integer roundNumber,
         @RequestBody CaptainDraftLineupRequest request,
         HttpServletRequest httpRequest
     ) {
         requireRequestEmail(httpRequest);
         try {
-            return captainDraftService.submitLineup(groupId, draftId, roundNumber, request, viewer(httpRequest));
+            return captainDraftService.submitLineup(groupId, draftId, request, viewer(httpRequest));
         } catch (CaptainDraftLineupForbiddenException notACaptain) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, notACaptain.getMessage(), notACaptain);
         } catch (IllegalArgumentException illegalArgumentException) {
@@ -237,9 +239,65 @@ public class CaptainDraftController {
                 illegalArgumentException.getMessage(),
                 illegalArgumentException
             );
-        } catch (IllegalStateException bothIn) {
-            // Both line-ups are in and shown: the round stays as it is.
-            throw new ResponseStatusException(HttpStatus.CONFLICT, bothIn.getMessage(), bothIn);
+        } catch (IllegalStateException handedInAlready) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, handedInAlready.getMessage(), handedInAlready);
+        } catch (NoSuchElementException noSuchElementException) {
+            throw new ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                noSuchElementException.getMessage(),
+                noSuchElementException
+            );
+        }
+    }
+
+    // Whoever runs the draft changes how its sets are filled in; a change that would show or hide
+    // what must not be is refused (409).
+    @PutMapping("/{groupId}/captain-drafts/{draftId}/entry-mode")
+    public CaptainDraftResponse changeEntryMode(
+        @PathVariable Long groupId,
+        @PathVariable Long draftId,
+        @RequestBody CaptainDraftEntryModeRequest request,
+        HttpServletRequest httpRequest
+    ) {
+        requireRequestEmail(httpRequest);
+        try {
+            return captainDraftService.changeEntryMode(groupId, draftId, request, viewer(httpRequest));
+        } catch (IllegalArgumentException illegalArgumentException) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                illegalArgumentException.getMessage(),
+                illegalArgumentException
+            );
+        } catch (IllegalStateException notNow) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, notNow.getMessage(), notNow);
+        } catch (NoSuchElementException noSuchElementException) {
+            throw new ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                noSuchElementException.getMessage(),
+                noSuchElementException
+            );
+        }
+    }
+
+    // An ace decider for a draft whose rounds ended level; refused (409) when they did not, or once played.
+    @PostMapping("/{groupId}/captain-drafts/{draftId}/ace")
+    public CaptainDraftResponse addAceDecider(
+        @PathVariable Long groupId,
+        @PathVariable Long draftId,
+        @RequestBody(required = false) CaptainDraftAceRequest request,
+        HttpServletRequest httpRequest
+    ) {
+        requireRequestEmail(httpRequest);
+        try {
+            return captainDraftService.addAceDecider(groupId, draftId, request, viewer(httpRequest));
+        } catch (IllegalArgumentException illegalArgumentException) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                illegalArgumentException.getMessage(),
+                illegalArgumentException
+            );
+        } catch (IllegalStateException notNow) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, notNow.getMessage(), notNow);
         } catch (NoSuchElementException noSuchElementException) {
             throw new ResponseStatusException(
                 HttpStatus.NOT_FOUND,

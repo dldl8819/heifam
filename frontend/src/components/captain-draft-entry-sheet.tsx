@@ -7,14 +7,15 @@ import {
   draftPlayerTags,
   playersInRound,
   requiredTierPresets,
+  teamSubmitted,
   withSlot,
   type DraftWinnerSelection,
   type EffectiveEntry,
   type EntryEdit,
-  type RoundLineup,
   type SetControls,
+  type StageLineup,
 } from '@/lib/captain-draft'
-import type { CaptainDraftParticipant, PlayerRosterItem, TeamSide } from '@/types/api'
+import type { CaptainDraftLineupStage, CaptainDraftParticipant, PlayerRosterItem, TeamSide } from '@/types/api'
 
 const TIER_PRESET_LIST_ID = 'captain-draft-tier-presets'
 const WINNER_OPTIONS = [
@@ -33,6 +34,8 @@ export type EntrySheetRound = {
   // The composition of the round's biggest set, as shown.
   roundCode: string
   sets: EffectiveEntry[]
+  // The ace decider (에이스 결정전), played when the rounds end level.
+  aceDecider: boolean
 }
 
 export type EntrySheetMember = CaptainDraftParticipant & { playerId: number }
@@ -46,13 +49,8 @@ type CaptainDraftEntrySheetProps = {
   controls: ReadonlyMap<string, SetControls>
   onEditEntry: (key: string, change: EntryEdit) => void
   onChangeRoundCode: (roundNumber: number, code: string) => void
-  // A draft run by its captains: each round's line-ups, the team this viewer hands in when they
-  // captain one, and the rounds whose line-up on screen is not the one handed in.
-  lineups?: ReadonlyMap<number, RoundLineup>
-  submitTeam?: TeamSide | null
-  unsubmittedRounds?: ReadonlySet<number>
-  submittingRound?: number | null
-  onSubmitLineup?: (roundNumber: number) => void
+  // A draft run by its captains: each stage's line-ups (the regular rounds, the ace decider).
+  lineups?: ReadonlyMap<CaptainDraftLineupStage, StageLineup>
 }
 
 // The compositions a set of this size can take, with the current one kept even if unusual.
@@ -64,10 +62,6 @@ function compositionOptions(size: number, current: string): string[] {
 function selectedPlayerId(value: string): number | null {
   const parsed = Number(value)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null
-}
-
-function teamSubmitted(lineup: RoundLineup | undefined, team: TeamSide): boolean {
-  return Boolean(team === 'HOME' ? lineup?.homeSubmitted : lineup?.awaySubmitted)
 }
 
 /**
@@ -85,10 +79,6 @@ export function CaptainDraftEntrySheet({
   onEditEntry,
   onChangeRoundCode,
   lineups,
-  submitTeam = null,
-  unsubmittedRounds,
-  submittingRound = null,
-  onSubmitLineup,
 }: CaptainDraftEntrySheetProps) {
   // The players a slot can take: that team's players not yet placed elsewhere in the round.
   const playerOptions = (team: TeamSide, set: EffectiveEntry, slot: number) => {
@@ -146,7 +136,7 @@ export function CaptainDraftEntrySheet({
             const roundHomeWins = round.sets.filter((set) => set.winnerTeam === 'HOME').length
             const roundAwayWins = round.sets.filter((set) => set.winnerTeam === 'AWAY').length
             const roundSettingsOpen = round.sets.some((set) => controls.get(set.key)?.settings)
-            const lineup = lineups?.get(round.roundNumber)
+            const lineup = lineups?.get(round.aceDecider ? 'ACE' : 'MAIN')
 
             return round.sets.map((set, setIndex) => {
               const dividerClass = roundIndex > 0 && setIndex === 0 ? 'border-t-[3px] border-t-slate-800' : ''
@@ -158,7 +148,9 @@ export function CaptainDraftEntrySheet({
                       rowSpan={round.sets.length}
                       className={`border border-slate-400 bg-white px-2 py-2 text-center align-middle font-semibold text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 ${dividerClass}`.trim()}
                     >
-                      <span className="block text-base">{t('captainDraft.entry.roundOnly', { round: round.roundNumber })}</span>
+                      <span className={`block ${round.aceDecider ? 'text-sm text-amber-700 dark:text-amber-300' : 'text-base'}`}>
+                        {round.aceDecider ? t('captainDraft.ace.roundLabel') : t('captainDraft.entry.roundOnly', { round: round.roundNumber })}
+                      </span>
                       <select
                         value={round.roundCode}
                         onChange={(event) => onChangeRoundCode(round.roundNumber, event.target.value)}
@@ -172,16 +164,10 @@ export function CaptainDraftEntrySheet({
                           </option>
                         ))}
                       </select>
-                      {lineups && (
-                        <RoundLineupStatus
-                          roundNumber={round.roundNumber}
-                          lineup={lineup}
-                          submitTeam={submitTeam}
-                          unsubmitted={unsubmittedRounds?.has(round.roundNumber) ?? false}
-                          submitting={submittingRound === round.roundNumber}
-                          busy={submittingRound !== null}
-                          onSubmit={onSubmitLineup}
-                        />
+                      {lineup?.revealed && (
+                        <span className="mt-2 inline-block rounded-sm bg-emerald-100 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                          {t('captainDraft.lineup.revealed')}
+                        </span>
                       )}
                     </th>
                   )}
@@ -310,63 +296,6 @@ export function CaptainDraftEntrySheet({
           <option key={preset} value={preset} />
         ))}
       </datalist>
-    </div>
-  )
-}
-
-type RoundLineupStatusProps = {
-  roundNumber: number
-  lineup: RoundLineup | undefined
-  submitTeam: TeamSide | null
-  unsubmitted: boolean
-  submitting: boolean
-  busy: boolean
-  onSubmit?: (roundNumber: number) => void
-}
-
-// Under a round's name in a draft run by its captains: who has handed it in, and the captain's button.
-function RoundLineupStatus({ roundNumber, lineup, submitTeam, unsubmitted, submitting, busy, onSubmit }: RoundLineupStatusProps) {
-  if (lineup?.revealed) {
-    return (
-      <span className="mt-2 inline-block rounded-sm bg-emerald-100 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
-        {t('captainDraft.lineup.revealed')}
-      </span>
-    )
-  }
-  return (
-    <div className="mt-2 space-y-0.5 text-[11px] font-medium">
-      {(['HOME', 'AWAY'] as const).map((team) => {
-        const submitted = teamSubmitted(lineup, team)
-        const label = t(TEAM_LABELS[team])
-        return (
-          <span
-            key={`${roundNumber}-${team}-status`}
-            className={`block ${
-              submitted
-                ? team === 'HOME'
-                  ? 'text-sky-700 dark:text-sky-300'
-                  : 'text-rose-700 dark:text-rose-300'
-                : 'text-slate-400 dark:text-slate-500'
-            }`}
-          >
-            {t(submitted ? 'captainDraft.lineup.teamIn' : 'captainDraft.lineup.teamPending', { team: label })}
-          </span>
-        )
-      })}
-      {submitTeam && onSubmit && (
-        <button
-          type="button"
-          onClick={() => onSubmit(roundNumber)}
-          disabled={busy}
-          aria-label={t('captainDraft.lineup.submitLabel', { round: roundNumber, team: t(TEAM_LABELS[submitTeam]) })}
-          className="mt-1 w-full rounded-md bg-slate-900 px-1 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
-        >
-          {submitting
-            ? t('captainDraft.lineup.submitting')
-            : t(teamSubmitted(lineup, submitTeam) ? 'captainDraft.lineup.resubmit' : 'captainDraft.lineup.submit')}
-        </button>
-      )}
-      {unsubmitted && <span className="block text-amber-700 dark:text-amber-300">{t('captainDraft.lineup.unsubmitted')}</span>}
     </div>
   )
 }

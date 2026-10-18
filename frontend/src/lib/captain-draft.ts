@@ -3,6 +3,7 @@ import { toTierOrder } from '@/lib/player-tier'
 import type {
   CaptainDraftEntry,
   CaptainDraftLineupRequest,
+  CaptainDraftLineupStage,
   CaptainDraftResponse,
   CaptainDraftSummary,
   PlayerRosterItem,
@@ -47,6 +48,8 @@ export type EffectiveEntry = {
   winnerTeam: DraftWinnerSelection
   // Who put the saved result in, while the result shown is that one; null otherwise.
   resultRecordedBy: string | null
+  // The set of the ace decider (에이스 결정전), the extra round played when the rounds end level.
+  aceDecider: boolean
 }
 
 export type SetWins = {
@@ -80,6 +83,7 @@ export function effectiveEntry(entry: CaptainDraftEntry, edit: EntryEdit | undef
     winnerTeam,
     // A result changed here and not saved yet is nobody's yet.
     resultRecordedBy: winnerTeam !== '' && winnerTeam === savedWinner ? (entry.resultRecordedByNickname ?? null) : null,
+    aceDecider: Boolean(entry.aceDecider),
   }
 }
 
@@ -97,37 +101,53 @@ export function hasAnyResult(entries: readonly CaptainDraftEntry[]): boolean {
   return entries.some(hasSavedResult)
 }
 
-/** A draft whose captains hand in their own team's line-up a round at a time, unseen by the other. */
+/** A draft whose captains hand in their own team's line-up, unseen by the other team until both are in. */
 export function isRunByCaptains(draft: Pick<CaptainDraftResponse, 'entryMode'> | null | undefined): boolean {
   return draft?.entryMode === 'CAPTAINS'
 }
 
-// Which team has handed a round's line-up in, and whether both have (both shown to everyone).
-export type RoundLineup = {
+/** What a captain hands in at once: every regular round (MAIN), then the ace decider (ACE). */
+export function stageOf(entry: Pick<CaptainDraftEntry, 'aceDecider'>): CaptainDraftLineupStage {
+  return entry.aceDecider ? 'ACE' : 'MAIN'
+}
+
+// Which team has handed a stage's line-up in, and whether both have (both shown to everyone).
+export type StageLineup = {
   homeSubmitted: boolean
   awaySubmitted: boolean
   revealed: boolean
 }
 
-/** Each round's line-ups of a draft run by its captains; none for a draft the host fills in. */
-export function roundLineups(draft: Pick<CaptainDraftResponse, 'entryMode' | 'lineups'> | null): Map<number, RoundLineup> {
-  const rounds = new Map<number, RoundLineup>()
+export function teamSubmitted(lineup: StageLineup | undefined, team: TeamSide): boolean {
+  return Boolean(team === 'HOME' ? lineup?.homeSubmitted : lineup?.awaySubmitted)
+}
+
+/** Each stage's line-ups of a draft run by its captains; none for a draft the host fills in. */
+export function stageLineups(
+  draft: Pick<CaptainDraftResponse, 'entryMode' | 'lineups'> | null,
+): Map<CaptainDraftLineupStage, StageLineup> {
+  const stages = new Map<CaptainDraftLineupStage, StageLineup>()
   if (!isRunByCaptains(draft)) {
-    return rounds
+    return stages
   }
   for (const lineup of draft?.lineups ?? []) {
-    rounds.set(lineup.roundNumber, {
+    stages.set(lineup.stage, {
       homeSubmitted: lineup.homeSubmitted,
       awaySubmitted: lineup.awaySubmitted,
       revealed: lineup.revealed,
     })
   }
-  return rounds
+  return stages
 }
 
 /** Whether a captain has handed any line-up in: the teams then stay as they are. */
-export function hasAnyLineup(lineups: ReadonlyMap<number, RoundLineup>): boolean {
+export function hasAnyLineup(lineups: ReadonlyMap<CaptainDraftLineupStage, StageLineup>): boolean {
   return [...lineups.values()].some((lineup) => lineup.homeSubmitted || lineup.awaySubmitted)
+}
+
+/** Whether one captain alone has handed a stage in; the draft cannot go back to its host then. */
+export function hasLoneLineup(lineups: ReadonlyMap<CaptainDraftLineupStage, StageLineup>): boolean {
+  return [...lineups.values()].some((lineup) => lineup.homeSubmitted !== lineup.awaySubmitted)
 }
 
 // Who reads the sheet: how the draft is run, the reader's team (the backend knows it from their
@@ -154,35 +174,24 @@ export type SetControls = {
 /**
  * What this viewer may change in a set. The backend holds to the same; this only shapes the sheet.
  *
- * Filled in by the host: anything, but a set whose result is saved only by those who may edit results.
- * Run by the captains, until both line-ups of the round are in: a captain fills in their own side,
- * their team reads it, and the other side is hidden; races and tier notes are anyone's until a
- * captain hands the round in, and no result yet. Once both are in: the players, races and tier
- * notes are for those who may edit results, and a set's first result anyone's.
+ * Filled in by the host, or run by the captains once both line-ups of the set's stage are in:
+ * anything, but a set whose result is saved only by those who may edit results. Run by the captains
+ * before that: a captain fills in their own side until they hand it in, their team reads it, and the
+ * other side is hidden; races and tier notes are anyone's, and no result yet.
  */
-export function setControls(entry: CaptainDraftEntry, lineup: RoundLineup | undefined, viewer: DraftViewer): SetControls {
+export function setControls(entry: CaptainDraftEntry, lineup: StageLineup | undefined, viewer: DraftViewer): SetControls {
   const resultLocked = hasSavedResult(entry) && !viewer.canEditResults
-  if (!viewer.byCaptains) {
+  if (!viewer.byCaptains || lineup?.revealed) {
     const side: SideAccess = resultLocked ? 'read' : 'edit'
     return { sides: { HOME: side, AWAY: side }, settings: !resultLocked, result: !resultLocked, locked: resultLocked }
-  }
-  if (lineup?.revealed) {
-    const side: SideAccess = viewer.canEditResults ? 'edit' : 'read'
-    return { sides: { HOME: side, AWAY: side }, settings: viewer.canEditResults, result: !resultLocked, locked: resultLocked }
   }
   const access = (team: TeamSide): SideAccess => {
     if (team === 'HOME' ? entry.homeHidden : entry.awayHidden) {
       return 'hidden'
     }
-    return viewer.viewerCaptain && viewer.viewerTeam === team ? 'edit' : 'read'
+    return viewer.viewerCaptain && viewer.viewerTeam === team && !teamSubmitted(lineup, team) ? 'edit' : 'read'
   }
-  const anyIn = Boolean(lineup?.homeSubmitted || lineup?.awaySubmitted)
-  return {
-    sides: { HOME: access('HOME'), AWAY: access('AWAY') },
-    settings: !anyIn || viewer.canEditResults,
-    result: false,
-    locked: false,
-  }
+  return { sides: { HOME: access('HOME'), AWAY: access('AWAY') }, settings: true, result: false, locked: false }
 }
 
 // A captain's line-up not handed in yet: their side of each set, by set key.
@@ -191,7 +200,7 @@ export type LineupEdits = Record<string, SidePlayerIds>
 export type SheetRow = {
   set: EffectiveEntry
   controls: SetControls
-  // Whether it carries changes not saved yet (races, tier note, result or, for the host, players).
+  // Whether it carries changes not saved yet (races, tier note, result or players, but not a captain's line-up).
   edited: boolean
 }
 
@@ -201,19 +210,19 @@ function sideKey(team: TeamSide): 'homePlayerIds' | 'awayPlayerIds' {
 
 /**
  * The sheet as this viewer sees it: the saved sets with the changes made here laid over them, only
- * those the viewer may make. In a round of a draft run by its captains that is not in for both
+ * those the viewer may make. In a stage of a draft run by its captains that is not in for both
  * teams, the players are the captains': a captain's line-up not handed in yet shows on their side.
  */
 export function draftSheet(
   entries: readonly CaptainDraftEntry[],
   edits: EntryEdits,
   lineupEdits: LineupEdits,
-  lineups: ReadonlyMap<number, RoundLineup>,
+  lineups: ReadonlyMap<CaptainDraftLineupStage, StageLineup>,
   viewer: DraftViewer,
 ): SheetRow[] {
   return entries.map((entry) => {
     const key = entryKey(entry)
-    const lineup = lineups.get(entry.roundNumber)
+    const lineup = lineups.get(stageOf(entry))
     const controls = setControls(entry, lineup, viewer)
     const own: EntryEdit = { ...(edits[key] ?? {}) }
     if (!controls.settings) {
@@ -239,21 +248,27 @@ export function draftSheet(
 }
 
 /**
- * A captain's line-up for one round as the backend takes it: their side of every set of the round,
- * and whether every slot is filled (the backend takes none with an empty slot).
+ * A captain's line-up for a stage as the backend takes it, once: their side of every set of every
+ * round of it, and whether every slot is filled (the backend takes none with an empty slot).
  */
 export function lineupSubmission(
   sheet: readonly EffectiveEntry[],
-  roundNumber: number,
+  stage: CaptainDraftLineupStage,
   team: TeamSide,
 ): { request: CaptainDraftLineupRequest; complete: boolean } {
   const sets = sheet
-    .filter((set) => set.roundNumber === roundNumber)
-    .sort((left, right) => left.setNumber - right.setNumber)
-    .map((set) => ({ setNumber: set.setNumber, slots: team === 'HOME' ? set.homePlayerIds : set.awayPlayerIds }))
+    .filter((set) => stageOf(set) === stage)
+    .sort((left, right) => left.roundNumber - right.roundNumber || left.setNumber - right.setNumber)
+    .map((set) => ({
+      roundNumber: set.roundNumber,
+      setNumber: set.setNumber,
+      slots: team === 'HOME' ? set.homePlayerIds : set.awayPlayerIds,
+    }))
   return {
     request: {
-      sets: sets.map(({ setNumber, slots }) => ({
+      stage,
+      sets: sets.map(({ roundNumber, setNumber, slots }) => ({
+        roundNumber,
         setNumber,
         playerIds: slots.filter((playerId): playerId is number => typeof playerId === 'number'),
       })),
@@ -262,22 +277,61 @@ export function lineupSubmission(
   }
 }
 
-/** The rounds whose line-up on screen is not the one handed in: changed here, or never handed in. */
-export function lineupRoundsChanged(lineupEdits: LineupEdits, entries: readonly CaptainDraftEntry[], team: TeamSide): Set<number> {
-  const changed = new Set<number>()
+/** The stages a captain has a line-up on screen for that is not handed in yet. */
+export function stagesWithLineupEdits(lineupEdits: LineupEdits, entries: readonly CaptainDraftEntry[]): Set<CaptainDraftLineupStage> {
+  const stages = new Set<CaptainDraftLineupStage>()
   for (const entry of entries) {
-    const edit = lineupEdits[entryKey(entry)]
-    if (edit && edit.some((playerId, index) => playerId !== savedSide(entry, team)[index])) {
-      changed.add(entry.roundNumber)
+    if (lineupEdits[entryKey(entry)]) {
+      stages.add(stageOf(entry))
     }
   }
-  return changed
+  return stages
 }
 
-/** Takes the rounds handed in off a captain's line-up not handed in yet. */
-export function dropLineupEdits(lineupEdits: LineupEdits, entries: readonly CaptainDraftEntry[], roundNumber: number): LineupEdits {
-  const keys = new Set(entries.filter((entry) => entry.roundNumber === roundNumber).map(entryKey))
+/** Takes a stage handed in off a captain's line-up not handed in yet. */
+export function dropLineupEdits(
+  lineupEdits: LineupEdits,
+  entries: readonly CaptainDraftEntry[],
+  stage: CaptainDraftLineupStage,
+): LineupEdits {
+  const keys = new Set(entries.filter((entry) => stageOf(entry) === stage).map(entryKey))
   return Object.fromEntries(Object.entries(lineupEdits).filter(([key]) => !keys.has(key)))
+}
+
+/**
+ * The round score when an ace decider (에이스 결정전) can be offered: every set of the draft has a
+ * result, the rounds ended level, and none has been played; null otherwise. A round goes to the team
+ * that won more of its sets, as the backend counts it; a level round goes to nobody.
+ */
+export function aceDeciderOffer(entries: readonly CaptainDraftEntry[]): { home: number; away: number } | null {
+  if (entries.length === 0 || entries.some((entry) => entry.aceDecider) || !entries.every(hasSavedResult)) {
+    return null
+  }
+  const rounds = new Map<number, { home: number; away: number }>()
+  for (const entry of entries) {
+    const round = rounds.get(entry.roundNumber) ?? { home: 0, away: 0 }
+    if (entry.winnerTeam === 'HOME') {
+      round.home += 1
+    } else {
+      round.away += 1
+    }
+    rounds.set(entry.roundNumber, round)
+  }
+  let home = 0
+  let away = 0
+  for (const round of rounds.values()) {
+    if (round.home > round.away) {
+      home += 1
+    } else if (round.away > round.home) {
+      away += 1
+    }
+  }
+  return home === away ? { home, away } : null
+}
+
+/** The sizes an ace decider can take: 1:1 up to 3:3, as far as the smaller team allows. */
+export function aceSizeChoices(homePlayers: number, awayPlayers: number): number[] {
+  return [1, 2, 3].filter((size) => size <= Math.min(homePlayers, awayPlayers))
 }
 
 /** Sets won by each team, and by each player on the winning side of one. */
@@ -372,12 +426,13 @@ export function nextSetSize(sizes: number[], playersPerTeam: number): number {
   return SET_SIZES.find((size) => size <= left) ?? 1
 }
 
-/** The layout and number of rounds of a draft already started, read back from its sets. */
+/** The layout and number of regular rounds of a draft already started, read back from its sets. */
 export function draftLayout(entries: CaptainDraftEntry[]): { setSizes: number[]; roundCount: number } {
-  const rounds = new Set(entries.map((entry) => entry.roundNumber))
+  const regular = entries.filter((entry) => !entry.aceDecider)
+  const rounds = new Set(regular.map((entry) => entry.roundNumber))
   const firstRound = Math.min(...rounds)
   return {
-    setSizes: entries
+    setSizes: regular
       .filter((entry) => entry.roundNumber === firstRound)
       .sort((left, right) => left.setNumber - right.setNumber)
       .map((entry) => entry.teamSize),

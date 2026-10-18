@@ -13,13 +13,14 @@ import jakarta.persistence.UniqueConstraint;
 import java.time.OffsetDateTime;
 
 /**
- * A team's line-up for one round of a draft run by its captains, handed in by that team's captain:
- * when it was last handed in. The players themselves are in the round's sets.
+ * A team's line-up for one stage of a draft run by its captains, handed in once by that team's
+ * captain: MAIN for every regular round, ACE for the ace decider. The players themselves are in the
+ * sets.
  */
 @Entity
 @Table(
     name = "captain_draft_lineups",
-    uniqueConstraints = @UniqueConstraint(columnNames = { "draft_id", "round_number", "team" })
+    uniqueConstraints = @UniqueConstraint(columnNames = { "draft_id", "stage", "team" })
 )
 public class CaptainDraftLineup {
 
@@ -31,8 +32,8 @@ public class CaptainDraftLineup {
     @JoinColumn(name = "draft_id", nullable = false)
     private CaptainDraft draft;
 
-    @Column(nullable = false)
-    private Integer roundNumber;
+    @Column(nullable = false, length = 10)
+    private String stage;
 
     @Column(nullable = false, length = 10)
     private String team;
@@ -56,12 +57,12 @@ public class CaptainDraftLineup {
         this.draft = draft;
     }
 
-    public Integer getRoundNumber() {
-        return roundNumber;
+    public String getStage() {
+        return stage;
     }
 
-    public void setRoundNumber(Integer roundNumber) {
-        this.roundNumber = roundNumber;
+    public void setStage(String stage) {
+        this.stage = stage;
     }
 
     public String getTeam() {

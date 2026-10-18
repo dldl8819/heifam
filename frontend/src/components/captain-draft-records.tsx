@@ -81,6 +81,11 @@ export function CaptainDraftRecords({
                   <span className="text-sky-700 dark:text-sky-300">{t('captainDraft.scoreboard.homeHeader')}</span>{' '}
                   <span className="font-semibold">{t('captainDraft.records.rounds', { home: record.homeRoundWins, away: record.awayRoundWins })}</span>{' '}
                   <span className="text-rose-700 dark:text-rose-300">{t('captainDraft.scoreboard.awayHeader')}</span>
+                  {record.aceDecider && (
+                    <span className="ml-1 rounded-sm bg-amber-100 px-1 text-[11px] font-semibold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                      {t('captainDraft.ace.badge')}
+                    </span>
+                  )}
                   <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">
                     {t('captainDraft.records.sets', { home: record.homeSetWins, away: record.awaySetWins })}
                   </span>

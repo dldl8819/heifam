@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  aceDeciderOffer,
+  aceSizeChoices,
   canAddSet,
   canonicalComposition,
   compositionsOfSize,
@@ -17,14 +19,13 @@ import {
   entryKey,
   hasAnyLineup,
   hasAnyResult,
+  hasLoneLineup,
   isRunByCaptains,
-  lineupRoundsChanged,
   lineupSubmission,
   nextSetSize,
   playersInRound,
   requiredTierPresets,
   roundComposition,
-  roundLineups,
   setComposition,
   setControls,
   setLayoutSummary,
@@ -32,11 +33,14 @@ import {
   setTeamSizes,
   setupDiffersFromDraft,
   sortByTier,
+  stageLineups,
+  stageOf,
+  stagesWithLineupEdits,
   withSlot,
   type DraftViewer,
-  type RoundLineup,
+  type StageLineup,
 } from '@/lib/captain-draft'
-import type { CaptainDraftEntry, PlayerRosterItem } from '@/types/api'
+import type { CaptainDraftEntry, CaptainDraftLineupStage, PlayerRosterItem } from '@/types/api'
 
 function slot(playerId: number | null) {
   return playerId === null ? null : { playerId, nickname: `P${playerId}` }
@@ -66,19 +70,23 @@ function rosterPlayer(overrides: Partial<PlayerRosterItem>): PlayerRosterItem {
 }
 
 const HOST_MEMBER: DraftViewer = { byCaptains: false, viewerTeam: null, viewerCaptain: false, canEditResults: false }
-const NOT_IN: RoundLineup = { homeSubmitted: false, awaySubmitted: false, revealed: false }
-const HOME_IN: RoundLineup = { homeSubmitted: true, awaySubmitted: false, revealed: false }
-const BOTH_IN: RoundLineup = { homeSubmitted: true, awaySubmitted: true, revealed: true }
+const NOT_IN: StageLineup = { homeSubmitted: false, awaySubmitted: false, revealed: false }
+const HOME_IN: StageLineup = { homeSubmitted: true, awaySubmitted: false, revealed: false }
+const BOTH_IN: StageLineup = { homeSubmitted: true, awaySubmitted: true, revealed: true }
 
 function captainsViewer(overrides: Partial<DraftViewer> = {}): DraftViewer {
   return { byCaptains: true, viewerTeam: null, viewerCaptain: false, canEditResults: false, ...overrides }
 }
 
-// A set of a round not shown to everyone, as the backend sends it to one who may not see a side.
+// A set of a stage not shown to everyone, as the backend sends it to one who may not see a side.
 function hiding(set: CaptainDraftEntry, team: 'HOME' | 'AWAY'): CaptainDraftEntry {
   return team === 'HOME'
     ? { ...set, homePlayers: set.homePlayers.map(() => null), homeHidden: true }
     : { ...set, awayPlayers: set.awayPlayers.map(() => null), awayHidden: true }
+}
+
+function ace(set: CaptainDraftEntry): CaptainDraftEntry {
+  return { ...set, aceDecider: true }
 }
 
 describe('captain draft sets', () => {
@@ -100,7 +108,7 @@ describe('captain draft sets', () => {
     })
   })
 
-  it('lets a captain fill in only their own side before both line-ups are in, and hides the other', () => {
+  it('lets a captain fill in only their own side until they hand it in, and hides the other', () => {
     const set = hiding(entry(1, 1, [1, 3, 5], [null, null, null]), 'AWAY')
     const homeCaptain = captainsViewer({ viewerTeam: 'HOME', viewerCaptain: true })
 
@@ -110,37 +118,41 @@ describe('captain draft sets', () => {
       result: false,
       locked: false,
     })
+    // Handed in: once only, so it stays as it is until both are in.
+    expect(setControls(set, HOME_IN, homeCaptain).sides.HOME).toBe('read')
     // A team player reads their team's line-up; one in no team sees neither side.
     expect(setControls(set, HOME_IN, captainsViewer({ viewerTeam: 'HOME' })).sides).toEqual({ HOME: 'read', AWAY: 'hidden' })
     expect(setControls(hiding(set, 'HOME'), HOME_IN, captainsViewer()).sides).toEqual({ HOME: 'hidden', AWAY: 'hidden' })
-    // A line-up is in: its races and tier notes are fixed but for those who may edit results.
-    expect(setControls(set, HOME_IN, homeCaptain).settings).toBe(false)
-    expect(setControls(set, HOME_IN, captainsViewer({ canEditResults: true })).settings).toBe(true)
+    // Races and tier notes stay anyone's.
+    expect(setControls(set, HOME_IN, captainsViewer()).settings).toBe(true)
   })
 
-  it('shows both sides once both line-ups are in, with players fixed and the first result open to all', () => {
+  it('lets anyone running the draft change a set once both line-ups are in, but a saved result stays locked', () => {
     const set = entry(1, 1, [1, 3, 5], [2, 4, 6])
 
     expect(setControls(set, BOTH_IN, captainsViewer({ viewerTeam: 'HOME', viewerCaptain: true }))).toEqual({
-      sides: { HOME: 'read', AWAY: 'read' },
-      settings: false,
+      sides: { HOME: 'edit', AWAY: 'edit' },
+      settings: true,
       result: true,
       locked: false,
     })
-    expect(setControls(set, BOTH_IN, captainsViewer({ canEditResults: true })).sides).toEqual({ HOME: 'edit', AWAY: 'edit' })
+    expect(setControls(set, BOTH_IN, captainsViewer()).sides).toEqual({ HOME: 'edit', AWAY: 'edit' })
     expect(setControls({ ...set, winnerTeam: 'AWAY' }, BOTH_IN, captainsViewer()).locked).toBe(true)
   })
 
   it('lays a captain\'s line-up over their own side and keeps the rest of the players as handed in', () => {
-    const entries = [hiding(entry(1, 1, [1, 3, 5], [null, null, null]), 'AWAY'), entry(2, 1, [1, 3, 5], [2, 4, 6])]
-    const lineups = new Map([[1, HOME_IN], [2, BOTH_IN]])
+    const entries = [
+      hiding(entry(1, 1, [1, 3, 5], [null, null, null]), 'AWAY'),
+      ace(hiding(entry(2, 1, [null], [null]), 'AWAY')),
+    ]
+    const lineups = new Map<CaptainDraftLineupStage, StageLineup>([['MAIN', NOT_IN], ['ACE', NOT_IN]])
     const homeCaptain = captainsViewer({ viewerTeam: 'HOME', viewerCaptain: true })
 
     const rows = draftSheet(
       entries,
-      // Side changes through the host's edits never count in a round not shown, nor results.
-      { '1-1': { awayPlayerIds: [9, 9, 9], winnerTeam: 'HOME' }, '2-1': { homePlayerIds: [5, 3, 1] } },
-      { '1-1': [5, 1, 3] },
+      // Side changes through the host's edits never count in a stage not shown, nor results.
+      { '1-1': { awayPlayerIds: [9, 9, 9], winnerTeam: 'HOME' } },
+      { '1-1': [5, 1, 3], '2-1': [7] },
       lineups,
       homeCaptain,
     )
@@ -149,10 +161,11 @@ describe('captain draft sets', () => {
     expect(rows[0].set.awayPlayerIds).toEqual([null, null, null])
     expect(rows[0].set.winnerTeam).toBe('')
     expect(rows[0].edited).toBe(false)
-    expect(rows[1].set.homePlayerIds).toEqual([1, 3, 5])
-    expect(rows[1].edited).toBe(false)
-    // The same line-up once the round is shown to everyone: what was handed in counts.
-    expect(draftSheet(entries.slice(1), {}, { '2-1': [5, 3, 1] }, lineups, homeCaptain)[0].set.homePlayerIds).toEqual([1, 3, 5])
+    expect(rows[1].set.homePlayerIds).toEqual([7])
+    expect(rows[1].set.aceDecider).toBe(true)
+    // Once the regular rounds are shown to everyone, what was handed in counts.
+    const shown = new Map<CaptainDraftLineupStage, StageLineup>([['MAIN', BOTH_IN]])
+    expect(draftSheet([entry(1, 1, [1, 3, 5], [2, 4, 6])], {}, { '1-1': [5, 3, 1] }, shown, homeCaptain)[0].set.homePlayerIds).toEqual([1, 3, 5])
   })
 
   it('keeps the host\'s edits in a draft the host fills in, but none to a set they may not change', () => {
@@ -169,40 +182,78 @@ describe('captain draft sets', () => {
     expect(rows.map((row) => row.edited)).toEqual([true, false])
   })
 
-  it('hands in a round\'s line-up only with every slot of every set filled', () => {
+  it('hands in every round of a stage at once, only with every slot filled', () => {
     const sheet = [
+      effectiveEntry(entry(2, 1, [1, null], [null, null]), undefined),
       effectiveEntry(entry(1, 2, [7], [null]), undefined),
       effectiveEntry(entry(1, 1, [1, 3], [null, null]), undefined),
-      effectiveEntry(entry(2, 1, [1, null], [null, null]), undefined),
+      effectiveEntry(ace(entry(3, 1, [9], [null])), undefined),
     ]
 
-    expect(lineupSubmission(sheet, 1, 'HOME')).toEqual({
-      request: { sets: [{ setNumber: 1, playerIds: [1, 3] }, { setNumber: 2, playerIds: [7] }] },
+    expect(lineupSubmission(sheet.slice(1), 'MAIN', 'HOME')).toEqual({
+      request: {
+        stage: 'MAIN',
+        sets: [
+          { roundNumber: 1, setNumber: 1, playerIds: [1, 3] },
+          { roundNumber: 1, setNumber: 2, playerIds: [7] },
+        ],
+      },
       complete: true,
     })
-    expect(lineupSubmission(sheet, 2, 'HOME').complete).toBe(false)
-    expect(lineupSubmission(sheet, 1, 'AWAY').complete).toBe(false)
-    expect(lineupSubmission(sheet, 3, 'HOME').complete).toBe(false)
+    expect(lineupSubmission(sheet, 'MAIN', 'HOME').complete).toBe(false)
+    expect(lineupSubmission(sheet, 'ACE', 'HOME')).toEqual({
+      request: { stage: 'ACE', sets: [{ roundNumber: 3, setNumber: 1, playerIds: [9] }] },
+      complete: true,
+    })
+    expect(lineupSubmission(sheet, 'ACE', 'AWAY').complete).toBe(false)
   })
 
-  it('tells the rounds whose line-up on screen is not the one handed in, and drops a round handed in', () => {
-    const entries = [entry(1, 1, [1, 3], [2, 4]), entry(2, 1, [1, 3], [2, 4]), entry(2, 2, [5], [6])]
-    const edits = { '1-1': [1, 3], '2-1': [3, 1] }
+  it('tells the stages with a line-up on screen, and drops a stage handed in', () => {
+    const entries = [entry(1, 1, [1, 3], [2, 4]), entry(2, 1, [1, 3], [2, 4]), ace(entry(3, 1, [5], [6]))]
+    const edits = { '1-1': [1, 3], '3-1': [5] }
 
-    expect([...lineupRoundsChanged(edits, entries, 'HOME')]).toEqual([2])
-    expect(dropLineupEdits(edits, entries, 2)).toEqual({ '1-1': [1, 3] })
+    expect([...stagesWithLineupEdits(edits, entries)].sort()).toEqual(['ACE', 'MAIN'])
+    expect(dropLineupEdits(edits, entries, 'MAIN')).toEqual({ '3-1': [5] })
   })
 
   it('reads the line-ups of a draft run by its captains, and none for one the host fills in', () => {
-    const lineups = [{ roundNumber: 1, homeSubmitted: true, awaySubmitted: false, revealed: false }]
+    const lineups = [{ stage: 'MAIN' as const, homeSubmitted: true, awaySubmitted: false, revealed: false }]
 
     expect(isRunByCaptains({ entryMode: 'CAPTAINS' })).toBe(true)
     expect(isRunByCaptains({ entryMode: 'HOST' })).toBe(false)
     expect(isRunByCaptains({})).toBe(false)
-    expect(roundLineups({ entryMode: 'CAPTAINS', lineups }).get(1)).toEqual(HOME_IN)
-    expect(roundLineups({ entryMode: 'HOST', lineups }).size).toBe(0)
-    expect(hasAnyLineup(roundLineups({ entryMode: 'CAPTAINS', lineups }))).toBe(true)
-    expect(hasAnyLineup(new Map([[1, NOT_IN]]))).toBe(false)
+    expect(stageLineups({ entryMode: 'CAPTAINS', lineups }).get('MAIN')).toEqual(HOME_IN)
+    expect(stageLineups({ entryMode: 'HOST', lineups }).size).toBe(0)
+    expect(hasAnyLineup(stageLineups({ entryMode: 'CAPTAINS', lineups }))).toBe(true)
+    expect(hasAnyLineup(new Map([['MAIN', NOT_IN]]))).toBe(false)
+    expect(hasLoneLineup(new Map([['MAIN', HOME_IN]]))).toBe(true)
+    expect(hasLoneLineup(new Map([['MAIN', BOTH_IN], ['ACE', NOT_IN]]))).toBe(false)
+    expect(stageOf({ aceDecider: true })).toBe('ACE')
+    expect(stageOf({})).toBe('MAIN')
+  })
+
+  it('offers an ace decider only once every set is played and the rounds ended level', () => {
+    // Round 1 to home (2:0), round 2 to away, round 3 level (1:1): 1 : 1.
+    const level = [
+      entry(1, 1, [1], [2], 'HOME'), entry(1, 2, [3], [4], 'HOME'),
+      entry(2, 1, [1], [2], 'AWAY'), entry(2, 2, [3], [4], 'AWAY'),
+      entry(3, 1, [1], [2], 'HOME'), entry(3, 2, [3], [4], 'AWAY'),
+    ]
+
+    expect(aceDeciderOffer(level)).toEqual({ home: 1, away: 1 })
+    expect(aceDeciderOffer(level.slice(0, 4).concat(entry(3, 1, [1], [2], 'HOME'), entry(3, 2, [3], [4], 'HOME')))).toBeNull()
+    expect(aceDeciderOffer([...level.slice(0, 5), entry(3, 2, [3], [4])])).toBeNull()
+    expect(aceDeciderOffer([...level, ace(entry(4, 1, [1], [2]))])).toBeNull()
+    expect(aceDeciderOffer([])).toBeNull()
+    expect(aceSizeChoices(5, 2)).toEqual([1, 2])
+    expect(aceSizeChoices(4, 4)).toEqual([1, 2, 3])
+  })
+
+  it('reads the layout back without the ace decider', () => {
+    expect(draftLayout([entry(1, 1, [1, 3, 5], [2, 4, 6]), entry(2, 1, [1, 3, 5], [2, 4, 6]), ace(entry(3, 1, [1], [2]))])).toEqual({
+      setSizes: [3],
+      roundCount: 2,
+    })
   })
 
   it('names who put a saved result in, but not for a result changed here and not saved', () => {
