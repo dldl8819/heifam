@@ -179,7 +179,7 @@ export function AuthControls() {
         {menuOpen && (
           <div
             role="menu"
-            className="absolute right-0 top-full z-40 mt-2 min-w-[11rem] rounded-xl border border-slate-700 bg-slate-900/95 p-2 shadow-2xl backdrop-blur"
+            className="absolute right-0 top-full z-40 mt-2 min-w-44 rounded-xl border border-slate-700 bg-slate-900/95 p-2 shadow-2xl backdrop-blur-sm"
           >
             {canViewMmr && (
               <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-xs text-slate-200 transition-colors hover:bg-slate-800/80">

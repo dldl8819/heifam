@@ -24,7 +24,7 @@ export function NoticeBody({ groupId, content }: NoticeBodyProps) {
           return (
             <p
               key={`text-${index}`}
-              className="whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-200"
+              className="whitespace-pre-wrap wrap-break-word text-sm text-slate-700 dark:text-slate-200"
             >
               {part.text}
             </p>

@@ -41,7 +41,7 @@ function DetailList({
   items: string[]
 }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-700 dark:bg-slate-900">
       <h3 className="text-sm font-bold text-slate-950 dark:text-slate-100">{title}</h3>
       <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-700 dark:text-slate-300">
         {items.map((item) => (
@@ -69,7 +69,7 @@ function getStatusClass(status: EventRecord['status']): string {
 
 function ScheduleList({ event }: { event: EventRecord }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:[&>h3]:text-slate-100">
+    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-700 dark:bg-slate-900 dark:[&>h3]:text-slate-100">
       <h3 className="text-sm font-bold text-slate-950">일정</h3>
       <dl className="mt-3 space-y-3">
         {event.schedule.map((item) => (
@@ -93,7 +93,7 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
 
   return (
     <section className="space-y-6">
-      <div className="rounded-lg border border-cyan-100 bg-white px-5 py-6 shadow-sm dark:border-cyan-900 dark:bg-slate-900 sm:px-6">
+      <div className="rounded-lg border border-cyan-100 bg-white px-5 py-6 shadow-xs dark:border-cyan-900 dark:bg-slate-900 sm:px-6">
         <Link href="/events" className="text-sm font-semibold text-cyan-700 hover:text-cyan-900 dark:text-cyan-300 dark:hover:text-cyan-200">
           이벤트 목록
         </Link>
@@ -122,12 +122,12 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
 
         <aside className="space-y-4">
           <ScheduleList event={event} />
-          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:[&>h3]:text-slate-100">
+          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-700 dark:bg-slate-900 dark:[&>h3]:text-slate-100">
             <h3 className="text-sm font-bold text-slate-950">팀 편성</h3>
             <p className="mt-3 text-sm leading-6 text-slate-700 dark:text-slate-300">{event.teamAssignmentNote}</p>
           </section>
           {event.sponsors.length > 0 && (
-            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:[&>h3]:text-slate-100">
+            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-700 dark:bg-slate-900 dark:[&>h3]:text-slate-100">
               <h3 className="text-sm font-bold text-slate-950">후원</h3>
               <p className="mt-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
                 {event.sponsors.join(', ')}

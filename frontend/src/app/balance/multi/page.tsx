@@ -304,7 +304,7 @@ export default function MultiBalancePage() {
     return (
       <article
         key={`series-plan-${match.matchNumber}`}
-        className="space-y-2 rounded-lg border border-indigo-200 bg-white p-4 shadow-sm dark:border-indigo-800 dark:bg-slate-900"
+        className="space-y-2 rounded-lg border border-indigo-200 bg-white p-4 shadow-xs dark:border-indigo-800 dark:bg-slate-900"
       >
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
@@ -407,7 +407,7 @@ export default function MultiBalancePage() {
 
   return (
     <section className="space-y-6">
-      <header className="space-y-1 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <header className="space-y-1 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
         <h2 className="text-2xl font-semibold tracking-tight">{t('multiBalance.title')}</h2>
         <p className="text-sm text-slate-600 dark:text-slate-300">{t('multiBalance.description')}</p>
         <p className="text-xs text-slate-500 dark:text-slate-400">{t('multiBalance.helper.defaultPriority')}</p>
@@ -446,7 +446,7 @@ export default function MultiBalancePage() {
           />
         </div>
 
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
           <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('multiBalance.summary.title')}</h3>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
             {t('multiBalance.summary.selectedCount', { count: selectedIds.length })}
@@ -519,7 +519,7 @@ export default function MultiBalancePage() {
               {copied === 'all' ? t('balance.copy.copiedButton') : t('multiBalance.copy.allButton')}
             </button>
           </div>
-          <header className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <header className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900">
             <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-700">
               <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">{t('multiBalance.result.title')}</p>
               <h3 className="mt-1 text-lg font-semibold text-slate-950 dark:text-slate-100">
@@ -552,7 +552,7 @@ export default function MultiBalancePage() {
           </header>
 
           {result.waitingPlayers.length > 0 && (
-            <article className="rounded-lg border border-amber-200 bg-white p-4 shadow-sm dark:border-amber-800 dark:bg-slate-900">
+            <article className="rounded-lg border border-amber-200 bg-white p-4 shadow-xs dark:border-amber-800 dark:bg-slate-900">
               <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('multiBalance.result.waitingTitle')}</h4>
               <ul className="mt-3 flex flex-wrap gap-2">
                 {result.waitingPlayers.map((player) => (
@@ -574,7 +574,7 @@ export default function MultiBalancePage() {
               return (
                 <article
                   key={team.key}
-                className={`overflow-hidden rounded-lg border bg-white shadow-sm dark:bg-slate-900 ${theme.card}`}
+                className={`overflow-hidden rounded-lg border bg-white shadow-xs dark:bg-slate-900 ${theme.card}`}
                 >
                   <header className={`border-b px-4 py-3 ${theme.header}`}>
                     <div>

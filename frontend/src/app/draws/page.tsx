@@ -96,7 +96,7 @@ export default function DrawsPage() {
                 {actionError}
               </p>
             )}
-            <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <div className="rounded-xl border border-slate-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900">
               {list.draws.length === 0 ? (
                 <p className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">{t('prizeDraw.historyEmpty')}</p>
               ) : (

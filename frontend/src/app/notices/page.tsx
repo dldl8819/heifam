@@ -106,7 +106,7 @@ function VisitorNotices({ hint }: { hint: string }) {
         <p className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">{t('notices.posts.empty')}</p>
       )}
       {!loading && !error && titles.length > 0 && (
-        <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white shadow-sm dark:divide-slate-800 dark:border-slate-700 dark:bg-slate-900">
+        <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white shadow-xs dark:divide-slate-800 dark:border-slate-700 dark:bg-slate-900">
           {titles.map((notice, index) => (
             <li key={`${notice.createdAt}-${index}`} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
               <span className="font-semibold text-slate-900 dark:text-slate-100">{notice.title}</span>
@@ -383,7 +383,7 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
 
           <BoardSearchBox />
 
-          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900">
             <table className="min-w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs tracking-wide text-slate-500 dark:bg-slate-800/80 dark:text-slate-300">
                 <tr>

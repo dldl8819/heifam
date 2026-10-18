@@ -110,7 +110,7 @@ export default function PointRankingPage() {
             >
               {t('points.ranking.previous')}
             </button>
-            <span className="min-w-[6rem] text-center font-medium text-slate-900 dark:text-slate-100">
+            <span className="min-w-24 text-center font-medium text-slate-900 dark:text-slate-100">
               {formatMonthLabel(month)}
             </span>
             <button

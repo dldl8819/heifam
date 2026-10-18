@@ -124,7 +124,7 @@ const promotions: Promotion[] = [
 export default function AdsPage() {
   return (
     <section className="space-y-6">
-      <div className="rounded-lg border border-emerald-100 bg-white px-5 py-6 shadow-sm dark:border-emerald-900 dark:bg-slate-900 sm:px-6">
+      <div className="rounded-lg border border-emerald-100 bg-white px-5 py-6 shadow-xs dark:border-emerald-900 dark:bg-slate-900 sm:px-6">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">
           Hei`Fam Local
         </p>
@@ -136,7 +136,7 @@ export default function AdsPage() {
         </div>
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white px-5 py-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:[&>p:first-child]:text-slate-100 sm:px-6">
+      <div className="rounded-lg border border-slate-200 bg-white px-5 py-4 shadow-xs dark:border-slate-700 dark:bg-slate-900 dark:[&>p:first-child]:text-slate-100 sm:px-6">
         <p className="text-sm font-semibold text-slate-950">광고 문의는 운영진에게 연락해 주세요.</p>
         <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
           가게, 상품, 프로젝트 홍보를 함께 진행해드립니다.
@@ -155,7 +155,7 @@ export default function AdsPage() {
         {promotions.map((promotion) => (
           <article
             key={promotion.title}
-            className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900"
+            className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900"
           >
             {promotion.imageHref ? (
               <a
@@ -163,7 +163,7 @@ export default function AdsPage() {
                 target="_blank"
                 rel="noreferrer"
                 aria-label={`${promotion.title} 상세 이미지 보기`}
-                className="relative block aspect-[16/9] w-full bg-slate-100 dark:bg-slate-800"
+                className="relative block aspect-video w-full bg-slate-100 dark:bg-slate-800"
               >
                 <Image
                   src={promotion.imageSrc}
@@ -175,7 +175,7 @@ export default function AdsPage() {
                 />
               </a>
             ) : (
-              <div className="relative aspect-[16/9] w-full bg-slate-100 dark:bg-slate-800">
+              <div className="relative aspect-video w-full bg-slate-100 dark:bg-slate-800">
                 <Image
                   src={promotion.imageSrc}
                   alt={promotion.imageAlt}

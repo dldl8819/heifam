@@ -9,7 +9,7 @@ import { apiClient, isApiBadRequestError, isApiForbiddenError } from '@/lib/api'
 import { t } from '@/lib/i18n'
 import type { AccessPeopleOverview, AccessPersonMember } from '@/types/api'
 
-const CARD_CLASS = 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900'
+const CARD_CLASS = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900'
 const FIELD_CLASS =
   'rounded-md border border-slate-300 px-2.5 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-900'
 const PRIMARY_BUTTON_CLASS =
@@ -132,7 +132,7 @@ export function AccessPeoplePanel() {
 
   return (
     <section className="space-y-6">
-      <header className="space-y-1 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <header className="space-y-1 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
         <h2 className="text-2xl font-semibold tracking-tight">{t('accessPeople.title')}</h2>
         <p className="text-sm text-slate-600 dark:text-slate-300">{t('accessPeople.description')}</p>
       </header>
@@ -261,7 +261,7 @@ export function AccessPeoplePanel() {
                                 <span className="break-all">
                                   {memberLabel(member)}
                                   {!member.hasAccess && (
-                                    <span className="ml-2 rounded border border-slate-300 px-1.5 py-0.5 text-[11px] text-slate-500 dark:border-slate-600 dark:text-slate-400">
+                                    <span className="ml-2 rounded-sm border border-slate-300 px-1.5 py-0.5 text-[11px] text-slate-500 dark:border-slate-600 dark:text-slate-400">
                                       {t('accessPeople.noAccess')}
                                     </span>
                                   )}
@@ -294,7 +294,7 @@ export function AccessPeoplePanel() {
                   <ul className="max-h-72 space-y-1 overflow-y-auto rounded-lg border border-slate-200 p-2 dark:border-slate-700">
                     {shownCandidates.map((candidate) => (
                       <li key={candidate.email}>
-                        <label className="flex cursor-pointer items-start gap-2 rounded px-1.5 py-1 text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800">
+                        <label className="flex cursor-pointer items-start gap-2 rounded-sm px-1.5 py-1 text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800">
                           <input type="checkbox" checked={chosen.has(candidate.email)} disabled={busy} onChange={() => toggle(candidate.email)} />
                           <span className="break-all">
                             {memberLabel(candidate)}

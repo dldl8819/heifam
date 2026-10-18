@@ -21,8 +21,8 @@ export function AppShell({ children }: AppShellProps) {
   return (
     <MmrVisibilityProvider>
       <div className="min-h-screen bg-slate-100 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
-        <header className="sticky top-0 z-30 border-b border-slate-700 bg-slate-900/95 text-white backdrop-blur">
-          <div className="mx-auto flex max-w-screen-2xl flex-col gap-3 px-4 py-4 sm:px-6">
+        <header className="sticky top-0 z-30 border-b border-slate-700 bg-slate-900/95 text-white backdrop-blur-sm">
+          <div className="mx-auto flex max-w-(--breakpoint-2xl) flex-col gap-3 px-4 py-4 sm:px-6">
             {/* One row at every width: on a narrow phone the name and tagline give way (the tagline
                 wraps) so the buttons stay on the right. The row is also what the notification panel
                 hangs from on phones. */}
@@ -59,7 +59,7 @@ export function AppShell({ children }: AppShellProps) {
           </div>
         </header>
 
-        <main className="mx-auto max-w-screen-2xl p-4 sm:p-6">
+        <main className="mx-auto max-w-(--breakpoint-2xl) p-4 sm:p-6">
           <AccessGate>{children}</AccessGate>
         </main>
         <SiteFooter />

@@ -37,7 +37,7 @@ export function CaptainDraftRecords({
   onDelete,
 }: CaptainDraftRecordsProps) {
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
       <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('captainDraft.records.title')}</h3>
       <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('captainDraft.records.description')}</p>
 
@@ -58,7 +58,7 @@ export function CaptainDraftRecords({
                 <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-900 dark:text-slate-100">
                     <span className="truncate">{record.title}</span>
-                    <span className={`rounded px-1.5 text-[11px] font-semibold ${STATE_STYLES[state]}`}>
+                    <span className={`rounded-sm px-1.5 text-[11px] font-semibold ${STATE_STYLES[state]}`}>
                       {state === 'playing'
                         ? t('captainDraft.records.state.playing', { decided: record.decidedSets, total: record.totalSets })
                         : t(`captainDraft.records.state.${state}`)}

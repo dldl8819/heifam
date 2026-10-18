@@ -135,7 +135,7 @@ export function CaptainDraftEntrySheet({
                         value={round.roundCode}
                         onChange={(event) => onChangeRoundCode(round.roundNumber, event.target.value)}
                         aria-label={t('captainDraft.entry.roundCodeLabel', { round: round.roundNumber })}
-                        className="mt-1 w-full rounded-md border border-slate-300 bg-white px-1 py-1 text-sm font-semibold text-slate-800 outline-none focus:border-slate-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+                        className="mt-1 w-full rounded-md border border-slate-300 bg-white px-1 py-1 text-sm font-semibold text-slate-800 outline-hidden focus:border-slate-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
                       >
                         {compositionOptions(biggestSize, round.roundCode).map((code) => (
                           <option key={`round-${round.roundNumber}-${code}`} value={code}>
@@ -156,7 +156,7 @@ export function CaptainDraftEntrySheet({
                       value={set.raceCode}
                       onChange={(event) => onEditEntry(set.key, { raceCode: event.target.value })}
                       aria-label={t('captainDraft.entry.raceCodeLabel', { round: round.roundNumber, set: set.setNumber })}
-                      className="w-full rounded-md border border-transparent bg-transparent px-1 py-1.5 text-center text-sm font-medium text-slate-800 outline-none focus:border-slate-300 dark:text-slate-200 dark:focus:border-slate-600"
+                      className="w-full rounded-md border border-transparent bg-transparent px-1 py-1.5 text-center text-sm font-medium text-slate-800 outline-hidden focus:border-slate-300 dark:text-slate-200 dark:focus:border-slate-600"
                     >
                       {compositionOptions(set.teamSize, set.raceCode).map((code) => (
                         <option key={`${set.key}-race-${code}`} value={code}>
@@ -173,7 +173,7 @@ export function CaptainDraftEntrySheet({
                       maxLength={30}
                       placeholder={t('captainDraft.entry.requiredTierPlaceholder')}
                       aria-label={`${t('captainDraft.entry.requiredTierLabel')} ${t('captainDraft.entry.roundOnly', { round: round.roundNumber })} ${t('captainDraft.entry.setCell', { set: set.setNumber })}`}
-                      className="w-full rounded-md border border-transparent bg-transparent px-2 py-1.5 text-center text-sm text-slate-800 outline-none placeholder:text-slate-300 focus:border-slate-300 focus:bg-slate-50 dark:text-slate-100 dark:placeholder:text-slate-600 dark:focus:border-slate-600 dark:focus:bg-slate-800"
+                      className="w-full rounded-md border border-transparent bg-transparent px-2 py-1.5 text-center text-sm text-slate-800 outline-hidden placeholder:text-slate-300 focus:border-slate-300 focus:bg-slate-50 dark:text-slate-100 dark:placeholder:text-slate-600 dark:focus:border-slate-600 dark:focus:bg-slate-800"
                     />
                   </td>
                   {(['HOME', 'AWAY'] as const).map((team) => (
@@ -189,7 +189,7 @@ export function CaptainDraftEntrySheet({
                               set: `${round.roundNumber}-${set.setNumber}`,
                               slot: slot + 1,
                             })}
-                            className={`w-full min-w-0 truncate rounded-md border border-slate-200 bg-transparent px-1 py-1.5 text-sm font-medium outline-none dark:border-slate-700 ${
+                            className={`w-full min-w-0 truncate rounded-md border border-slate-200 bg-transparent px-1 py-1.5 text-sm font-medium outline-hidden dark:border-slate-700 ${
                               team === 'HOME'
                                 ? 'text-sky-700 focus:bg-sky-50 dark:text-sky-300 dark:focus:bg-sky-950/50'
                                 : 'text-rose-700 focus:bg-rose-50 dark:text-rose-300 dark:focus:bg-rose-950/50'
@@ -207,7 +207,7 @@ export function CaptainDraftEntrySheet({
                       value={set.winnerTeam}
                       onChange={(event) => onEditEntry(set.key, { winnerTeam: event.target.value as DraftWinnerSelection })}
                       aria-label={`${t('captainDraft.entry.resultLabel')} ${t('captainDraft.entry.roundOnly', { round: round.roundNumber })} ${t('captainDraft.entry.setCell', { set: set.setNumber })}`}
-                      className="w-full border-0 bg-transparent px-1 py-2 text-sm font-medium text-slate-700 outline-none focus:bg-slate-50 dark:text-slate-200 dark:focus:bg-slate-800"
+                      className="w-full border-0 bg-transparent px-1 py-2 text-sm font-medium text-slate-700 outline-hidden focus:bg-slate-50 dark:text-slate-200 dark:focus:bg-slate-800"
                     >
                       <option value="">{t('captainDraft.entry.notSet')}</option>
                       {WINNER_OPTIONS.map((option) => (

@@ -185,7 +185,7 @@ export function NoticeVoteView({ vote, onPress, onWithdraw, onAddOption, onRemov
                 onClick={() => (option.mine ? undefined : onPress?.(option))}
                 disabled={!canPress}
                 aria-pressed={option.mine}
-                className={`min-h-[3.5rem] w-full rounded-lg border-2 px-3 py-2 text-left transition-colors disabled:cursor-default ${
+                className={`min-h-14 w-full rounded-lg border-2 px-3 py-2 text-left transition-colors disabled:cursor-default ${
                   canRemove ? 'pr-9' : ''
                 } ${
                   option.mine
@@ -201,7 +201,7 @@ export function NoticeVoteView({ vote, onPress, onWithdraw, onAddOption, onRemov
                   ) : (
                     <span className={`mt-[0.3rem] h-2.5 w-2.5 shrink-0 rounded-full ${tint.dot}`} aria-hidden="true" />
                   )}
-                  <span className="min-w-0 break-words">{option.label}</span>
+                  <span className="min-w-0 wrap-break-word">{option.label}</span>
                   {option.mine && <span className="sr-only"> ({t('notices.posts.voteMine')})</span>}
                 </span>
                 <span className={`mt-0.5 block text-xs ${option.mine ? 'opacity-80' : 'text-slate-500 dark:text-slate-400'}`}>
@@ -245,7 +245,7 @@ export function NoticeVoteView({ vote, onPress, onWithdraw, onAddOption, onRemov
           {options
             .filter((option) => (option.voters ?? []).length > 0)
             .map((option) => (
-              <li key={option.id} className="break-words text-slate-600 dark:text-slate-300">
+              <li key={option.id} className="wrap-break-word text-slate-600 dark:text-slate-300">
                 <span className="mr-1.5 font-semibold text-slate-900 dark:text-slate-100">{option.label}</span>
                 {(option.voters ?? []).map((voter) => voter ?? t('notices.posts.voteVoterUnnamed')).join(', ')}
               </li>

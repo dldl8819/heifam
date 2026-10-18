@@ -18,7 +18,7 @@ type MatchConfirmationsPanelProps = {
   groupId: number
 }
 
-const CARD_CLASS = 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900'
+const CARD_CLASS = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900'
 const PRIMARY_BUTTON_CLASS =
   'rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60'
 const SECONDARY_BUTTON_CLASS =
@@ -54,10 +54,10 @@ function Lineup({ match, side }: { match: MatchConfirmation; side: TeamSide }) {
       <p className="flex flex-wrap items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
         {teamName(side)}
         {match.myTeam === side && (
-          <span className="rounded bg-indigo-600 px-1.5 py-0.5 text-[10px] text-white">{t('predictions.confirm.myTeamBadge')}</span>
+          <span className="rounded-sm bg-indigo-600 px-1.5 py-0.5 text-[10px] text-white">{t('predictions.confirm.myTeamBadge')}</span>
         )}
         {match.winnerTeam === side && (
-          <span className="rounded bg-emerald-600 px-1.5 py-0.5 text-[10px] text-white">{t('predictions.confirm.winnerBadge')}</span>
+          <span className="rounded-sm bg-emerald-600 px-1.5 py-0.5 text-[10px] text-white">{t('predictions.confirm.winnerBadge')}</span>
         )}
       </p>
       <p className="mt-0.5 text-sm text-slate-800 dark:text-slate-200">{formatPredictionPlayers(players)}</p>

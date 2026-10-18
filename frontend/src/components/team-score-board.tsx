@@ -44,7 +44,7 @@ export function TeamScoreBoard({ groupId }: TeamScoreBoardProps) {
   }, [groupId])
 
   return (
-    <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
       <div className="space-y-1">
         <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('teamScore.title')}</h3>
         <p className="text-xs text-slate-500 dark:text-slate-400">{t('teamScore.description')}</p>

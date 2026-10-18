@@ -192,7 +192,7 @@ export function NoticeComments({ groupId, noticeId, comments, onChange }: Notice
             </div>
           </form>
         ) : (
-          <p className="whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-200">{comment.content}</p>
+          <p className="whitespace-pre-wrap wrap-break-word text-sm text-slate-700 dark:text-slate-200">{comment.content}</p>
         )}
 
         <div className="flex items-center gap-3">
@@ -221,7 +221,7 @@ export function NoticeComments({ groupId, noticeId, comments, onChange }: Notice
   }
 
   return (
-    <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-700 dark:bg-slate-900">
       <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
         {t('notices.posts.commentCount', { count: countNoticeComments(comments) })}
       </h2>
