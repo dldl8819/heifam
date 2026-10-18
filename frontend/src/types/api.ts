@@ -441,6 +441,10 @@ export type GroupPlayerRaceStatsItem = {
 
 export type CaptainDraftTeam = 'HOME' | 'AWAY' | 'UNASSIGNED'
 
+// HOST: the host fills both teams in, seen by everyone. CAPTAINS: each captain hands their own team
+// in a round at a time, and a team's players are shown to the other team once both are in.
+export type CaptainDraftEntryMode = 'HOST' | 'CAPTAINS'
+
 export type CaptainDraftCreateRequest = {
   title?: string
   participantPlayerIds: number[]
@@ -449,6 +453,33 @@ export type CaptainDraftCreateRequest = {
   // How many rounds (1 to 7, four if left out), and each set's team size (3, 2 or 1) in play order.
   roundCount?: number
   setSizes?: number[]
+  entryMode?: CaptainDraftEntryMode
+}
+
+// What a captain hands in at once: every regular round (MAIN), then the ace decider (ACE) if played.
+export type CaptainDraftLineupStage = 'MAIN' | 'ACE'
+
+// A captain's line-up, handed in once: their team's players in every set of the stage, every slot filled.
+export type CaptainDraftLineupRequest = {
+  stage: CaptainDraftLineupStage
+  sets: Array<{ roundNumber: number; setNumber: number; playerIds: number[] }>
+}
+
+// Which team has handed a stage's line-up in, and whether both have (then shown to everyone).
+export type CaptainDraftStageLineup = {
+  stage: CaptainDraftLineupStage
+  homeSubmitted: boolean
+  awaySubmitted: boolean
+  revealed: boolean
+}
+
+export type CaptainDraftEntryModeRequest = {
+  entryMode: CaptainDraftEntryMode
+}
+
+// The ace decider for a draft whose rounds ended level: one set of teamSize a side.
+export type CaptainDraftAceRequest = {
+  teamSize: number
 }
 
 export type CaptainDraftPickRequest = {
@@ -490,6 +521,8 @@ export type CaptainDraftSummary = {
   totalSets: number
   // Who started it, by nickname as it was then; none for drafts from before that was kept.
   createdByNickname?: string | null
+  // An ace decider was played; it counts as one more round. roundCount is the regular rounds.
+  aceDecider?: boolean
 }
 
 export type CaptainDraftListResponse = {
@@ -538,6 +571,12 @@ export type CaptainDraftEntry = {
   // With a result: who put it in (nickname as it was then) and when; none for older results.
   resultRecordedByNickname?: string | null
   resultRecordedAt?: string | null
+  // A side kept from this reader (every slot null): its stage is not in for both teams, and the
+  // reader is not on that team.
+  homeHidden?: boolean
+  awayHidden?: boolean
+  // The set of the extra round played when the regular rounds ended level (에이스 결정전).
+  aceDecider?: boolean
 }
 
 export type CaptainDraftResponse = {
@@ -557,6 +596,12 @@ export type CaptainDraftResponse = {
   participants: CaptainDraftParticipant[]
   picks: CaptainDraftPickLog[]
   entries: CaptainDraftEntry[]
+  entryMode?: CaptainDraftEntryMode
+  // The reader's team, from the player linked to their account, and whether they captain it.
+  viewerTeam?: TeamSide | null
+  viewerCaptain?: boolean
+  // Each stage's line-ups, for a draft run by its captains.
+  lineups?: CaptainDraftStageLineup[]
 }
 
 export type AccessRole = 'SUPER_ADMIN' | 'ADMIN' | 'MEMBER' | 'BLOCKED'

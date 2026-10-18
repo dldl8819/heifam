@@ -149,6 +149,7 @@ import com.balancify.backend.service.RatingRecalculationService;
 import com.balancify.backend.service.TeamBalancingService;
 import com.balancify.backend.service.exception.MatchEditQuotaExceededException;
 import com.balancify.backend.service.exception.BoardForbiddenException;
+import com.balancify.backend.service.exception.CaptainDraftLineupForbiddenException;
 import com.balancify.backend.service.exception.CaptainDraftResultLockedException;
 import com.balancify.backend.service.exception.BoardLimitException;
 import com.balancify.backend.service.exception.CommentLimitException;
@@ -4244,6 +4245,9 @@ class AdminKeyFilterTest {
                 .content("{\"captainPlayerId\":1,\"pickedPlayerId\":3}"),
             post("/api/groups/1/captain-drafts/5/unpick").contentType(MediaType.APPLICATION_JSON).content("{\"playerId\":3}"),
             put("/api/groups/1/captain-drafts/5/entries").contentType(MediaType.APPLICATION_JSON).content("{\"entries\":[]}"),
+            put("/api/groups/1/captain-drafts/5/lineup").contentType(MediaType.APPLICATION_JSON).content("{\"sets\":[]}"),
+            put("/api/groups/1/captain-drafts/5/entry-mode").contentType(MediaType.APPLICATION_JSON).content("{\"entryMode\":\"CAPTAINS\"}"),
+            post("/api/groups/1/captain-drafts/5/ace").contentType(MediaType.APPLICATION_JSON).content("{\"teamSize\":1}"),
             delete("/api/groups/1/captain-drafts/5")
         );
     }
@@ -4269,15 +4273,22 @@ class AdminKeyFilterTest {
             .perform(calls.get(calls.size() - 1).header("X-USER-EMAIL", "member@hei.gg"))
             .andExpect(status().isForbidden());
 
+        // An email header names nobody as a reader of a draft (isNull): only a verified token does,
+        // so no one sees a team's line-up before both are in by saying who they are.
         verify(captainDraftService).listDrafts(1L);
-        verify(captainDraftService).getLatestDraft(1L);
-        verify(captainDraftService).getDraft(1L, 5L);
+        verify(captainDraftService).getLatestDraft(eq(1L), isNull());
+        verify(captainDraftService).getDraft(eq(1L), eq(5L), isNull());
         // Starting a draft and saving its sets name who did it.
-        verify(captainDraftService).createDraft(eq(1L), any(), eq("member@hei.gg"), any());
-        verify(captainDraftService).pickPlayer(eq(1L), eq(5L), any());
-        verify(captainDraftService).unpickPlayer(eq(1L), eq(5L), any());
+        verify(captainDraftService).createDraft(eq(1L), any(), eq("member@hei.gg"), any(), isNull());
+        verify(captainDraftService).pickPlayer(eq(1L), eq(5L), any(), isNull());
+        verify(captainDraftService).unpickPlayer(eq(1L), eq(5L), any(), isNull());
         // A member saves the sets without the right to change a result already in.
-        verify(captainDraftService).updateEntries(eq(1L), eq(5L), any(), eq(false), eq("member@hei.gg"), any());
+        verify(captainDraftService).updateEntries(eq(1L), eq(5L), any(), eq(false), eq("member@hei.gg"), any(), isNull());
+        // Whether they captain the draft is the service's to decide.
+        verify(captainDraftService).submitLineup(eq(1L), eq(5L), any(), isNull());
+        // Anyone running the draft changes its entry mode and adds an ace decider.
+        verify(captainDraftService).changeEntryMode(eq(1L), eq(5L), any(), isNull());
+        verify(captainDraftService).addAceDecider(eq(1L), eq(5L), any(), isNull());
         verify(captainDraftService, never()).deleteDraft(any(), any(), any(), any());
     }
 
@@ -4291,7 +4302,7 @@ class AdminKeyFilterTest {
                     .content("{\"entries\":[]}")
             )
             .andExpect(status().isOk());
-        verify(captainDraftService).updateEntries(eq(1L), eq(5L), any(), eq(true), eq("admin@hei.gg"), any());
+        verify(captainDraftService).updateEntries(eq(1L), eq(5L), any(), eq(true), eq("admin@hei.gg"), any(), isNull());
 
         when(accessControlService.isMatchResultEditor("member@hei.gg")).thenReturn(true);
         mockMvc
@@ -4302,14 +4313,58 @@ class AdminKeyFilterTest {
                     .content("{\"entries\":[]}")
             )
             .andExpect(status().isOk());
-        verify(captainDraftService).updateEntries(eq(1L), eq(5L), any(), eq(true), eq("member@hei.gg"), any());
+        verify(captainDraftService).updateEntries(eq(1L), eq(5L), any(), eq(true), eq("member@hei.gg"), any(), isNull());
+    }
+
+    @Test
+    void refusesALineUpFromAnyoneButACaptainWith403AndOneHandedInAlreadyWith409() throws Exception {
+        when(captainDraftService.submitLineup(any(), any(), any(), any()))
+            .thenThrow(new CaptainDraftLineupForbiddenException("Only a captain of this draft hands in a line-up"))
+            .thenThrow(new IllegalStateException("This team's line-up is handed in already; a line-up is handed in once"));
+
+        mockMvc
+            .perform(
+                put("/api/groups/1/captain-drafts/5/lineup")
+                    .header("X-USER-EMAIL", "admin@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"sets\":[]}")
+            )
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(
+                put("/api/groups/1/captain-drafts/5/lineup")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"sets\":[]}")
+            )
+            .andExpect(status().isConflict());
+    }
+
+    @Test
+    void refusesAnEntryModeChangeOrAnAceDeciderThatDoesNotFitTheDraftWith409() throws Exception {
+        when(captainDraftService.changeEntryMode(any(), any(), any(), any()))
+            .thenThrow(new IllegalStateException("One captain alone has handed a line-up in; it would be shown to the other team"));
+        when(captainDraftService.addAceDecider(any(), any(), any(), any()))
+            .thenThrow(new IllegalStateException("The rounds did not end level"));
+
+        mockMvc
+            .perform(
+                put("/api/groups/1/captain-drafts/5/entry-mode")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"entryMode\":\"HOST\"}")
+            )
+            .andExpect(status().isConflict());
+        mockMvc
+            .perform(post("/api/groups/1/captain-drafts/5/ace").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isConflict());
     }
 
     @Test
     void refusesAMembersChangeToAResultWith403AndATakeBackAfterResultsWith409() throws Exception {
-        when(captainDraftService.updateEntries(any(), any(), any(), anyBoolean(), any(), any()))
+        when(captainDraftService.updateEntries(any(), any(), any(), anyBoolean(), any(), any(), any()))
             .thenThrow(new CaptainDraftResultLockedException("Round 1 set 1 already has a result"));
-        when(captainDraftService.unpickPlayer(any(), any(), any()))
+        when(captainDraftService.unpickPlayer(any(), any(), any(), any()))
             .thenThrow(new IllegalStateException("A pick cannot be taken back once a set has a result"));
 
         mockMvc

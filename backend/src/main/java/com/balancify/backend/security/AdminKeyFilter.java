@@ -121,7 +121,9 @@ public class AdminKeyFilter extends OncePerRequestFilter {
         // Regular drafts (정기 감전) are open to members with access: reading, starting one, teams,
         // taking a pick back, and the sets with a set's first result. Changing a result already in is
         // held to admins and match result editors by CaptainDraftController and CaptainDraftService;
-        // removing a draft stays with admins.
+        // removing a draft stays with admins. A line-up is handed in by a captain of the draft only,
+        // which CaptainDraftService decides from the verified account; changing how a draft is run
+        // and adding an ace decider are for anyone running it.
         new ProtectedRoute(
             "POST",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/captain-drafts"),
@@ -160,6 +162,21 @@ public class AdminKeyFilter extends OncePerRequestFilter {
         new ProtectedRoute(
             "POST",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/captain-drafts/{draftId}/unpick"),
+            AuthType.SERVICE_ACCESS
+        ),
+        new ProtectedRoute(
+            "PUT",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/captain-drafts/{draftId}/lineup"),
+            AuthType.SERVICE_ACCESS
+        ),
+        new ProtectedRoute(
+            "PUT",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/captain-drafts/{draftId}/entry-mode"),
+            AuthType.SERVICE_ACCESS
+        ),
+        new ProtectedRoute(
+            "POST",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/captain-drafts/{draftId}/ace"),
             AuthType.SERVICE_ACCESS
         ),
         // Prize events: admins see them while points are tried out, super admins run them.

@@ -58,6 +58,11 @@ public class CaptainDraft {
     @Column(length = 100)
     private String createdByNickname;
 
+    // HOST: the host fills both teams in, seen by everyone. CAPTAINS: each captain hands their own
+    // team in for a round, and a team's players are shown to the other team once both are in (V82).
+    @Column(nullable = false, length = 10)
+    private String entryMode = "HOST";
+
     @PrePersist
     @PreUpdate
     private void updateTimestamp() {
@@ -161,5 +166,13 @@ public class CaptainDraft {
 
     public void setCreatedByNickname(String createdByNickname) {
         this.createdByNickname = createdByNickname;
+    }
+
+    public String getEntryMode() {
+        return entryMode;
+    }
+
+    public void setEntryMode(String entryMode) {
+        this.entryMode = entryMode;
     }
 }

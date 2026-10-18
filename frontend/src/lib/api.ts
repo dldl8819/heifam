@@ -8,7 +8,10 @@ import type {
   BalanceResponse,
   CreateGroupMatchResponse,
   CaptainDraftCreateRequest,
+  CaptainDraftAceRequest,
   CaptainDraftEntriesUpdateRequest,
+  CaptainDraftEntryModeRequest,
+  CaptainDraftLineupRequest,
   CaptainDraftListResponse,
   CaptainDraftPickRequest,
   CaptainDraftResponse,
@@ -1275,6 +1278,35 @@ export const apiClient = {
         body: JSON.stringify(payload),
       },
       { includeUserEmail: true }
+    ),
+  // A captain hands in their team's line-up, once a stage; the backend knows the team from the account.
+  submitCaptainDraftLineup: (groupId: number, draftId: number, payload: CaptainDraftLineupRequest) =>
+    apiRequest<CaptainDraftResponse>(
+      `/api/groups/${groupId}/captain-drafts/${draftId}/lineup`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  changeCaptainDraftEntryMode: (groupId: number, draftId: number, payload: CaptainDraftEntryModeRequest) =>
+    apiRequest<CaptainDraftResponse>(
+      `/api/groups/${groupId}/captain-drafts/${draftId}/entry-mode`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
+  // The ace decider (에이스 결정전) for a draft whose rounds ended level.
+  addCaptainDraftAceDecider: (groupId: number, draftId: number, payload: CaptainDraftAceRequest) =>
+    apiRequest<CaptainDraftResponse>(
+      `/api/groups/${groupId}/captain-drafts/${draftId}/ace`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      { requireUserEmail: true, includeUserEmail: true }
     ),
   getMyAccess: (identity?: { email: string; nickname?: string; accessToken?: string }) =>
     apiRequest<AccessMeResponse>('/api/access/me', undefined, {
