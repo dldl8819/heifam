@@ -13,10 +13,9 @@ import type { PrizeDraw, PrizeDrawList } from '@/types/api'
 const TEMP_GROUP_ID = 1
 
 /**
- * Prize draws: every member reads the records of draws that were run; admins also run them, with
- * the pinball or the cannon, on their own screen, and only the outcome is kept here. The quick
- * cannon, drawing a number or an item and keeping nothing, is shown to members as it is and to
- * admins when they pick the cannon.
+ * Prize draws: every member reads the records of draws that were run, and runs one too, with the
+ * pinball or the cannon, on their own screen; only the outcome is kept here. The quick cannon,
+ * drawing a number or an item and keeping nothing, shows under the setup when the cannon is picked.
  */
 export default function DrawsPage() {
   const [list, setList] = useState<PrizeDrawList | null>(null)
@@ -86,7 +85,7 @@ export default function DrawsPage() {
         <>
           {list.canRun && <PrizeDrawPanel groupId={TEMP_GROUP_ID} onSaved={setList} />}
 
-          {/* Admins get it from the setup, when they pick the cannon; for members it is the only tool here. */}
+          {/* Members get it from the setup when they pick the cannon; this is for anyone the setup is not shown to. */}
           {!list.canRun && <QuickCannon />}
 
           <div className="space-y-2">

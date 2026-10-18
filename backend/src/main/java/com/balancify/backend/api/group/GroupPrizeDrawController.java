@@ -20,8 +20,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * The records of prize draws. Members read them (ServiceAccessFilter); saving one is for admins
- * and removing one for super admins (AdminKeyFilter, and PrizeDrawService checks again).
+ * The records of prize draws. Members read them and save one they ran (ServiceAccessFilter and
+ * AdminKeyFilter); removing one is for super admins (AdminKeyFilter). PrizeDrawService checks again.
  */
 @RestController
 @RequestMapping("/api/groups/{groupId}/prize-draws")

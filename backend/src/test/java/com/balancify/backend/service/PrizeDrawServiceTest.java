@@ -64,6 +64,9 @@ class PrizeDrawServiceTest {
         when(accessControlService.isAdminEmail(ADMIN)).thenReturn(true);
         when(accessControlService.isAdminEmail(SUPER)).thenReturn(true);
         when(accessControlService.isSuperAdminEmail(SUPER)).thenReturn(true);
+        for (String allowed : new String[] {SUPER, ADMIN, MEMBER}) {
+            when(accessControlService.isServiceAccessAllowed(allowed)).thenReturn(true);
+        }
         when(accessControlService.resolveDisplayNicknames(anyCollection())).thenReturn(Map.of(ADMIN, "OpsUser"));
         when(prizeDrawRepository.insertDraw(any(), any(), any(), anyInt(), any())).thenReturn(40L);
     }
@@ -105,9 +108,21 @@ class PrizeDrawServiceTest {
     }
 
     @Test
-    void letsOnlyAdminsSaveADraw() {
-        assertThatThrownBy(() -> prizeDrawService.save(1L, MEMBER, "YOUR_USERNAME", draw("t", "FIRST", 5, winner(1, "a", null, null))))
-            .isInstanceOf(BoardForbiddenException.class);
+    void letsAMemberSaveADrawTheyRan() {
+        prizeDrawService.save(1L, MEMBER, "YOUR_USERNAME", draw("Member draw", "FIRST", 5, winner(1, "a", null, null)));
+
+        verify(prizeDrawRepository).insertDraw(1L, "Member draw", "FIRST", 5, MEMBER);
+        verify(operationAuditLogService).recordPrizeDraw(
+            OperationAuditLogService.ACTION_PRIZE_DRAW_SAVED, MEMBER, "YOUR_USERNAME", 40L, 1L, "Member draw",
+            "entrants=5, winners=1, mode=FIRST"
+        );
+    }
+
+    @Test
+    void refusesADrawFromAnAccountWithoutAccess() {
+        assertThatThrownBy(() -> prizeDrawService.save(
+            1L, "YOUR_USERNAME@example.com", "YOUR_USERNAME", draw("t", "FIRST", 5, winner(1, "a", null, null))
+        )).isInstanceOf(BoardForbiddenException.class);
 
         verify(prizeDrawRepository, never()).insertDraw(any(), any(), any(), anyInt(), any());
     }
@@ -189,7 +204,8 @@ class PrizeDrawServiceTest {
 
         PrizeDrawListResponse forMember = prizeDrawService.list(1L, MEMBER);
 
-        assertThat(forMember.canRun()).isFalse();
+        // Every member may run a draw; removing a record stays with super admins.
+        assertThat(forMember.canRun()).isTrue();
         assertThat(forMember.draws())
             .extracting(
                 PrizeDrawResponse::id, PrizeDrawResponse::title, PrizeDrawResponse::mode, PrizeDrawResponse::entrantCount,
