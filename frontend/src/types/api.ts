@@ -441,6 +441,10 @@ export type GroupPlayerRaceStatsItem = {
 
 export type CaptainDraftTeam = 'HOME' | 'AWAY' | 'UNASSIGNED'
 
+// HOST: the host fills both teams in, seen by everyone. CAPTAINS: each captain hands their own team
+// in a round at a time, and a team's players are shown to the other team once both are in.
+export type CaptainDraftEntryMode = 'HOST' | 'CAPTAINS'
+
 export type CaptainDraftCreateRequest = {
   title?: string
   participantPlayerIds: number[]
@@ -449,6 +453,20 @@ export type CaptainDraftCreateRequest = {
   // How many rounds (1 to 7, four if left out), and each set's team size (3, 2 or 1) in play order.
   roundCount?: number
   setSizes?: number[]
+  entryMode?: CaptainDraftEntryMode
+}
+
+// A captain's line-up for a round: their team's players in every set of it, every slot filled.
+export type CaptainDraftLineupRequest = {
+  sets: Array<{ setNumber: number; playerIds: number[] }>
+}
+
+// Which team has handed a round's line-up in, and whether both have (then shown to everyone).
+export type CaptainDraftRoundLineup = {
+  roundNumber: number
+  homeSubmitted: boolean
+  awaySubmitted: boolean
+  revealed: boolean
 }
 
 export type CaptainDraftPickRequest = {
@@ -538,6 +556,10 @@ export type CaptainDraftEntry = {
   // With a result: who put it in (nickname as it was then) and when; none for older results.
   resultRecordedByNickname?: string | null
   resultRecordedAt?: string | null
+  // A side kept from this reader (every slot null): its round is not in for both teams, and the
+  // reader is not on that team.
+  homeHidden?: boolean
+  awayHidden?: boolean
 }
 
 export type CaptainDraftResponse = {
@@ -557,6 +579,12 @@ export type CaptainDraftResponse = {
   participants: CaptainDraftParticipant[]
   picks: CaptainDraftPickLog[]
   entries: CaptainDraftEntry[]
+  entryMode?: CaptainDraftEntryMode
+  // The reader's team, from the player linked to their account, and whether they captain it.
+  viewerTeam?: TeamSide | null
+  viewerCaptain?: boolean
+  // Each round's line-ups, for a draft run by its captains.
+  lineups?: CaptainDraftRoundLineup[]
 }
 
 export type AccessRole = 'SUPER_ADMIN' | 'ADMIN' | 'MEMBER' | 'BLOCKED'

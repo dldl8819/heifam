@@ -1,6 +1,13 @@
 import { t } from '@/lib/i18n'
 import { toTierOrder } from '@/lib/player-tier'
-import type { CaptainDraftEntry, CaptainDraftResponse, CaptainDraftSummary, PlayerRosterItem, TeamSide } from '@/types/api'
+import type {
+  CaptainDraftEntry,
+  CaptainDraftLineupRequest,
+  CaptainDraftResponse,
+  CaptainDraftSummary,
+  PlayerRosterItem,
+  TeamSide,
+} from '@/types/api'
 
 export type DraftWinnerSelection = '' | TeamSide
 
@@ -85,17 +92,192 @@ function hasSavedResult(entry: CaptainDraftEntry): boolean {
   return entry.winnerTeam === 'HOME' || entry.winnerTeam === 'AWAY'
 }
 
-/**
- * The sets this viewer may not change: those whose result is saved already, unless the viewer may
- * edit results (admins and match result editors). The backend refuses such a change as well.
- */
-export function lockedSetKeys(entries: readonly CaptainDraftEntry[], canEditResults: boolean): Set<string> {
-  return canEditResults ? new Set() : new Set(entries.filter(hasSavedResult).map(entryKey))
-}
-
 /** Whether any set has a saved result: the games have begun, and no pick can be taken back. */
 export function hasAnyResult(entries: readonly CaptainDraftEntry[]): boolean {
   return entries.some(hasSavedResult)
+}
+
+/** A draft whose captains hand in their own team's line-up a round at a time, unseen by the other. */
+export function isRunByCaptains(draft: Pick<CaptainDraftResponse, 'entryMode'> | null | undefined): boolean {
+  return draft?.entryMode === 'CAPTAINS'
+}
+
+// Which team has handed a round's line-up in, and whether both have (both shown to everyone).
+export type RoundLineup = {
+  homeSubmitted: boolean
+  awaySubmitted: boolean
+  revealed: boolean
+}
+
+/** Each round's line-ups of a draft run by its captains; none for a draft the host fills in. */
+export function roundLineups(draft: Pick<CaptainDraftResponse, 'entryMode' | 'lineups'> | null): Map<number, RoundLineup> {
+  const rounds = new Map<number, RoundLineup>()
+  if (!isRunByCaptains(draft)) {
+    return rounds
+  }
+  for (const lineup of draft?.lineups ?? []) {
+    rounds.set(lineup.roundNumber, {
+      homeSubmitted: lineup.homeSubmitted,
+      awaySubmitted: lineup.awaySubmitted,
+      revealed: lineup.revealed,
+    })
+  }
+  return rounds
+}
+
+/** Whether a captain has handed any line-up in: the teams then stay as they are. */
+export function hasAnyLineup(lineups: ReadonlyMap<number, RoundLineup>): boolean {
+  return [...lineups.values()].some((lineup) => lineup.homeSubmitted || lineup.awaySubmitted)
+}
+
+// Who reads the sheet: how the draft is run, the reader's team (the backend knows it from their
+// account), whether they captain it, and whether they may edit results (admins and editors).
+export type DraftViewer = {
+  byCaptains: boolean
+  viewerTeam: TeamSide | null
+  viewerCaptain: boolean
+  canEditResults: boolean
+}
+
+/** A side as this viewer has it: to fill in, to read, or kept from them until both teams are in. */
+export type SideAccess = 'edit' | 'read' | 'hidden'
+
+export type SetControls = {
+  sides: Record<TeamSide, SideAccess>
+  // Its races and tier note.
+  settings: boolean
+  result: boolean
+  // Its result is saved and this viewer may not change it.
+  locked: boolean
+}
+
+/**
+ * What this viewer may change in a set. The backend holds to the same; this only shapes the sheet.
+ *
+ * Filled in by the host: anything, but a set whose result is saved only by those who may edit results.
+ * Run by the captains, until both line-ups of the round are in: a captain fills in their own side,
+ * their team reads it, and the other side is hidden; races and tier notes are anyone's until a
+ * captain hands the round in, and no result yet. Once both are in: the players, races and tier
+ * notes are for those who may edit results, and a set's first result anyone's.
+ */
+export function setControls(entry: CaptainDraftEntry, lineup: RoundLineup | undefined, viewer: DraftViewer): SetControls {
+  const resultLocked = hasSavedResult(entry) && !viewer.canEditResults
+  if (!viewer.byCaptains) {
+    const side: SideAccess = resultLocked ? 'read' : 'edit'
+    return { sides: { HOME: side, AWAY: side }, settings: !resultLocked, result: !resultLocked, locked: resultLocked }
+  }
+  if (lineup?.revealed) {
+    const side: SideAccess = viewer.canEditResults ? 'edit' : 'read'
+    return { sides: { HOME: side, AWAY: side }, settings: viewer.canEditResults, result: !resultLocked, locked: resultLocked }
+  }
+  const access = (team: TeamSide): SideAccess => {
+    if (team === 'HOME' ? entry.homeHidden : entry.awayHidden) {
+      return 'hidden'
+    }
+    return viewer.viewerCaptain && viewer.viewerTeam === team ? 'edit' : 'read'
+  }
+  const anyIn = Boolean(lineup?.homeSubmitted || lineup?.awaySubmitted)
+  return {
+    sides: { HOME: access('HOME'), AWAY: access('AWAY') },
+    settings: !anyIn || viewer.canEditResults,
+    result: false,
+    locked: false,
+  }
+}
+
+// A captain's line-up not handed in yet: their side of each set, by set key.
+export type LineupEdits = Record<string, SidePlayerIds>
+
+export type SheetRow = {
+  set: EffectiveEntry
+  controls: SetControls
+  // Whether it carries changes not saved yet (races, tier note, result or, for the host, players).
+  edited: boolean
+}
+
+function sideKey(team: TeamSide): 'homePlayerIds' | 'awayPlayerIds' {
+  return team === 'HOME' ? 'homePlayerIds' : 'awayPlayerIds'
+}
+
+/**
+ * The sheet as this viewer sees it: the saved sets with the changes made here laid over them, only
+ * those the viewer may make. In a round of a draft run by its captains that is not in for both
+ * teams, the players are the captains': a captain's line-up not handed in yet shows on their side.
+ */
+export function draftSheet(
+  entries: readonly CaptainDraftEntry[],
+  edits: EntryEdits,
+  lineupEdits: LineupEdits,
+  lineups: ReadonlyMap<number, RoundLineup>,
+  viewer: DraftViewer,
+): SheetRow[] {
+  return entries.map((entry) => {
+    const key = entryKey(entry)
+    const lineup = lineups.get(entry.roundNumber)
+    const controls = setControls(entry, lineup, viewer)
+    const own: EntryEdit = { ...(edits[key] ?? {}) }
+    if (!controls.settings) {
+      delete own.raceCode
+      delete own.requiredTier
+    }
+    if (!controls.result) {
+      delete own.winnerTeam
+    }
+    const byCaptainsUnshown = viewer.byCaptains && !lineup?.revealed
+    for (const team of ['HOME', 'AWAY'] as const) {
+      if (byCaptainsUnshown || controls.sides[team] !== 'edit') {
+        delete own[sideKey(team)]
+      }
+    }
+    const edited = Object.keys(own).length > 0
+    const team = viewer.viewerTeam
+    if (byCaptainsUnshown && team && controls.sides[team] === 'edit' && lineupEdits[key]) {
+      own[sideKey(team)] = lineupEdits[key]
+    }
+    return { set: effectiveEntry(entry, own), controls, edited }
+  })
+}
+
+/**
+ * A captain's line-up for one round as the backend takes it: their side of every set of the round,
+ * and whether every slot is filled (the backend takes none with an empty slot).
+ */
+export function lineupSubmission(
+  sheet: readonly EffectiveEntry[],
+  roundNumber: number,
+  team: TeamSide,
+): { request: CaptainDraftLineupRequest; complete: boolean } {
+  const sets = sheet
+    .filter((set) => set.roundNumber === roundNumber)
+    .sort((left, right) => left.setNumber - right.setNumber)
+    .map((set) => ({ setNumber: set.setNumber, slots: team === 'HOME' ? set.homePlayerIds : set.awayPlayerIds }))
+  return {
+    request: {
+      sets: sets.map(({ setNumber, slots }) => ({
+        setNumber,
+        playerIds: slots.filter((playerId): playerId is number => typeof playerId === 'number'),
+      })),
+    },
+    complete: sets.length > 0 && sets.every(({ slots }) => slots.every((playerId) => typeof playerId === 'number')),
+  }
+}
+
+/** The rounds whose line-up on screen is not the one handed in: changed here, or never handed in. */
+export function lineupRoundsChanged(lineupEdits: LineupEdits, entries: readonly CaptainDraftEntry[], team: TeamSide): Set<number> {
+  const changed = new Set<number>()
+  for (const entry of entries) {
+    const edit = lineupEdits[entryKey(entry)]
+    if (edit && edit.some((playerId, index) => playerId !== savedSide(entry, team)[index])) {
+      changed.add(entry.roundNumber)
+    }
+  }
+  return changed
+}
+
+/** Takes the rounds handed in off a captain's line-up not handed in yet. */
+export function dropLineupEdits(lineupEdits: LineupEdits, entries: readonly CaptainDraftEntry[], roundNumber: number): LineupEdits {
+  const keys = new Set(entries.filter((entry) => entry.roundNumber === roundNumber).map(entryKey))
+  return Object.fromEntries(Object.entries(lineupEdits).filter(([key]) => !keys.has(key)))
 }
 
 /** Sets won by each team, and by each player on the winning side of one. */

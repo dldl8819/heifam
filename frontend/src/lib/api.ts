@@ -9,6 +9,7 @@ import type {
   CreateGroupMatchResponse,
   CaptainDraftCreateRequest,
   CaptainDraftEntriesUpdateRequest,
+  CaptainDraftLineupRequest,
   CaptainDraftListResponse,
   CaptainDraftPickRequest,
   CaptainDraftResponse,
@@ -1275,6 +1276,21 @@ export const apiClient = {
         body: JSON.stringify(payload),
       },
       { includeUserEmail: true }
+    ),
+  // A captain hands in their team's line-up for a round; the backend knows the team from the account.
+  submitCaptainDraftLineup: (
+    groupId: number,
+    draftId: number,
+    roundNumber: number,
+    payload: CaptainDraftLineupRequest
+  ) =>
+    apiRequest<CaptainDraftResponse>(
+      `/api/groups/${groupId}/captain-drafts/${draftId}/rounds/${roundNumber}/lineup`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      },
+      { requireUserEmail: true, includeUserEmail: true }
     ),
   getMyAccess: (identity?: { email: string; nickname?: string; accessToken?: string }) =>
     apiRequest<AccessMeResponse>('/api/access/me', undefined, {

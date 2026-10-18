@@ -10,22 +10,31 @@ import {
   draftPlayerOptionLabel,
   draftRecordState,
   draftPlayerTags,
+  draftSheet,
   dropEditsNaming,
+  dropLineupEdits,
   effectiveEntry,
   entryKey,
+  hasAnyLineup,
   hasAnyResult,
-  lockedSetKeys,
+  isRunByCaptains,
+  lineupRoundsChanged,
+  lineupSubmission,
   nextSetSize,
   playersInRound,
   requiredTierPresets,
   roundComposition,
+  roundLineups,
   setComposition,
+  setControls,
   setLayoutSummary,
   setSizeChoices,
   setTeamSizes,
   setupDiffersFromDraft,
   sortByTier,
   withSlot,
+  type DraftViewer,
+  type RoundLineup,
 } from '@/lib/captain-draft'
 import type { CaptainDraftEntry, PlayerRosterItem } from '@/types/api'
 
@@ -56,13 +65,144 @@ function rosterPlayer(overrides: Partial<PlayerRosterItem>): PlayerRosterItem {
   return { id: 3, nickname: 'Ace', race: 'PT', tier: 'A', wins: 0, losses: 0, games: 0, ...overrides }
 }
 
+const HOST_MEMBER: DraftViewer = { byCaptains: false, viewerTeam: null, viewerCaptain: false, canEditResults: false }
+const NOT_IN: RoundLineup = { homeSubmitted: false, awaySubmitted: false, revealed: false }
+const HOME_IN: RoundLineup = { homeSubmitted: true, awaySubmitted: false, revealed: false }
+const BOTH_IN: RoundLineup = { homeSubmitted: true, awaySubmitted: true, revealed: true }
+
+function captainsViewer(overrides: Partial<DraftViewer> = {}): DraftViewer {
+  return { byCaptains: true, viewerTeam: null, viewerCaptain: false, canEditResults: false, ...overrides }
+}
+
+// A set of a round not shown to everyone, as the backend sends it to one who may not see a side.
+function hiding(set: CaptainDraftEntry, team: 'HOME' | 'AWAY'): CaptainDraftEntry {
+  return team === 'HOME'
+    ? { ...set, homePlayers: set.homePlayers.map(() => null), homeHidden: true }
+    : { ...set, awayPlayers: set.awayPlayers.map(() => null), awayHidden: true }
+}
+
 describe('captain draft sets', () => {
   it('locks the sets with a saved result for those who may not edit results, and none for those who may', () => {
-    const entries = [entry(1, 1, [1], [2], 'HOME'), entry(1, 2, [3], [4]), entry(2, 1, [1], [2], 'AWAY')]
+    const decided = entry(1, 1, [1], [2], 'HOME')
 
-    expect([...lockedSetKeys(entries, false)]).toEqual(['1-1', '2-1'])
-    expect(lockedSetKeys(entries, true).size).toBe(0)
-    expect(lockedSetKeys([entry(1, 1, [1], [2])], false).size).toBe(0)
+    expect(setControls(decided, undefined, HOST_MEMBER)).toEqual({
+      sides: { HOME: 'read', AWAY: 'read' },
+      settings: false,
+      result: false,
+      locked: true,
+    })
+    expect(setControls(decided, undefined, { ...HOST_MEMBER, canEditResults: true }).locked).toBe(false)
+    expect(setControls(entry(1, 2, [3], [4]), undefined, HOST_MEMBER)).toEqual({
+      sides: { HOME: 'edit', AWAY: 'edit' },
+      settings: true,
+      result: true,
+      locked: false,
+    })
+  })
+
+  it('lets a captain fill in only their own side before both line-ups are in, and hides the other', () => {
+    const set = hiding(entry(1, 1, [1, 3, 5], [null, null, null]), 'AWAY')
+    const homeCaptain = captainsViewer({ viewerTeam: 'HOME', viewerCaptain: true })
+
+    expect(setControls(set, NOT_IN, homeCaptain)).toEqual({
+      sides: { HOME: 'edit', AWAY: 'hidden' },
+      settings: true,
+      result: false,
+      locked: false,
+    })
+    // A team player reads their team's line-up; one in no team sees neither side.
+    expect(setControls(set, HOME_IN, captainsViewer({ viewerTeam: 'HOME' })).sides).toEqual({ HOME: 'read', AWAY: 'hidden' })
+    expect(setControls(hiding(set, 'HOME'), HOME_IN, captainsViewer()).sides).toEqual({ HOME: 'hidden', AWAY: 'hidden' })
+    // A line-up is in: its races and tier notes are fixed but for those who may edit results.
+    expect(setControls(set, HOME_IN, homeCaptain).settings).toBe(false)
+    expect(setControls(set, HOME_IN, captainsViewer({ canEditResults: true })).settings).toBe(true)
+  })
+
+  it('shows both sides once both line-ups are in, with players fixed and the first result open to all', () => {
+    const set = entry(1, 1, [1, 3, 5], [2, 4, 6])
+
+    expect(setControls(set, BOTH_IN, captainsViewer({ viewerTeam: 'HOME', viewerCaptain: true }))).toEqual({
+      sides: { HOME: 'read', AWAY: 'read' },
+      settings: false,
+      result: true,
+      locked: false,
+    })
+    expect(setControls(set, BOTH_IN, captainsViewer({ canEditResults: true })).sides).toEqual({ HOME: 'edit', AWAY: 'edit' })
+    expect(setControls({ ...set, winnerTeam: 'AWAY' }, BOTH_IN, captainsViewer()).locked).toBe(true)
+  })
+
+  it('lays a captain\'s line-up over their own side and keeps the rest of the players as handed in', () => {
+    const entries = [hiding(entry(1, 1, [1, 3, 5], [null, null, null]), 'AWAY'), entry(2, 1, [1, 3, 5], [2, 4, 6])]
+    const lineups = new Map([[1, HOME_IN], [2, BOTH_IN]])
+    const homeCaptain = captainsViewer({ viewerTeam: 'HOME', viewerCaptain: true })
+
+    const rows = draftSheet(
+      entries,
+      // Side changes through the host's edits never count in a round not shown, nor results.
+      { '1-1': { awayPlayerIds: [9, 9, 9], winnerTeam: 'HOME' }, '2-1': { homePlayerIds: [5, 3, 1] } },
+      { '1-1': [5, 1, 3] },
+      lineups,
+      homeCaptain,
+    )
+
+    expect(rows[0].set.homePlayerIds).toEqual([5, 1, 3])
+    expect(rows[0].set.awayPlayerIds).toEqual([null, null, null])
+    expect(rows[0].set.winnerTeam).toBe('')
+    expect(rows[0].edited).toBe(false)
+    expect(rows[1].set.homePlayerIds).toEqual([1, 3, 5])
+    expect(rows[1].edited).toBe(false)
+    // The same line-up once the round is shown to everyone: what was handed in counts.
+    expect(draftSheet(entries.slice(1), {}, { '2-1': [5, 3, 1] }, lineups, homeCaptain)[0].set.homePlayerIds).toEqual([1, 3, 5])
+  })
+
+  it('keeps the host\'s edits in a draft the host fills in, but none to a set they may not change', () => {
+    const rows = draftSheet(
+      [entry(1, 1, [1], [2]), entry(1, 2, [3], [4], 'HOME')],
+      { '1-1': { homePlayerIds: [7] }, '1-2': { winnerTeam: 'AWAY' } },
+      {},
+      new Map(),
+      HOST_MEMBER,
+    )
+
+    expect(rows.map((row) => row.set.homePlayerIds)).toEqual([[7], [3]])
+    expect(rows.map((row) => row.set.winnerTeam)).toEqual(['', 'HOME'])
+    expect(rows.map((row) => row.edited)).toEqual([true, false])
+  })
+
+  it('hands in a round\'s line-up only with every slot of every set filled', () => {
+    const sheet = [
+      effectiveEntry(entry(1, 2, [7], [null]), undefined),
+      effectiveEntry(entry(1, 1, [1, 3], [null, null]), undefined),
+      effectiveEntry(entry(2, 1, [1, null], [null, null]), undefined),
+    ]
+
+    expect(lineupSubmission(sheet, 1, 'HOME')).toEqual({
+      request: { sets: [{ setNumber: 1, playerIds: [1, 3] }, { setNumber: 2, playerIds: [7] }] },
+      complete: true,
+    })
+    expect(lineupSubmission(sheet, 2, 'HOME').complete).toBe(false)
+    expect(lineupSubmission(sheet, 1, 'AWAY').complete).toBe(false)
+    expect(lineupSubmission(sheet, 3, 'HOME').complete).toBe(false)
+  })
+
+  it('tells the rounds whose line-up on screen is not the one handed in, and drops a round handed in', () => {
+    const entries = [entry(1, 1, [1, 3], [2, 4]), entry(2, 1, [1, 3], [2, 4]), entry(2, 2, [5], [6])]
+    const edits = { '1-1': [1, 3], '2-1': [3, 1] }
+
+    expect([...lineupRoundsChanged(edits, entries, 'HOME')]).toEqual([2])
+    expect(dropLineupEdits(edits, entries, 2)).toEqual({ '1-1': [1, 3] })
+  })
+
+  it('reads the line-ups of a draft run by its captains, and none for one the host fills in', () => {
+    const lineups = [{ roundNumber: 1, homeSubmitted: true, awaySubmitted: false, revealed: false }]
+
+    expect(isRunByCaptains({ entryMode: 'CAPTAINS' })).toBe(true)
+    expect(isRunByCaptains({ entryMode: 'HOST' })).toBe(false)
+    expect(isRunByCaptains({})).toBe(false)
+    expect(roundLineups({ entryMode: 'CAPTAINS', lineups }).get(1)).toEqual(HOME_IN)
+    expect(roundLineups({ entryMode: 'HOST', lineups }).size).toBe(0)
+    expect(hasAnyLineup(roundLineups({ entryMode: 'CAPTAINS', lineups }))).toBe(true)
+    expect(hasAnyLineup(new Map([[1, NOT_IN]]))).toBe(false)
   })
 
   it('names who put a saved result in, but not for a result changed here and not saved', () => {

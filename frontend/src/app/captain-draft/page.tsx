@@ -17,16 +17,24 @@ import {
   defaultDraftTitle,
   defaultSetSizes,
   draftLayout,
+  draftSheet,
   dropEditsNaming,
-  effectiveEntry,
+  dropLineupEdits,
+  hasAnyLineup,
   hasAnyResult,
-  lockedSetKeys,
+  isRunByCaptains,
+  lineupRoundsChanged,
+  lineupSubmission,
   roundComposition,
+  roundLineups,
   setComposition,
   setupDiffersFromDraft,
+  type DraftViewer,
   type EffectiveEntry,
   type EntryEdit,
   type EntryEdits,
+  type LineupEdits,
+  type SetControls,
 } from '@/lib/captain-draft'
 import { startVisiblePolling } from '@/lib/visible-polling'
 import {
@@ -40,12 +48,18 @@ import {
 } from '@/lib/participant-slots'
 import { formatKstDateTime } from '@/lib/kst-time'
 import type {
+  CaptainDraftEntryMode,
   CaptainDraftParticipant,
   CaptainDraftResponse,
   CaptainDraftSummary,
   PlayerRosterItem,
   TeamSide,
 } from '@/types/api'
+
+const TEAM_LABEL_KEYS: Record<TeamSide, string> = {
+  HOME: 'captainDraft.scoreboard.homeHeader',
+  AWAY: 'captainDraft.scoreboard.awayHeader',
+}
 
 const TEMP_GROUP_ID = 1
 const MINIMUM_PARTICIPANT_SLOTS = 8
@@ -82,7 +96,9 @@ function errorWithReason(key: string, caught: unknown): string {
 
 /**
  * The regular draft (정기 감전), run by the host: attendance and two captains, then the players each
- * captain calls out are put into their team, in any order, and both teams' round entries are set.
+ * captain calls out are put into their team, in any order, and both teams' round entries are set,
+ * by the host or, for a draft run by its captains, by each captain for their own team unseen by the
+ * other until both are in.
  */
 export default function CaptainDraftPage() {
   const { canViewMmr, isAdmin, isMatchResultEditor } = useAdminAuth()
@@ -102,6 +118,7 @@ export default function CaptainDraftPage() {
   // Each set's team size in play order, and how many rounds, for the next draft started.
   const [setSizes, setSetSizes] = useState<number[]>([])
   const [roundCount, setRoundCount] = useState<number>(DEFAULT_ROUND_COUNT)
+  const [entryMode, setEntryMode] = useState<CaptainDraftEntryMode>('HOST')
 
   const [draftTitle, setDraftTitle] = useState<string>(() => defaultDraftTitle())
   const [draft, setDraft] = useState<CaptainDraftResponse | null>(null)
@@ -112,10 +129,13 @@ export default function CaptainDraftPage() {
   const [draftLoading, setDraftLoading] = useState<boolean>(true)
 
   const [entryEdits, setEntryEdits] = useState<EntryEdits>({})
+  // A captain's line-up for their own team not handed in yet (a draft run by its captains).
+  const [lineupEdits, setLineupEdits] = useState<LineupEdits>({})
 
   const [isCreatingDraft, setIsCreatingDraft] = useState<boolean>(false)
   const [isChangingTeams, setIsChangingTeams] = useState<boolean>(false)
   const [isSavingEntries, setIsSavingEntries] = useState<boolean>(false)
+  const [submittingRound, setSubmittingRound] = useState<number | null>(null)
 
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
@@ -175,22 +195,47 @@ export default function CaptainDraftPage() {
     return members
   }, [draft])
 
-  // Sets this viewer may only read: their result is saved, and they may not edit results.
-  const lockedKeys = useMemo(() => lockedSetKeys(draft?.entries ?? [], canEditResults), [draft, canEditResults])
-  const canTakeBack = !hasAnyResult(draft?.entries ?? [])
-
-  // The sheet as shown: saved sets with the host's unsaved changes laid over them. A set that got its
-  // result meanwhile (someone else saved it) shows as saved, and its changes here are dropped.
-  const sheet = useMemo(
-    () =>
-      (draft?.entries ?? []).map((entry) => {
-        const key = `${entry.roundNumber}-${entry.setNumber}`
-        return effectiveEntry(entry, lockedKeys.has(key) ? undefined : entryEdits[key])
-      }),
-    [draft, entryEdits, lockedKeys],
+  // Who reads the sheet. The backend tells the reader's team from their account, and keeps a team's
+  // line-up from everyone else until both are in; this only shapes the screen.
+  const byCaptains = isRunByCaptains(draft)
+  const viewer = useMemo<DraftViewer>(
+    () => ({
+      byCaptains,
+      viewerTeam: draft?.viewerTeam ?? null,
+      viewerCaptain: Boolean(draft?.viewerCaptain),
+      canEditResults,
+    }),
+    [byCaptains, draft?.viewerTeam, draft?.viewerCaptain, canEditResults],
   )
+  const lineups = useMemo(() => roundLineups(draft), [draft])
+  // The team this viewer hands in: their own, when they captain it.
+  const submitTeam = byCaptains && viewer.viewerCaptain ? viewer.viewerTeam : null
+  const canTakeBack = !hasAnyResult(draft?.entries ?? []) && !hasAnyLineup(lineups)
+
+  // The sheet as shown: saved sets with the changes made here laid over them, only those this viewer
+  // may make. A set that got its result meanwhile (someone else saved it) shows as saved.
+  const sheetRows = useMemo(
+    () => draftSheet(draft?.entries ?? [], entryEdits, lineupEdits, lineups, viewer),
+    [draft, entryEdits, lineupEdits, lineups, viewer],
+  )
+  const sheet = useMemo(() => sheetRows.map((row) => row.set), [sheetRows])
+  const controls = useMemo(() => {
+    const byKey = new Map<string, SetControls>()
+    for (const row of sheetRows) {
+      byKey.set(row.set.key, row.controls)
+    }
+    return byKey
+  }, [sheetRows])
   const setWins = useMemo(() => countSetWins(sheet), [sheet])
-  const unsavedCount = Object.keys(entryEdits).filter((key) => !lockedKeys.has(key)).length
+  const unsavedCount = sheetRows.filter((row) => row.edited).length
+  // Rounds whose line-up on screen differs from the one handed in, not yet shown to everyone.
+  const unsubmittedRounds = useMemo(() => {
+    if (!submitTeam) {
+      return new Set<number>()
+    }
+    const changed = lineupRoundsChanged(lineupEdits, draft?.entries ?? [], submitTeam)
+    return new Set([...changed].filter((round) => !lineups.get(round)?.revealed))
+  }, [submitTeam, lineupEdits, draft, lineups])
 
   // The rounds in order, each with its sets and the composition of its biggest set.
   const roundGroups = useMemo(() => {
@@ -251,6 +296,7 @@ export default function CaptainDraftPage() {
         const layout = draftLayout(response.entries)
         setSetSizes(layout.setSizes)
         setRoundCount(layout.roundCount || DEFAULT_ROUND_COUNT)
+        setEntryMode(response.entryMode ?? 'HOST')
       } catch (latestDraftError) {
         if (!mounted) {
           return
@@ -433,10 +479,12 @@ export default function CaptainDraftPage() {
         captainPlayerIds: [homeCaptainId, awayCaptainId],
         roundCount,
         setSizes,
+        entryMode,
       })
       moveToNewView()
       setDraft(created)
       setEntryEdits({})
+      setLineupEdits({})
       setMessage(t('captainDraft.messages.createSuccess'))
       void loadRecords()
     } catch (createError) {
@@ -455,14 +503,19 @@ export default function CaptainDraftPage() {
     setAwayCaptainId(null)
     setSetSizes([])
     setRoundCount(DEFAULT_ROUND_COUNT)
+    setEntryMode('HOST')
     setDraftTitle(defaultDraftTitle())
     setDraft(null)
     setDraftLoading(false)
     setEntryEdits({})
+    setLineupEdits({})
   }
 
+  // Changes on screen that 초기화 or loading another draft would lose, a captain's line-up included.
+  const pendingCount = unsavedCount + unsubmittedRounds.size
+
   const handleResetDraftSetup = () => {
-    if (unsavedCount > 0 && !window.confirm(t('captainDraft.actions.resetConfirm', { count: unsavedCount }))) {
+    if (pendingCount > 0 && !window.confirm(t('captainDraft.actions.resetConfirm', { count: pendingCount }))) {
       return
     }
     clearScreen()
@@ -504,7 +557,9 @@ export default function CaptainDraftPage() {
     const layout = draftLayout(shown.entries)
     setSetSizes(layout.setSizes)
     setRoundCount(layout.roundCount || DEFAULT_ROUND_COUNT)
+    setEntryMode(shown.entryMode ?? 'HOST')
     setEntryEdits({})
+    setLineupEdits({})
   }
 
   const handleOpenRecord = async (draftId: number) => {
@@ -527,7 +582,7 @@ export default function CaptainDraftPage() {
   // captains typed for the next draft and unsaved entry changes would be lost, so ask first.
   const handleRefreshDraft = async () => {
     const wouldOverwrite =
-      unsavedCount > 0 || setupDiffersFromDraft(draft, selectedParticipantIds, homeCaptainId, awayCaptainId)
+      pendingCount > 0 || setupDiffersFromDraft(draft, selectedParticipantIds, homeCaptainId, awayCaptainId)
     if (wouldOverwrite && !window.confirm(t('captainDraft.actions.loadLatestConfirm'))) {
       return
     }
@@ -553,6 +608,7 @@ export default function CaptainDraftPage() {
         setHomeCaptainId(null)
         setAwayCaptainId(null)
         setEntryEdits({})
+        setLineupEdits({})
         setSetSizes([])
         setRoundCount(DEFAULT_ROUND_COUNT)
       } else {
@@ -612,8 +668,56 @@ export default function CaptainDraftPage() {
     }
   }
 
+  // A captain's own side of a round not shown to everyone yet is their line-up, handed in by round;
+  // everything else is saved with 엔트리 저장.
   const editEntry = (key: string, change: EntryEdit) => {
+    const set = sheet.find((candidate) => candidate.key === key)
+    const { homePlayerIds, awayPlayerIds, ...rest } = change
+    const ownSide = submitTeam === 'HOME' ? homePlayerIds : submitTeam === 'AWAY' ? awayPlayerIds : undefined
+    if (set && submitTeam && !lineups.get(set.roundNumber)?.revealed && ownSide) {
+      setLineupEdits((previous) => ({ ...previous, [key]: ownSide }))
+      if (Object.keys(rest).length === 0) {
+        return
+      }
+      setEntryEdits((previous) => ({ ...previous, [key]: { ...previous[key], ...rest } }))
+      return
+    }
     setEntryEdits((previous) => ({ ...previous, [key]: { ...previous[key], ...change } }))
+  }
+
+  const handleSubmitLineup = async (roundNumber: number) => {
+    if (!draft?.draftId || !submitTeam) {
+      return
+    }
+    setMessage(null)
+    setError(null)
+    const { request, complete } = lineupSubmission(sheet, roundNumber, submitTeam)
+    if (!complete) {
+      setError(t('captainDraft.lineup.incomplete', { round: roundNumber }))
+      return
+    }
+    setSubmittingRound(roundNumber)
+    const view = draftViewRef.current
+    try {
+      const next = await apiClient.submitCaptainDraftLineup(TEMP_GROUP_ID, draft.draftId, roundNumber, request)
+      if (view !== draftViewRef.current) {
+        return
+      }
+      setDraft(next)
+      setLineupEdits((previous) => dropLineupEdits(previous, next.entries, roundNumber))
+      const revealed = next.lineups?.find((lineup) => lineup.roundNumber === roundNumber)?.revealed
+      setMessage(t(revealed ? 'captainDraft.lineup.revealedNow' : 'captainDraft.lineup.submitted', { round: roundNumber }))
+    } catch (submitError) {
+      setError(
+        isApiForbiddenError(submitError)
+          ? t('captainDraft.lineup.notCaptain')
+          : isApiConflictError(submitError)
+            ? t('captainDraft.lineup.alreadyRevealed')
+            : errorWithReason('captainDraft.lineup.submitFailed', submitError),
+      )
+    } finally {
+      setSubmittingRound(null)
+    }
   }
 
   const handleSaveEntries = async () => {
@@ -658,11 +762,11 @@ export default function CaptainDraftPage() {
   }
 
   // A round's composition sets every set of it: the biggest plays it, smaller ones a cut-down version.
-  // Sets this viewer may only read keep theirs.
+  // Sets whose races this viewer may not change keep theirs.
   const changeRoundCode = (roundNumber: number, code: string) => {
     setEntryEdits((previous) => {
       const next = { ...previous }
-      for (const set of sheet.filter((candidate) => candidate.roundNumber === roundNumber && !lockedKeys.has(candidate.key))) {
+      for (const set of sheet.filter((candidate) => candidate.roundNumber === roundNumber && controls.get(candidate.key)?.settings)) {
         next[set.key] = { ...next[set.key], raceCode: setComposition(code, set.teamSize) }
       }
       return next
@@ -757,6 +861,21 @@ export default function CaptainDraftPage() {
                   ))}
                 </select>
               </label>
+
+              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">
+                {t('captainDraft.entryMode.label')}
+                <select
+                  value={entryMode}
+                  onChange={(event) => setEntryMode(event.target.value === 'CAPTAINS' ? 'CAPTAINS' : 'HOST')}
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                >
+                  <option value="HOST">{t('captainDraft.entryMode.host')}</option>
+                  <option value="CAPTAINS">{t('captainDraft.entryMode.captains')}</option>
+                </select>
+                <span className="mt-1 block font-normal text-slate-500 dark:text-slate-400">
+                  {t(entryMode === 'CAPTAINS' ? 'captainDraft.entryMode.captainsHelp' : 'captainDraft.entryMode.hostHelp')}
+                </span>
+              </label>
             </div>
 
             <CaptainDraftRoundSettings
@@ -806,6 +925,18 @@ export default function CaptainDraftPage() {
                   {t('captainDraft.status.label')}:{' '}
                   {draft.status === 'READY' ? t('captainDraft.status.ready') : t('captainDraft.status.drafting')}
                 </p>
+                <p className="mt-1">
+                  {t('captainDraft.entryMode.status', {
+                    mode: t(byCaptains ? 'captainDraft.entryMode.captains' : 'captainDraft.entryMode.host'),
+                  })}
+                </p>
+                {byCaptains && viewer.viewerTeam && (
+                  <p className="mt-1 font-semibold">
+                    {t(viewer.viewerCaptain ? 'captainDraft.entryMode.viewerCaptain' : 'captainDraft.entryMode.viewerMember', {
+                      team: t(TEAM_LABEL_KEYS[viewer.viewerTeam]),
+                    })}
+                  </p>
+                )}
               </div>
             )}
           </article>
@@ -828,7 +959,9 @@ export default function CaptainDraftPage() {
         <>
           <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
             <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('captainDraft.entry.title')}</h3>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('captainDraft.entry.helper')}</p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              {t(byCaptains ? 'captainDraft.lineup.helper' : 'captainDraft.entry.helper')}
+            </p>
 
             <div className="mt-4 space-y-4">
               <CaptainDraftEntrySheet
@@ -836,11 +969,16 @@ export default function CaptainDraftPage() {
                 sheet={sheet}
                 teamMembers={teamMembers}
                 playerMap={playerMap}
-                lockedKeys={lockedKeys}
+                controls={controls}
                 onEditEntry={editEntry}
                 onChangeRoundCode={changeRoundCode}
+                lineups={byCaptains ? lineups : undefined}
+                submitTeam={submitTeam}
+                unsubmittedRounds={unsubmittedRounds}
+                submittingRound={submittingRound}
+                onSubmitLineup={(roundNumber) => void handleSubmitLineup(roundNumber)}
               />
-              {lockedKeys.size > 0 && (
+              {sheetRows.some((row) => row.controls.locked) && (
                 <p className="text-xs text-slate-500 dark:text-slate-400">{t('captainDraft.entry.lockedHint')}</p>
               )}
 
@@ -856,7 +994,9 @@ export default function CaptainDraftPage() {
                   disabled={isSavingEntries}
                   className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
                 >
-                  {isSavingEntries ? t('captainDraft.actions.savingEntries') : t('captainDraft.actions.saveEntries')}
+                  {isSavingEntries
+                    ? t('captainDraft.actions.savingEntries')
+                    : t(byCaptains ? 'captainDraft.lineup.saveSets' : 'captainDraft.actions.saveEntries')}
                 </button>
               </div>
             </div>

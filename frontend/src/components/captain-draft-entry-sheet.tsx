@@ -11,6 +11,8 @@ import {
   type DraftWinnerSelection,
   type EffectiveEntry,
   type EntryEdit,
+  type RoundLineup,
+  type SetControls,
 } from '@/lib/captain-draft'
 import type { CaptainDraftParticipant, PlayerRosterItem, TeamSide } from '@/types/api'
 
@@ -23,6 +25,8 @@ const TEAM_LABELS: Record<TeamSide, string> = {
   HOME: 'captainDraft.scoreboard.homeHeader',
   AWAY: 'captainDraft.scoreboard.awayHeader',
 }
+// What a set shows before its controls are known: nothing to change.
+const READ_ONLY: SetControls = { sides: { HOME: 'read', AWAY: 'read' }, settings: false, result: false, locked: false }
 
 export type EntrySheetRound = {
   roundNumber: number
@@ -38,10 +42,17 @@ type CaptainDraftEntrySheetProps = {
   sheet: EffectiveEntry[]
   teamMembers: Record<TeamSide, EntrySheetMember[]>
   playerMap: Map<number, PlayerRosterItem>
-  // Sets this viewer may only read: a result is saved and they may not edit results.
-  lockedKeys: ReadonlySet<string>
+  // What this viewer may change in each set, by set key.
+  controls: ReadonlyMap<string, SetControls>
   onEditEntry: (key: string, change: EntryEdit) => void
   onChangeRoundCode: (roundNumber: number, code: string) => void
+  // A draft run by its captains: each round's line-ups, the team this viewer hands in when they
+  // captain one, and the rounds whose line-up on screen is not the one handed in.
+  lineups?: ReadonlyMap<number, RoundLineup>
+  submitTeam?: TeamSide | null
+  unsubmittedRounds?: ReadonlySet<number>
+  submittingRound?: number | null
+  onSubmitLineup?: (roundNumber: number) => void
 }
 
 // The compositions a set of this size can take, with the current one kept even if unusual.
@@ -55,19 +66,29 @@ function selectedPlayerId(value: string): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null
 }
 
+function teamSubmitted(lineup: RoundLineup | undefined, team: TeamSide): boolean {
+  return Boolean(team === 'HOME' ? lineup?.homeSubmitted : lineup?.awaySubmitted)
+}
+
 /**
  * The round sheet of the regular draft: a row per set with each side's players on one line, the
- * round's race composition under its name, the tiers a set asks for, and the results. A set whose
- * result is saved is read-only to those who may not edit results.
+ * round's race composition under its name, the tiers a set asks for, and the results. What the
+ * viewer may change comes with each set: a set whose result is saved is read-only to those who may
+ * not edit results, and in a draft run by its captains a side not yet shown to the viewer is hidden.
  */
 export function CaptainDraftEntrySheet({
   rounds,
   sheet,
   teamMembers,
   playerMap,
-  lockedKeys,
+  controls,
   onEditEntry,
   onChangeRoundCode,
+  lineups,
+  submitTeam = null,
+  unsubmittedRounds,
+  submittingRound = null,
+  onSubmitLineup,
 }: CaptainDraftEntrySheetProps) {
   // The players a slot can take: that team's players not yet placed elsewhere in the round.
   const playerOptions = (team: TeamSide, set: EffectiveEntry, slot: number) => {
@@ -124,11 +145,12 @@ export function CaptainDraftEntrySheet({
             const biggestSize = Math.max(...round.sets.map((set) => set.teamSize))
             const roundHomeWins = round.sets.filter((set) => set.winnerTeam === 'HOME').length
             const roundAwayWins = round.sets.filter((set) => set.winnerTeam === 'AWAY').length
-            const roundLocked = round.sets.every((set) => lockedKeys.has(set.key))
+            const roundSettingsOpen = round.sets.some((set) => controls.get(set.key)?.settings)
+            const lineup = lineups?.get(round.roundNumber)
 
             return round.sets.map((set, setIndex) => {
               const dividerClass = roundIndex > 0 && setIndex === 0 ? 'border-t-[3px] border-t-slate-800' : ''
-              const locked = lockedKeys.has(set.key)
+              const allowed = controls.get(set.key) ?? READ_ONLY
               return (
                 <tr key={`entry-${set.key}`} className={`bg-white dark:bg-slate-900 ${dividerClass}`.trim()}>
                   {setIndex === 0 && (
@@ -140,7 +162,7 @@ export function CaptainDraftEntrySheet({
                       <select
                         value={round.roundCode}
                         onChange={(event) => onChangeRoundCode(round.roundNumber, event.target.value)}
-                        disabled={roundLocked}
+                        disabled={!roundSettingsOpen}
                         aria-label={t('captainDraft.entry.roundCodeLabel', { round: round.roundNumber })}
                         className="mt-1 w-full rounded-md border border-slate-300 bg-white px-1 py-1 text-sm font-semibold text-slate-800 outline-hidden focus:border-slate-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
                       >
@@ -150,6 +172,17 @@ export function CaptainDraftEntrySheet({
                           </option>
                         ))}
                       </select>
+                      {lineups && (
+                        <RoundLineupStatus
+                          roundNumber={round.roundNumber}
+                          lineup={lineup}
+                          submitTeam={submitTeam}
+                          unsubmitted={unsubmittedRounds?.has(round.roundNumber) ?? false}
+                          submitting={submittingRound === round.roundNumber}
+                          busy={submittingRound !== null}
+                          onSubmit={onSubmitLineup}
+                        />
+                      )}
                     </th>
                   )}
                   <td className={`border border-slate-300 px-2 py-2 text-center text-slate-700 dark:border-slate-700 dark:text-slate-300 ${dividerClass}`.trim()}>
@@ -157,7 +190,7 @@ export function CaptainDraftEntrySheet({
                     <span className="block text-xs text-slate-500 dark:text-slate-400">
                       {t('captainDraft.entry.teamSize', { size: set.teamSize })}
                     </span>
-                    {locked && (
+                    {allowed.locked && (
                       <span
                         title={t('captainDraft.entry.lockedHint')}
                         className="mt-1 inline-block rounded-sm bg-slate-200 px-1 text-[11px] font-semibold text-slate-600 dark:bg-slate-700 dark:text-slate-300"
@@ -170,7 +203,7 @@ export function CaptainDraftEntrySheet({
                     <select
                       value={set.raceCode}
                       onChange={(event) => onEditEntry(set.key, { raceCode: event.target.value })}
-                      disabled={locked}
+                      disabled={!allowed.settings}
                       aria-label={t('captainDraft.entry.raceCodeLabel', { round: round.roundNumber, set: set.setNumber })}
                       className="w-full rounded-md border border-transparent bg-transparent px-1 py-1.5 text-center text-sm font-medium text-slate-800 outline-hidden focus:border-slate-300 dark:text-slate-200 dark:focus:border-slate-600"
                     >
@@ -185,7 +218,7 @@ export function CaptainDraftEntrySheet({
                     <input
                       value={set.requiredTier}
                       onChange={(event) => onEditEntry(set.key, { requiredTier: event.target.value })}
-                      disabled={locked}
+                      disabled={!allowed.settings}
                       list={TIER_PRESET_LIST_ID}
                       maxLength={30}
                       placeholder={t('captainDraft.entry.requiredTierPlaceholder')}
@@ -195,37 +228,53 @@ export function CaptainDraftEntrySheet({
                   </td>
                   {(['HOME', 'AWAY'] as const).map((team) => (
                     <td key={`${set.key}-${team}`} className={`border border-slate-300 px-1 py-1 dark:border-slate-700 ${dividerClass}`.trim()}>
-                      <div className={`grid gap-1 ${set.teamSize >= 3 ? 'grid-cols-3' : set.teamSize === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                        {(team === 'HOME' ? set.homePlayerIds : set.awayPlayerIds).map((playerId, slot) => (
-                          <select
-                            key={`${set.key}-${team}-${slot}`}
-                            value={playerId ?? ''}
-                            onChange={(event) => changeSlot(set, team, slot, event.target.value)}
-                            disabled={locked}
-                            aria-label={t('captainDraft.entry.slotLabel', {
-                              team: t(TEAM_LABELS[team]),
-                              set: `${round.roundNumber}-${set.setNumber}`,
-                              slot: slot + 1,
-                            })}
-                            className={`w-full min-w-0 truncate rounded-md border border-slate-200 bg-transparent px-1 py-1.5 text-sm font-medium outline-hidden dark:border-slate-700 ${
-                              team === 'HOME'
-                                ? 'text-sky-700 focus:bg-sky-50 dark:text-sky-300 dark:focus:bg-sky-950/50'
-                                : 'text-rose-700 focus:bg-rose-50 dark:text-rose-300 dark:focus:bg-rose-950/50'
-                            }`}
-                          >
-                            <option value="">{t('captainDraft.entry.notSet')}</option>
-                            {playerOptions(team, set, slot)}
-                          </select>
-                        ))}
-                      </div>
+                      {allowed.sides[team] === 'hidden' ? (
+                        <div className="rounded-md border border-dashed border-slate-300 px-2 py-1.5 text-center text-xs font-medium text-slate-500 dark:border-slate-600 dark:text-slate-400">
+                          {t('captainDraft.lineup.hidden')}
+                          {' · '}
+                          {t(teamSubmitted(lineup, team) ? 'captainDraft.lineup.teamIn' : 'captainDraft.lineup.teamPending', {
+                            team: t(TEAM_LABELS[team]),
+                          })}
+                        </div>
+                      ) : (
+                        <div className={`grid gap-1 ${set.teamSize >= 3 ? 'grid-cols-3' : set.teamSize === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                          {(team === 'HOME' ? set.homePlayerIds : set.awayPlayerIds).map((playerId, slot) => (
+                            <select
+                              key={`${set.key}-${team}-${slot}`}
+                              value={playerId ?? ''}
+                              onChange={(event) => changeSlot(set, team, slot, event.target.value)}
+                              disabled={allowed.sides[team] !== 'edit'}
+                              aria-label={t('captainDraft.entry.slotLabel', {
+                                team: t(TEAM_LABELS[team]),
+                                set: `${round.roundNumber}-${set.setNumber}`,
+                                slot: slot + 1,
+                              })}
+                              className={`w-full min-w-0 truncate rounded-md border border-slate-200 bg-transparent px-1 py-1.5 text-sm font-medium outline-hidden dark:border-slate-700 ${
+                                team === 'HOME'
+                                  ? 'text-sky-700 focus:bg-sky-50 dark:text-sky-300 dark:focus:bg-sky-950/50'
+                                  : 'text-rose-700 focus:bg-rose-50 dark:text-rose-300 dark:focus:bg-rose-950/50'
+                              }`}
+                            >
+                              <option value="">{t('captainDraft.entry.notSet')}</option>
+                              {playerOptions(team, set, slot)}
+                            </select>
+                          ))}
+                        </div>
+                      )}
                     </td>
                   ))}
                   <td className={`border border-slate-300 px-1 py-1 text-center dark:border-slate-700 ${dividerClass}`.trim()}>
                     <select
                       value={set.winnerTeam}
                       onChange={(event) => onEditEntry(set.key, { winnerTeam: event.target.value as DraftWinnerSelection })}
-                      disabled={locked}
-                      title={locked ? t('captainDraft.entry.lockedHint') : undefined}
+                      disabled={!allowed.result}
+                      title={
+                        allowed.locked
+                          ? t('captainDraft.entry.lockedHint')
+                          : lineups && !lineup?.revealed
+                            ? t('captainDraft.lineup.resultAfterReveal')
+                            : undefined
+                      }
                       aria-label={`${t('captainDraft.entry.resultLabel')} ${t('captainDraft.entry.roundOnly', { round: round.roundNumber })} ${t('captainDraft.entry.setCell', { set: set.setNumber })}`}
                       className="w-full border-0 bg-transparent px-1 py-2 text-sm font-medium text-slate-700 outline-hidden focus:bg-slate-50 dark:text-slate-200 dark:focus:bg-slate-800"
                     >
@@ -261,6 +310,63 @@ export function CaptainDraftEntrySheet({
           <option key={preset} value={preset} />
         ))}
       </datalist>
+    </div>
+  )
+}
+
+type RoundLineupStatusProps = {
+  roundNumber: number
+  lineup: RoundLineup | undefined
+  submitTeam: TeamSide | null
+  unsubmitted: boolean
+  submitting: boolean
+  busy: boolean
+  onSubmit?: (roundNumber: number) => void
+}
+
+// Under a round's name in a draft run by its captains: who has handed it in, and the captain's button.
+function RoundLineupStatus({ roundNumber, lineup, submitTeam, unsubmitted, submitting, busy, onSubmit }: RoundLineupStatusProps) {
+  if (lineup?.revealed) {
+    return (
+      <span className="mt-2 inline-block rounded-sm bg-emerald-100 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+        {t('captainDraft.lineup.revealed')}
+      </span>
+    )
+  }
+  return (
+    <div className="mt-2 space-y-0.5 text-[11px] font-medium">
+      {(['HOME', 'AWAY'] as const).map((team) => {
+        const submitted = teamSubmitted(lineup, team)
+        const label = t(TEAM_LABELS[team])
+        return (
+          <span
+            key={`${roundNumber}-${team}-status`}
+            className={`block ${
+              submitted
+                ? team === 'HOME'
+                  ? 'text-sky-700 dark:text-sky-300'
+                  : 'text-rose-700 dark:text-rose-300'
+                : 'text-slate-400 dark:text-slate-500'
+            }`}
+          >
+            {t(submitted ? 'captainDraft.lineup.teamIn' : 'captainDraft.lineup.teamPending', { team: label })}
+          </span>
+        )
+      })}
+      {submitTeam && onSubmit && (
+        <button
+          type="button"
+          onClick={() => onSubmit(roundNumber)}
+          disabled={busy}
+          aria-label={t('captainDraft.lineup.submitLabel', { round: roundNumber, team: t(TEAM_LABELS[submitTeam]) })}
+          className="mt-1 w-full rounded-md bg-slate-900 px-1 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
+        >
+          {submitting
+            ? t('captainDraft.lineup.submitting')
+            : t(teamSubmitted(lineup, submitTeam) ? 'captainDraft.lineup.resubmit' : 'captainDraft.lineup.submit')}
+        </button>
+      )}
+      {unsubmitted && <span className="block text-amber-700 dark:text-amber-300">{t('captainDraft.lineup.unsubmitted')}</span>}
     </div>
   )
 }

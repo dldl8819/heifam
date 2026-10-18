@@ -5,6 +5,9 @@ import com.balancify.backend.api.group.dto.CaptainDraftEntriesUpdateRequest;
 import com.balancify.backend.api.group.dto.CaptainDraftEntryPlayerResponse;
 import com.balancify.backend.api.group.dto.CaptainDraftEntryResponse;
 import com.balancify.backend.api.group.dto.CaptainDraftEntryUpdateItemRequest;
+import com.balancify.backend.api.group.dto.CaptainDraftLineupRequest;
+import com.balancify.backend.api.group.dto.CaptainDraftLineupResponse;
+import com.balancify.backend.api.group.dto.CaptainDraftLineupSetRequest;
 import com.balancify.backend.api.group.dto.CaptainDraftListResponse;
 import com.balancify.backend.api.group.dto.CaptainDraftParticipantResponse;
 import com.balancify.backend.api.group.dto.CaptainDraftPickLogResponse;
@@ -14,14 +17,17 @@ import com.balancify.backend.api.group.dto.CaptainDraftSummaryResponse;
 import com.balancify.backend.api.group.dto.CaptainDraftUnpickRequest;
 import com.balancify.backend.domain.CaptainDraft;
 import com.balancify.backend.domain.CaptainDraftEntry;
+import com.balancify.backend.domain.CaptainDraftLineup;
 import com.balancify.backend.domain.CaptainDraftParticipant;
 import com.balancify.backend.domain.Group;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.CaptainDraftEntryRepository;
+import com.balancify.backend.repository.CaptainDraftLineupRepository;
 import com.balancify.backend.repository.CaptainDraftParticipantRepository;
 import com.balancify.backend.repository.CaptainDraftRepository;
 import com.balancify.backend.repository.GroupRepository;
 import com.balancify.backend.repository.PlayerRepository;
+import com.balancify.backend.service.exception.CaptainDraftLineupForbiddenException;
 import com.balancify.backend.service.exception.CaptainDraftResultLockedException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -36,6 +42,8 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -49,6 +57,9 @@ public class CaptainDraftService {
     private static final String TEAM_UNASSIGNED = "UNASSIGNED";
     private static final String STATUS_DRAFTING = "DRAFTING";
     private static final String STATUS_READY = "READY";
+    // The host fills both teams in for everyone to see, or each captain hands in their own team.
+    private static final String ENTRY_MODE_HOST = "HOST";
+    private static final String ENTRY_MODE_CAPTAINS = "CAPTAINS";
     // Rounds take these compositions in turn unless the host picks others.
     private static final List<String> DEFAULT_ROUND_CODES = List.of("PPP", "PPT", "PPZ", "PTZ");
     private static final String RACE_ORDER = "PTZR";
@@ -70,6 +81,7 @@ public class CaptainDraftService {
     private final CaptainDraftRepository captainDraftRepository;
     private final CaptainDraftParticipantRepository captainDraftParticipantRepository;
     private final CaptainDraftEntryRepository captainDraftEntryRepository;
+    private final CaptainDraftLineupRepository captainDraftLineupRepository;
     private final OperationAuditLogService operationAuditLogService;
 
     public CaptainDraftService(
@@ -78,6 +90,7 @@ public class CaptainDraftService {
         CaptainDraftRepository captainDraftRepository,
         CaptainDraftParticipantRepository captainDraftParticipantRepository,
         CaptainDraftEntryRepository captainDraftEntryRepository,
+        CaptainDraftLineupRepository captainDraftLineupRepository,
         OperationAuditLogService operationAuditLogService
     ) {
         this.groupRepository = groupRepository;
@@ -85,21 +98,31 @@ public class CaptainDraftService {
         this.captainDraftRepository = captainDraftRepository;
         this.captainDraftParticipantRepository = captainDraftParticipantRepository;
         this.captainDraftEntryRepository = captainDraftEntryRepository;
+        this.captainDraftLineupRepository = captainDraftLineupRepository;
         this.operationAuditLogService = operationAuditLogService;
     }
 
-    /** Starts a draft; whoever started it is kept with it, the nickname shown and the email not. */
+    /**
+     * Starts a draft; whoever started it is kept with it, the nickname shown and the email not. A
+     * draft run by its captains needs both captains' players linked to a site account, as only a
+     * captain signed in as themselves hands their team in.
+     *
+     * Every answer below is for one reader (viewerUserId: the verified account asking, or null), who
+     * is shown a team's players of a round not yet in for both teams only when on that team.
+     */
     @Transactional
     public CaptainDraftResponse createDraft(
         Long groupId,
         CaptainDraftCreateRequest request,
         String actorEmail,
-        String actorNickname
+        String actorNickname,
+        UUID viewerUserId
     ) {
         if (request == null) {
             throw new IllegalArgumentException("Request is required");
         }
 
+        String entryMode = resolveEntryMode(request.entryMode());
         String title = resolveTitle(request.title());
         List<Long> participantPlayerIds = normalizeDistinctPlayerIds(request.participantPlayerIds());
         List<Long> captainPlayerIds = normalizeDistinctPlayerIds(request.captainPlayerIds());
@@ -137,10 +160,25 @@ public class CaptainDraftService {
         if (homeCaptain == null || awayCaptain == null) {
             throw new IllegalArgumentException("Invalid captain player IDs");
         }
+        if (ENTRY_MODE_CAPTAINS.equals(entryMode)) {
+            List<String> unlinked = List.of(homeCaptain, awayCaptain)
+                .stream()
+                .filter(captain -> captain.getAuthUserId() == null)
+                .map(Player::getNickname)
+                .toList();
+            if (!unlinked.isEmpty()) {
+                // Shown on the page as it is, so in the page's language.
+                throw new IllegalArgumentException(
+                    "사이트 계정과 연결되지 않은 감독이 있어 감독 제출 방식으로 시작할 수 없습니다: "
+                        + String.join(", ", unlinked)
+                );
+            }
+        }
 
         CaptainDraft draft = new CaptainDraft();
         draft.setGroup(group);
         draft.setTitle(title);
+        draft.setEntryMode(entryMode);
         draft.setStatus(STATUS_DRAFTING);
         int playersPerTeam = participantPlayerIds.size() / 2;
         List<Integer> teamSizes = resolveSetSizes(request.setSizes(), request.setsPerRound(), playersPerTeam);
@@ -191,16 +229,13 @@ public class CaptainDraftService {
         }
         captainDraftEntryRepository.saveAll(entries);
 
-        return toResponse(savedDraft, participants, entries);
+        return toResponse(savedDraft, participants, entries, List.of(), viewerUserId);
     }
 
     @Transactional(readOnly = true)
-    public CaptainDraftResponse getDraft(Long groupId, Long draftId) {
+    public CaptainDraftResponse getDraft(Long groupId, Long draftId, UUID viewerUserId) {
         CaptainDraft draft = loadDraft(groupId, draftId);
-        List<CaptainDraftParticipant> participants =
-            captainDraftParticipantRepository.findByDraftIdWithPlayer(draft.getId());
-        List<CaptainDraftEntry> entries = captainDraftEntryRepository.findByDraftIdWithPlayers(draft.getId());
-        return toResponse(draft, participants, entries);
+        return readDraft(draft, viewerUserId);
     }
 
     /**
@@ -251,18 +286,26 @@ public class CaptainDraftService {
     }
 
     @Transactional(readOnly = true)
-    public CaptainDraftResponse getLatestDraft(Long groupId) {
+    public CaptainDraftResponse getLatestDraft(Long groupId, UUID viewerUserId) {
         CaptainDraft draft = captainDraftRepository.findTopByGroup_IdOrderByCreatedAtDescIdDesc(groupId)
             .orElseThrow(() -> new NoSuchElementException("Draft not found for group: " + groupId));
+        return readDraft(draft, viewerUserId);
+    }
 
+    private CaptainDraftResponse readDraft(CaptainDraft draft, UUID viewerUserId) {
         List<CaptainDraftParticipant> participants =
             captainDraftParticipantRepository.findByDraftIdWithPlayer(draft.getId());
         List<CaptainDraftEntry> entries = captainDraftEntryRepository.findByDraftIdWithPlayers(draft.getId());
-        return toResponse(draft, participants, entries);
+        return toResponse(draft, participants, entries, lineupsOf(draft), viewerUserId);
     }
 
     @Transactional
-    public CaptainDraftResponse pickPlayer(Long groupId, Long draftId, CaptainDraftPickRequest request) {
+    public CaptainDraftResponse pickPlayer(
+        Long groupId,
+        Long draftId,
+        CaptainDraftPickRequest request,
+        UUID viewerUserId
+    ) {
         if (request == null || request.captainPlayerId() == null || request.pickedPlayerId() == null) {
             throw new IllegalArgumentException("captainPlayerId and pickedPlayerId are required");
         }
@@ -315,16 +358,22 @@ public class CaptainDraftService {
         captainDraftRepository.save(draft);
 
         List<CaptainDraftEntry> entries = captainDraftEntryRepository.findByDraftIdWithPlayers(draft.getId());
-        return toResponse(draft, participants, entries);
+        return toResponse(draft, participants, entries, lineupsOf(draft), viewerUserId);
     }
 
     /**
      * Takes a picked player back out of their team, for a pick entered by mistake: out of the sets
      * that named them, and a finished draft is open again. Only before any set has a result: once
      * the games have begun, taking a pick back would wipe a result, which nobody may do this way.
+     * Nor once a captain has handed a line-up in, which taking a player out would quietly change.
      */
     @Transactional
-    public CaptainDraftResponse unpickPlayer(Long groupId, Long draftId, CaptainDraftUnpickRequest request) {
+    public CaptainDraftResponse unpickPlayer(
+        Long groupId,
+        Long draftId,
+        CaptainDraftUnpickRequest request,
+        UUID viewerUserId
+    ) {
         if (request == null || request.playerId() == null) {
             throw new IllegalArgumentException("playerId is required");
         }
@@ -348,6 +397,10 @@ public class CaptainDraftService {
         List<CaptainDraftEntry> entries = captainDraftEntryRepository.findByDraftIdWithPlayers(draft.getId());
         if (entries.stream().anyMatch(entry -> normalizeWinnerTeam(entry.getWinnerTeam()) != null)) {
             throw new IllegalStateException("A pick cannot be taken back once a set has a result");
+        }
+        List<CaptainDraftLineup> lineups = lineupsOf(draft);
+        if (!lineups.isEmpty()) {
+            throw new IllegalStateException("A pick cannot be taken back once a captain has handed a line-up in");
         }
 
         participant.setTeam(null);
@@ -374,7 +427,7 @@ public class CaptainDraftService {
             draft.setCurrentTurnTeam(team);
             captainDraftRepository.save(draft);
         }
-        return toResponse(draft, participants, entries);
+        return toResponse(draft, participants, entries, lineups, viewerUserId);
     }
 
     /**
@@ -387,6 +440,12 @@ public class CaptainDraftService {
      * only by those who may edit results: admins and match result editors. Anyone else may send it
      * back unchanged, as the page sends every set; a change to it is refused, and nothing is saved.
      * A set whose result is put in or changed names who did it and when; one taken out names nobody.
+     *
+     * In a draft run by its captains the players are the captains' to hand in (submitLineup), and
+     * the players sent here are kept as they are until both teams of the round are in; neither
+     * can a set of such a round have a result yet. Once a captain has handed the round in, its races
+     * and tier notes stay as they are, and once both have, so do its players; admins and match
+     * result editors may still change both.
      */
     @Transactional
     public CaptainDraftResponse updateEntries(
@@ -395,7 +454,8 @@ public class CaptainDraftService {
         CaptainDraftEntriesUpdateRequest request,
         boolean canEditResults,
         String actorEmail,
-        String actorNickname
+        String actorNickname,
+        UUID viewerUserId
     ) {
         if (request == null || request.entries() == null || request.entries().isEmpty()) {
             throw new IllegalArgumentException("entries are required");
@@ -419,6 +479,9 @@ public class CaptainDraftService {
         for (CaptainDraftEntry entry : entries) {
             entriesByKey.put(entryKey(entry.getRoundNumber(), entry.getSetNumber()), entry);
         }
+        boolean byCaptains = isRunByCaptains(draft);
+        List<CaptainDraftLineup> lineups = lineupsOf(draft);
+        Map<Integer, Set<String>> teamsIn = teamsInByRound(lineups);
 
         for (CaptainDraftEntryUpdateItemRequest updateItem : request.entries()) {
             if (updateItem == null) {
@@ -444,6 +507,25 @@ public class CaptainDraftService {
             String raceCode = updateItem.raceCode() == null ? targetEntry.getRoundCode() : normalizeRaceCode(updateItem.raceCode());
             String winnerTeam = normalizeWinnerTeam(updateItem.winnerTeam());
             String savedWinnerTeam = normalizeWinnerTeam(targetEntry.getWinnerTeam());
+            if (byCaptains) {
+                String round = "Round " + targetEntry.getRoundNumber();
+                Set<String> roundTeamsIn = teamsIn.getOrDefault(targetEntry.getRoundNumber(), Set.of());
+                if (roundTeamsIn.size() < 2) {
+                    // Not shown to everyone yet: what was sent for the players is not what the captains handed in.
+                    home = targetEntry.sidePlayers(TEAM_HOME);
+                    away = targetEntry.sidePlayers(TEAM_AWAY);
+                    if (winnerTeam != null) {
+                        throw new IllegalArgumentException(round + " has no result before both line-ups are in");
+                    }
+                }
+                // The result is held to below, as in any draft.
+                if (!roundTeamsIn.isEmpty() && !canEditResults
+                    && changesSet(targetEntry, home, away, raceCode, requiredTier, savedWinnerTeam)) {
+                    throw new CaptainDraftResultLockedException(
+                        round + " has a line-up in; only admins and result editors can change its sets"
+                    );
+                }
+            }
             if (!canEditResults
                 && savedWinnerTeam != null
                 && changesSet(targetEntry, home, away, raceCode, requiredTier, winnerTeam)) {
@@ -476,7 +558,141 @@ public class CaptainDraftService {
 
         requireOneSetPerRound(entries);
         captainDraftEntryRepository.saveAll(entries);
-        return toResponse(draft, participants, entries);
+        return toResponse(draft, participants, entries, lineups, viewerUserId);
+    }
+
+    /**
+     * A captain hands in their team's line-up for one round of a draft run by its captains: their
+     * team's players for every set of the round, every slot filled, each player once. Until the other
+     * captain hands theirs in, it is shown to their own team only, and the captain may hand it in
+     * again with changes; once both are in, both are shown to everyone and stay as they are.
+     */
+    @Transactional
+    public CaptainDraftResponse submitLineup(
+        Long groupId,
+        Long draftId,
+        Integer roundNumber,
+        CaptainDraftLineupRequest request,
+        UUID viewerUserId
+    ) {
+        if (request == null || request.sets() == null || request.sets().isEmpty()) {
+            throw new IllegalArgumentException("sets are required");
+        }
+        CaptainDraft draft = loadDraft(groupId, draftId);
+        if (!isRunByCaptains(draft)) {
+            throw new IllegalArgumentException("This draft's sets are filled in by the host");
+        }
+        List<CaptainDraftParticipant> participants =
+            captainDraftParticipantRepository.findByDraftIdWithPlayer(draft.getId());
+        requireActiveDraftParticipants(participants);
+        CaptainDraftParticipant captain = viewerParticipant(participants, viewerUserId);
+        if (captain == null || !captain.isCaptain()) {
+            throw new CaptainDraftLineupForbiddenException("Only a captain of this draft hands in a line-up");
+        }
+        String team = normalizeTeam(captain.getTeam());
+
+        List<CaptainDraftEntry> entries = captainDraftEntryRepository.findByDraftIdWithPlayers(draft.getId());
+        Map<Integer, CaptainDraftEntry> roundSets = new TreeMap<>();
+        for (CaptainDraftEntry entry : entries) {
+            if (Objects.equals(entry.getRoundNumber(), roundNumber)) {
+                roundSets.put(entry.getSetNumber(), entry);
+            }
+        }
+        if (roundSets.isEmpty()) {
+            throw new NoSuchElementException("Round not found: " + roundNumber);
+        }
+        List<CaptainDraftLineup> lineups = lineupsOf(draft);
+        if (teamsInByRound(lineups).getOrDefault(roundNumber, Set.of()).size() == 2) {
+            throw new IllegalStateException("Round " + roundNumber + "'s line-ups are both in and shown; they stay as they are");
+        }
+
+        Map<Integer, List<Long>> sent = new HashMap<>();
+        for (CaptainDraftLineupSetRequest set : request.sets()) {
+            if (set == null || set.setNumber() == null || !roundSets.containsKey(set.setNumber())) {
+                throw new IllegalArgumentException("Invalid set of round " + roundNumber);
+            }
+            if (sent.put(set.setNumber(), set.playerIds() == null ? List.of() : set.playerIds()) != null) {
+                throw new IllegalArgumentException("A set is sent once");
+            }
+        }
+        if (!sent.keySet().equals(roundSets.keySet())) {
+            throw new IllegalArgumentException("A line-up takes every set of the round");
+        }
+
+        Map<Long, CaptainDraftParticipant> participantsByPlayerId = participants
+            .stream()
+            .collect(Collectors.toMap(participant -> participant.getPlayer().getId(), participant -> participant));
+        Set<Long> ownTeam = teamPlayerIds(participants, team);
+        for (Map.Entry<Integer, CaptainDraftEntry> set : roundSets.entrySet()) {
+            CaptainDraftEntry entry = set.getValue();
+            List<Player> side = sidePlayers(sent.get(set.getKey()), entry.getTeamSize(), ownTeam, participantsByPlayerId);
+            if (side.stream().anyMatch(Objects::isNull)) {
+                throw new IllegalArgumentException("Every slot of a line-up is filled");
+            }
+            entry.setSidePlayers(team, side);
+        }
+        requireOneSetPerRound(entries);
+        captainDraftEntryRepository.saveAll(entries);
+
+        CaptainDraftLineup lineup = lineups
+            .stream()
+            .filter(candidate -> Objects.equals(candidate.getRoundNumber(), roundNumber) && team.equals(candidate.getTeam()))
+            .findFirst()
+            .orElseGet(() -> {
+                CaptainDraftLineup added = new CaptainDraftLineup();
+                added.setDraft(draft);
+                added.setRoundNumber(roundNumber);
+                added.setTeam(team);
+                lineups.add(added);
+                return added;
+            });
+        lineup.setSubmittedAt(OffsetDateTime.now());
+        captainDraftLineupRepository.save(lineup);
+        return toResponse(draft, participants, entries, lineups, viewerUserId);
+    }
+
+    private boolean isRunByCaptains(CaptainDraft draft) {
+        return ENTRY_MODE_CAPTAINS.equals(safeTrim(draft.getEntryMode()));
+    }
+
+    // A draft run by the host has no line-ups to read.
+    private List<CaptainDraftLineup> lineupsOf(CaptainDraft draft) {
+        return isRunByCaptains(draft)
+            ? new ArrayList<>(captainDraftLineupRepository.findByDraftId(draft.getId()))
+            : new ArrayList<>();
+    }
+
+    private Map<Integer, Set<String>> teamsInByRound(List<CaptainDraftLineup> lineups) {
+        Map<Integer, Set<String>> teams = new HashMap<>();
+        for (CaptainDraftLineup lineup : lineups) {
+            teams.computeIfAbsent(lineup.getRoundNumber(), ignored -> new HashSet<>()).add(normalizeTeam(lineup.getTeam()));
+        }
+        return teams;
+    }
+
+    // The participant whose player is linked to the verified account asking; none for anyone else.
+    private CaptainDraftParticipant viewerParticipant(List<CaptainDraftParticipant> participants, UUID viewerUserId) {
+        if (viewerUserId == null) {
+            return null;
+        }
+        return participants
+            .stream()
+            .filter(participant -> participant.getPlayer() != null
+                && !PlayerIdentityPolicy.isIdentityHidden(participant.getPlayer())
+                && viewerUserId.equals(participant.getPlayer().getAuthUserId()))
+            .findFirst()
+            .orElse(null);
+    }
+
+    private String resolveEntryMode(String entryMode) {
+        String normalized = safeTrim(entryMode).toUpperCase(Locale.ROOT);
+        if (normalized.isEmpty()) {
+            return ENTRY_MODE_HOST;
+        }
+        if (!ENTRY_MODE_HOST.equals(normalized) && !ENTRY_MODE_CAPTAINS.equals(normalized)) {
+            throw new IllegalArgumentException("entryMode must be HOST or CAPTAINS");
+        }
+        return normalized;
     }
 
     /**
@@ -769,11 +985,22 @@ public class CaptainDraftService {
             .orElse(0) + 1;
     }
 
+    /**
+     * The draft for one reader. In a draft run by its captains, a team's players of a round that is
+     * not in for both teams yet are left out (every slot null, the side marked hidden) unless the
+     * reader's player is on that team; everything else is the same for everyone.
+     */
     private CaptainDraftResponse toResponse(
         CaptainDraft draft,
         List<CaptainDraftParticipant> participants,
-        List<CaptainDraftEntry> entries
+        List<CaptainDraftEntry> entries,
+        List<CaptainDraftLineup> lineups,
+        UUID viewerUserId
     ) {
+        boolean byCaptains = isRunByCaptains(draft);
+        CaptainDraftParticipant viewer = viewerParticipant(participants, viewerUserId);
+        String viewerTeam = viewer == null ? TEAM_UNASSIGNED : normalizeTeam(viewer.getTeam());
+        Map<Integer, Set<String>> teamsIn = teamsInByRound(lineups);
         List<CaptainDraftParticipantResponse> participantResponses = participants
             .stream()
             .sorted(
@@ -833,19 +1060,41 @@ public class CaptainDraftService {
                     .comparing(CaptainDraftEntry::getRoundNumber)
                     .thenComparing(CaptainDraftEntry::getSetNumber)
             )
-            .map(entry -> new CaptainDraftEntryResponse(
-                safeInt(entry.getRoundNumber()),
-                safeTrim(entry.getRoundCode()),
-                safeInt(entry.getSetNumber()),
-                entry.sidePlayers(TEAM_HOME).size(),
-                entry.getRequiredTier(),
-                sideResponse(entry, TEAM_HOME),
-                sideResponse(entry, TEAM_AWAY),
-                normalizeWinnerTeam(entry.getWinnerTeam()),
-                entry.getResultRecordedByNickname(),
-                entry.getResultRecordedAt()
-            ))
+            .map(entry -> {
+                boolean shown = !byCaptains || teamsIn.getOrDefault(entry.getRoundNumber(), Set.of()).size() == 2;
+                boolean homeHidden = !shown && !TEAM_HOME.equals(viewerTeam);
+                boolean awayHidden = !shown && !TEAM_AWAY.equals(viewerTeam);
+                return new CaptainDraftEntryResponse(
+                    safeInt(entry.getRoundNumber()),
+                    safeTrim(entry.getRoundCode()),
+                    safeInt(entry.getSetNumber()),
+                    entry.sidePlayers(TEAM_HOME).size(),
+                    entry.getRequiredTier(),
+                    homeHidden ? hiddenSide(entry) : sideResponse(entry, TEAM_HOME),
+                    awayHidden ? hiddenSide(entry) : sideResponse(entry, TEAM_AWAY),
+                    normalizeWinnerTeam(entry.getWinnerTeam()),
+                    entry.getResultRecordedByNickname(),
+                    entry.getResultRecordedAt(),
+                    homeHidden,
+                    awayHidden
+                );
+            })
             .toList();
+
+        List<CaptainDraftLineupResponse> lineupResponses = byCaptains
+            ? entries
+                .stream()
+                .map(CaptainDraftEntry::getRoundNumber)
+                .collect(Collectors.toCollection(TreeSet::new))
+                .stream()
+                .map(round -> {
+                    Set<String> in = teamsIn.getOrDefault(round, Set.of());
+                    return new CaptainDraftLineupResponse(
+                        round, in.contains(TEAM_HOME), in.contains(TEAM_AWAY), in.size() == 2
+                    );
+                })
+                .toList()
+            : List.of();
 
         return new CaptainDraftResponse(
             draft.getId(),
@@ -863,8 +1112,22 @@ public class CaptainDraftService {
             responseNickname(draft.getAwayCaptain()),
             participantResponses,
             pickResponses,
-            entryResponses
+            entryResponses,
+            byCaptains ? ENTRY_MODE_CAPTAINS : ENTRY_MODE_HOST,
+            TEAM_UNASSIGNED.equals(viewerTeam) ? null : viewerTeam,
+            viewer != null && viewer.isCaptain(),
+            lineupResponses
         );
+    }
+
+    // A side the reader may not see yet: as many empty slots as the set has, and nothing else.
+    private List<CaptainDraftEntryPlayerResponse> hiddenSide(CaptainDraftEntry entry) {
+        int size = entry.getTeamSize() == null || entry.getTeamSize() < 1 ? 1 : entry.getTeamSize();
+        List<CaptainDraftEntryPlayerResponse> empty = new ArrayList<>();
+        for (int index = 0; index < size; index++) {
+            empty.add(null);
+        }
+        return empty;
     }
 
     private int teamRank(String team) {
