@@ -74,7 +74,7 @@ export function UserRaceSetupModal() {
             id="profile-race-select"
             value={selectedRace}
             onChange={(event) => setSelectedRace(event.target.value as PlayerRace)}
-            className="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-amber-400"
+            className="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-white outline-hidden transition-colors focus:border-amber-400"
             disabled={submitting}
           >
             {RACE_OPTIONS.map((option) => (

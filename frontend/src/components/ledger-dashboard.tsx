@@ -32,7 +32,7 @@ const EXPENSE_FILL = 'fill-[#eb6834] dark:fill-[#d95926]'
 const EXPENSE_BG = 'bg-[#eb6834] dark:bg-[#d95926]'
 const GRID_STROKE = 'stroke-slate-200 dark:stroke-slate-700'
 const TICK_TEXT = 'fill-slate-500 text-[11px] tabular-nums dark:fill-slate-400'
-const CARD = 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900'
+const CARD = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900'
 const TOOLTIP_WIDTH = 200
 const MIN_CHART_WIDTH = 280
 
@@ -133,7 +133,7 @@ function StatTile({ tone, label, value, foot }: { tone: Tone; label: string; val
   return (
     <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
       <p className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-        <span aria-hidden className={`h-2.5 w-2.5 shrink-0 rounded-sm ${toneBackground(tone)}`} />
+        <span aria-hidden className={`h-2.5 w-2.5 shrink-0 rounded-xs ${toneBackground(tone)}`} />
         {label}
       </p>
       <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">{value}</p>
@@ -245,7 +245,7 @@ function BalanceChart({ points }: { points: LedgerDashboardBalancePoint[] }) {
       <svg
         ref={svgRef}
         viewBox={`0 0 ${width} ${height}`}
-        className="block h-auto w-full overflow-visible rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+        className="block h-auto w-full overflow-visible rounded-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-slate-400"
         role="img"
         tabIndex={0}
         aria-label={t(key('balanceAria'), { balance: formatWon(last.balance) })}
@@ -452,7 +452,7 @@ function MonthlyChart({ months, spansYears }: { months: LedgerDashboardMonthItem
             height={plotHeight}
             fill="transparent"
             tabIndex={0}
-            className="focus:outline-none focus-visible:stroke-slate-400"
+            className="focus:outline-hidden focus-visible:stroke-slate-400"
             aria-label={t(key('monthlyBarAria'), {
               month: monthLabel(month.month, spansYears),
               income: formatWon(month.income),
@@ -714,11 +714,11 @@ export function LedgerDashboardContent({ dashboard }: { dashboard: LedgerDashboa
         <SectionHeading title={t(key('monthlyTitle'))} hint={t(key('monthlyHint'))} />
         <div className="mb-2 flex flex-wrap gap-4 text-xs text-slate-600 dark:text-slate-300">
           <span className="inline-flex items-center gap-1.5">
-            <span aria-hidden className={`h-2.5 w-2.5 rounded-sm ${INCOME_BG}`} />
+            <span aria-hidden className={`h-2.5 w-2.5 rounded-xs ${INCOME_BG}`} />
             {t(key('legendIncome'))}
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span aria-hidden className={`h-2.5 w-2.5 rounded-sm ${EXPENSE_BG}`} />
+            <span aria-hidden className={`h-2.5 w-2.5 rounded-xs ${EXPENSE_BG}`} />
             {t(key('legendExpense'))}
           </span>
         </div>

@@ -1010,7 +1010,7 @@ export default function ResultsPage() {
                   onChange={(event) => handleRecentPlayerRaceChange(team, index, event.target.value)}
                   disabled={isRecentSaving || isRecentDeleting}
                   aria-label={t('results.recent.playerRaceAriaLabel', { nickname: player.nickname })}
-                  className="rounded-md border border-slate-300 bg-white px-1.5 py-0.5 text-xs text-slate-800 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                  className="rounded-md border border-slate-300 bg-white px-1.5 py-0.5 text-xs text-slate-800 outline-hidden focus:border-slate-400 focus:ring-1 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                 >
                   {race === null && (
                     <option value="" disabled>
@@ -1172,7 +1172,7 @@ export default function ResultsPage() {
   return (
     <section className="space-y-6">
       {canUseManualEntry && (
-      <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
           <button
             type="button"
             onClick={() => setManualEntryOpen((previous) => !previous)}
@@ -1230,7 +1230,7 @@ export default function ResultsPage() {
                   <select
                     value={manualTeamSize}
                     onChange={(event) => setManualTeamSize(event.target.value === '2' ? 2 : 3)}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                   >
                     {manualTeamSizeOptions.map((teamSizeOption) => (
                       <option key={teamSizeOption} value={teamSizeOption}>
@@ -1261,7 +1261,7 @@ export default function ResultsPage() {
                     ref={manualWinnerTeamRef}
                     value={manualWinnerTeam}
                     onChange={(event) => setManualWinnerTeam(event.target.value as ManualWinnerTeam)}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                   >
                     <option value="">{t('results.manual.validation.winnerRequired')}</option>
                     {winnerTeamOptions.map((team) => (
@@ -1328,7 +1328,7 @@ export default function ResultsPage() {
                                       event.preventDefault()
                                     }
                                   }}
-                                  className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                                  className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                                   placeholder={t('results.manual.playerInputPlaceholder')}
                                 />
                                 <select
@@ -1337,7 +1337,7 @@ export default function ResultsPage() {
                                     setManualSlotRace(team, slotIndex, normalizeAssignedRace(event.target.value))
                                   }
                                   aria-label={t('results.manual.playerRaceAriaLabel', { slot: slotIndex + 1 })}
-                                  className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                                  className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                                 >
                                   <option value="" disabled>
                                     -
@@ -1401,7 +1401,7 @@ export default function ResultsPage() {
         </article>
       )}
 
-      <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
         <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('results.recent.title')}</h3>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
           {isSuperAdmin ? t('results.recent.history.description') : t('results.recent.description')}
@@ -1418,7 +1418,7 @@ export default function ResultsPage() {
                 type="date"
                 value={draftFromDate}
                 onChange={(event) => setDraftFromDate(event.target.value)}
-                className="mt-1 block rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                className="mt-1 block rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
               />
             </label>
             <label className="space-y-1 text-xs font-medium text-slate-500 dark:text-slate-400">
@@ -1427,7 +1427,7 @@ export default function ResultsPage() {
                 type="date"
                 value={draftToDate}
                 onChange={(event) => setDraftToDate(event.target.value)}
-                className="mt-1 block rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                className="mt-1 block rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
               />
             </label>
             <button
@@ -1485,7 +1485,7 @@ export default function ResultsPage() {
 
         {!recentMatchesLoading && !recentMatchesError && recentMatches.length > 0 && (
           <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
-            <table className="min-w-[52rem] text-left text-sm">
+            <table className="min-w-208 text-left text-sm">
               <thead className="bg-slate-50 text-xs tracking-wide text-slate-500 dark:bg-slate-800/80 dark:text-slate-300">
                 <tr>
                   <th className="px-3 py-2">{t('results.recent.table.displayOrder')}</th>
@@ -1494,8 +1494,8 @@ export default function ResultsPage() {
                   <th className="px-3 py-2">{t('results.recent.table.recordedBy')}</th>
                   <th className="whitespace-nowrap px-3 py-2">{t('results.recent.table.winner')}</th>
                   <th className="whitespace-nowrap px-3 py-2">{t('results.recent.table.raceComposition')}</th>
-                  <th className="min-w-[8rem] break-keep px-3 py-2">{t('results.recent.table.homeTeam')}</th>
-                  <th className="min-w-[8rem] break-keep px-3 py-2">{t('results.recent.table.awayTeam')}</th>
+                  <th className="min-w-32 break-keep px-3 py-2">{t('results.recent.table.homeTeam')}</th>
+                  <th className="min-w-32 break-keep px-3 py-2">{t('results.recent.table.awayTeam')}</th>
                   {showMmr && <th className="px-3 py-2">{t('results.recent.table.mmrDiff')}</th>}
                   {(isAdmin || recentMatches.some((recentMatch) => recentMatch.canEditRaceComposition)) && (
                     <th className="px-3 py-2">{t('results.recent.table.action')}</th>
@@ -1530,7 +1530,7 @@ export default function ResultsPage() {
                           value={selectedRecentWinnerTeam}
                           onChange={(event) => setSelectedRecentWinnerTeam(event.target.value as TeamSide)}
                           disabled={isRecentSaving || isRecentDeleting}
-                          className="min-w-[4.5rem] whitespace-nowrap rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                          className="min-w-18 whitespace-nowrap rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 outline-hidden focus:border-slate-400 focus:ring-1 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                         >
                           {winnerTeamOptions.map((team) => (
                             <option key={`${recentMatch.matchId}-${team}`} value={team}>
@@ -1547,7 +1547,7 @@ export default function ResultsPage() {
                         <div className="space-y-1">
                           <span className="font-medium">{selectedRecentRaceComposition ?? '-'}</span>
                           {recentRaceError && (
-                            <p className="max-w-[12rem] whitespace-normal text-xs text-rose-600 dark:text-rose-300">
+                            <p className="max-w-48 whitespace-normal text-xs text-rose-600 dark:text-rose-300">
                               {recentRaceError}
                             </p>
                           )}
@@ -1557,7 +1557,7 @@ export default function ResultsPage() {
                       )}
                     </td>
                     <td
-                      className={`min-w-[8rem] break-keep px-3 py-2 ${
+                      className={`min-w-32 break-keep px-3 py-2 ${
                         isWinningTeam('HOME', recentMatch.winningTeam)
                           ? 'font-medium text-emerald-700 dark:text-emerald-300'
                           : 'text-slate-700 dark:text-slate-300'
@@ -1568,7 +1568,7 @@ export default function ResultsPage() {
                         : formatTeamPlayers(recentMatch, 'HOME')}
                     </td>
                     <td
-                      className={`min-w-[8rem] break-keep px-3 py-2 ${
+                      className={`min-w-32 break-keep px-3 py-2 ${
                         isWinningTeam('AWAY', recentMatch.winningTeam)
                           ? 'font-medium text-emerald-700 dark:text-emerald-300'
                           : 'text-slate-700 dark:text-slate-300'
@@ -1681,7 +1681,7 @@ export default function ResultsPage() {
       </article>
 
       {result && (
-      <article className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <article className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900">
         <h3 className="border-b border-slate-200 px-4 py-3 text-sm font-semibold text-slate-900 dark:border-slate-700 dark:text-slate-100">
             {t('results.participants.title')}
           </h3>
@@ -1765,14 +1765,14 @@ export default function ResultsPage() {
       )}
 
       {isSuperAdmin && (
-      <article id="match-import" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <article id="match-import" className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
         <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('results.import.title')}</h3>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('results.import.description')}</p>
           <form className="mt-3 space-y-3" onSubmit={handleImportMatches}>
             <textarea
               value={matchImportPayload}
               onChange={(event) => setMatchImportPayload(event.target.value)}
-            className="h-32 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+            className="h-32 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
               placeholder={t('results.import.placeholder')}
             />
 

@@ -1,6 +1,6 @@
 export default function DashboardPage() {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <section className="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
       <h2 className="text-2xl font-semibold tracking-tight">대시보드 임시 중단</h2>
       <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
         Supabase 트래픽 사용량 절감을 위해 대시보드는 임시로 비활성화했습니다.

@@ -741,7 +741,7 @@ export function PinballStage({ entrants, winnerCount, mode, onFinished }: Pinbal
       </div>
 
       <div className="space-y-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
           <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
             {t(mode === 'FIRST' ? 'prizeDraw.stage.firstRule' : 'prizeDraw.stage.lastRule', { count: winnerCount })}
           </h3>
@@ -764,7 +764,7 @@ export function PinballStage({ entrants, winnerCount, mode, onFinished }: Pinbal
         </div>
 
         {status === 'running' && leaders.length > 0 && (
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
             <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
               {t(mode === 'FIRST' ? 'prizeDraw.stage.leadersFirst' : 'prizeDraw.stage.leadersLast')}
             </h3>
@@ -791,7 +791,7 @@ export function PinballStage({ entrants, winnerCount, mode, onFinished }: Pinbal
           </div>
         )}
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
           <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('prizeDraw.stage.arrivals')}</h3>
           {arrivals.length === 0 ? (
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('prizeDraw.stage.noArrivals')}</p>

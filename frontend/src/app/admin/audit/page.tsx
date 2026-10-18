@@ -323,7 +323,7 @@ export default function OperationAuditPage() {
 
   return (
     <section className="space-y-6">
-      <header className="space-y-1 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <header className="space-y-1 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
         <h2 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-slate-100">{t('audit.title')}</h2>
         <p className="text-sm text-slate-600 dark:text-slate-300">
           {isSuperAdmin ? t('audit.description') : t('audit.resultEditorDescription')}
@@ -340,7 +340,7 @@ export default function OperationAuditPage() {
         </Alert>
       )}
 
-      <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('audit.recentTitle')}</h3>
@@ -358,7 +358,7 @@ export default function OperationAuditPage() {
               type="date"
               value={draftFilters.fromDate}
               onChange={(event) => setDraftFilters((current) => ({ ...current, fromDate: event.target.value }))}
-              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
+              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
             />
           </label>
           <label className="space-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
@@ -367,7 +367,7 @@ export default function OperationAuditPage() {
               type="date"
               value={draftFilters.toDate}
               onChange={(event) => setDraftFilters((current) => ({ ...current, toDate: event.target.value }))}
-              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
+              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
             />
           </label>
           <label className="space-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
@@ -377,7 +377,7 @@ export default function OperationAuditPage() {
               value={draftFilters.actor}
               onChange={(event) => setDraftFilters((current) => ({ ...current, actor: event.target.value }))}
               placeholder={t('audit.filters.actorPlaceholder')}
-              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
+              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
             />
           </label>
           <label className="space-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
@@ -387,7 +387,7 @@ export default function OperationAuditPage() {
               onChange={(event) =>
                 setDraftFilters((current) => ({ ...current, action: event.target.value as AuditActionFilter }))
               }
-              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
+              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
             >
               {AUDIT_ACTION_FILTER_OPTIONS.map((action) => (
                 <option key={action} value={action}>
@@ -403,7 +403,7 @@ export default function OperationAuditPage() {
               value={draftFilters.content}
               onChange={(event) => setDraftFilters((current) => ({ ...current, content: event.target.value }))}
               placeholder={t('audit.filters.contentPlaceholder')}
-              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
+              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
             />
           </label>
           <label className="space-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
@@ -413,20 +413,20 @@ export default function OperationAuditPage() {
               value={draftFilters.target}
               onChange={(event) => setDraftFilters((current) => ({ ...current, target: event.target.value }))}
               placeholder={t('audit.filters.targetPlaceholder')}
-              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
+              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-amber-400 dark:focus:ring-amber-400/30"
             />
           </label>
           <div className="flex gap-2 sm:col-span-2 lg:col-span-6">
             <button
               type="submit"
-              className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+              className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-amber-500 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
             >
               {t('audit.filters.apply')}
             </button>
             <button
               type="button"
               onClick={handleFilterReset}
-              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-amber-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               {t('audit.filters.reset')}
             </button>
@@ -488,7 +488,7 @@ export default function OperationAuditPage() {
                     type="button"
                     disabled={loading || loadingMore}
                     onClick={handleLoadMore}
-                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
                   >
                     {loadingMore ? t('audit.pagination.loadingMore') : t('audit.pagination.loadMore')}
                   </button>

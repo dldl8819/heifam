@@ -25,7 +25,7 @@ const plainButtonClass =
   'rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800'
 const errorClass =
   'rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300'
-const cardClass = 'rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900'
+const cardClass = 'rounded-xl border border-slate-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900'
 
 /** Why a change was not taken, by what the backend answered. */
 function failureMessage(caught: unknown, conflictKey: string): string {
@@ -80,13 +80,13 @@ function RequestRow({
           : ''}
       </p>
       {request.reason && (
-        <p className="whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-200">
+        <p className="whitespace-pre-wrap wrap-break-word text-sm text-slate-700 dark:text-slate-200">
           <span className="mr-1.5 text-xs text-slate-500 dark:text-slate-400">{t('nicknameRequests.reasonLabel')}</span>
           {request.reason}
         </p>
       )}
       {request.adminNote && (
-        <p className="whitespace-pre-wrap break-words rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
+        <p className="whitespace-pre-wrap wrap-break-word rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
           <span className="mr-1.5 text-xs text-slate-500 dark:text-slate-400">{t('nicknameRequests.noteLabel')}</span>
           {request.adminNote}
         </p>

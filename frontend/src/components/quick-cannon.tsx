@@ -19,7 +19,7 @@ import {
 } from '@/lib/cannon-draw'
 import { t } from '@/lib/i18n'
 
-const CARD_CLASS = 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900'
+const CARD_CLASS = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900'
 const MODES: CannonMode[] = ['number', 'items']
 // The items last written on this device, for the next ace match. Only a convenience: nothing breaks without it.
 const ITEMS_STORAGE_KEY = 'heifam.cannon.items'
@@ -257,7 +257,7 @@ export function QuickCannon({ preset = null }: QuickCannonProps) {
 
         <CannonStage shot={shot} onLanded={handleLanded}>
           {range && (
-            <span className="absolute left-3 top-3 rounded-md bg-white/85 px-2.5 py-1 text-xs font-semibold text-slate-800 shadow-sm">
+            <span className="absolute left-3 top-3 rounded-md bg-white/85 px-2.5 py-1 text-xs font-semibold text-slate-800 shadow-xs">
               {range}
             </span>
           )}

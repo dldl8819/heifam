@@ -256,7 +256,7 @@ export default function NoticeDetailPage() {
 
       {!loading && !error && notice && !editing && (
         <>
-          <article className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <article className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-700 dark:bg-slate-900">
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{notice.title}</h1>

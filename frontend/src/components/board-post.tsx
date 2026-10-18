@@ -193,7 +193,7 @@ export function BoardPost({ board, postId }: { board: BoardKind; postId: number 
 
       {!loading && !error && post && !editing && (
         <>
-          <article className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <article className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-700 dark:bg-slate-900">
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="break-all text-lg font-semibold text-slate-900 dark:text-slate-100">{post.title}</h1>
@@ -214,7 +214,7 @@ export function BoardPost({ board, postId }: { board: BoardKind; postId: number 
             {/* On the video board the video is the post: it comes first, any words after it. */}
             {video && post.videoId && <YouTubePlayer videoId={post.videoId} title={post.title} />}
             {post.content.trim().length > 0 && (
-              <p className="whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-200">{post.content}</p>
+              <p className="whitespace-pre-wrap wrap-break-word text-sm text-slate-700 dark:text-slate-200">{post.content}</p>
             )}
 
             <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
@@ -263,7 +263,7 @@ export function BoardPost({ board, postId }: { board: BoardKind; postId: number 
             </div>
           </article>
 
-          <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-700 dark:bg-slate-900">
             <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
               {t('boards.comments', { count: post.comments.length })}
             </h2>
@@ -317,7 +317,7 @@ export function BoardPost({ board, postId }: { board: BoardKind; postId: number 
                         </button>
                       )}
                     </div>
-                    <p className="whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-200">{comment.content}</p>
+                    <p className="whitespace-pre-wrap wrap-break-word text-sm text-slate-700 dark:text-slate-200">{comment.content}</p>
                   </li>
                 ))}
               </ul>

@@ -137,7 +137,7 @@ export function TierParticipantBoard({
   }
 
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h3>
@@ -194,7 +194,7 @@ export function TierParticipantBoard({
                     value={slot.inputValue}
                     onChange={(event) => onSlotInputChange(index, event.target.value)}
                     onKeyDown={(event) => handleSlotKeyDown(event, index)}
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                     placeholder={t('common.tierBoard.placeholder')}
                   />
                   {selectedPlayer && (
@@ -210,7 +210,7 @@ export function TierParticipantBoard({
             })}
           </div>
 
-          <div className="mt-5 rounded-[24px] border border-[#d5c4ab] bg-[#fbf4e8] p-4 shadow-sm dark:border-[#6f5b3c] dark:bg-slate-950 sm:p-5">
+          <div className="mt-5 rounded-[24px] border border-[#d5c4ab] bg-[#fbf4e8] p-4 shadow-xs dark:border-[#6f5b3c] dark:bg-slate-950 sm:p-5">
             <div className="text-center">
               <h4 className="text-2xl font-semibold tracking-tight text-[#6f5b3c] dark:text-amber-200 sm:text-4xl">
                 {t('common.tierBoard.title')}

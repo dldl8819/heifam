@@ -60,7 +60,7 @@ const sections = [
 export default function TermsPage() {
   return (
     <section className="space-y-6">
-      <header className="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <header className="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
         <h2 className="text-2xl font-semibold tracking-tight">{t('legal.terms.title')}</h2>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
           {t('legal.terms.description')}
@@ -70,7 +70,7 @@ export default function TermsPage() {
         </p>
       </header>
 
-      <article className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <article className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
         {sections.map((section) => (
           <section key={section.title} className="space-y-2">
             <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{section.title}</h3>

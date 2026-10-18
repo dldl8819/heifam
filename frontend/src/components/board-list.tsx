@@ -187,7 +187,7 @@ export function BoardList({ board }: { board: BoardKind }) {
         </h2>
       )}
 
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="rounded-xl border border-slate-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900">
         {loading && (
           <div className="px-4 py-3">
             <LoadingIndicator label={t('common.loading')} />

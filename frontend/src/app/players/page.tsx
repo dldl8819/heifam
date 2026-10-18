@@ -1077,7 +1077,7 @@ export default function PlayersPage() {
       )}
 
       {isAdmin && (
-        <article id="player-import" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <article id="player-import" className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
           <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('players.import.title')}</h3>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('players.import.description')}</p>
           <form className="mt-3 space-y-3" onSubmit={handleRegisterPlayer}>
@@ -1089,7 +1089,7 @@ export default function PlayersPage() {
                   value={registrationNickname}
                   onChange={(event) => setRegistrationNickname(event.target.value)}
                   placeholder={t('players.import.nicknamePlaceholder')}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                 />
               </label>
 
@@ -1100,7 +1100,7 @@ export default function PlayersPage() {
                   onChange={(event) =>
                     setRegistrationTier(event.target.value as PlayerRegistrationTier | '')
                   }
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                 >
                   <option value="">{t('players.import.tierPlaceholder')}</option>
                   {PLAYER_REGISTRATION_TIER_OPTIONS.map((tierOption) => (
@@ -1118,7 +1118,7 @@ export default function PlayersPage() {
                 <select
                   value={registrationRace}
                   onChange={(event) => setRegistrationRace(event.target.value as PlayerRace | '')}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                 >
                   <option value="">{t('players.import.racePlaceholder')}</option>
                   {PLAYER_RACE_OPTIONS.map((raceOption) => (
@@ -1225,7 +1225,7 @@ export default function PlayersPage() {
                           current === null ? current : { ...current, chatLeftAt: event.target.value }
                         )
                       }
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                     />
                   </label>
                 <label className="block space-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
@@ -1238,7 +1238,7 @@ export default function PlayersPage() {
                           current === null ? current : { ...current, chatLeftReason: event.target.value }
                         )
                       }
-                      className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                      className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                     >
                       <option value="" disabled>
                         {t('players.activityForm.chatLeftReasonPlaceholder')}
@@ -1266,7 +1266,7 @@ export default function PlayersPage() {
                         current === null ? current : { ...current, chatRejoinedAt: event.target.value }
                       )
                     }
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                   />
                 </label>
               )}
@@ -1313,7 +1313,7 @@ export default function PlayersPage() {
         onClose={handleCloseGameTypeStats}
       />
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
         {isAdmin && (
           <div className="mb-3 flex flex-wrap items-center gap-2">
             {rosterView === 'inactive' ? (
@@ -1343,7 +1343,7 @@ export default function PlayersPage() {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder={t('players.filters.searchPlaceholder')}
-              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
             />
           </label>
 
@@ -1352,7 +1352,7 @@ export default function PlayersPage() {
             <select
               value={raceFilter}
               onChange={(event) => setRaceFilter(event.target.value as RaceFilter)}
-              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
             >
               <option value="ALL">{t('common.all')}</option>
               {PLAYER_RACE_OPTIONS.map((raceOption) => (
@@ -1372,7 +1372,7 @@ export default function PlayersPage() {
                 onChange={(event) =>
                   handleRosterViewChange('inactive', event.target.checked)
                 }
-                className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+                className="h-4 w-4 rounded-sm border-slate-300 text-slate-900 focus:ring-slate-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
               />
               <span>{t('players.filters.includeInactive')}</span>
             </label>
@@ -1383,7 +1383,7 @@ export default function PlayersPage() {
                 onChange={(event) =>
                   handleRosterViewChange('idle', event.target.checked)
                 }
-                className="h-4 w-4 rounded border-slate-300 text-amber-700 focus:ring-amber-400 dark:border-slate-600 dark:bg-slate-950 dark:text-amber-300"
+                className="h-4 w-4 rounded-sm border-slate-300 text-amber-700 focus:ring-amber-400 dark:border-slate-600 dark:bg-slate-950 dark:text-amber-300"
               />
               <span>{t('players.filters.includeIdle')}</span>
             </label>
@@ -1394,7 +1394,7 @@ export default function PlayersPage() {
                 onChange={(event) =>
                   handleRosterViewChange('dormant', event.target.checked)
                 }
-                className="h-4 w-4 rounded border-slate-300 text-violet-700 focus:ring-violet-400 dark:border-slate-600 dark:bg-slate-950 dark:text-violet-300"
+                className="h-4 w-4 rounded-sm border-slate-300 text-violet-700 focus:ring-violet-400 dark:border-slate-600 dark:bg-slate-950 dark:text-violet-300"
               />
               <span>{t('players.filters.includeDormant')}</span>
             </label>
@@ -1436,16 +1436,16 @@ export default function PlayersPage() {
         </p>
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900">
         <table
-          className={`${rosterView === 'inactive' ? 'min-w-[48rem]' : 'min-w-full'} text-left text-sm`}
+          className={`${rosterView === 'inactive' ? 'min-w-3xl' : 'min-w-full'} text-left text-sm`}
         >
           <thead className="bg-slate-50 text-xs tracking-wide text-slate-500 dark:bg-slate-800/80 dark:text-slate-300">
             <tr>
               <th className="whitespace-nowrap px-4 py-3">{t('players.table.nickname')}</th>
               <th className="whitespace-nowrap px-4 py-3">{t('players.table.race')}</th>
               {showTierColumn && <th className="whitespace-nowrap px-4 py-3">{t('players.table.tier')}</th>}
-              {showStatusColumn && <th className="min-w-[11rem] whitespace-nowrap px-4 py-3">{t('players.table.status')}</th>}
+              {showStatusColumn && <th className="min-w-44 whitespace-nowrap px-4 py-3">{t('players.table.status')}</th>}
               {showRosterMmrColumn && <th className="whitespace-nowrap px-4 py-3">{t('players.table.currentMmr')}</th>}
               <th className="whitespace-nowrap px-4 py-3">{t('players.table.wins')}</th>
               <th className="whitespace-nowrap px-4 py-3">{t('players.table.losses')}</th>
@@ -1523,10 +1523,10 @@ export default function PlayersPage() {
                           type="text"
                           value={editingNickname}
                           onChange={(event) => setEditingNickname(event.target.value)}
-                          className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                          className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                         />
                       ) : (
-                        <div className="min-w-[8rem] space-y-1.5">
+                        <div className="min-w-32 space-y-1.5">
                           <div className="flex flex-wrap items-center gap-2">
                             {canInspectLastParticipation ? (
                               <button
@@ -1541,7 +1541,7 @@ export default function PlayersPage() {
                                   nickname: row.nickname,
                                 })}
                                 onClick={() => handleToggleLastParticipation(row)}
-                                className="rounded-sm text-left font-semibold text-slate-900 underline decoration-slate-300 underline-offset-4 transition-colors hover:text-amber-700 hover:decoration-amber-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 dark:text-slate-100 dark:decoration-slate-600 dark:hover:text-amber-300 dark:focus-visible:ring-offset-slate-900"
+                                className="rounded-xs text-left font-semibold text-slate-900 underline decoration-slate-300 underline-offset-4 transition-colors hover:text-amber-700 hover:decoration-amber-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 dark:text-slate-100 dark:decoration-slate-600 dark:hover:text-amber-300 dark:focus-visible:ring-offset-slate-900"
                               >
                                 {row.nickname}
                               </button>
@@ -1593,7 +1593,7 @@ export default function PlayersPage() {
                         <select
                           value={editingRace}
                           onChange={(event) => setEditingRace(event.target.value as PlayerRace)}
-                          className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                          className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                         >
                           {PLAYER_RACE_OPTIONS.map((raceOption) => (
                             <option key={raceOption} value={raceOption}>
@@ -1607,7 +1607,7 @@ export default function PlayersPage() {
                             value={ownRaceEditingValue}
                             onChange={(event) => setOwnRaceEditingValue(event.target.value as PlayerRace)}
                             disabled={ownRaceSavingPlayerId === row.id}
-                            className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                            className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                           >
                             {PLAYER_RACE_OPTIONS.map((raceOption) => (
                               <option key={raceOption} value={raceOption}>
@@ -1648,7 +1648,7 @@ export default function PlayersPage() {
                       )}
                     </td>
                     {showTierColumn && (
-                      <td className="min-w-[11rem] px-4 py-3">
+                      <td className="min-w-44 px-4 py-3">
                         {identityHidden ? (
                           <span className="text-slate-500 dark:text-slate-400" aria-hidden="true">—</span>
                         ) : isEditing ? (
@@ -1661,7 +1661,7 @@ export default function PlayersPage() {
                                 setEditingInlineMmrValue(String(resolveDefaultMmrForTier(nextTier)))
                               }
                             }}
-                            className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                            className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                           >
                             {PLAYER_EDIT_TIER_OPTIONS.map((tierOption) => (
                               <option key={tierOption} value={tierOption}>
@@ -1753,7 +1753,7 @@ export default function PlayersPage() {
                             step={1}
                             value={editingInlineMmrValue}
                             onChange={(event) => setEditingInlineMmrValue(event.target.value)}
-                            className="w-24 rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
+                            className="w-24 rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                           />
                         ) : (
                           formatMmrValue(row.currentMmr, (row.liveTier ?? row.tier) === 'UNASSIGNED')

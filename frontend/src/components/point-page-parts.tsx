@@ -2,7 +2,7 @@ import { Alert, AlertContent, AlertDescription, AlertIcon } from '@/components/u
 
 /** What the points pages (a member's points, the monthly ranking, the prize events) share. */
 
-export const POINT_CARD_CLASS = 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900'
+export const POINT_CARD_CLASS = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900'
 
 export function PointErrorAlert({ message }: { message: string }) {
   return (

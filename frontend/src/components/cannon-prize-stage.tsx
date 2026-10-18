@@ -68,7 +68,7 @@ export function CannonPrizeStage({ entrants, winnerCount, onFinished }: CannonPr
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
       <CannonStage shot={shot} onLanded={handleLanded}>
-        <span className="absolute left-3 top-3 rounded-md bg-white/85 px-2.5 py-1 text-xs font-semibold text-slate-800 shadow-sm">
+        <span className="absolute left-3 top-3 rounded-md bg-white/85 px-2.5 py-1 text-xs font-semibold text-slate-800 shadow-xs">
           {t('prizeDraw.cannon.range', { count: entrants.length - drawn.length })}
         </span>
         {!finished && (
@@ -86,7 +86,7 @@ export function CannonPrizeStage({ entrants, winnerCount, onFinished }: CannonPr
         {announcement}
       </p>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
         <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('prizeDraw.cannon.rule', { count: places })}</h3>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
           {t('prizeDraw.cannon.progress', { done: drawn.length, count: places, remaining: entrants.length - drawn.length })}

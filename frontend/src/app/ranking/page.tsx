@@ -245,7 +245,7 @@ export default function RankingPage() {
         onClose={handleCloseGameTypeStats}
       />
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900">
         {monthlyPeriodLabel.length > 0 && (
           <div className="min-w-full border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 dark:border-slate-800 dark:text-slate-200">
             {monthlyPeriodLabel}

@@ -22,7 +22,7 @@ import { startVisiblePolling } from '@/lib/visible-polling'
 import type { PredictionBoard, PredictionMatch, TeamSide } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
-const CARD_CLASS = 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900'
+const CARD_CLASS = 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900'
 
 function teamName(team: TeamSide): string {
   return team === 'HOME' ? t('predictions.home') : t('predictions.away')

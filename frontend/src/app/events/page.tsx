@@ -32,7 +32,7 @@ export default function EventsPage() {
 
   return (
     <section className="space-y-6">
-      <div className="rounded-lg border border-cyan-100 bg-white px-5 py-6 shadow-sm dark:border-cyan-900 dark:bg-slate-900 sm:px-6">
+      <div className="rounded-lg border border-cyan-100 bg-white px-5 py-6 shadow-xs dark:border-cyan-900 dark:bg-slate-900 sm:px-6">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700 dark:text-cyan-300">
           Hei`Fam Events
         </p>
@@ -74,7 +74,7 @@ export default function EventsPage() {
           {filteredEvents.map((event) => (
             <article
               key={event.slug}
-              className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+              className="rounded-lg border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-700 dark:bg-slate-900"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="space-y-2">

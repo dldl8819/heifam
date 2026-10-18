@@ -90,7 +90,7 @@ export function CannonStage({ shot, onLanded, children }: CannonStageProps) {
   const smoke = shot && progress < SMOKE_UNTIL ? progress / SMOKE_UNTIL : null
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-slate-200 shadow-sm dark:border-slate-700">
+    <div className="relative overflow-hidden rounded-xl border border-slate-200 shadow-xs dark:border-slate-700">
       <svg viewBox="0 0 640 440" className="block h-auto w-full select-none" aria-hidden="true">
         <defs>
           <linearGradient id="cannon-sky" x1="0" y1="0" x2="0" y2="1">

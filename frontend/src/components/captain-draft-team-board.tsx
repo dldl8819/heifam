@@ -32,12 +32,12 @@ function Tags({ tags }: { tags: DraftPlayerTags }) {
   return (
     <>
       {tags.tier && (
-        <span className="rounded bg-amber-100 px-1 text-[11px] font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">
+        <span className="rounded-sm bg-amber-100 px-1 text-[11px] font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">
           {tags.tier}
         </span>
       )}
       {tags.races && (
-        <span className="rounded bg-slate-100 px-1 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+        <span className="rounded-sm bg-slate-100 px-1 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
           {tags.races}
         </span>
       )}
@@ -78,7 +78,7 @@ export function CaptainDraftTeamBoard({ draft, playerMap, setWins, busy, onPick,
   )
 
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
       <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('captainDraft.scoreboard.title')}</h3>
       <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('captainDraft.scoreboard.helper')}</p>
 
@@ -106,7 +106,7 @@ export function CaptainDraftTeamBoard({ draft, playerMap, setWins, busy, onPick,
                     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
                       <span className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{member.nickname}</span>
                       {member.captain && (
-                        <span className="rounded bg-slate-900 px-1 text-[11px] font-semibold text-white dark:bg-slate-100 dark:text-slate-900">
+                        <span className="rounded-sm bg-slate-900 px-1 text-[11px] font-semibold text-white dark:bg-slate-100 dark:text-slate-900">
                           {t('captainDraft.teams.captainBadge')}
                         </span>
                       )}
@@ -122,7 +122,7 @@ export function CaptainDraftTeamBoard({ draft, playerMap, setWins, busy, onPick,
                         disabled={busy}
                         aria-label={t('captainDraft.teams.unpick', { nickname: member.nickname })}
                         title={t('captainDraft.teams.unpick', { nickname: member.nickname })}
-                        className="shrink-0 rounded px-1 text-xs text-slate-400 hover:bg-slate-100 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-slate-800 dark:hover:text-rose-400"
+                        className="shrink-0 rounded-sm px-1 text-xs text-slate-400 hover:bg-slate-100 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-slate-800 dark:hover:text-rose-400"
                       >
                         ×
                       </button>

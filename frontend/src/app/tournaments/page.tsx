@@ -24,7 +24,7 @@ export default function TournamentsPage() {
 
   return (
     <section className="space-y-6">
-      <header className="space-y-1 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <header className="space-y-1 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
         <h2 className="text-2xl font-semibold tracking-tight">{t('tournaments.title')}</h2>
         <p className="text-sm text-slate-600 dark:text-slate-300">{t('tournaments.description')}</p>
       </header>

@@ -10,7 +10,7 @@ export default function ImportPage() {
 
   return (
     <section className="space-y-6">
-      <header className="space-y-1 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <header className="space-y-1 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
         <h2 className="text-2xl font-semibold tracking-tight">{t('adminGuard.importCenterTitle')}</h2>
         <p className="text-sm text-slate-600 dark:text-slate-300">{t('adminGuard.importCenterDescription')}</p>
       </header>
@@ -18,7 +18,7 @@ export default function ImportPage() {
       <AdminOnlyContent>
         <div className="grid gap-4 md:grid-cols-2">
           {isAdmin && (
-            <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
               <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('players.import.title')}</h3>
               <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{t('adminGuard.playersImportGuide')}</p>
               <Link
@@ -31,7 +31,7 @@ export default function ImportPage() {
           )}
 
           {isSuperAdmin && (
-            <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
               <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('results.import.title')}</h3>
               <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{t('adminGuard.matchesImportGuide')}</p>
               <Link

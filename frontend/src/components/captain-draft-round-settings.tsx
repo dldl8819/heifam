@@ -19,7 +19,7 @@ type CaptainDraftRoundSettingsProps = {
 }
 
 const SELECT_CLASS =
-  'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700 dark:disabled:bg-slate-800'
+  'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700 dark:disabled:bg-slate-800'
 
 /**
  * How a draft is played: how many rounds, and the sets of a round as 3:3, 2:2 and 1:1 games in any
@@ -89,7 +89,7 @@ export function CaptainDraftRoundSettings({
                     disabled={setSizes.length <= 1}
                     aria-label={t('captainDraft.settings.removeSet', { set: index + 1 })}
                     title={t('captainDraft.settings.removeSet', { set: index + 1 })}
-                    className="shrink-0 rounded px-2 py-1 text-sm text-slate-400 hover:bg-slate-100 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-slate-800 dark:hover:text-rose-400"
+                    className="shrink-0 rounded-sm px-2 py-1 text-sm text-slate-400 hover:bg-slate-100 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-slate-800 dark:hover:text-rose-400"
                   >
                     ×
                   </button>
