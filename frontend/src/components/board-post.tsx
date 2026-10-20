@@ -8,6 +8,7 @@ import { useAdminAuth } from '@/lib/admin-auth'
 import { Alert, AlertContent, AlertDescription, AlertIcon } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { VideoLinkField, YouTubePlayer } from '@/components/board-video'
+import { ShareLinkButton } from '@/components/share-link-button'
 import {
   BOARD_COMMENT_MAX_LENGTH,
   BOARD_CONTENT_MAX_LENGTH,
@@ -234,6 +235,8 @@ export function BoardPost({ board, postId }: { board: BoardKind; postId: number 
                   {post.likedByMe ? '♥' : '♡'} {t('boards.likes', { count: post.likeCount })}
                 </button>
               )}
+              {/* The link names the post only, so an anonymous post's writer stays unknown. */}
+              <ShareLinkButton title={post.title} path={`/boards/${board}/${postId}`} />
               {post.canEdit && (
                 <button
                   type="button"
