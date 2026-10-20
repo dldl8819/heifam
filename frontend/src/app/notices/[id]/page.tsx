@@ -12,6 +12,7 @@ import { NoticeComments } from '@/components/notice-comments'
 import { NoticeContentEditor } from '@/components/notice-content-editor'
 import { NoticeVotePanel, NoticeVoteView } from '@/components/notice-vote'
 import { NoticeVoteSettings } from '@/components/notice-vote-settings'
+import { ShareLinkButton } from '@/components/share-link-button'
 import { NOTICE_IMAGE_MAX_COUNT, noticeImageIds } from '@/lib/notice-images'
 import { t } from '@/lib/i18n'
 import {
@@ -303,6 +304,7 @@ export default function NoticeDetailPage() {
               >
                 {notice.likedByMe ? '♥' : '♡'} {t('notices.posts.likeCount', { count: notice.likeCount })}
               </button>
+              <ShareLinkButton title={notice.title} path={`/notices/${noticeId}`} />
 
               {isAdmin && (
                 <>

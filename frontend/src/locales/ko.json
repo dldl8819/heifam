@@ -254,6 +254,9 @@
   "common": {
     "all": "전체",
     "loading": "불러오는 중...",
+    "shareLink": "링크 공유",
+    "shareLinkCopied": "링크 복사됨",
+    "shareLinkFailed": "링크를 복사하지 못했습니다. 이 주소를 길게 눌러 복사해 주세요:",
     "errorPrefix": "오류:",
     "readOnly": "읽기 전용",
     "mmrHidden": "MMR 정보는 열람 권한이 있는 관리자만 확인할 수 있습니다.",
