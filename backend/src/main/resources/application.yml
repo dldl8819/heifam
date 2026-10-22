@@ -102,6 +102,9 @@ balancify:
     supabase-url: ${SUPABASE_URL:}
     verify-timeout-ms: ${SUPABASE_VERIFY_TIMEOUT_MS:3000}
     verification-cache-ttl-seconds: ${SUPABASE_VERIFICATION_CACHE_TTL_SECONDS:60}
+    # Tokens the key set does not verify, put to Supabase Auth at most this often a minute once the
+    # key set has verified a real token: forged tokens cannot turn every request into an Auth call.
+    unverified-auth-checks-per-minute: ${SUPABASE_UNVERIFIED_AUTH_CHECKS_PER_MINUTE:30}
     service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
