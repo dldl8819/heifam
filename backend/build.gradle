@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '4.1.1'
+    id 'org.springframework.boot' version '4.1.2'
     id 'io.spring.dependency-management' version '1.1.7'
 }
 
@@ -22,12 +22,6 @@ java {
     }
 }
 
-// Patch releases newer than the ones Spring Boot 4.1.1 manages, taken for their security fixes
-// (Tomcat 11.0.25: CVE-2026-65905, CVE-2026-65182, CVE-2026-68525; Jackson 3.1.6 and 3.1.7:
-// CVE-2026-89407 and others). Drop a line once Spring Boot manages that version or a later one.
-ext['tomcat.version'] = '11.0.26'
-ext['jackson-bom.version'] = '3.1.7'
-
 configurations {
     compileOnly {
         extendsFrom annotationProcessor
@@ -41,7 +35,7 @@ repositories {
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    implementation 'com.nimbusds:nimbus-jose-jwt:10.0.2'
+    implementation 'com.nimbusds:nimbus-jose-jwt:10.10'
     // Since Spring Boot 4 the starter is what turns Flyway on; flyway-core alone runs no migration.
     implementation 'org.springframework.boot:spring-boot-starter-flyway'
     // Flyway 10+ keeps PostgreSQL support in its own module; without it startup fails.
