@@ -15,6 +15,7 @@ public class SupabaseAuthProperties {
 
     private int verifyTimeoutMs = 3000;
     private int verificationCacheTtlSeconds = 60;
+    private int unverifiedAuthChecksPerMinute = 30;
     private String serviceRoleKey;
 
     public boolean isRequireJwt() {
@@ -61,6 +62,17 @@ public class SupabaseAuthProperties {
             0,
             Math.min(MAX_VERIFICATION_CACHE_TTL_SECONDS, verificationCacheTtlSeconds)
         );
+    }
+
+    public int getUnverifiedAuthChecksPerMinute() {
+        return unverifiedAuthChecksPerMinute;
+    }
+
+    // How many tokens a minute that the key set does not verify are still put to Supabase Auth,
+    // once the key set has verified a real one (SupabaseJwtVerifier). Forged tokens cannot make
+    // more Auth requests than this. 0 sends none of them.
+    public void setUnverifiedAuthChecksPerMinute(int unverifiedAuthChecksPerMinute) {
+        this.unverifiedAuthChecksPerMinute = Math.max(0, unverifiedAuthChecksPerMinute);
     }
 
     public String getApiKey() {

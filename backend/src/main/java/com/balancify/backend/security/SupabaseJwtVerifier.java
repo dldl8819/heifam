@@ -32,6 +32,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
@@ -42,10 +45,25 @@ import tools.jackson.databind.json.JsonMapper;
 @Component
 public class SupabaseJwtVerifier {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(SupabaseJwtVerifier.class);
     private static final long CLOCK_SKEW_SECONDS = 30L;
+    // A token Supabase Auth refused is refused again without asking for this long.
+    private static final long REJECTED_TOKEN_TTL_MS = 60_000L;
+    // Forged tokens could fill the list of refused ones, so it holds this many at most.
+    private static final int MAX_REJECTED_TOKENS = 2_000;
+    private static final long UNVERIFIED_WINDOW_MS = 60_000L;
 
     private final SupabaseAuthProperties supabaseAuthProperties;
     private final ConcurrentMap<String, CachedVerification> verificationCache = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, Long> rejectedTokens = new ConcurrentHashMap<>();
+    // Set once a token has passed both the key set and Supabase Auth: the project signs with the keys
+    // the key set publishes, so a token the key set does not verify is all but certainly forged. Until
+    // then (a project still on a shared secret, say) every token goes to Supabase Auth as before.
+    private final AtomicBoolean keySetProven = new AtomicBoolean(false);
+    private final Object unverifiedChecksLock = new Object();
+    private long unverifiedWindowStart;
+    private int unverifiedChecksInWindow;
+    private boolean unverifiedLimitLogged;
     private final ConfigurableJWTProcessor<SecurityContext> jwtProcessor;
     private final HttpClient authHttpClient;
     private final ObjectMapper objectMapper = JsonMapper.builder().build();
@@ -95,12 +113,21 @@ public class SupabaseJwtVerifier {
             verificationCache.remove(cacheKey, cached);
         }
 
+        // Each check below costs nothing but this server's time; only what passes them all is put to
+        // Supabase Auth, so that tokens refused anyway cannot turn every request into an Auth call.
+        if (isRejectedRecently(cacheKey, now) || !looksLikeLiveAccessToken(normalizedToken, now)) {
+            return Optional.empty();
+        }
+
         Optional<VerifiedUser> jwksVerifiedUser = jwtProcessor == null
             ? Optional.empty()
             : verifyWithJwks(normalizedToken, now);
-        Optional<VerifiedUser> authApiVerifiedUser = verifyWithSupabaseAuthApi(normalizedToken);
-        if (authApiVerifiedUser.isPresent()) {
-            VerifiedUser activeUser = authApiVerifiedUser.get();
+        if (jwksVerifiedUser.isEmpty() && keySetProven.get() && !takeUnverifiedCheck(now)) {
+            return Optional.empty();
+        }
+        AuthAnswer authAnswer = verifyWithSupabaseAuthApi(normalizedToken);
+        if (authAnswer.user().isPresent()) {
+            VerifiedUser activeUser = authAnswer.user().get();
             if (jwksVerifiedUser.isPresent()) {
                 VerifiedUser signedUser = jwksVerifiedUser.get();
                 if (!signedUser.userId().equals(activeUser.userId())
@@ -108,6 +135,7 @@ public class SupabaseJwtVerifier {
                     verificationCache.remove(cacheKey);
                     return Optional.empty();
                 }
+                keySetProven.set(true);
                 activeUser = new VerifiedUser(
                     signedUser.userId(),
                     activeUser.email(),
@@ -119,8 +147,89 @@ public class SupabaseJwtVerifier {
             return Optional.of(activeUser);
         }
 
+        if (authAnswer.refused()) {
+            rememberRejected(cacheKey, now);
+        }
         verificationCache.remove(cacheKey);
         return Optional.empty();
+    }
+
+    // A Supabase access token is a signed JWT naming its user, with an expiry not yet passed.
+    // Nothing else could be accepted by Supabase Auth, so nothing else is put to it.
+    private boolean looksLikeLiveAccessToken(String token, long nowEpochMs) {
+        try {
+            JWTClaimsSet claims = SignedJWT.parse(token).getJWTClaimsSet();
+            Date expirationTime = claims.getExpirationTime();
+            return !safeTrim(claims.getSubject()).isEmpty()
+                && expirationTime != null
+                && !expirationTime.toInstant().isBefore(Instant.ofEpochMilli(nowEpochMs).minusSeconds(CLOCK_SKEW_SECONDS));
+        } catch (ParseException exception) {
+            return false;
+        }
+    }
+
+    private boolean isRejectedRecently(String cacheKey, long now) {
+        Long refusedUntil = rejectedTokens.get(cacheKey);
+        if (refusedUntil == null) {
+            return false;
+        }
+        if (refusedUntil > now) {
+            return true;
+        }
+        rejectedTokens.remove(cacheKey, refusedUntil);
+        return false;
+    }
+
+    // When the list is full, refusals that ran out go first; if none has, this one is not remembered.
+    private void rememberRejected(String cacheKey, long now) {
+        if (rejectedTokens.size() >= MAX_REJECTED_TOKENS) {
+            rejectedTokens.values().removeIf(refusedUntil -> refusedUntil <= now);
+            if (rejectedTokens.size() >= MAX_REJECTED_TOKENS) {
+                return;
+            }
+        }
+        rejectedTokens.put(cacheKey, now + REJECTED_TOKEN_TTL_MS);
+    }
+
+    // One of this minute's Supabase Auth checks for a token the key set does not verify, if any is left.
+    private boolean takeUnverifiedCheck(long now) {
+        int limit = supabaseAuthProperties.getUnverifiedAuthChecksPerMinute();
+        synchronized (unverifiedChecksLock) {
+            if (now - unverifiedWindowStart >= UNVERIFIED_WINDOW_MS) {
+                unverifiedWindowStart = now;
+                unverifiedChecksInWindow = 0;
+                unverifiedLimitLogged = false;
+            }
+            if (unverifiedChecksInWindow >= limit) {
+                if (!unverifiedLimitLogged) {
+                    unverifiedLimitLogged = true;
+                    LOGGER.warn(
+                        "Tokens the key set does not verify used this minute's {} Supabase Auth checks; the rest are refused",
+                        limit
+                    );
+                }
+                return false;
+            }
+            unverifiedChecksInWindow++;
+            return true;
+        }
+    }
+
+    /** What Supabase Auth said: the user it accepts the token for, or whether it refused the token outright. */
+    private record AuthAnswer(Optional<VerifiedUser> user, boolean refused) {
+
+        static AuthAnswer accepted(VerifiedUser user) {
+            return new AuthAnswer(Optional.of(user), false);
+        }
+
+        static AuthAnswer refusedToken() {
+            return new AuthAnswer(Optional.empty(), true);
+        }
+
+        // No answer to go by (unreachable, timed out, overloaded, unreadable): not remembered.
+        static AuthAnswer none() {
+            return new AuthAnswer(Optional.empty(), false);
+        }
     }
 
     public void invalidateUser(String userId) {
@@ -152,14 +261,14 @@ public class SupabaseJwtVerifier {
         }
     }
 
-    private Optional<VerifiedUser> verifyWithSupabaseAuthApi(String normalizedToken) {
+    private AuthAnswer verifyWithSupabaseAuthApi(String normalizedToken) {
         if (expectedIssuer.isEmpty()) {
-            return Optional.empty();
+            return AuthAnswer.none();
         }
 
         String apiKey = supabaseAuthProperties.getApiKey();
         if (apiKey.isEmpty()) {
-            return Optional.empty();
+            return AuthAnswer.none();
         }
 
         try {
@@ -175,8 +284,12 @@ public class SupabaseJwtVerifier {
                 request,
                 HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
             );
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                return Optional.empty();
+            int status = response.statusCode();
+            if (status == 400 || status == 401 || status == 403) {
+                return AuthAnswer.refusedToken();
+            }
+            if (status < 200 || status >= 300) {
+                return AuthAnswer.none();
             }
 
             Map<String, Object> payload = objectMapper.readValue(
@@ -187,16 +300,16 @@ public class SupabaseJwtVerifier {
             String userId = safeTrim(asString(payload.get("id")));
             String email = normalizeEmail(asString(payload.get("email")));
             if (userId.isEmpty() || email.isEmpty()) {
-                return Optional.empty();
+                return AuthAnswer.none();
             }
             String nickname = resolveNickname(payload.get("user_metadata"));
-            return Optional.of(new VerifiedUser(userId, email, nickname, ""));
+            return AuthAnswer.accepted(new VerifiedUser(userId, email, nickname, ""));
         } catch (InterruptedException interruptedException) {
             Thread.currentThread().interrupt();
-            return Optional.empty();
+            return AuthAnswer.none();
         } catch (IOException | JacksonException | IllegalArgumentException runtimeException) {
             // An answer that cannot be read verifies nobody; Jackson 3 reports it unchecked.
-            return Optional.empty();
+            return AuthAnswer.none();
         }
     }
 

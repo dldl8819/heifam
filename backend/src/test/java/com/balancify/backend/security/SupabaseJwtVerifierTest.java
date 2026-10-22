@@ -277,7 +277,7 @@ class SupabaseJwtVerifierTest {
 
         SupabaseJwtVerifier verifier = new SupabaseJwtVerifier(properties);
 
-        Optional<SupabaseJwtVerifier.VerifiedUser> verifiedUser = verifier.verify("opaque-token");
+        Optional<SupabaseJwtVerifier.VerifiedUser> verifiedUser = verifier.verify(unverifiableToken("player@example.test"));
 
         assertThat(verifiedUser).isPresent();
         assertThat(verifiedUser.orElseThrow().userId()).isEqualTo(PLACEHOLDER_USER_ID);
@@ -317,7 +317,7 @@ class SupabaseJwtVerifierTest {
         for (int index = 0; index < unreadable.length; index++) {
             answer.set(unreadable[index]);
 
-            assertThat(verifier.verify("opaque-token-" + index)).as(unreadable[index]).isEmpty();
+            assertThat(verifier.verify(unverifiableToken("player" + index + "@example.test"))).as(unreadable[index]).isEmpty();
         }
         assertThat(authUserRequestCount.get()).isEqualTo(unreadable.length);
     }
@@ -334,9 +334,10 @@ class SupabaseJwtVerifierTest {
         properties.setVerificationCacheTtlSeconds(0);
 
         SupabaseJwtVerifier verifier = new SupabaseJwtVerifier(properties);
+        String token = unverifiableToken("player@example.test");
 
-        assertThat(verifier.verify("placeholder-access-token")).isPresent();
-        assertThat(verifier.verify("placeholder-access-token")).isEmpty();
+        assertThat(verifier.verify(token)).isPresent();
+        assertThat(verifier.verify(token)).isEmpty();
         assertThat(authUserRequestCount.get()).isEqualTo(2);
     }
 
@@ -353,12 +354,13 @@ class SupabaseJwtVerifierTest {
 
         MutableClock clock = new MutableClock(Instant.now());
         SupabaseJwtVerifier verifier = new SupabaseJwtVerifier(properties, clock);
+        String token = unverifiableToken("player@example.test");
 
-        assertThat(verifier.verify("placeholder-access-token")).isPresent();
+        assertThat(verifier.verify(token)).isPresent();
         clock.advanceSeconds(30);
-        assertThat(verifier.verify("placeholder-access-token")).isPresent();
+        assertThat(verifier.verify(token)).isPresent();
         clock.advanceSeconds(31);
-        assertThat(verifier.verify("placeholder-access-token")).isEmpty();
+        assertThat(verifier.verify(token)).isEmpty();
         assertThat(authUserRequestCount.get()).isEqualTo(2);
     }
 
@@ -374,10 +376,11 @@ class SupabaseJwtVerifierTest {
         properties.setVerificationCacheTtlSeconds(60);
 
         SupabaseJwtVerifier verifier = new SupabaseJwtVerifier(properties);
+        String token = unverifiableToken("player@example.test");
 
-        assertThat(verifier.verify("placeholder-access-token")).isPresent();
+        assertThat(verifier.verify(token)).isPresent();
         verifier.invalidateUser(PLACEHOLDER_USER_ID);
-        assertThat(verifier.verify("placeholder-access-token")).isEmpty();
+        assertThat(verifier.verify(token)).isEmpty();
         assertThat(authUserRequestCount.get()).isEqualTo(2);
     }
 
@@ -447,6 +450,128 @@ class SupabaseJwtVerifierTest {
             assertThat(verifier.verify(forged)).isEmpty();
         }
         assertThat(jwksRequestCount.get()).isLessThanOrEqualTo(2);
+    }
+
+    @Test
+    void neverAsksSupabaseAuthAboutATokenThatCannotBeAnAccessToken() throws Exception {
+        String baseUrl = startJwksServer(new JWKSet().toString());
+        registerActiveUserEndpoint();
+        SupabaseJwtVerifier verifier = new SupabaseJwtVerifier(defaultProperties(baseUrl));
+        ECKey key = new ECKeyGenerator(Curve.P_256).keyID("not-published").generate();
+
+        SignedJWT withoutUser = new SignedJWT(
+            new JWSHeader.Builder(JWSAlgorithm.ES256).keyID(key.getKeyID()).build(),
+            new JWTClaimsSet.Builder()
+                .issuer(baseUrl + "/auth/v1")
+                .expirationTime(Date.from(Instant.now().plusSeconds(600)))
+                .build()
+        );
+        withoutUser.sign(new ECDSASigner(key));
+        String expired = createToken(key, baseUrl + "/auth/v1", "member@example.test", Map.of(), Instant.now().minusSeconds(120));
+
+        for (String token : new String[] {"YOUR_ACCESS_TOKEN", "a.b.c", expired, withoutUser.serialize()}) {
+            assertThat(verifier.verify(token)).isEmpty();
+        }
+        assertThat(authUserRequestCount.get()).isZero();
+
+        // A token shaped like one is still put to Supabase Auth, which is the judge.
+        assertThat(verifier.verify(unverifiableToken("member@example.test"))).isPresent();
+        assertThat(authUserRequestCount.get()).isEqualTo(1);
+    }
+
+    @Test
+    void remembersForAMinuteThatSupabaseAuthRefusedAToken() throws Exception {
+        String baseUrl = startJwksServer(new JWKSet().toString());
+        AtomicInteger status = new AtomicInteger(401);
+        jwksServer.createContext("/auth/v1/user", exchange -> {
+            authUserRequestCount.incrementAndGet();
+            exchange.sendResponseHeaders(status.get(), -1);
+            exchange.close();
+        });
+        MutableClock clock = new MutableClock(Instant.now());
+        SupabaseJwtVerifier verifier = new SupabaseJwtVerifier(defaultProperties(baseUrl), clock);
+        String refused = unverifiableToken("member@example.test");
+
+        assertThat(verifier.verify(refused)).isEmpty();
+        assertThat(verifier.verify(refused)).isEmpty();
+        assertThat(authUserRequestCount.get()).isEqualTo(1);
+        clock.advanceSeconds(61);
+        assertThat(verifier.verify(refused)).isEmpty();
+        assertThat(authUserRequestCount.get()).isEqualTo(2);
+
+        // No answer to go by (overloaded, failing) is not remembered: the next request asks again.
+        for (int unanswered : new int[] {429, 500}) {
+            status.set(unanswered);
+            String token = unverifiableToken("member" + unanswered + "@example.test");
+            int before = authUserRequestCount.get();
+            assertThat(verifier.verify(token)).isEmpty();
+            assertThat(verifier.verify(token)).isEmpty();
+            assertThat(authUserRequestCount.get()).isEqualTo(before + 2);
+        }
+    }
+
+    @Test
+    void limitsAuthChecksForTokensTheKeySetDoesNotVerifyOnceItHasVerifiedARealOne() throws Exception {
+        ECKey signingKey = new ECKeyGenerator(Curve.P_256)
+            .keyID("hei-test-key")
+            .generate();
+        String baseUrl = startJwksServer(new JWKSet(signingKey.toPublicJWK()).toString());
+        registerActiveUserEndpoint();
+        SupabaseAuthProperties properties = defaultProperties(baseUrl);
+        properties.setUnverifiedAuthChecksPerMinute(2);
+        MutableClock clock = new MutableClock(Instant.now());
+        SupabaseJwtVerifier verifier = new SupabaseJwtVerifier(properties, clock);
+
+        assertThat(verifier.verify(createToken(signingKey, baseUrl + "/auth/v1", "member@example.test", Map.of()))).isPresent();
+        assertThat(authUserRequestCount.get()).isEqualTo(1);
+
+        // The key set has shown it signs this project's tokens: ones it does not verify get two Auth
+        // checks a minute (here), and the rest are refused without one.
+        for (int index = 0; index < 5; index++) {
+            verifier.verify(unverifiableToken("forged" + index + "@example.test"));
+        }
+        assertThat(authUserRequestCount.get()).isEqualTo(3);
+        assertThat(verifier.verify(unverifiableToken("forged5@example.test"))).isEmpty();
+        assertThat(authUserRequestCount.get()).isEqualTo(3);
+
+        clock.advanceSeconds(61);
+        verifier.verify(unverifiableToken("forged6@example.test"));
+        assertThat(authUserRequestCount.get()).isEqualTo(4);
+
+        // Tokens the key set verifies are never held back by it.
+        assertThat(verifier.verify(createToken(signingKey, baseUrl + "/auth/v1", "member@example.test", Map.of("nickname", "민식")))).isPresent();
+        assertThat(authUserRequestCount.get()).isEqualTo(5);
+    }
+
+    @Test
+    void limitsNothingWhileTheKeySetHasVerifiedNoRealToken() throws Exception {
+        String baseUrl = startJwksServer(new JWKSet().toString());
+        registerActiveUserEndpoint();
+        SupabaseAuthProperties properties = defaultProperties(baseUrl);
+        properties.setUnverifiedAuthChecksPerMinute(2);
+        SupabaseJwtVerifier verifier = new SupabaseJwtVerifier(properties);
+
+        // As on a project still signing with a shared secret: every token goes to Supabase Auth.
+        for (int index = 0; index < 5; index++) {
+            assertThat(verifier.verify(unverifiableToken("member" + index + "@example.test"))).isPresent();
+        }
+        assertThat(authUserRequestCount.get()).isEqualTo(5);
+    }
+
+    private SupabaseAuthProperties defaultProperties(String baseUrl) {
+        SupabaseAuthProperties properties = new SupabaseAuthProperties();
+        properties.setSupabaseUrl(baseUrl);
+        properties.setApiKey(PLACEHOLDER_API_KEY);
+        properties.setVerifyTimeoutMs(1000);
+        properties.setVerificationCacheTtlSeconds(60);
+        return properties;
+    }
+
+    // A well-formed access token that a key set without its key cannot verify, as a project on a
+    // shared secret sends, or a forger: only Supabase Auth can tell whether it is good.
+    private String unverifiableToken(String email) throws Exception {
+        ECKey key = new ECKeyGenerator(Curve.P_256).keyID("not-published").generate();
+        return createToken(key, "https://YOUR_PROJECT.supabase.co/auth/v1", email, Map.of());
     }
 
     private void registerActiveUserEndpoint() {
