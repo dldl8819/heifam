@@ -46,7 +46,7 @@ ALLOWED_SIGNIN_DOMAINS=
 ### 1) Service type
 - Create a Render Web Service from this repository.
 - Root directory: `backend`
-- Runtime: Java 21
+- Runtime: Java 25, Oracle JDK 25.0.5.0.2 pinned by version and checksum in `backend/Dockerfile`
 
 ### 2) Build/Start commands
 - Build command: `./gradlew clean bootJar`

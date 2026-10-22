@@ -12,12 +12,12 @@ Balancify is an automatic team balancing and ELO-based league management system 
 
 ## Architecture
 - **Frontend**: Next.js with TypeScript and Tailwind CSS
-- **Backend**: Spring Boot with Gradle and Java 21
+- **Backend**: Spring Boot with Gradle and Java 25
 - **Database**: PostgreSQL
 - **Local Development**: Docker Compose for PostgreSQL
 
 ## Tech Stack
 - Frontend: Next.js, TypeScript, Tailwind CSS
-- Backend: Spring Boot, Gradle, Java 21
+- Backend: Spring Boot, Gradle, Java 25
 - Database: PostgreSQL
 - Containerization: Docker Compose
