@@ -14,6 +14,7 @@ Expected production URLs:
 ### 1) Project import
 - Import the `frontend` directory as a Vercel project.
 - Framework preset: Next.js
+- Node.js: 24 (`engines.node` in `frontend/package.json`, which Vercel follows over the project setting)
 
 ### 2) Build settings
 - Install command: `npm install`

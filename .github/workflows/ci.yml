@@ -52,9 +52,10 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+      # The same Node as Vercel builds with (engines.node in package.json).
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci --no-audit --no-fund
