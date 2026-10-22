@@ -420,6 +420,35 @@ class SupabaseJwtVerifierTest {
         );
     }
 
+    @Test
+    void doesNotFetchTheKeySetAgainForEachTokenNamingAnUnknownKey() throws Exception {
+        ECKey signingKey = new ECKeyGenerator(Curve.P_256)
+            .keyID("hei-test-key")
+            .generate();
+        ECKey unknownKey = new ECKeyGenerator(Curve.P_256)
+            .keyID("unknown-key")
+            .generate();
+        String baseUrl = startJwksServer(new JWKSet(signingKey.toPublicJWK()).toString());
+
+        SupabaseAuthProperties properties = new SupabaseAuthProperties();
+        properties.setSupabaseUrl(baseUrl);
+        properties.setApiKey(PLACEHOLDER_API_KEY);
+        properties.setVerifyTimeoutMs(1000);
+        properties.setVerificationCacheTtlSeconds(60);
+
+        SupabaseJwtVerifier verifier = new SupabaseJwtVerifier(properties);
+        verifier.verify(createToken(signingKey, baseUrl + "/auth/v1", "member@example.test", Map.of()));
+
+        // Supabase Auth stays the judge of every token (there is no user endpoint here, so all are
+        // refused). What is checked is the key set: tokens naming a key it does not hold must not
+        // make each request fetch it again.
+        for (int index = 0; index < 5; index++) {
+            String forged = createToken(unknownKey, baseUrl + "/auth/v1", "forged" + index + "@example.test", Map.of());
+            assertThat(verifier.verify(forged)).isEmpty();
+        }
+        assertThat(jwksRequestCount.get()).isLessThanOrEqualTo(2);
+    }
+
     private void registerActiveUserEndpoint() {
         jwksServer.createContext(
             "/auth/v1/user",

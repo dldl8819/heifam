@@ -2,7 +2,7 @@ package com.balancify.backend.security;
 
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.jwk.source.JWKSource;
-import com.nimbusds.jose.jwk.source.RemoteJWKSet;
+import com.nimbusds.jose.jwk.source.JWKSourceBuilder;
 import com.nimbusds.jose.proc.BadJOSEException;
 import com.nimbusds.jose.proc.JWSAlgorithmFamilyJWSKeySelector;
 import com.nimbusds.jose.proc.JWSKeySelector;
@@ -15,7 +15,6 @@ import com.nimbusds.jose.util.DefaultResourceRetriever;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URI;
-import java.net.URL;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -253,13 +252,17 @@ public class SupabaseJwtVerifier {
                 supabaseAuthProperties.getVerifyTimeoutMs(),
                 supabaseAuthProperties.getVerifyTimeoutMs()
             );
-            JWKSource<SecurityContext> jwkSource = new RemoteJWKSet<>(new URL(jwksUrl), resourceRetriever);
+            // Cached and rate limited (nimbus defaults): tokens naming unknown keys cannot make every
+            // request fetch the key set again.
+            JWKSource<SecurityContext> jwkSource = JWKSourceBuilder
+                .<SecurityContext>create(URI.create(jwksUrl).toURL(), resourceRetriever)
+                .build();
             DefaultJWTProcessor<SecurityContext> processor = new DefaultJWTProcessor<>();
             JWSKeySelector<SecurityContext> keySelector =
                 JWSAlgorithmFamilyJWSKeySelector.fromJWKSource(jwkSource);
             processor.setJWSKeySelector(keySelector);
             return processor;
-        } catch (MalformedURLException malformedURLException) {
+        } catch (MalformedURLException | IllegalArgumentException malformedUrl) {
             return null;
         } catch (JOSEException joseException) {
             return null;
