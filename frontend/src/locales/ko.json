@@ -254,6 +254,9 @@
   "common": {
     "all": "전체",
     "loading": "불러오는 중...",
+    "globalErrorTitle": "화면을 표시하지 못했습니다",
+    "globalErrorDescription": "잠시 후 다시 시도해 주세요. 같은 문제가 계속되면 운영진에게 알려 주세요.",
+    "globalErrorRetry": "다시 시도",
     "shareLink": "링크 공유",
     "shareLinkCopied": "링크 복사됨",
     "shareLinkFailed": "링크를 복사하지 못했습니다. 이 주소를 길게 눌러 복사해 주세요:",

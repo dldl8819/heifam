@@ -1,4 +1,5 @@
 const path = require('path')
+const { withSentryConfig } = require('@sentry/nextjs/config')
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -27,4 +28,16 @@ const nextConfig = {
   },
 }
 
-module.exports = nextConfig
+// Sentry (instrumentation-client.ts, sentry.*.config.ts) sends from the live site only. Events go
+// through /monitoring on this site. Source maps are uploaded only where SENTRY_AUTH_TOKEN is set
+// (Vercel's build), so stack traces read as the source; without it the build is as before.
+module.exports = withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG ?? 'hei-m9',
+  project: process.env.SENTRY_PROJECT ?? 'heifam-frontend',
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+  widenClientFileUpload: true,
+  tunnelRoute: '/monitoring',
+  silent: !process.env.CI,
+  telemetry: false,
+})
