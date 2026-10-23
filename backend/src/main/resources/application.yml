@@ -57,6 +57,13 @@ management:
     configprops:
       show-values: never
 
+# Sentry takes the backend's unhandled errors (500s) once SENTRY_DSN is set, on Render; with no
+# DSN nothing is sent. No event names a member: send-default-pii stays off (no user, no IP), and
+# SentryEventScrubber also drops headers, cookies, query strings and bodies and masks email
+# addresses. Only errors for now: SENTRY_TRACES_SAMPLE_RATE would turn tracing on.
+sentry:
+  send-default-pii: false
+
 balancify:
   integrations:
     upbit:
