@@ -27,6 +27,7 @@ import {
   hasAnyResult,
   isRunByCaptains,
   lineupSubmission,
+  repeatedSetGroups,
   roundComposition,
   setComposition,
   setupDiffersFromDraft,
@@ -236,6 +237,18 @@ export default function CaptainDraftPage() {
     return byKey
   }, [sheetRows])
   const setWins = useMemo(() => countSetWins(sheet), [sheet])
+  // Groups that play a set together again in a later round, team by team: said on screen, to ask
+  // for groups that mix everyone.
+  const repeatedGroups = useMemo(() => repeatedSetGroups(sheet), [sheet])
+  const nicknameOf = useMemo(() => {
+    const names = new Map<number, string>()
+    for (const participant of draft?.participants ?? []) {
+      if (participant.playerId !== null) {
+        names.set(participant.playerId, participant.nickname)
+      }
+    }
+    return names
+  }, [draft])
   const unsavedCount = sheetRows.filter((row) => row.edited).length
   // Stages this captain has a line-up on screen for that is not handed in yet.
   const unsubmittedStages = useMemo(() => {
@@ -1098,6 +1111,24 @@ export default function CaptainDraftPage() {
                     )}
                   </div>
                 ))}
+              {repeatedGroups.length > 0 && (
+                <div
+                  role="status"
+                  className="space-y-1 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+                >
+                  {repeatedGroups.map((repeat) => (
+                    <p key={`repeated-${repeat.team}-${repeat.again.round}-${repeat.again.set}`} className="font-medium">
+                      {t('captainDraft.entry.repeatedGroup', {
+                        team: t(TEAM_LABEL_KEYS[repeat.team]),
+                        players: repeat.playerIds.map((playerId) => nicknameOf.get(playerId) ?? `#${playerId}`).join(', '),
+                        first: t('captainDraft.entry.roundSet', { round: repeat.first.round, set: repeat.first.set }),
+                        again: t('captainDraft.entry.roundSet', { round: repeat.again.round, set: repeat.again.set }),
+                      })}
+                    </p>
+                  ))}
+                  <p className="text-xs">{t('captainDraft.entry.repeatedLineupAdvice')}</p>
+                </div>
+              )}
               <CaptainDraftEntrySheet
                 rounds={roundGroups}
                 sheet={sheet}

@@ -24,6 +24,7 @@ import {
   lineupSubmission,
   nextSetSize,
   playersInRound,
+  repeatedSetGroups,
   requiredTierPresets,
   roundComposition,
   setComposition,
@@ -318,6 +319,39 @@ describe('captain draft sets', () => {
     ]
 
     expect([...playersInRound(sheet, 1)].sort((a, b) => a - b)).toEqual([1, 2, 4, 5, 6, 7])
+  })
+
+  it('tells, team by team, a group playing a set together again in a later round, in whichever set', () => {
+    const sheet = (sets: CaptainDraftEntry[]) => sets.map((set) => effectiveEntry(set, undefined))
+
+    // Home's 1, 3 and 5 play round 1 set 1 together, and again in round 2 set 3; away's 2 and 4
+    // play together in rounds 1 and 3. Away's 6 and 8 play round 2 with another third player: a new
+    // group, not told. Home's 3 and 5 in round 3 are a pair, not the trio of round 1.
+    expect(
+      repeatedSetGroups(
+        sheet([
+          entry(1, 1, [1, 3, 5], [6, 8, 10]), entry(1, 2, [7, 9], [2, 4]),
+          entry(2, 1, [7, 11, 13], [6, 8, 12]), entry(2, 3, [5, 1, 3], [10, 14]),
+          entry(3, 1, [1, 7, 9], [2, 4, 16]), entry(3, 2, [3, 5], [4, 2]),
+        ]),
+      ),
+    ).toEqual([
+      { team: 'HOME', playerIds: [1, 3, 5], first: { round: 1, set: 1 }, again: { round: 2, set: 3 } },
+      { team: 'AWAY', playerIds: [2, 4], first: { round: 1, set: 2 }, again: { round: 3, set: 2 } },
+    ])
+  })
+
+  it('leaves out 1:1 sets, the ace decider, sets not filled in and sides not shown', () => {
+    const sheet = (sets: CaptainDraftEntry[]) => sets.map((set) => effectiveEntry(set, undefined))
+
+    expect(repeatedSetGroups(sheet([
+      // A player alone in a 1:1 set has no teammates to vary.
+      entry(1, 1, [1], [2]), entry(2, 1, [1], [2]),
+      // A slot still empty, or a side not shown yet (a captain's line-up not handed in).
+      entry(1, 2, [3, null], [null, null]), entry(2, 2, [3, null], [null, null]),
+      // The ace decider is its own round.
+      entry(1, 3, [5, 7], [6, 8]), ace(entry(3, 1, [5, 7], [6, 8])),
+    ]))).toEqual([])
   })
 
   it('takes a player taken out of their team off the unsaved changes', () => {
