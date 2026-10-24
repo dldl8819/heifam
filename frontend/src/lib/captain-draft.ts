@@ -371,6 +371,50 @@ export function playersInRound(entries: EffectiveEntry[], roundNumber: number): 
   return placed
 }
 
+/** Where a set was played: its round and set number. */
+export type SetPlace = { round: number; set: number }
+
+/** A group of a team's players playing a set together again, after a set of an earlier round. */
+export type RepeatedSetGroup = {
+  team: TeamSide
+  playerIds: number[]
+  first: SetPlace
+  again: SetPlace
+}
+
+/**
+ * For each team on its own: a group of its players (2:2 and 3:3 sets) who play a set together again
+ * in a later round, in whichever set, after playing one together in an earlier round. The regular
+ * draft is for everyone to play together across the tiers, so the page asks for groups that change
+ * from round to round; it only says so and stops nothing. A 1:1 set has no teammates and is left
+ * out, as are the ace decider, a set with a slot still empty, and a side not shown to the reader.
+ */
+export function repeatedSetGroups(sheet: readonly EffectiveEntry[]): RepeatedSetGroup[] {
+  const sets = sheet
+    .filter((set) => !set.aceDecider && set.teamSize >= 2)
+    .sort((left, right) => left.roundNumber - right.roundNumber || left.setNumber - right.setNumber)
+  const repeats: RepeatedSetGroup[] = []
+  for (const team of ['HOME', 'AWAY'] as const) {
+    const firstPlayed = new Map<string, SetPlace>()
+    for (const set of sets) {
+      const side = team === 'HOME' ? set.homePlayerIds : set.awayPlayerIds
+      if (side.length < 2 || side.some((playerId) => typeof playerId !== 'number')) {
+        continue
+      }
+      const playerIds = [...(side as number[])].sort((left, right) => left - right)
+      const group = playerIds.join(',')
+      const place = { round: set.roundNumber, set: set.setNumber }
+      const first = firstPlayed.get(group)
+      if (first === undefined) {
+        firstPlayed.set(group, place)
+      } else if (first.round !== place.round) {
+        repeats.push({ team, playerIds, first, again: place })
+      }
+    }
+  }
+  return repeats
+}
+
 /**
  * Takes a player taken out of their team off the host's unsaved changes too. The backend already
  * cleared the saved sets that named them, with their results.
