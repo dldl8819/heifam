@@ -10,6 +10,7 @@ import { PlayerTeammateStatsModal } from '@/components/player-teammate-stats-mod
 import { canOpenTeammateStats } from '@/lib/teammate-stats'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
+import { useDialogFocus } from '@/lib/use-dialog-focus'
 import { toTierOrder } from '@/lib/player-tier'
 import {
   buildOwnPlayerRaceUpdateRequest,
@@ -729,6 +730,8 @@ export default function PlayersPage() {
   const handleCancelActivityForm = () => {
     setActivityForm(null)
   }
+  const activityDialogRef = useRef<HTMLDivElement>(null)
+  useDialogFocus(activityDialogRef, activityForm !== null, handleCancelActivityForm)
 
   const handleSubmitActivityForm = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -1189,13 +1192,20 @@ export default function PlayersPage() {
       )}
 
       {activityForm !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 px-4 dark:bg-black/70">
+        <div
+          ref={activityDialogRef}
+          tabIndex={-1}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="player-activity-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 px-4 dark:bg-black/70"
+        >
           <form
             className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-700 dark:bg-slate-900"
             onSubmit={handleSubmitActivityForm}
           >
             <div className="space-y-1">
-                <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                <h3 id="player-activity-title" className="text-base font-semibold text-slate-900 dark:text-slate-100">
                 {activityForm.mode === 'deactivate'
                   ? t('players.activityForm.deactivateTitle')
                   : t('players.activityForm.reactivateTitle')}
@@ -1206,7 +1216,7 @@ export default function PlayersPage() {
             </div>
 
             {playerActionError && (
-              <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300">
+              <p role="alert" className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300">
                 {playerActionError}
               </p>
             )}
@@ -1522,6 +1532,7 @@ export default function PlayersPage() {
                         <input
                           type="text"
                           value={editingNickname}
+                          aria-label={t('players.table.nickname')}
                           onChange={(event) => setEditingNickname(event.target.value)}
                           className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                         />
@@ -1592,6 +1603,7 @@ export default function PlayersPage() {
                       ) : isEditing ? (
                         <select
                           value={editingRace}
+                          aria-label={t('players.table.race')}
                           onChange={(event) => setEditingRace(event.target.value as PlayerRace)}
                           className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                         >
@@ -1605,6 +1617,7 @@ export default function PlayersPage() {
                         <div className="flex items-center gap-1.5 whitespace-nowrap">
                           <select
                             value={ownRaceEditingValue}
+                            aria-label={t('players.table.race')}
                             onChange={(event) => setOwnRaceEditingValue(event.target.value as PlayerRace)}
                             disabled={ownRaceSavingPlayerId === row.id}
                             className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
@@ -1654,6 +1667,7 @@ export default function PlayersPage() {
                         ) : isEditing ? (
                           <select
                             value={editingTier}
+                            aria-label={t('players.table.tier')}
                             onChange={(event) => {
                               const nextTier = event.target.value as PlayerTierStatus
                               setEditingTier(nextTier)
@@ -1752,6 +1766,7 @@ export default function PlayersPage() {
                             max={5000}
                             step={1}
                             value={editingInlineMmrValue}
+                            aria-label={t('players.table.currentMmr')}
                             onChange={(event) => setEditingInlineMmrValue(event.target.value)}
                             className="w-24 rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                           />

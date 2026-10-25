@@ -52,7 +52,7 @@ export default function NoticesPage() {
   return (
     <section className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{t('notices.title')}</h1>
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{t('notices.title')}</h2>
         <p className="text-sm text-slate-500 dark:text-slate-400">{t('notices.description')}</p>
       </div>
 
@@ -304,7 +304,7 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
               className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60"
             >
               {formError && (
-                <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300">
+                <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300">
                   {formError}
                 </p>
               )}
@@ -323,6 +323,7 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
               <input
                 type="text"
                 value={title}
+                aria-label={withVote ? t('a11y.fields.voteTitle') : t('a11y.fields.title')}
                 onChange={(event) => setTitle(event.target.value)}
                 placeholder={withVote ? t('notices.posts.voteTitlePlaceholder') : t('notices.posts.titlePlaceholder')}
                 className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900"
@@ -447,7 +448,7 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
                             </span>
                           )}
                         </div>
-                        <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
+                        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                           {t('notices.posts.viewCount', { count: notice.viewCount ?? 0 })}
                           {' · '}
                           {t('notices.posts.likeCount', { count: notice.likeCount })}

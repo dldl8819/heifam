@@ -1355,7 +1355,7 @@ export default function ResultsPage() {
                                 </p>
                               )}
                               {isDuplicateSelection && (
-                              <p className="text-[11px] text-rose-700 dark:text-rose-300">
+                              <p role="alert" className="text-[11px] text-rose-700 dark:text-rose-300">
                                   {t('results.manual.validation.duplicatePlayers')}
                                 </p>
                               )}
@@ -1390,7 +1390,7 @@ export default function ResultsPage() {
                 {manualSubmitting ? t('results.manual.submitting') : t('results.manual.submit')}
               </button>
               {!manualRaceComposition && (
-                <p className="text-xs text-rose-700 dark:text-rose-300">
+                <p role="alert" className="text-xs text-rose-700 dark:text-rose-300">
                   {t('results.manual.validation.raceCompositionRequired')}
                 </p>
               )}
@@ -1528,6 +1528,7 @@ export default function ResultsPage() {
                       {selectedRecentMatchId === recentMatch.matchId && canChangeMatchWinner ? (
                         <select
                           value={selectedRecentWinnerTeam}
+                          aria-label={t('results.recent.table.winner')}
                           onChange={(event) => setSelectedRecentWinnerTeam(event.target.value as TeamSide)}
                           disabled={isRecentSaving || isRecentDeleting}
                           className="min-w-18 whitespace-nowrap rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 outline-hidden focus:border-slate-400 focus:ring-1 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
@@ -1547,7 +1548,7 @@ export default function ResultsPage() {
                         <div className="space-y-1">
                           <span className="font-medium">{selectedRecentRaceComposition ?? '-'}</span>
                           {recentRaceError && (
-                            <p className="max-w-48 whitespace-normal text-xs text-rose-600 dark:text-rose-300">
+                            <p role="alert" className="max-w-48 whitespace-normal text-xs text-rose-600 dark:text-rose-300">
                               {recentRaceError}
                             </p>
                           )}
@@ -1748,7 +1749,7 @@ export default function ResultsPage() {
                     {showMmr && participantMmrDelta !== null ? (
                       <td
                         className={`px-4 py-3 font-medium ${
-                          participantMmrDelta >= 0 ? 'text-emerald-600 dark:text-emerald-300' : 'text-rose-600 dark:text-rose-300'
+                          participantMmrDelta >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-600 dark:text-rose-300'
                         }`}
                       >
                         {participantMmrDelta >= 0 ? `+${participantMmrDelta}` : participantMmrDelta}
@@ -1771,6 +1772,7 @@ export default function ResultsPage() {
           <form className="mt-3 space-y-3" onSubmit={handleImportMatches}>
             <textarea
               value={matchImportPayload}
+              aria-label={t('results.import.title')}
               onChange={(event) => setMatchImportPayload(event.target.value)}
             className="h-32 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
               placeholder={t('results.import.placeholder')}

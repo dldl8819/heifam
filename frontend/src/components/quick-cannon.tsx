@@ -243,11 +243,11 @@ export function QuickCannon({ preset = null }: QuickCannonProps) {
           )}
 
           {mode === 'number' && last === null ? (
-            <p className="text-xs text-rose-600 dark:text-rose-400">
+            <p role="alert" className="text-xs text-rose-600 dark:text-rose-400">
               {t('cannonDraw.lastNumberInvalid', { min: CANNON_MIN_LAST, max: CANNON_MAX_LAST })}
             </p>
           ) : mode === 'items' && itemsMessage !== null ? (
-            <p className="text-xs text-rose-600 dark:text-rose-400">{itemsMessage}</p>
+            <p role="alert" className="text-xs text-rose-600 dark:text-rose-400">{itemsMessage}</p>
           ) : (
             <p className="text-xs text-slate-500 dark:text-slate-400">
               {t(mode === 'items' ? 'cannonDraw.itemsHint' : 'cannonDraw.lastNumberHint')}

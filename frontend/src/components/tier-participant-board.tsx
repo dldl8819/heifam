@@ -203,7 +203,7 @@ export function TierParticipantBoard({
                     </p>
                   )}
                   {isDuplicateSelection && (
-                    <p className="text-[11px] text-rose-700 dark:text-rose-300">{duplicateMessage}</p>
+                    <p role="alert" className="text-[11px] text-rose-700 dark:text-rose-300">{duplicateMessage}</p>
                   )}
                 </label>
               )

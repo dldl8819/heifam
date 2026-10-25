@@ -331,7 +331,7 @@ export default function RankingPage() {
                       )}
                       {row.nickname}
                       {row.isNew && (
-                        <span className="ml-1.5 inline-block rounded-full bg-emerald-100 px-1.5 py-0.5 align-middle text-[10px] font-bold leading-none tracking-wide text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
+                        <span className="ml-1.5 inline-block rounded-full bg-emerald-100 px-1.5 py-0.5 align-middle text-[11px] font-bold leading-none tracking-wide text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
                           {t('ranking.newBadge')}
                         </span>
                       )}
@@ -362,7 +362,7 @@ export default function RankingPage() {
                     {showMmr && rowMmrDelta !== null ? (
                       <td
                         className={`px-4 py-3 font-medium ${
-                          rowMmrDelta >= 0 ? 'text-emerald-600 dark:text-emerald-300' : 'text-rose-600 dark:text-rose-300'
+                          rowMmrDelta >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-600 dark:text-rose-300'
                         }`}
                       >
                         {rowMmrDelta >= 0 ? `+${rowMmrDelta}` : rowMmrDelta}

@@ -66,7 +66,7 @@ export default function DrawsPage() {
   return (
     <section className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{t('prizeDraw.title')}</h1>
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{t('prizeDraw.title')}</h2>
         <p className="max-w-2xl text-sm text-slate-500 dark:text-slate-400">{t('prizeDraw.description')}</p>
       </div>
 
@@ -91,7 +91,7 @@ export default function DrawsPage() {
           <div className="space-y-2">
             <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('prizeDraw.historyTitle')}</h2>
             {actionError && (
-              <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300">
+              <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300">
                 {actionError}
               </p>
             )}

@@ -88,11 +88,11 @@ export function AccessGate({ children }: AccessGateProps) {
         {t('access.blockedApply')}
       </a>
       {email && (
-        <p className="mt-3 text-xs text-rose-700 dark:text-rose-300">
+        <p role="alert" className="mt-3 text-xs text-rose-700 dark:text-rose-300">
           {t('access.blockedEmail', { email })}
         </p>
       )}
-      <p className="mt-1 text-xs text-rose-700 dark:text-rose-300">
+      <p role="alert" className="mt-1 text-xs text-rose-700 dark:text-rose-300">
         {t('access.blockedEmailHint')}
       </p>
     </section>

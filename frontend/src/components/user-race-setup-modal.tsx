@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Alert, AlertContent, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { useAdminAuth } from '@/lib/admin-auth'
 import { apiClient, isApiForbiddenError } from '@/lib/api'
 import { t } from '@/lib/i18n'
+import { useDialogFocus } from '@/lib/use-dialog-focus'
 import type { PlayerRace } from '@/types/api'
 
 const RACE_OPTIONS: Array<{ value: PlayerRace; label: string }> = [
@@ -25,6 +26,9 @@ export function UserRaceSetupModal() {
   const [error, setError] = useState<string | null>(null)
 
   const shouldOpen = isLoggedIn && canAccess && !preferredRace
+  const dialogRef = useRef<HTMLDivElement>(null)
+  // No way to close it but saving a race, so Escape does nothing here.
+  useDialogFocus(dialogRef, shouldOpen)
 
   if (!shouldOpen) {
     return null
@@ -48,9 +52,18 @@ export function UserRaceSetupModal() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4">
+    <div
+      ref={dialogRef}
+      tabIndex={-1}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="profile-race-title"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4"
+    >
       <article className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-5 text-white shadow-2xl">
-        <h2 className="text-lg font-semibold">{t('profileRace.title')}</h2>
+        <h2 id="profile-race-title" className="text-lg font-semibold">
+          {t('profileRace.title')}
+        </h2>
         <p className="mt-1 text-sm text-slate-300">{t('profileRace.description')}</p>
 
         {error ? (

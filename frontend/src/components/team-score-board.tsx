@@ -52,7 +52,7 @@ export function TeamScoreBoard({ groupId }: TeamScoreBoardProps) {
       </div>
 
       {loading && <LoadingIndicator label={t('common.loading')} />}
-      {!loading && error && <p className="text-sm text-rose-600 dark:text-rose-300">{error}</p>}
+      {!loading && error && <p role="alert" className="text-sm text-rose-600 dark:text-rose-300">{error}</p>}
       {!loading && !error && entries.length === 0 && (
         <p className="text-sm text-slate-500 dark:text-slate-400">{t('teamScore.empty')}</p>
       )}

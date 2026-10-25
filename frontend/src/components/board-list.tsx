@@ -147,7 +147,7 @@ export function BoardList({ board }: { board: BoardKind }) {
           className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60"
         >
           {formError && (
-            <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300">
+            <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300">
               {formError}
             </p>
           )}
@@ -155,6 +155,7 @@ export function BoardList({ board }: { board: BoardKind }) {
           <input
             type="text"
             value={title}
+            aria-label={t('a11y.fields.title')}
             onChange={(event) => setTitle(event.target.value)}
             maxLength={BOARD_TITLE_MAX_LENGTH}
             placeholder={t('boards.titlePlaceholder')}
@@ -162,6 +163,7 @@ export function BoardList({ board }: { board: BoardKind }) {
           />
           <textarea
             value={content}
+            aria-label={t('a11y.fields.content')}
             onChange={(event) => setContent(event.target.value)}
             placeholder={video ? t('boards.video.contentPlaceholder') : t('boards.contentPlaceholder')}
             rows={8}

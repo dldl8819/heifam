@@ -46,7 +46,7 @@ export function BoardSearchBox({ initialQuery = '' }: { initialQuery?: string })
           {t('boardSearch.submit')}
         </button>
       </div>
-      {problem && <p className="text-xs text-rose-600 dark:text-rose-400">{problem}</p>}
+      {problem && <p role="alert" className="text-xs text-rose-600 dark:text-rose-400">{problem}</p>}
     </form>
   )
 }

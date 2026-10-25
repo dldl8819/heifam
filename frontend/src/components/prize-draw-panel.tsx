@@ -269,6 +269,7 @@ export function PrizeDrawPanel({ groupId, onSaved }: PrizeDrawPanelProps) {
         <input
           type="text"
           value={title}
+          aria-label={t('a11y.fields.drawTitle')}
           onChange={(event) => setTitle(event.target.value)}
           maxLength={PRIZE_DRAW_TITLE_MAX_LENGTH}
           placeholder={t('prizeDraw.titlePlaceholder')}
@@ -321,6 +322,7 @@ export function PrizeDrawPanel({ groupId, onSaved }: PrizeDrawPanelProps) {
                 <input
                   type="text"
                   value={prize}
+                  aria-label={t('a11y.fields.prizeAt', { place: t('prizeDraw.place', { place: index + 1 }) })}
                   onChange={(event) => setPrizes((previous) => previous.map((value, position) => (position === index ? event.target.value : value)))}
                   maxLength={PRIZE_DRAW_PRIZE_MAX_LENGTH}
                   placeholder={t('prizeDraw.prizePlaceholder')}
@@ -406,6 +408,7 @@ export function PrizeDrawPanel({ groupId, onSaved }: PrizeDrawPanelProps) {
           <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">{t('prizeDraw.manualLabel')}</p>
           <textarea
             value={manual}
+            aria-label={t('prizeDraw.manualLabel')}
             onChange={(event) => setManual(event.target.value)}
             rows={3}
             placeholder={t('prizeDraw.manualPlaceholder')}

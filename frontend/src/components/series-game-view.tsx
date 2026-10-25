@@ -138,7 +138,7 @@ export function SeriesGameView({
           {submitting ? t('teamTournament.games.submitting') : t('teamTournament.games.submit')}
         </button>
       </div>
-      {error && <p className="text-xs text-rose-600 dark:text-rose-300">{error}</p>}
+      {error && <p role="alert" className="text-xs text-rose-600 dark:text-rose-300">{error}</p>}
     </div>
   )
 

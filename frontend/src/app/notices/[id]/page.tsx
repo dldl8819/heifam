@@ -260,7 +260,7 @@ export default function NoticeDetailPage() {
           <article className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-700 dark:bg-slate-900">
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{notice.title}</h1>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{notice.title}</h2>
                 {notice.adminOnly && (
                   <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
                     {t('notices.posts.adminOnlyBadge')}
@@ -328,7 +328,7 @@ export default function NoticeDetailPage() {
               )}
             </div>
             {engagementError && (
-              <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300">
+              <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300">
                 {engagementError}
               </p>
             )}
@@ -349,7 +349,7 @@ export default function NoticeDetailPage() {
           className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60"
         >
           {formError && (
-            <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300">
+            <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300">
               {formError}
             </p>
           )}
@@ -371,6 +371,7 @@ export default function NoticeDetailPage() {
           <input
             type="text"
             value={title}
+            aria-label={voteStatus === 'NONE' ? t('a11y.fields.title') : t('a11y.fields.voteTitle')}
             onChange={(event) => setTitle(event.target.value)}
             placeholder={voteStatus === 'NONE' ? t('notices.posts.titlePlaceholder') : t('notices.posts.voteTitlePlaceholder')}
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900"

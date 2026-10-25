@@ -147,7 +147,7 @@ export function PrizeEventsPanel({ groupId, canManage }: PrizeEventsPanelProps) 
         <p className="text-xs text-slate-500 dark:text-slate-400">{t('prizeEvents.description')}</p>
       </div>
 
-      {error && <p className="text-xs text-rose-600 dark:text-rose-300">{error}</p>}
+      {error && <p role="alert" className="text-xs text-rose-600 dark:text-rose-300">{error}</p>}
       {message && <p className="text-xs text-emerald-700 dark:text-emerald-300">{message}</p>}
 
       {canManage && (
@@ -230,6 +230,7 @@ export function PrizeEventsPanel({ groupId, canManage }: PrizeEventsPanelProps) 
                               <td className="py-1 pr-2">
                                 <input
                                   value={draft?.prize ?? ''}
+                                  aria-label={t('a11y.fields.ofRow', { row: candidate.nickname ?? t('prizeEvents.unknownNickname'), field: t('prizeEvents.table.prize') })}
                                   maxLength={100}
                                   onChange={(change) => updateDraft(event.eventId, candidate.pointAccountId, { prize: change.target.value })}
                                   placeholder={t('prizeEvents.table.prizePlaceholder')}
@@ -242,6 +243,7 @@ export function PrizeEventsPanel({ groupId, canManage }: PrizeEventsPanelProps) 
                                 <input
                                   inputMode="numeric"
                                   value={draft?.amount ?? ''}
+                                  aria-label={t('a11y.fields.ofRow', { row: candidate.nickname ?? t('prizeEvents.unknownNickname'), field: t('prizeEvents.table.amount') })}
                                   onChange={(change) => updateDraft(event.eventId, candidate.pointAccountId, { amount: change.target.value })}
                                   placeholder="0"
                                   className={`${INPUT_CLASS} w-24`}

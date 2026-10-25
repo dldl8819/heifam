@@ -222,7 +222,7 @@ function NotificationCenter() {
           </p>
           <div className="max-h-80 overflow-y-auto">
             {loadError && notifications.length === 0 && (
-              <p className="px-4 py-6 text-center text-xs text-rose-600 dark:text-rose-300">{t('notifications.loadError')}</p>
+              <p role="alert" className="px-4 py-6 text-center text-xs text-rose-600 dark:text-rose-300">{t('notifications.loadError')}</p>
             )}
             {!loadError && notifications.length === 0 && (
               <p className="px-4 py-6 text-center text-xs text-slate-500 dark:text-slate-400">{t('notifications.empty')}</p>
@@ -239,7 +239,7 @@ function NotificationCenter() {
                       <span className={`text-xs ${notification.read ? 'text-slate-500 dark:text-slate-400' : 'font-semibold text-indigo-700 dark:text-indigo-300'}`}>
                         {notification.title}
                       </span>
-                      <span className="shrink-0 text-[11px] text-slate-400">{timeLabel(notification.createdAt)}</span>
+                      <span className="shrink-0 text-[11px] text-slate-500 dark:text-slate-400">{timeLabel(notification.createdAt)}</span>
                     </div>
                     {notification.body && (
                       <p className={`mt-0.5 text-sm ${notification.read ? 'text-slate-600 dark:text-slate-300' : 'font-semibold'}`}>
@@ -278,7 +278,7 @@ function NotificationCenter() {
                 </p>
               )
             )}
-            {pushError && <p className="text-[11px] text-rose-600 dark:text-rose-300">{t('notifications.push.error')}</p>}
+            {pushError && <p role="alert" className="text-[11px] text-rose-600 dark:text-rose-300">{t('notifications.push.error')}</p>}
           </div>
         </div>
       )}

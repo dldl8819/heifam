@@ -131,6 +131,34 @@ export function findActiveNavHref(pathname: string, items: NavItem[]): string | 
     .sort((a, b) => b.href.length - a.href.length)[0]?.href
 }
 
+/** Pages no menu links to, by the name they go by. */
+function pagesOutsideMenus(): NavItem[] {
+  return [
+    { label: t('nav.home'), href: '/' },
+    { label: t('nav.dashboard'), href: '/dashboard' },
+    { label: t('a11y.pages.auth'), href: '/auth' },
+    { label: t('adminGuard.importCenterTitle'), href: '/import' },
+    { label: t('footer.privacy'), href: '/privacy' },
+    { label: t('footer.terms'), href: '/terms' },
+  ]
+}
+
+/**
+ * The name of the page at this path, for the window title and the page's heading: the menu link it
+ * is under, as for an admin who sees every menu (the names are no secret; what a page shows is
+ * decided by the page). Undefined for a path no link covers.
+ */
+export function pageNameFor(pathname: string): string | undefined {
+  const items = [
+    ...getVisibleNavItems({ isLoggedIn: true, canAccess: true, isAdmin: true, isSuperAdmin: true }),
+    ...pagesOutsideMenus(),
+  ]
+  const href = findActiveNavHref(pathname, items)
+
+  // A link before the menu holding it: /points is "my points", not the menu's name.
+  return items.flatMap((item) => [...(item.children ?? []), item]).find((item) => item.href === href)?.label
+}
+
 /** Whether a top-level item is the one to light up: itself, or for a menu any link inside it. */
 export function isNavItemActive(item: NavItem, activeHref: string | undefined): boolean {
   if (activeHref === undefined) {

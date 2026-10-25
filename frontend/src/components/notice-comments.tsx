@@ -133,7 +133,7 @@ export function NoticeComments({ groupId, noticeId, comments, onChange }: Notice
     if (comment.deleted) {
       return (
         <div className="flex items-center justify-between gap-2">
-          <p className="text-sm italic text-slate-400 dark:text-slate-500">{t('notices.posts.commentDeleted')}</p>
+          <p className="text-sm italic text-slate-500 dark:text-slate-400">{t('notices.posts.commentDeleted')}</p>
           <button type="button" onClick={() => startReply(comment)} disabled={busy} className={textButtonClass}>
             {t('notices.posts.commentReply')}
           </button>
@@ -174,13 +174,14 @@ export function NoticeComments({ groupId, noticeId, comments, onChange }: Notice
           <form onSubmit={handleEdit} className="space-y-2">
             <textarea
               value={editDraft}
+              aria-label={t('a11y.fields.commentEdit')}
               onChange={(event) => setEditDraft(event.target.value)}
               maxLength={NOTICE_COMMENT_MAX_LENGTH}
               rows={3}
               className={fieldClass}
             />
             <div className="flex items-center justify-end gap-2">
-              <span className="mr-auto text-xs text-slate-400 dark:text-slate-500">
+              <span className="mr-auto text-xs text-slate-500 dark:text-slate-400">
                 {editDraft.length}/{NOTICE_COMMENT_MAX_LENGTH}
               </span>
               <button type="button" onClick={() => setEditingId(null)} disabled={busy} className={plainButtonClass}>
@@ -227,7 +228,7 @@ export function NoticeComments({ groupId, noticeId, comments, onChange }: Notice
       </h2>
 
       {error && (
-        <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300">
+        <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300">
           {error}
         </p>
       )}
@@ -236,6 +237,7 @@ export function NoticeComments({ groupId, noticeId, comments, onChange }: Notice
       <form onSubmit={handleComment} className="space-y-2">
         <textarea
           value={draft}
+          aria-label={t('a11y.fields.comment')}
           onChange={(event) => setDraft(event.target.value)}
           placeholder={t('notices.posts.commentPlaceholder')}
           maxLength={NOTICE_COMMENT_MAX_LENGTH}
@@ -243,7 +245,7 @@ export function NoticeComments({ groupId, noticeId, comments, onChange }: Notice
           className={fieldClass}
         />
         <div className="flex items-center justify-between gap-2">
-          <span className="text-xs text-slate-400 dark:text-slate-500">
+          <span className="text-xs text-slate-500 dark:text-slate-400">
             {draft.length}/{NOTICE_COMMENT_MAX_LENGTH}
           </span>
           <button type="submit" disabled={busy} className={primaryButtonClass}>
@@ -270,6 +272,7 @@ export function NoticeComments({ groupId, noticeId, comments, onChange }: Notice
                     <form onSubmit={handleReply} className="space-y-2">
                       <textarea
                         value={replyDraft}
+                        aria-label={t('a11y.fields.reply')}
                         onChange={(event) => setReplyDraft(event.target.value)}
                         placeholder={t('notices.posts.commentReplyPlaceholder')}
                         maxLength={NOTICE_COMMENT_MAX_LENGTH}
@@ -278,7 +281,7 @@ export function NoticeComments({ groupId, noticeId, comments, onChange }: Notice
                         className={fieldClass}
                       />
                       <div className="flex items-center justify-end gap-2">
-                        <span className="mr-auto text-xs text-slate-400 dark:text-slate-500">
+                        <span className="mr-auto text-xs text-slate-500 dark:text-slate-400">
                           {replyDraft.length}/{NOTICE_COMMENT_MAX_LENGTH}
                         </span>
                         <button type="button" onClick={() => setReplyTo(null)} disabled={busy} className={plainButtonClass}>

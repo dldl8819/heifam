@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { findActiveNavHref, getVisibleNavItems, isNavItemActive } from '@/components/nav-items'
+import { findActiveNavHref, getVisibleNavItems, isNavItemActive, pageNameFor } from '@/components/nav-items'
 import type { NavItem } from '@/types/navigation'
 
 const MEMBER = { isLoggedIn: true, canAccess: true, isAdmin: false, isSuperAdmin: false }
@@ -180,5 +180,28 @@ describe('isNavItemActive', () => {
     expect(isNavItemActive(byHref('/matches'), '/players')).toBe(false)
     expect(isNavItemActive(byHref('/points'), '/balance')).toBe(false)
     expect(isNavItemActive(byHref('/matches'), undefined)).toBe(false)
+  })
+})
+
+describe('pageNameFor', () => {
+  it('names a page by the link it is under, whoever reads it', () => {
+    expect(pageNameFor('/players')).toBe('선수 관리')
+    expect(pageNameFor('/players/import')).toBe('선수 관리')
+    expect(pageNameFor('/balance/multi')).toBe('다중 밸런스')
+    expect(pageNameFor('/notices/12')).toBe('공지사항')
+    // An admin's page has its name too: the names are in the menus anyway.
+    expect(pageNameFor('/admin/audit')).toBe('운영 로그')
+  })
+
+  it('takes the link over the menu that holds it', () => {
+    expect(pageNameFor('/points')).toBe('내 포인트')
+    expect(pageNameFor('/boards')).toBe('게시판')
+  })
+
+  it('names the pages no menu links to, and nothing else', () => {
+    expect(pageNameFor('/')).toBe('홈')
+    expect(pageNameFor('/privacy')).toBe('개인정보처리방침')
+    expect(pageNameFor('/auth/error')).toBe('로그인')
+    expect(pageNameFor('/nowhere')).toBeUndefined()
   })
 })
