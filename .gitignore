@@ -114,6 +114,9 @@ dist/
 **/dist/
 coverage/
 **/coverage/
+# Playwright's results and report of the accessibility checks (frontend/e2e).
+**/test-results/
+**/playwright-report/
 .parcel-cache/
 .turbo/
 .npm/

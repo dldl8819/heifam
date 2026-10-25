@@ -72,7 +72,7 @@ export function BoardSearch() {
   return (
     <section className="space-y-4">
       <div className="space-y-1">
-        <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{t('boardSearch.title')}</h1>
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{t('boardSearch.title')}</h2>
         <p className="max-w-2xl text-sm text-slate-500 dark:text-slate-400">{t('boardSearch.description')}</p>
       </div>
 
