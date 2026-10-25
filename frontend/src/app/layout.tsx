@@ -6,7 +6,7 @@ import { AppShell } from '@/components/app-shell'
 import { AdminAuthProvider } from '@/components/admin-auth-provider'
 import { AuthProvider } from '@/components/auth-session-provider'
 import { t } from '@/lib/i18n'
-import { THEME_STORAGE_KEY } from '@/lib/theme'
+import { CONTRAST_STORAGE_KEY, HIGH_CONTRAST_CLASS, THEME_STORAGE_KEY } from '@/lib/theme'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -30,8 +30,24 @@ const themeInitializationScript = String.raw`
 
     root.classList.toggle('dark', theme === 'dark');
     root.style.colorScheme = theme;
+
+    // High contrast goes with either theme: the choice made here, else the device's setting.
+    let storedContrast = null;
+    try {
+      storedContrast = window.localStorage.getItem('__CONTRAST_STORAGE_KEY__');
+    } catch {
+      storedContrast = null;
+    }
+    const prefersMore = window.matchMedia('(prefers-contrast: more)').matches;
+    const contrast = storedContrast === 'more' || storedContrast === 'normal'
+      ? storedContrast
+      : prefersMore ? 'more' : 'normal';
+    root.classList.toggle('__HIGH_CONTRAST_CLASS__', contrast === 'more');
   })();
-`.replace('__THEME_STORAGE_KEY__', THEME_STORAGE_KEY)
+`
+  .replace('__THEME_STORAGE_KEY__', THEME_STORAGE_KEY)
+  .replace('__CONTRAST_STORAGE_KEY__', CONTRAST_STORAGE_KEY)
+  .replace('__HIGH_CONTRAST_CLASS__', HIGH_CONTRAST_CLASS)
 
 export const metadata: Metadata = {
   applicationName: '헤이팸',

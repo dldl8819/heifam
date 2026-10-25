@@ -158,3 +158,290 @@ textarea::placeholder {
 .dark textarea::placeholder {
   color: var(--color-slate-400, #94a3b8);
 }
+
+/*
+  High contrast: .hc on <html>, set by the contrast switch in the header or, until one is chosen, by
+  the device's "increase contrast". It goes with either theme. Rather than classes of its own on
+  every screen, it moves the colour variables Tailwind's classes read further from the surface
+  behind them: grey and coloured text darker on light surfaces and lighter on dark ones, edges
+  stronger, the page plain white or black. Text aims at 7:1 (1.4.6) and edges well past 3:1.
+  Which steps move follows what the screens use them for: light-mode text is slate-400..800 and
+  colour-600/700, its edges slate-100..300 and colour-200/300; dark-mode text is slate-200..500 and
+  colour-300/400, its edges slate-600..800 and colour-800. Coloured text moves one step less than
+  grey (to 800 in light mode; colour-300 stays in dark mode, already past 7:1 on black), so the
+  teams' blue and red, and the other colours, stay told apart. Backgrounds keep their steps (slate-300,
+  colour-50/100/500, dark slate-800/900 panels), so no text turns the colour of what is behind it.
+  The values are fixed colours, not other variables, since Tailwind leaves out the ones no class uses.
+*/
+/* Light mode: the page and every light surface, a dropdown inside the dark header included. */
+html.hc:not(.dark),
+html.hc:not(.dark) :is(.bg-white, .bg-slate-50, .bg-slate-100, [class^='bg-white/'], [class*=' bg-white/']) {
+  --color-slate-50: #ffffff;
+  --color-slate-100: #ffffff;
+  --color-slate-400: #334155;
+  --color-slate-500: #1e293b;
+  --color-slate-600: #0f172a;
+  --color-slate-700: #0f172a;
+  --color-slate-800: #020617;
+  --color-gray-200: #475569;
+  --color-amber-200: #b45309;
+  --color-amber-300: #92400e;
+  --color-amber-600: #92400e;
+  --color-amber-700: #78350f;
+  --color-amber-800: #78350f;
+  --color-blue-200: #1d4ed8;
+  --color-blue-300: #1e40af;
+  --color-blue-600: #1e40af;
+  --color-blue-700: #1e40af;
+  --color-blue-800: #1e3a8a;
+  --color-cyan-200: #0e7490;
+  --color-cyan-300: #155e75;
+  --color-cyan-600: #155e75;
+  --color-cyan-700: #155e75;
+  --color-cyan-800: #164e63;
+  --color-emerald-200: #047857;
+  --color-emerald-300: #065f46;
+  --color-emerald-600: #065f46;
+  --color-emerald-700: #065f46;
+  --color-emerald-800: #064e3b;
+  --color-fuchsia-200: #a21caf;
+  --color-fuchsia-300: #86198f;
+  --color-fuchsia-600: #86198f;
+  --color-fuchsia-700: #86198f;
+  --color-fuchsia-800: #701a75;
+  --color-indigo-200: #4338ca;
+  --color-indigo-300: #3730a3;
+  --color-indigo-600: #3730a3;
+  --color-indigo-700: #3730a3;
+  --color-indigo-800: #312e81;
+  --color-lime-200: #4d7c0f;
+  --color-lime-300: #3f6212;
+  --color-lime-600: #3f6212;
+  --color-lime-700: #3f6212;
+  --color-lime-800: #365314;
+  --color-orange-200: #c2410c;
+  --color-orange-300: #9a3412;
+  --color-orange-600: #9a3412;
+  --color-orange-700: #9a3412;
+  --color-orange-800: #7c2d12;
+  --color-pink-200: #be185d;
+  --color-pink-300: #9d174d;
+  --color-pink-600: #9d174d;
+  --color-pink-700: #9d174d;
+  --color-pink-800: #831843;
+  --color-red-200: #b91c1c;
+  --color-red-300: #991b1b;
+  --color-red-600: #991b1b;
+  --color-red-700: #991b1b;
+  --color-red-800: #7f1d1d;
+  --color-rose-200: #be123c;
+  --color-rose-300: #9f1239;
+  --color-rose-600: #9f1239;
+  --color-rose-700: #9f1239;
+  --color-rose-800: #881337;
+  --color-sky-200: #0369a1;
+  --color-sky-300: #075985;
+  --color-sky-600: #075985;
+  --color-sky-700: #075985;
+  --color-sky-800: #0c4a6e;
+  --color-teal-200: #0f766e;
+  --color-teal-300: #115e59;
+  --color-teal-600: #115e59;
+  --color-teal-700: #115e59;
+  --color-teal-800: #134e4a;
+  --color-violet-200: #6d28d9;
+  --color-violet-300: #5b21b6;
+  --color-violet-600: #5b21b6;
+  --color-violet-700: #5b21b6;
+  --color-violet-800: #4c1d95;
+}
+
+/* Light mode, on a dark surface (the header, its menus, dark buttons and panels): light text there. */
+html.hc:not(.dark) :is(.bg-slate-800, .bg-slate-900, .bg-slate-950, [class^='bg-slate-800/'], [class*=' bg-slate-800/'], [class^='bg-slate-900/'], [class*=' bg-slate-900/'], [class^='bg-slate-950/'], [class*=' bg-slate-950/']) {
+  --color-slate-50: #ffffff;
+  --color-slate-100: #ffffff;
+  --color-slate-200: #f1f5f9;
+  --color-slate-300: #e2e8f0;
+  --color-slate-400: #cbd5e1;
+  --color-slate-500: #94a3b8;
+  --color-slate-600: #94a3b8;
+  --color-slate-700: #64748b;
+  --color-slate-800: #334155;
+  --color-gray-200: #94a3b8;
+  --color-amber-200: #fde68a;
+  --color-amber-300: #fde68a;
+  --color-amber-400: #fcd34d;
+  --color-amber-600: #d97706;
+  --color-amber-700: #b45309;
+  --color-amber-800: #92400e;
+  --color-blue-200: #bfdbfe;
+  --color-blue-300: #bfdbfe;
+  --color-blue-400: #93c5fd;
+  --color-blue-600: #2563eb;
+  --color-blue-700: #1d4ed8;
+  --color-blue-800: #1e40af;
+  --color-cyan-200: #a5f3fc;
+  --color-cyan-300: #a5f3fc;
+  --color-cyan-400: #67e8f9;
+  --color-cyan-600: #0891b2;
+  --color-cyan-700: #0e7490;
+  --color-cyan-800: #155e75;
+  --color-emerald-200: #a7f3d0;
+  --color-emerald-300: #a7f3d0;
+  --color-emerald-400: #6ee7b7;
+  --color-emerald-600: #059669;
+  --color-emerald-700: #047857;
+  --color-emerald-800: #065f46;
+  --color-fuchsia-200: #f5d0fe;
+  --color-fuchsia-300: #f5d0fe;
+  --color-fuchsia-400: #f0abfc;
+  --color-fuchsia-600: #c026d3;
+  --color-fuchsia-700: #a21caf;
+  --color-fuchsia-800: #86198f;
+  --color-indigo-200: #c7d2fe;
+  --color-indigo-300: #c7d2fe;
+  --color-indigo-400: #a5b4fc;
+  --color-indigo-600: #4f46e5;
+  --color-indigo-700: #4338ca;
+  --color-indigo-800: #3730a3;
+  --color-lime-200: #d9f99d;
+  --color-lime-300: #d9f99d;
+  --color-lime-400: #bef264;
+  --color-lime-600: #65a30d;
+  --color-lime-700: #4d7c0f;
+  --color-lime-800: #3f6212;
+  --color-orange-200: #fed7aa;
+  --color-orange-300: #fed7aa;
+  --color-orange-400: #fdba74;
+  --color-orange-600: #ea580c;
+  --color-orange-700: #c2410c;
+  --color-orange-800: #9a3412;
+  --color-pink-200: #fbcfe8;
+  --color-pink-300: #fbcfe8;
+  --color-pink-400: #f9a8d4;
+  --color-pink-600: #db2777;
+  --color-pink-700: #be185d;
+  --color-pink-800: #9d174d;
+  --color-red-200: #fecaca;
+  --color-red-300: #fecaca;
+  --color-red-400: #fca5a5;
+  --color-red-600: #dc2626;
+  --color-red-700: #b91c1c;
+  --color-red-800: #991b1b;
+  --color-rose-200: #fecdd3;
+  --color-rose-300: #fecdd3;
+  --color-rose-400: #fda4af;
+  --color-rose-600: #e11d48;
+  --color-rose-700: #be123c;
+  --color-rose-800: #9f1239;
+  --color-sky-200: #bae6fd;
+  --color-sky-300: #bae6fd;
+  --color-sky-400: #7dd3fc;
+  --color-sky-600: #0284c7;
+  --color-sky-700: #0369a1;
+  --color-sky-800: #075985;
+  --color-teal-200: #99f6e4;
+  --color-teal-300: #99f6e4;
+  --color-teal-400: #5eead4;
+  --color-teal-600: #0d9488;
+  --color-teal-700: #0f766e;
+  --color-teal-800: #115e59;
+  --color-violet-200: #ddd6fe;
+  --color-violet-300: #ddd6fe;
+  --color-violet-400: #c4b5fd;
+  --color-violet-600: #7c3aed;
+  --color-violet-700: #6d28d9;
+  --color-violet-800: #5b21b6;
+}
+
+html.hc:not(.dark) :is(.border-slate-100, .border-slate-200, .border-slate-300, [class^='border-slate-200/'], [class*=' border-slate-200/']),
+html.hc:not(.dark) :is(.divide-slate-100, .divide-slate-200) > :not(:last-child) {
+  border-color: #475569;
+}
+
+/* Dark mode. */
+html.hc.dark {
+  --color-slate-200: #f8fafc;
+  --color-slate-300: #f1f5f9;
+  --color-slate-400: #e2e8f0;
+  --color-slate-500: #cbd5e1;
+  --color-slate-600: #94a3b8;
+  --color-slate-700: #556070;
+  --color-slate-900: #000000;
+  --color-slate-950: #000000;
+  --color-amber-400: #fcd34d;
+  --color-amber-800: #f59e0b;
+  --color-blue-400: #93c5fd;
+  --color-blue-800: #3b82f6;
+  --color-cyan-400: #67e8f9;
+  --color-cyan-800: #06b6d4;
+  --color-emerald-400: #6ee7b7;
+  --color-emerald-800: #10b981;
+  --color-fuchsia-400: #f0abfc;
+  --color-fuchsia-800: #d946ef;
+  --color-indigo-400: #a5b4fc;
+  --color-indigo-800: #6366f1;
+  --color-lime-400: #bef264;
+  --color-lime-800: #84cc16;
+  --color-orange-400: #fdba74;
+  --color-orange-800: #f97316;
+  --color-pink-400: #f9a8d4;
+  --color-pink-800: #ec4899;
+  --color-red-400: #fca5a5;
+  --color-red-800: #ef4444;
+  --color-rose-400: #fda4af;
+  --color-rose-800: #f43f5e;
+  --color-sky-400: #7dd3fc;
+  --color-sky-800: #0ea5e9;
+  --color-teal-400: #5eead4;
+  --color-teal-800: #14b8a6;
+  --color-violet-400: #c4b5fd;
+  --color-violet-800: #8b5cf6;
+}
+
+html.hc.dark
+  :is(
+    [class*='dark:border-slate-800'],
+    [class*='dark:divide-slate-700'] > :not(:last-child),
+    [class*='dark:divide-slate-800'] > :not(:last-child)
+  ) {
+  border-color: #94a3b8;
+}
+
+html.hc:not(.dark),
+html.hc:not(.dark) body {
+  background: #ffffff;
+}
+
+html.hc.dark,
+html.hc.dark body {
+  background: #000000;
+}
+
+/* A wider mark where the keyboard is: black around white, or yellow around black. */
+html.hc :focus-visible:not([tabindex='-1']) {
+  outline: 3px solid #000000;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px #ffffff;
+}
+
+html.hc.dark :focus-visible:not([tabindex='-1']) {
+  outline-color: #fde047;
+  box-shadow: 0 0 0 3px #000000;
+}
+
+html.hc input::placeholder,
+html.hc textarea::placeholder {
+  color: #475569;
+}
+
+html.hc.dark input::placeholder,
+html.hc.dark textarea::placeholder {
+  color: #cbd5e1;
+}
+
+/* Links in running text are underlined, not told by colour alone; links drawn as buttons are not. */
+html.hc :is(main, footer) a:not([class*='bg-'], [class*='rounded'], [role]) {
+  text-decoration-line: underline;
+  text-underline-offset: 3px;
+}
