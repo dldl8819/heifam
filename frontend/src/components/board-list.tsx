@@ -117,7 +117,7 @@ export function BoardList({ board }: { board: BoardKind }) {
     <section className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
-          <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{t(`boards.${board}.title`)}</h1>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{t(`boards.${board}.title`)}</h2>
           <p className="max-w-2xl text-sm text-slate-500 dark:text-slate-400">{t(`boards.${board}.description`)}</p>
         </div>
         <button

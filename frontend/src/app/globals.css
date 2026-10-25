@@ -3,6 +3,10 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
+  /* Tailwind's slate-500, a touch darker (lightness 55.4% -> 53.5%): it is the site's secondary text,
+     and much of it sits straight on the grey page (slate-100), where the original gives 4.35:1.
+     This one gives 4.7:1 there and 5.2:1 on white (WCAG 1.4.3). */
+  --color-slate-500: oklch(53.5% 0.046 257.417);
   --background-image-gradient-radial: radial-gradient(var(--tw-gradient-stops));
   --background-image-gradient-conic: conic-gradient(
     from 180deg at 50% 50%,

@@ -197,7 +197,7 @@ export function BoardPost({ board, postId }: { board: BoardKind; postId: number 
           <article className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-700 dark:bg-slate-900">
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="break-all text-lg font-semibold text-slate-900 dark:text-slate-100">{post.title}</h1>
+                <h2 className="break-all text-lg font-semibold text-slate-900 dark:text-slate-100">{post.title}</h2>
                 {post.mine && (
                   <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                     {t('boards.mine')}

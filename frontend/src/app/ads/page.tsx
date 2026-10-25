@@ -273,7 +273,7 @@ export default function AdsPage() {
                       href={promotion.orderHref}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+                      className="inline-flex rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 dark:bg-emerald-700 dark:hover:bg-emerald-800"
                     >
                       {promotion.orderCtaLabel}
                     </a>

@@ -4,6 +4,7 @@
 - Install: `npm install`
 - Build: `npm run build`
 - Start (production local check): `npm run start`
+- Accessibility check (axe-core in Chrome, after a build): `npm run test:a11y`. Build and run it with `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` set to placeholders, as CI does (`.github/workflows/ci.yml`); the backend and Supabase are answered inside the browser.
 
 ## Vercel Environment Variables
 Set all values in Vercel Project Settings > Environment Variables:
