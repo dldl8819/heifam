@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { AuthControls } from '@/components/auth-controls'
 import { AccessGate } from '@/components/access-gate'
+import { ContrastToggle } from '@/components/contrast-toggle'
 import { MenuAttendance } from '@/components/menu-attendance'
 import { pageNameFor } from '@/components/nav-items'
 import { NotificationBell } from '@/components/notification-bell'
@@ -92,6 +93,7 @@ export function AppShell({ children }: AppShellProps) {
               <div className="flex items-start gap-2">
                 <NotificationBell />
                 <ThemeToggle />
+                <ContrastToggle />
                 <TopNavMobile />
                 <div className="hidden w-full max-w-sm md:block">
                   <AuthControls />
