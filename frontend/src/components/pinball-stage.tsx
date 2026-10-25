@@ -16,6 +16,7 @@ import {
 import { approach, decidingPlace, focusOf, isDecided, placeOfArrival, standings } from '@/lib/pinball/show'
 import { ballColor, ballLabel, formatDrawClock, type DrawEntrant } from '@/lib/prize-draw'
 import { t } from '@/lib/i18n'
+import { drawAnnouncement } from '@/lib/pinball/announce'
 
 type PinballStageProps = {
   entrants: DrawEntrant[]
@@ -685,12 +686,29 @@ export function PinballStage({ entrants, winnerCount, mode, onFinished }: Pinbal
 
   const winners = status === 'done' ? winnersOf(arrivals, winnerCount, mode) : mode === 'FIRST' ? arrivals.slice(0, winnerCount) : []
   const remaining = entrants.length - arrivals.length
+  const announcement = drawAnnouncement(
+    status,
+    arrivals,
+    entrants.map((entrant) => entrant.name),
+    winnerCount,
+    mode
+  )
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,460px)_minmax(0,1fr)]">
       <div ref={containerRef} className="space-y-2">
+        {/* The canvas says nothing to a screen reader: the start, each place and the result are read out here. */}
+        <p role="status" className="sr-only">
+          {announcement}
+        </p>
         <div className="relative overflow-hidden rounded-xl border border-slate-700 bg-slate-900" style={{ height: size.height }}>
-          <canvas ref={canvasRef} style={{ width: size.width, height: size.height }} className="mx-auto block" />
+          <canvas
+            ref={canvasRef}
+            role="img"
+            aria-label={t('prizeDraw.stage.canvasLabel')}
+            style={{ width: size.width, height: size.height }}
+            className="mx-auto block"
+          />
           {status === 'ready' && (
             <div className="absolute inset-0 flex items-end justify-center bg-slate-950/30 pb-10">
               <button
