@@ -909,7 +909,11 @@
       "placeArrived": "{place}등!",
       "leadersFirst": "실시간 선두",
       "leadersLast": "실시간 꼴찌 · 당첨 후보",
-      "finished": "추첨 완료!"
+      "finished": "추첨 완료!",
+      "canvasLabel": "핀볼 추첨 화면. 당첨자와 도착 순서는 목록으로도 나옵니다.",
+      "announceStart": "추첨을 시작합니다.",
+      "announcePlace": "{place} {name}",
+      "announceFinished": "추첨이 끝났습니다. {places}"
     },
     "methodLabel": "추첨 방식",
     "methodPinball": "핀볼",
