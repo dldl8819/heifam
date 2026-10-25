@@ -54,7 +54,7 @@ export function ShareLinkButton({ title, path }: ShareLinkButtonProps) {
         {copied ? t('common.shareLinkCopied') : t('common.shareLink')}
       </button>
       {failedUrl && (
-        <span className="basis-full text-xs text-rose-700 dark:text-rose-300">
+        <span role="alert" className="basis-full text-xs text-rose-700 dark:text-rose-300">
           {t('common.shareLinkFailed')} <span className="break-all select-all">{failedUrl}</span>
         </span>
       )}

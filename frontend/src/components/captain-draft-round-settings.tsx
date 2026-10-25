@@ -89,7 +89,7 @@ export function CaptainDraftRoundSettings({
                     disabled={setSizes.length <= 1}
                     aria-label={t('captainDraft.settings.removeSet', { set: index + 1 })}
                     title={t('captainDraft.settings.removeSet', { set: index + 1 })}
-                    className="shrink-0 rounded-sm px-2 py-1 text-sm text-slate-400 hover:bg-slate-100 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-slate-800 dark:hover:text-rose-400"
+                    className="shrink-0 rounded-sm px-2 py-1 text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-100 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-slate-800 dark:hover:text-rose-400"
                   >
                     ×
                   </button>

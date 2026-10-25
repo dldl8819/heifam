@@ -27,12 +27,7 @@
     border-color: var(--color-gray-200, currentcolor);
   }
 
-  /* Two more of v3's defaults that v4 dropped: grey placeholders, and a hand over buttons. */
-  input::placeholder,
-  textarea::placeholder {
-    color: var(--color-gray-400);
-  }
-
+  /* Another of v3's defaults that v4 dropped: a hand over buttons. Placeholders are below. */
   button:not(:disabled),
   [role='button']:not(:disabled) {
     cursor: pointer;
@@ -122,4 +117,44 @@
   body {
     transition: none;
   }
+}
+
+/*
+  Accessibility (WCAG 2.2 AA). These sit outside the layers, so they win over any utility on the
+  element: no screen can bring back a faint edge or focus mark by its own classes.
+*/
+
+/* Where the keyboard is: a dark line around a white gap in light mode, an amber line around a dark
+   gap in dark mode. One of the two shows on any surface, the dark header included. What only code
+   focuses (the page after "skip to content", a dialog's frame) carries tabindex="-1" and shows none. */
+:focus-visible:not([tabindex='-1']) {
+  outline: 2px solid var(--color-slate-900, #0f172a);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px #fff;
+}
+
+.dark :focus-visible:not([tabindex='-1']) {
+  outline-color: var(--color-amber-400, #fbbf24);
+  box-shadow: 0 0 0 2px var(--color-slate-950, #020617);
+}
+
+/* A field's edge shows where it is: at least 3:1 against the page (1.4.11). A field turned off may
+   stay faint, and one marked wrong keeps its own colour. */
+:where(
+    input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='hidden']),
+    select,
+    textarea
+  ):not(:disabled, [aria-invalid='true']) {
+  border-color: var(--color-slate-500, #64748b);
+}
+
+/* Placeholder text is text: 4.5:1 (1.4.3). */
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-slate-500, #64748b);
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: var(--color-slate-400, #94a3b8);
 }

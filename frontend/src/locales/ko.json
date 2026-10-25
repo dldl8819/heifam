@@ -7,6 +7,33 @@
     "name": "Hei",
     "tagline": "Hei`Fam 스타크래프트 내전 운영툴"
   },
+  "a11y": {
+    "skipToContent": "본문 바로가기",
+    "mainNav": "주 메뉴",
+    "menuOpen": "메뉴 열기",
+    "menuClose": "메뉴 닫기",
+    "pageTitle": "{page} | {site}",
+    "pages": {
+      "auth": "로그인"
+    },
+    "fields": {
+      "title": "제목",
+      "voteTitle": "투표 제목",
+      "content": "내용",
+      "comment": "댓글",
+      "answer": "답변",
+      "reply": "답글",
+      "commentEdit": "댓글 수정",
+      "email": "이메일",
+      "nickname": "닉네임",
+      "note": "메모",
+      "desiredNickname": "바꿀 닉네임",
+      "reason": "변경 사유",
+      "drawTitle": "추첨 제목",
+      "prizeAt": "{place} 상품",
+      "ofRow": "{row} {field}"
+    }
+  },
   "nav": {
     "home": "홈",
     "dashboard": "대시보드",

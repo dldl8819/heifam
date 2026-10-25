@@ -898,7 +898,7 @@ export default function BalancePage() {
                     <p className="text-[11px] text-slate-500 dark:text-slate-400">{toPlayerLabel(inputMatchedPlayer, showMmr)}</p>
                     )}
                     {isDuplicateSelection && (
-                    <p className="text-[11px] text-rose-700 dark:text-rose-300">{t('balance.validation.duplicate')}</p>
+                    <p role="alert" className="text-[11px] text-rose-700 dark:text-rose-300">{t('balance.validation.duplicate')}</p>
                     )}
                   </label>
                 )
@@ -1011,13 +1011,13 @@ export default function BalancePage() {
             </p>
           )}
           {!playersLoading && players.length === 0 && (
-            <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">{t('balance.validation.noPlayers')}</p>
+            <p role="alert" className="mt-2 text-xs text-rose-700 dark:text-rose-300">{t('balance.validation.noPlayers')}</p>
           )}
           {hasDuplicates && (
-            <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">{t('balance.validation.duplicate')}</p>
+            <p role="alert" className="mt-2 text-xs text-rose-700 dark:text-rose-300">{t('balance.validation.duplicate')}</p>
           )}
           {!raceComposition && (
-            <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">
+            <p role="alert" className="mt-2 text-xs text-rose-700 dark:text-rose-300">
               {t('balance.validation.raceCompositionRequired')}
             </p>
           )}
@@ -1036,7 +1036,7 @@ export default function BalancePage() {
         <>
           <div className="flex flex-wrap items-center justify-end gap-2">
             {copyStatus === 'failed' && (
-            <p className="text-xs text-rose-700 dark:text-rose-300">{t('balance.copy.failed')}</p>
+            <p role="alert" className="text-xs text-rose-700 dark:text-rose-300">{t('balance.copy.failed')}</p>
             )}
             <button
               type="button"
@@ -1234,7 +1234,7 @@ export default function BalancePage() {
               ))}
             </div>
             {actualRaceError && (
-              <p className="text-xs text-rose-600 dark:text-rose-300">{actualRaceError}</p>
+              <p role="alert" className="text-xs text-rose-600 dark:text-rose-300">{actualRaceError}</p>
             )}
           </div>
         )}

@@ -102,7 +102,7 @@ export function CannonPrizeStage({ entrants, winnerCount, onFinished }: CannonPr
                   pending
                     ? next
                       ? 'border border-dashed border-amber-400 text-slate-500 dark:border-amber-600 dark:text-slate-400'
-                      : 'bg-slate-50 text-slate-400 dark:bg-slate-800/60 dark:text-slate-500'
+                      : 'bg-slate-50 text-slate-500 dark:bg-slate-800/60 dark:text-slate-400'
                     : 'bg-amber-50 dark:bg-amber-950/40'
                 }`}
               >

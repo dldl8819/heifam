@@ -54,10 +54,10 @@ function Lineup({ match, side }: { match: MatchConfirmation; side: TeamSide }) {
       <p className="flex flex-wrap items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
         {teamName(side)}
         {match.myTeam === side && (
-          <span className="rounded-sm bg-indigo-600 px-1.5 py-0.5 text-[10px] text-white">{t('predictions.confirm.myTeamBadge')}</span>
+          <span className="rounded-sm bg-indigo-600 px-1.5 py-0.5 text-[11px] text-white">{t('predictions.confirm.myTeamBadge')}</span>
         )}
         {match.winnerTeam === side && (
-          <span className="rounded-sm bg-emerald-600 px-1.5 py-0.5 text-[10px] text-white">{t('predictions.confirm.winnerBadge')}</span>
+          <span className="rounded-sm bg-emerald-600 px-1.5 py-0.5 text-[11px] text-white">{t('predictions.confirm.winnerBadge')}</span>
         )}
       </p>
       <p className="mt-0.5 text-sm text-slate-800 dark:text-slate-200">{formatPredictionPlayers(players)}</p>
@@ -171,9 +171,9 @@ export function MatchConfirmationsPanel({ groupId }: MatchConfirmationsPanelProp
           <p className="text-amber-700 dark:text-amber-300">{t('predictions.confirm.notice')}</p>
         </div>
       )}
-      {loadError && <p className="text-xs text-rose-600 dark:text-rose-300">{t('predictions.confirm.error')}</p>}
+      {loadError && <p role="alert" className="text-xs text-rose-600 dark:text-rose-300">{t('predictions.confirm.error')}</p>}
       {list && capReached && pending.length > 0 && (
-        <p className="text-xs text-rose-600 dark:text-rose-300">{t('predictions.confirm.capReached', { cap: list.dailyCap })}</p>
+        <p role="alert" className="text-xs text-rose-600 dark:text-rose-300">{t('predictions.confirm.capReached', { cap: list.dailyCap })}</p>
       )}
       {list && !capReached && pending.length >= 2 && (
         <button type="button" disabled={busy} onClick={() => void confirmAll()} className={SECONDARY_BUTTON_CLASS}>
@@ -212,7 +212,7 @@ export function MatchConfirmationsPanel({ groupId }: MatchConfirmationsPanelProp
               </p>
             )}
             {match.confirmed ? (
-              <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+              <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
                 {t('predictions.confirm.confirmed', { points: list.points })}
               </span>
             ) : (
@@ -228,7 +228,7 @@ export function MatchConfirmationsPanel({ groupId }: MatchConfirmationsPanelProp
               </button>
             )}
           </div>
-          {errors[match.matchId] && <p className="text-xs text-rose-600 dark:text-rose-300">{errors[match.matchId]}</p>}
+          {errors[match.matchId] && <p role="alert" className="text-xs text-rose-600 dark:text-rose-300">{errors[match.matchId]}</p>}
         </article>
       ))}
     </div>

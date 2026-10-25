@@ -39,7 +39,7 @@ export function PointPolicyContent({ policy }: { policy: PointPolicyResponse | n
                       <div className="shrink-0 text-right">
                         <p
                           className={`text-sm font-semibold ${
-                            row.points > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'
+                            row.points > 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'
                           }`}
                         >
                           {formatPolicyPoints(row.points)}

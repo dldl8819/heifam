@@ -276,6 +276,7 @@ export function BoardPost({ board, postId }: { board: BoardKind; postId: number 
             <form onSubmit={handleComment} className="space-y-2">
               <textarea
                 value={commentDraft}
+                aria-label={anonymous && isAdmin && !post.mine ? t('a11y.fields.answer') : t('a11y.fields.comment')}
                 onChange={(event) => setCommentDraft(event.target.value)}
                 // On the anonymous board an admin's comment is the answer the writer is waiting for.
                 placeholder={anonymous && isAdmin && !post.mine ? t('boards.answerPlaceholder') : t('boards.commentPlaceholder')}
@@ -284,7 +285,7 @@ export function BoardPost({ board, postId }: { board: BoardKind; postId: number 
                 className={fieldClass}
               />
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-slate-400 dark:text-slate-500">
+                <span className="text-xs text-slate-500 dark:text-slate-400">
                   {commentDraft.length}/{BOARD_COMMENT_MAX_LENGTH}
                 </span>
                 <button type="submit" disabled={busy} className={primaryButtonClass}>
@@ -303,7 +304,7 @@ export function BoardPost({ board, postId }: { board: BoardKind; postId: number 
                       <p className="text-xs text-slate-500 dark:text-slate-400">
                         <span className="font-medium text-slate-700 dark:text-slate-200">{commentAuthor(comment, anonymous)}</span>
                         {comment.byPostAuthor && (
-                          <span className="ml-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                          <span className="ml-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                             {t('boards.postAuthorTag')}
                           </span>
                         )}
@@ -340,6 +341,7 @@ export function BoardPost({ board, postId }: { board: BoardKind; postId: number 
           <input
             type="text"
             value={title}
+            aria-label={t('a11y.fields.title')}
             onChange={(event) => setTitle(event.target.value)}
             maxLength={BOARD_TITLE_MAX_LENGTH}
             placeholder={t('boards.titlePlaceholder')}
@@ -347,6 +349,7 @@ export function BoardPost({ board, postId }: { board: BoardKind; postId: number 
           />
           <textarea
             value={content}
+            aria-label={t('a11y.fields.content')}
             onChange={(event) => setContent(event.target.value)}
             placeholder={video ? t('boards.video.contentPlaceholder') : t('boards.contentPlaceholder')}
             rows={8}

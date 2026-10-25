@@ -44,7 +44,7 @@ export function CaptainDraftRecords({
       <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('captainDraft.records.title')}</h3>
       <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('captainDraft.records.description')}</p>
 
-      {error && <p className="mt-3 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
+      {error && <p role="alert" className="mt-3 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
       {loading && !records && <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{t('common.loading')}</p>}
       {records && records.length === 0 && (
         <p className="mt-3 rounded-lg border border-dashed border-slate-200 px-3 py-6 text-center text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">

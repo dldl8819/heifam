@@ -247,7 +247,7 @@ export default function PredictionsPage() {
   return (
     <section className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{t('predictions.title')}</h1>
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{t('predictions.title')}</h2>
         <p className="text-sm text-slate-500 dark:text-slate-400">
           {t('predictions.description', { minutes: board?.windowMinutes ?? 3 })}
         </p>
@@ -335,7 +335,7 @@ export default function PredictionsPage() {
                     </div>
                   </div>
                   {matchErrors[match.matchId] && (
-                    <p className="text-xs text-rose-600 dark:text-rose-300">{matchErrors[match.matchId]}</p>
+                    <p role="alert" className="text-xs text-rose-600 dark:text-rose-300">{matchErrors[match.matchId]}</p>
                   )}
                 </article>
               )
@@ -368,7 +368,7 @@ export default function PredictionsPage() {
                   {callOffButton(match)}
                 </div>
                 {matchErrors[match.matchId] && (
-                  <p className="text-xs text-rose-600 dark:text-rose-300">{matchErrors[match.matchId]}</p>
+                  <p role="alert" className="text-xs text-rose-600 dark:text-rose-300">{matchErrors[match.matchId]}</p>
                 )}
               </article>
             ))}
@@ -387,7 +387,7 @@ export default function PredictionsPage() {
                       <MatchTitle match={match} />
                       <span
                         className={`text-xs font-semibold ${
-                          match.hit ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'
+                          match.hit ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'
                         }`}
                       >
                         {match.hit ? t('predictions.history.hit') : t('predictions.history.miss')}

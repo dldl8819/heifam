@@ -217,7 +217,7 @@ export function NoticeVoteView({ vote, onPress, onWithdraw, onAddOption, onRemov
                   disabled={busy}
                   aria-label={t('notices.posts.voteOptionRemove', { label: option.label })}
                   title={t('notices.posts.voteOptionRemove', { label: option.label })}
-                  className="absolute right-1.5 top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-rose-600 disabled:opacity-60 dark:hover:bg-slate-800"
+                  className="absolute right-1.5 top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-500 dark:text-slate-400 hover:bg-slate-100 hover:text-rose-600 disabled:opacity-60 dark:hover:bg-slate-800"
                 >
                   <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
                     <path d="M6 6l12 12M18 6L6 18" />
@@ -273,7 +273,7 @@ export function NoticeVoteView({ vote, onPress, onWithdraw, onAddOption, onRemov
               {t('notices.posts.voteOptionAdd')}
             </button>
           </div>
-          {draftError && <p className="text-xs text-rose-600 dark:text-rose-400">{draftError}</p>}
+          {draftError && <p role="alert" className="text-xs text-rose-600 dark:text-rose-400">{draftError}</p>}
         </form>
       )}
 
@@ -353,7 +353,7 @@ export function NoticeVotePanel({ groupId, noticeId, vote, onChange, onClosed }:
         busy={busy}
       />
       {error && (
-        <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300">
+        <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300">
           {error}
         </p>
       )}

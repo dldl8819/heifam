@@ -61,7 +61,7 @@ function RequestRow({
       <div className="flex flex-wrap items-center gap-2">
         <span className="break-all text-sm font-medium text-slate-900 dark:text-slate-100">
           {request.currentNickname || t('nicknameRequests.noNickname')}
-          <span className="mx-1.5 text-slate-400" aria-hidden="true">
+          <span className="mx-1.5 text-slate-500 dark:text-slate-400" aria-hidden="true">
             →
           </span>
           {request.desiredNickname}
@@ -96,6 +96,7 @@ function RequestRow({
           <input
             type="text"
             value={note}
+            aria-label={t('a11y.fields.note')}
             onChange={(event) => setNote(event.target.value)}
             maxLength={NICKNAME_REQUEST_NOTE_MAX_LENGTH}
             placeholder={t('nicknameRequests.notePlaceholder')}
@@ -308,6 +309,7 @@ export function NicknameRequests() {
               <input
                 type="text"
                 value={desiredNickname}
+                aria-label={t('a11y.fields.desiredNickname')}
                 onChange={(event) => setDesiredNickname(event.target.value)}
                 maxLength={NICKNAME_REQUEST_NICKNAME_MAX_LENGTH}
                 placeholder={t('nicknameRequests.nicknamePlaceholder')}
@@ -315,6 +317,7 @@ export function NicknameRequests() {
               />
               <textarea
                 value={reason}
+                aria-label={t('a11y.fields.reason')}
                 onChange={(event) => setReason(event.target.value)}
                 maxLength={NICKNAME_REQUEST_REASON_MAX_LENGTH}
                 placeholder={t('nicknameRequests.reasonPlaceholder')}

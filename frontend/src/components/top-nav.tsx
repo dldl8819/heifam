@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { findActiveNavHref, getVisibleNavItems, isNavItemActive } from '@/components/nav-items'
 import { useAdminAuth } from '@/lib/admin-auth'
+import { t } from '@/lib/i18n'
 import type { NavItem } from '@/types/navigation'
 
 // How long the pointer may be off a menu before it closes: long enough to cross the gap between
@@ -165,6 +166,7 @@ function DesktopMenu({ item, active, activeHref }: { item: NavItem; active: bool
                 <Link
                   href={child.href}
                   onClick={close}
+                  aria-current={child.href === activeHref ? 'page' : undefined}
                   className={`block whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                     child.href === activeHref ? 'bg-amber-500 text-slate-950' : 'text-slate-100 hover:bg-slate-800'
                   }`}
@@ -194,7 +196,7 @@ export function TopNavDesktop() {
   const activeHref = findActiveNavHref(pathname, navItems)
 
   return (
-    <nav className="hidden overflow-x-auto md:block">
+    <nav aria-label={t('a11y.mainNav')} className="hidden overflow-x-auto md:block">
       <ul className="flex min-w-max gap-2 py-3">
         {navItems.map((item) => {
           const active = isNavItemActive(item, activeHref)
@@ -205,7 +207,7 @@ export function TopNavDesktop() {
 
           return (
             <li key={item.href}>
-              <Link href={item.href} className={desktopItemClass(active)}>
+              <Link href={item.href} aria-current={active ? 'page' : undefined} className={desktopItemClass(active)}>
                 {item.label}
               </Link>
             </li>
@@ -221,11 +223,27 @@ export function TopNavMobile() {
   const [open, setOpen] = useState<boolean>(false)
   // The one group opened out, by its menu's href; every group starts folded.
   const [openGroup, setOpenGroup] = useState<string | null>(null)
+  const toggleRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     setOpen(false)
     setOpenGroup(null)
   }, [pathname])
+
+  // Escape closes the open menu and goes back to its button, as the desktop menus do.
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false)
+        toggleRef.current?.focus()
+      }
+    }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [open])
 
   if (isLoading || navItems.length === 0) {
     return null
@@ -240,28 +258,29 @@ export function TopNavMobile() {
   return (
     <div className="relative md:hidden">
       <button
+        ref={toggleRef}
         type="button"
         onClick={() => {
           setOpen((prev) => !prev)
           setOpenGroup(null)
         }}
-        aria-label="메뉴 열기"
+        aria-label={open ? t('a11y.menuClose') : t('a11y.menuOpen')}
         aria-expanded={open}
         className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-700 bg-slate-800/80 text-slate-100 transition-colors hover:bg-slate-700"
       >
         {open ? (
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>
         ) : (
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <path d="M4 7h16M4 12h16M4 17h16" />
           </svg>
         )}
       </button>
 
       {open && (
-        <nav className="absolute right-0 z-40 mt-2 max-h-[calc(100vh-5rem)] w-52 overflow-y-auto rounded-xl border border-slate-700 bg-slate-900/95 p-2 shadow-xl">
+        <nav aria-label={t('a11y.mainNav')} className="absolute right-0 z-40 mt-2 max-h-[calc(100vh-5rem)] w-52 overflow-y-auto rounded-xl border border-slate-700 bg-slate-900/95 p-2 shadow-xl">
           <ul className="space-y-1">
             {navItems.map((item) =>
               item.children ? (
@@ -296,7 +315,11 @@ export function TopNavMobile() {
                     >
                       {item.children.map((child) => (
                         <li key={`mobile-nav-${child.href}`}>
-                          <Link href={child.href} className={linkClass(child.href)}>
+                          <Link
+                            href={child.href}
+                            aria-current={child.href === activeHref ? 'page' : undefined}
+                            className={linkClass(child.href)}
+                          >
                             {child.label}
                           </Link>
                         </li>
@@ -306,7 +329,11 @@ export function TopNavMobile() {
                 </li>
               ) : (
                 <li key={`mobile-nav-${item.href}`}>
-                  <Link href={item.href} className={linkClass(item.href)}>
+                  <Link
+                    href={item.href}
+                    aria-current={item.href === activeHref ? 'page' : undefined}
+                    className={linkClass(item.href)}
+                  >
                     {item.label}
                   </Link>
                 </li>

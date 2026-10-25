@@ -67,7 +67,7 @@ export function VideoLinkField({ value, onChange }: { value: string; onChange: (
         className={fieldClass}
       />
       {value.trim().length > 0 && !videoId && (
-        <p className="text-xs text-rose-600 dark:text-rose-400">{t('boards.video.linkInvalid')}</p>
+        <p role="alert" className="text-xs text-rose-600 dark:text-rose-400">{t('boards.video.linkInvalid')}</p>
       )}
       {videoId && (
         <div className="w-48 max-w-full">

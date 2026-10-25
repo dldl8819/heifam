@@ -776,7 +776,7 @@ export function PinballStage({ entrants, winnerCount, mode, onFinished }: Pinbal
                 return (
                   <li key={ballIndex} className="flex items-center gap-2">
                     <span
-                      className={`w-7 shrink-0 text-right text-xs tabular-nums ${winning ? 'font-bold text-amber-600 dark:text-amber-300' : 'text-slate-400'}`}
+                      className={`w-7 shrink-0 text-right text-xs tabular-nums ${winning ? 'font-bold text-amber-700 dark:text-amber-300' : 'text-slate-500 dark:text-slate-400'}`}
                     >
                       {place}
                     </span>
@@ -799,7 +799,7 @@ export function PinballStage({ entrants, winnerCount, mode, onFinished }: Pinbal
             <ol className="mt-2 max-h-72 space-y-0.5 overflow-y-auto text-xs text-slate-700 dark:text-slate-200">
               {arrivals.map((ballIndex, position) => (
                 <li key={ballIndex} className="flex items-center gap-2">
-                  <span className="w-7 shrink-0 text-right tabular-nums text-slate-400">{position + 1}</span>
+                  <span className="w-7 shrink-0 text-right tabular-nums text-slate-500 dark:text-slate-400">{position + 1}</span>
                   <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: ballColor(ballIndex) }} aria-hidden="true" />
                   <span className="min-w-0 break-all">{entrants[ballIndex]?.name}</span>
                 </li>
