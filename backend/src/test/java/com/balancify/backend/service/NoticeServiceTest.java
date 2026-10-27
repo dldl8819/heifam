@@ -27,6 +27,7 @@ import com.balancify.backend.domain.Notice;
 import com.balancify.backend.domain.NoticeComment;
 import com.balancify.backend.repository.NoticeCommentRepository;
 import com.balancify.backend.repository.NoticeEngagementRepository;
+import com.balancify.backend.repository.NoticeListRow;
 import com.balancify.backend.repository.NoticeRepository;
 import com.balancify.backend.repository.NoticeVoteRepository;
 import com.balancify.backend.repository.NoticeVoteRepository.OptionRow;
@@ -111,11 +112,11 @@ class NoticeServiceTest {
         when(accessControlService.resolveDisplayNickname(ADMIN)).thenReturn("OpsUser");
         when(accessControlService.resolvePersonNames(anyCollection()))
             .thenReturn(Map.of(ADMIN, "OpsUser", MEMBER, "YOUR_USERNAME", OTHER, "OtherUser"));
-        when(noticeRepository.findByGroupIdOrderByCreatedAtDescIdDesc(1L)).thenReturn(List.of(
+        when(noticeRepository.findListRows(1L)).thenReturn(listRows(List.of(
             notice(3L, "admins only", true),
             notice(2L, "second", false),
             notice(1L, "first", false)
-        ));
+        )));
     }
 
     @Test
@@ -146,8 +147,8 @@ class NoticeServiceTest {
         Notice announcedAgain = notice(2L, "second", false);
         announcedAgain.setRevision(1);
         announcedAgain.setRevisedAt(OffsetDateTime.parse("2026-10-05T03:00:00Z"));
-        when(noticeRepository.findByGroupIdOrderByCreatedAtDescIdDesc(1L))
-            .thenReturn(List.of(announcedAgain, notice(1L, "first", false)));
+        when(noticeRepository.findListRows(1L))
+            .thenReturn(listRows(List.of(announcedAgain, notice(1L, "first", false))));
         // The repository leaves out reads older than the latest revision.
         when(noticeEngagementRepository.findReadNoticeIds(MEMBER, List.of(2L, 1L))).thenReturn(Set.of(1L));
 
@@ -845,14 +846,14 @@ class NoticeServiceTest {
 
     @Test
     void showsHowManyPeopleOpenedEachNoticeAndVotedOnThoseThatAsk() {
-        when(noticeRepository.findByGroupIdOrderByCreatedAtDescIdDesc(1L)).thenAnswer(invocation -> {
+        when(noticeRepository.findListRows(1L)).thenAnswer(invocation -> {
             Notice open = notice(3L, "third", false);
             open.setVoteStatus("OPEN");
             Notice closed = notice(2L, "second", false);
             closed.setVoteStatus("CLOSED");
             // Its vote was taken off again; the votes cast are kept but no longer shown.
             Notice plain = notice(1L, "first", false);
-            return List.of(open, closed, plain);
+            return listRows(List.of(open, closed, plain));
         });
         when(noticeEngagementRepository.countReads(List.of(3L, 2L, 1L))).thenReturn(Map.of(3L, 12L, 1L, 5L));
         when(noticeEngagementRepository.countVoters(List.of(3L, 2L, 1L))).thenReturn(Map.of(3L, 9L, 1L, 4L));
@@ -873,12 +874,12 @@ class NoticeServiceTest {
     @Test
     void marksNoticesWithAnOpenVoteInTheList() {
         // The list in setUp holds notices 3 (admins only), 2 and 1.
-        when(noticeRepository.findByGroupIdOrderByCreatedAtDescIdDesc(1L)).thenAnswer(invocation -> {
+        when(noticeRepository.findListRows(1L)).thenAnswer(invocation -> {
             Notice open = notice(2L, "second", false);
             open.setVoteStatus("OPEN");
             Notice closed = notice(1L, "first", false);
             closed.setVoteStatus("CLOSED");
-            return List.of(open, closed);
+            return listRows(List.of(open, closed));
         });
 
         assertThat(noticeService.list(1L, MEMBER).notices())
@@ -911,6 +912,21 @@ class NoticeServiceTest {
         notice.setVoteStatus(status);
         when(noticeVoteRepository.listOptions(id)).thenReturn(options);
         return notice;
+    }
+
+    // The rows the list query gives for these notices.
+    private static List<NoticeListRow> listRows(List<Notice> notices) {
+        return notices.stream()
+            .map(notice -> new NoticeListRow(
+                notice.getId(),
+                notice.getTitle(),
+                notice.getAuthorEmail(),
+                notice.getCreatedAt(),
+                notice.isAdminOnly(),
+                notice.getRevision(),
+                notice.getVoteStatus()
+            ))
+            .toList();
     }
 
     private Notice notice(Long id, String title, boolean adminOnly) {
