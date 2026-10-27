@@ -2001,11 +2001,29 @@ export const apiClient = {
       { method: 'POST' },
       { requireUserEmail: true, includeUserEmail: true }
     ),
-  getNotifications: (groupId: number) =>
-    apiRequest<NotificationList>(`/api/groups/${groupId}/notifications`, undefined, {
-      requireUserEmail: true,
-      includeUserEmail: true,
-    }),
+  /**
+   * The notifications, for the bell's polling: with the tag of the list shown, the backend answers
+   * "not modified" (list null) when nothing changed, without reading the list. The tag to send next
+   * time comes back either way.
+   */
+  getNotificationsIfChanged: async (
+    groupId: number,
+    etag: string | null
+  ): Promise<{ list: NotificationList | null; etag: string | null }> => {
+    let nextEtag: string | null = null
+    const list = await apiRequest<NotificationList | undefined>(
+      `/api/groups/${groupId}/notifications`,
+      etag ? { headers: { 'If-None-Match': etag } } : undefined,
+      {
+        requireUserEmail: true,
+        includeUserEmail: true,
+        onResponseHeaders: (headers) => {
+          nextEtag = headers.get('ETag')
+        },
+      }
+    )
+    return { list: list ?? null, etag: nextEtag ?? (list ? null : etag) }
+  },
   markNotificationsRead: (groupId: number) =>
     apiRequest<NotificationList>(
       `/api/groups/${groupId}/notifications/read`,

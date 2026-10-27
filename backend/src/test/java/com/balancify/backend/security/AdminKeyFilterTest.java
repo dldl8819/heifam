@@ -2644,7 +2644,9 @@ class AdminKeyFilterTest {
     @Test
     void sendsNotificationsToMembersWithAccess() throws Exception {
         when(notificationService.canUseNotifications("member@hei.gg")).thenReturn(true);
-        when(notificationService.list(1L, "member@hei.gg")).thenReturn(new NotificationListResponse(List.of(), 0));
+        when(notificationService.listIfChanged(1L, "member@hei.gg", null)).thenReturn(
+            new NotificationService.TaggedList("\"n-0-0-0-members\"", new NotificationListResponse(List.of(), 0))
+        );
         String subscription = "{\"endpoint\":\"https://fcm.googleapis.com/fcm/send/x\"}";
 
         mockMvc
@@ -2653,7 +2655,7 @@ class AdminKeyFilterTest {
         mockMvc
             .perform(get("/api/groups/1/notifications").header("X-USER-EMAIL", "blocked@hei.gg"))
             .andExpect(status().isForbidden());
-        verify(notificationService, never()).list(any(), eq("blocked@hei.gg"));
+        verify(notificationService, never()).listIfChanged(any(), eq("blocked@hei.gg"), any());
 
         mockMvc
             .perform(get("/api/groups/1/notifications").header("X-USER-EMAIL", "member@hei.gg"))

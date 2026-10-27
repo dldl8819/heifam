@@ -8,6 +8,7 @@ import com.balancify.backend.domain.Notification;
 import com.balancify.backend.domain.NotificationCursor;
 import com.balancify.backend.domain.PushSubscription;
 import com.balancify.backend.repository.NotificationCursorRepository;
+import com.balancify.backend.repository.NotificationListMark;
 import com.balancify.backend.repository.NotificationRepository;
 import com.balancify.backend.repository.PushSubscriptionRepository;
 import java.time.Clock;
@@ -186,10 +187,34 @@ public class NotificationService {
         notificationRepository.deleteByKindAndTargetId(KIND_PREDICTION, matchId);
     }
 
+    /**
+     * A reader's list with its tag (an ETag), or the tag alone when the one they bring back
+     * (If-None-Match) is still current. The bell asks every minute while a page is open and most
+     * asks find nothing new, so the tag is worked out from one row (NotificationListMark) and what
+     * the reader has read, and the list is read only when it differs. What the database sends out is
+     * what Supabase meters (egress).
+     */
     @Transactional(readOnly = true)
-    public NotificationListResponse list(Long groupId, String email) {
+    public TaggedList listIfChanged(Long groupId, String email, String ifNoneMatch) {
         String reader = normalizeEmail(email);
-        return toResponse(visible(groupId, reader), lastReadId(reader));
+        List<String> audiences = audiences(reader);
+        long lastReadId = lastReadId(reader);
+        NotificationListMark mark = notificationRepository.findListMark(groupId, audiences);
+        String tag = "\"n-" + (mark == null || mark.count() == null ? 0L : mark.count())
+            + "-" + (mark == null || mark.newestId() == null ? 0L : mark.newestId())
+            + "-" + lastReadId
+            + "-" + String.join(".", audiences).toLowerCase(Locale.ROOT) + "\"";
+        if (tag.equals(withoutWeakPrefix(ifNoneMatch))) {
+            return new TaggedList(tag, null);
+        }
+        return new TaggedList(
+            tag,
+            toResponse(notificationRepository.findTop30ByGroupIdAndAudienceInOrderByIdDesc(groupId, audiences), lastReadId)
+        );
+    }
+
+    /** The list, or null when the reader's copy is still current; its tag either way. */
+    public record TaggedList(String tag, NotificationListResponse list) {
     }
 
     @Transactional
@@ -313,10 +338,22 @@ public class NotificationService {
     }
 
     private List<Notification> visible(Long groupId, String reader) {
-        List<String> audiences = accessControlService.isAdminEmail(reader)
+        return notificationRepository.findTop30ByGroupIdAndAudienceInOrderByIdDesc(groupId, audiences(reader));
+    }
+
+    private List<String> audiences(String reader) {
+        return accessControlService.isAdminEmail(reader)
             ? List.of(AUDIENCE_MEMBERS, AUDIENCE_ADMINS)
             : List.of(AUDIENCE_MEMBERS);
-        return notificationRepository.findTop30ByGroupIdAndAudienceInOrderByIdDesc(groupId, audiences);
+    }
+
+    // A tag can come back marked weak (W/) by something on the way that compressed the answer.
+    private static String withoutWeakPrefix(String ifNoneMatch) {
+        if (ifNoneMatch == null) {
+            return "";
+        }
+        String value = ifNoneMatch.trim();
+        return value.startsWith("W/") ? value.substring(2) : value;
     }
 
     private long lastReadId(String reader) {
