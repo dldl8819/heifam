@@ -87,6 +87,7 @@ public class CaptainDraftService {
     private final CaptainDraftEntryRepository captainDraftEntryRepository;
     private final CaptainDraftLineupRepository captainDraftLineupRepository;
     private final OperationAuditLogService operationAuditLogService;
+    private final CaptainDraftVersions captainDraftVersions;
 
     public CaptainDraftService(
         GroupRepository groupRepository,
@@ -95,7 +96,8 @@ public class CaptainDraftService {
         CaptainDraftParticipantRepository captainDraftParticipantRepository,
         CaptainDraftEntryRepository captainDraftEntryRepository,
         CaptainDraftLineupRepository captainDraftLineupRepository,
-        OperationAuditLogService operationAuditLogService
+        OperationAuditLogService operationAuditLogService,
+        CaptainDraftVersions captainDraftVersions
     ) {
         this.groupRepository = groupRepository;
         this.playerRepository = playerRepository;
@@ -104,6 +106,7 @@ public class CaptainDraftService {
         this.captainDraftEntryRepository = captainDraftEntryRepository;
         this.captainDraftLineupRepository = captainDraftLineupRepository;
         this.operationAuditLogService = operationAuditLogService;
+        this.captainDraftVersions = captainDraftVersions;
     }
 
     /**
@@ -266,7 +269,7 @@ public class CaptainDraftService {
      */
     @Transactional
     public CaptainDraftListResponse deleteDraft(Long groupId, Long draftId, String actorEmail, String actorNickname) {
-        CaptainDraft draft = loadDraft(groupId, draftId);
+        CaptainDraft draft = loadDraftToChange(groupId, draftId);
         Long id = draft.getId();
         String title = draft.getTitle();
         int sets = captainDraftEntryRepository.deleteByDraftId(id);
@@ -303,7 +306,7 @@ public class CaptainDraftService {
             throw new IllegalArgumentException("captainPlayerId and pickedPlayerId are required");
         }
 
-        CaptainDraft draft = loadDraft(groupId, draftId);
+        CaptainDraft draft = loadDraftToChange(groupId, draftId);
         if (!STATUS_DRAFTING.equalsIgnoreCase(safeTrim(draft.getStatus()))) {
             throw new IllegalArgumentException("Draft picks are already completed");
         }
@@ -371,7 +374,7 @@ public class CaptainDraftService {
             throw new IllegalArgumentException("playerId is required");
         }
 
-        CaptainDraft draft = loadDraft(groupId, draftId);
+        CaptainDraft draft = loadDraftToChange(groupId, draftId);
         List<CaptainDraftParticipant> participants =
             captainDraftParticipantRepository.findByDraftIdWithPlayer(draft.getId());
         requireActiveDraftParticipants(participants);
@@ -453,7 +456,7 @@ public class CaptainDraftService {
             throw new IllegalArgumentException("entries are required");
         }
 
-        CaptainDraft draft = loadDraft(groupId, draftId);
+        CaptainDraft draft = loadDraftToChange(groupId, draftId);
         List<CaptainDraftParticipant> participants =
             captainDraftParticipantRepository.findByDraftIdWithPlayer(draft.getId());
         requireActiveDraftParticipants(participants);
@@ -561,7 +564,7 @@ public class CaptainDraftService {
             throw new IllegalArgumentException("sets are required");
         }
         String stage = resolveStage(request.stage());
-        CaptainDraft draft = loadDraft(groupId, draftId);
+        CaptainDraft draft = loadDraftToChange(groupId, draftId);
         if (!isRunByCaptains(draft)) {
             throw new IllegalArgumentException("This draft's sets are filled in by the host");
         }
@@ -646,7 +649,7 @@ public class CaptainDraftService {
             throw new IllegalArgumentException("entryMode is required");
         }
         String entryMode = resolveEntryMode(request.entryMode());
-        CaptainDraft draft = loadDraft(groupId, draftId);
+        CaptainDraft draft = loadDraftToChange(groupId, draftId);
         List<CaptainDraftParticipant> participants =
             captainDraftParticipantRepository.findByDraftIdWithPlayer(draft.getId());
         List<CaptainDraftEntry> entries = captainDraftEntryRepository.findByDraftIdWithPlayers(draft.getId());
@@ -681,7 +684,7 @@ public class CaptainDraftService {
         CaptainDraftAceRequest request,
         UUID viewerUserId
     ) {
-        CaptainDraft draft = loadDraft(groupId, draftId);
+        CaptainDraft draft = loadDraftToChange(groupId, draftId);
         List<CaptainDraftParticipant> participants =
             captainDraftParticipantRepository.findByDraftIdWithPlayer(draft.getId());
         requireActiveDraftParticipants(participants);
@@ -1016,6 +1019,17 @@ public class CaptainDraftService {
     private CaptainDraft loadDraft(Long groupId, Long draftId) {
         return captainDraftRepository.findByIdAndGroup_Id(draftId, groupId)
             .orElseThrow(() -> new NoSuchElementException("Draft not found: " + draftId));
+    }
+
+    /**
+     * The draft a write is about to change. Its version moves on now and again once the write
+     * commits, so a reader's copy tagged before or during the write is read afresh
+     * (CaptainDraftVersions).
+     */
+    private CaptainDraft loadDraftToChange(Long groupId, Long draftId) {
+        CaptainDraft draft = loadDraft(groupId, draftId);
+        TransactionAfterCommit.runNowAndAfterCommit(() -> captainDraftVersions.changed(draft.getId()));
+        return draft;
     }
 
     // A title longer than its column is refused here (400), not left to fail in the database (500).

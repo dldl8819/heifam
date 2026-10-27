@@ -82,6 +82,24 @@ describe('API proxy fallback policy', () => {
     expect(new Uint8Array(await response.arrayBuffer())).toEqual(image)
   })
 
+  it('passes on a polled draft unchanged as 304, its tag both ways', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 304, headers: { etag: '"YOUR_TAG"' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const path = ['api', 'groups', 'YOUR_GROUP_ID', 'captain-drafts', '7']
+
+    const response = await GET(
+      new NextRequest('https://YOUR_CLIENT.invalid/api/proxy/api/groups/YOUR_GROUP_ID/captain-drafts/7', {
+        headers: { 'If-None-Match': '"YOUR_TAG"' },
+      }),
+      { params: Promise.resolve({ path }) }
+    )
+
+    expect(response.status).toBe(304)
+    expect(response.headers.get('etag')).toBe('"YOUR_TAG"')
+    expect(response.body).toBeNull()
+    expect(new Headers(fetchMock.mock.calls[0][1].headers).get('if-none-match')).toBe('"YOUR_TAG"')
+  })
+
   it('sends an uploaded image on as it came, with its type', async () => {
     const image = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff, 0x80])
     const fetchMock = vi.fn().mockResolvedValue(new Response('{"id":9}', {

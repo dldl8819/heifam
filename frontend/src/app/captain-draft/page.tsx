@@ -376,13 +376,20 @@ export default function CaptainDraftPage() {
 
     const draftId = draft.draftId
     let active = true
+    // The tag of the copy this polling last got: an unchanged draft then comes back as "not
+    // modified", without the backend reading it again. A change made on this screen sets the draft
+    // itself, and the backend no longer matches the old tag, so the next poll reads it afresh.
+    let etag: string | null = null
     const stop = startVisiblePolling(async () => {
       const view = draftViewRef.current
       try {
-        const refreshed = await apiClient.getCaptainDraft(TEMP_GROUP_ID, draftId)
+        const refreshed = await apiClient.getCaptainDraftIfChanged(TEMP_GROUP_ID, draftId, etag)
         // A reply landing after polling stopped or the screen moved on is for a draft no longer shown.
         if (active && view === draftViewRef.current) {
-          setDraft(refreshed)
+          etag = refreshed.etag
+          if (refreshed.draft) {
+            setDraft(refreshed.draft)
+          }
         }
       } catch {
         // Keep current snapshot on polling failure.

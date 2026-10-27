@@ -161,6 +161,8 @@ export type ApiRequestOptions = {
   contentType?: string
   // The answer is a file: it is handed back as a Blob, not parsed.
   responseType?: 'blob'
+  // Handed each answer's headers, such as an ETag to send back as If-None-Match next time.
+  onResponseHeaders?: (headers: Headers) => void
 }
 
 export class ApiRequestError extends Error {
@@ -359,6 +361,12 @@ export async function apiRequest<T>(
       headers: buildHeaders(init, options, userEmail, userNickname, accessToken),
       signal: controller.signal,
     })
+
+    options?.onResponseHeaders?.(response.headers)
+    // Asked with If-None-Match and nothing changed: no body, and the caller keeps what it has.
+    if (response.status === 304) {
+      return undefined as T
+    }
 
     if (!response.ok) {
       const message = (await response.text()).trim()
@@ -1240,6 +1248,29 @@ export const apiClient = {
     apiRequest<CaptainDraftResponse>(`/api/groups/${groupId}/captain-drafts/${draftId}`, undefined, {
       includeUserEmail: true,
     }),
+  /**
+   * The draft again, for the page's polling: with the tag of the copy shown, the backend answers
+   * "not modified" (draft null) when nothing changed, without reading the draft. The tag to send
+   * next time comes back either way.
+   */
+  getCaptainDraftIfChanged: async (
+    groupId: number,
+    draftId: number,
+    etag: string | null
+  ): Promise<{ draft: CaptainDraftResponse | null; etag: string | null }> => {
+    let nextEtag: string | null = null
+    const draft = await apiRequest<CaptainDraftResponse | undefined>(
+      `/api/groups/${groupId}/captain-drafts/${draftId}`,
+      etag ? { headers: { 'If-None-Match': etag } } : undefined,
+      {
+        includeUserEmail: true,
+        onResponseHeaders: (headers) => {
+          nextEtag = headers.get('ETag')
+        },
+      }
+    )
+    return { draft: draft ?? null, etag: nextEtag ?? (draft ? null : etag) }
+  },
   pickCaptainDraftPlayer: (
     groupId: number,
     draftId: number,

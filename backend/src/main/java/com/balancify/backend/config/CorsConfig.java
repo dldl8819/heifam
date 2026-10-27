@@ -18,6 +18,8 @@ public class CorsConfig implements WebMvcConfigurer {
             .allowedOrigins(parseAllowedOrigins())
             .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
             .allowedHeaders("*")
+            // Read by the regular draft's polling, to send back as If-None-Match.
+            .exposedHeaders("ETag")
             .maxAge(3600);
     }
 

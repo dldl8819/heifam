@@ -186,7 +186,8 @@ async function buildProxyResponse(upstream: Response, noticeImageRead: boolean):
   responseHeaders.set('Cache-Control', resolveCacheControl(upstream, noticeImageRead))
 
   // Passed on as the bytes they are: read as text, an image in a notice would arrive broken.
-  const upstreamBody = upstream.status === 204 ? null : await upstream.arrayBuffer()
+  // 204 and 304 (a polled draft unchanged) carry no body, and a Response may not be given one.
+  const upstreamBody = upstream.status === 204 || upstream.status === 304 ? null : await upstream.arrayBuffer()
   return new NextResponse(upstreamBody, {
     status: upstream.status,
     headers: responseHeaders,
