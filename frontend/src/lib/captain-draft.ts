@@ -4,6 +4,7 @@ import type {
   CaptainDraftEntry,
   CaptainDraftLineupRequest,
   CaptainDraftLineupStage,
+  CaptainDraftParticipant,
   CaptainDraftResponse,
   CaptainDraftSummary,
   PlayerRosterItem,
@@ -104,6 +105,17 @@ export function hasAnyResult(entries: readonly CaptainDraftEntry[]): boolean {
 /** A draft whose captains hand in their own team's line-up, unseen by the other team until both are in. */
 export function isRunByCaptains(draft: Pick<CaptainDraftResponse, 'entryMode'> | null | undefined): boolean {
   return draft?.entryMode === 'CAPTAINS'
+}
+
+/** The team each player of a draft is on, captains included; players still to be picked are left out. */
+export function teamsByPlayer(participants: readonly CaptainDraftParticipant[]): Map<number, TeamSide> {
+  const teams = new Map<number, TeamSide>()
+  for (const participant of participants) {
+    if (participant.playerId != null && (participant.team === 'HOME' || participant.team === 'AWAY')) {
+      teams.set(participant.playerId, participant.team)
+    }
+  }
+  return teams
 }
 
 /** What a captain hands in at once: every regular round (MAIN), then the ace decider (ACE). */

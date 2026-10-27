@@ -35,6 +35,7 @@ import {
   stageOf,
   stagesWithLineupEdits,
   teamSubmitted,
+  teamsByPlayer,
   type DraftViewer,
   type EffectiveEntry,
   type EntryEdit,
@@ -204,6 +205,8 @@ export default function CaptainDraftPage() {
     }
     return members
   }, [draft])
+  // The tier board colours each picked player by team once a draft is under way.
+  const tierBoardTeams = useMemo(() => (draft ? teamsByPlayer(draft.participants) : undefined), [draft])
 
   // Who reads the sheet. The backend tells the reader's team from their account, and keeps a team's
   // line-up from everyone else until both are in; this only shapes the screen.
@@ -905,6 +908,7 @@ export default function CaptainDraftPage() {
             onReset={handleResetDraftSetup}
             onSlotInputChange={handleParticipantSlotInputChange}
             onSlotAutocomplete={handleParticipantSlotAutocomplete}
+            playerTeams={tierBoardTeams}
           />
         </div>
 

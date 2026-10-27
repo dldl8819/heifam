@@ -9,7 +9,7 @@ import {
   type SelectableParticipant,
 } from '@/lib/participant-slots'
 import { cn } from '@/lib/utils'
-import type { PlayerTierStatus } from '@/types/api'
+import type { PlayerTierStatus, TeamSide } from '@/types/api'
 
 type TierParticipantBoardProps = {
   title: string
@@ -27,7 +27,19 @@ type TierParticipantBoardProps = {
   onReset: () => void
   onSlotInputChange: (index: number, value: string) => void
   onSlotAutocomplete: (index: number) => boolean
+  // The team each player is already on (a regular draft's 청팀/백팀): their cell takes the team's
+  // colour and name, so the board shows who is picked. Left out, every player looks the same.
+  playerTeams?: ReadonlyMap<number, TeamSide>
 }
+
+// A picked player's cell: the team's colour (white text stays above 4.5:1, high contrast darkens
+// it further), a short team tag so the colour is not the only sign, and the team's name for
+// screen readers.
+const TEAM_CELLS: Record<TeamSide, { cellClassName: string; tag: string; name: string }> = {
+  HOME: { cellClassName: 'bg-sky-700 dark:bg-sky-700', tag: 'common.tierBoard.homeTag', name: 'common.tierBoard.homeTeam' },
+  AWAY: { cellClassName: 'bg-rose-700 dark:bg-rose-700', tag: 'common.tierBoard.awayTag', name: 'common.tierBoard.awayTeam' },
+}
+const UNPICKED_CELL_CLASS_NAME = 'bg-[#dff0f7] dark:bg-sky-950/60'
 
 type TierRow = {
   key: PlayerTierStatus
@@ -78,6 +90,7 @@ export function TierParticipantBoard({
   onReset,
   onSlotInputChange,
   onSlotAutocomplete,
+  playerTeams,
 }: TierParticipantBoardProps) {
   const selectedPlayers = slots.flatMap((slot) => {
     if (typeof slot.playerId !== 'number' || !Number.isFinite(slot.playerId)) {
@@ -215,10 +228,11 @@ export function TierParticipantBoard({
               <h4 className="text-2xl font-semibold tracking-tight text-[#6f5b3c] dark:text-amber-200 sm:text-4xl">
                 {t('common.tierBoard.title')}
               </h4>
-              <p className="mt-2 text-xs text-[#8b7551] dark:text-amber-300/80">{selectedCountLabel}</p>
+              <p className="mt-2 text-xs text-[#76623f] dark:text-amber-300/80">{selectedCountLabel}</p>
             </div>
 
-            <div className="mt-4 overflow-x-auto rounded-xl border border-[#8d7760] bg-white/90 dark:border-slate-600 dark:bg-slate-950/90">
+            {/* relative: the cells' screen-reader team names are placed inside this scroller, not past the page's edge. */}
+            <div className="relative mt-4 overflow-x-auto rounded-xl border border-[#8d7760] bg-white/90 dark:border-slate-600 dark:bg-slate-950/90">
               <table
                 className="w-full border-collapse text-xs sm:text-sm"
                 style={{ minWidth: `${Math.max(520, 96 + boardColumnCount * 104)}px` }}
@@ -236,15 +250,28 @@ export function TierParticipantBoard({
                       </th>
                       {Array.from({ length: boardColumnCount }, (_, columnIndex) => {
                         const player = buckets[row.key][columnIndex] ?? null
+                        const team = player ? playerTeams?.get(player.id) : undefined
                         return (
                           <td
                             key={`tier-board-cell-${row.key}-${columnIndex}`}
                             className={cn(
                               'h-10 border border-[#8d7760] px-2 py-1.5 align-middle dark:border-slate-600',
-                              player ? 'bg-[#dff0f7] dark:bg-sky-950/60' : 'bg-white dark:bg-slate-950',
+                              !player
+                                ? 'bg-white dark:bg-slate-950'
+                                : team
+                                  ? TEAM_CELLS[team].cellClassName
+                                  : UNPICKED_CELL_CLASS_NAME,
                             )}
                           >
-                            {player ? (
+                            {player && team ? (
+                              <span className="flex items-center justify-center gap-1 text-sm font-semibold text-white">
+                                <span aria-hidden="true" className="shrink-0 rounded-sm bg-white/25 px-1 text-[11px] leading-4">
+                                  {t(TEAM_CELLS[team].tag)}
+                                </span>
+                                <span className="sr-only">{t(TEAM_CELLS[team].name)} </span>
+                                <span className="truncate">{player.nickname}</span>
+                              </span>
+                            ) : player ? (
                               <span className="block truncate text-sm font-medium text-slate-900 dark:text-slate-100">
                                 {player.nickname}
                               </span>
@@ -259,6 +286,26 @@ export function TierParticipantBoard({
                 </tbody>
               </table>
             </div>
+            {playerTeams && (
+              <ul
+                aria-label={t('common.tierBoard.teamLegend')}
+                className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-slate-700 dark:text-slate-200"
+              >
+                {(['HOME', 'AWAY'] as const).map((team) => (
+                  <li key={`tier-board-legend-${team}`} className="flex items-center gap-1.5">
+                    <span aria-hidden="true" className={cn('inline-block h-3 w-3 rounded-sm', TEAM_CELLS[team].cellClassName)} />
+                    {t(TEAM_CELLS[team].name)}
+                  </li>
+                ))}
+                <li className="flex items-center gap-1.5">
+                  <span
+                    aria-hidden="true"
+                    className={cn('inline-block h-3 w-3 rounded-sm border border-[#8d7760] dark:border-slate-600', UNPICKED_CELL_CLASS_NAME)}
+                  />
+                  {t('common.tierBoard.notPicked')}
+                </li>
+              </ul>
+            )}
           </div>
         </>
       )}

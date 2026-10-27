@@ -307,7 +307,13 @@
       "index": "구분",
       "unassigned": "재배정 대상",
       "slot": "참가자 {index}",
-      "placeholder": "닉네임 입력..."
+      "placeholder": "닉네임 입력...",
+      "teamLegend": "팀 표시",
+      "homeTeam": "청팀",
+      "awayTeam": "백팀",
+      "homeTag": "청",
+      "awayTag": "백",
+      "notPicked": "아직 팀 없음"
     }
   },
   "access": {
