@@ -3,25 +3,29 @@ package com.balancify.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.balancify.backend.api.group.dto.GroupPlayerTeammateStatResponse;
 import com.balancify.backend.api.group.dto.GroupPlayerTeammateStatsResponse;
 import com.balancify.backend.domain.Group;
-import com.balancify.backend.domain.Match;
-import com.balancify.backend.domain.MatchParticipant;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.MatchParticipantRepository;
 import com.balancify.backend.repository.PlayerRepository;
-import java.time.OffsetDateTime;
+import com.balancify.backend.repository.TeammateMatchRow;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -66,32 +70,29 @@ class PlayerTeammateStatsQueryServiceTest {
         return player;
     }
 
-    private MatchParticipant participant(Match match, Player player, String team) {
-        MatchParticipant participant = new MatchParticipant();
-        participant.setMatch(match);
-        participant.setPlayer(player);
-        participant.setTeam(team);
-        return participant;
-    }
-
-    /** Builds one match, newest first in the returned list, with HOME winning unless stated. */
-    private List<MatchParticipant> match(
+    /** One match as the rows read it: two players at HOME, one AWAY. */
+    private List<TeammateMatchRow> match(
         Long matchId,
         String winningTeam,
         Player home1,
         Player home2,
         Player away1
     ) {
-        Match match = new Match();
-        match.setId(matchId);
-        match.setGroup(GROUP);
-        match.setWinningTeam(winningTeam);
-        match.setPlayedAt(OffsetDateTime.parse("2026-09-01T10:00:00Z").plusDays(matchId));
-        List<MatchParticipant> participants = new ArrayList<>();
-        participants.add(participant(match, home1, "HOME"));
-        participants.add(participant(match, home2, "HOME"));
-        participants.add(participant(match, away1, "AWAY"));
-        return participants;
+        return List.of(
+            new TeammateMatchRow(matchId, "HOME", winningTeam, home1.getId()),
+            new TeammateMatchRow(matchId, "HOME", winningTeam, home2.getId()),
+            new TeammateMatchRow(matchId, "AWAY", winningTeam, away1.getId())
+        );
+    }
+
+    /** The roster rows the teammates' names are read from, by id. */
+    @SuppressWarnings("unchecked")
+    private void roster(Player... players) {
+        when(playerRepository.findAllById(any())).thenAnswer(invocation -> {
+            Set<Long> ids = new HashSet<>();
+            ((Iterable<Long>) invocation.getArgument(0)).forEach(ids::add);
+            return Arrays.stream(players).filter(player -> ids.contains(player.getId())).toList();
+        });
     }
 
     @Test
@@ -100,17 +101,22 @@ class PlayerTeammateStatsQueryServiceTest {
         Player partner = player(2L, "보이");
         Player rival = player(3L, "스톰");
 
-        List<MatchParticipant> participants = new ArrayList<>();
+        List<TeammateMatchRow> rows = new ArrayList<>();
         // Newest first: two wins together, then a loss together, then an unfinished match.
-        participants.addAll(match(4L, "HOME", target, partner, rival));
-        participants.addAll(match(3L, "HOME", target, partner, rival));
-        participants.addAll(match(2L, "AWAY", target, partner, rival));
-        participants.addAll(match(1L, null, target, partner, rival));
+        rows.addAll(match(4L, "HOME", target, partner, rival));
+        rows.addAll(match(3L, "HOME", target, partner, rival));
+        rows.addAll(match(2L, "AWAY", target, partner, rival));
+        rows.addAll(match(1L, null, target, partner, rival));
         when(playerRepository.findByIdAndGroup_Id(1L, 1L)).thenReturn(Optional.of(target));
-        when(matchParticipantRepository.findByGroupIdAndPlayerMatchesOrderByPlayedAtDesc(1L, 1L))
-            .thenReturn(participants);
+        when(matchParticipantRepository.findTeammateMatchRows(1L, 1L)).thenReturn(rows);
+        roster(target, partner, rival);
 
         GroupPlayerTeammateStatsResponse response = playerTeammateStatsQueryService.getTeammateStats(1L, 1L);
+
+        // Only the teammate's own row is read for a name; the rival's is never needed.
+        ArgumentCaptor<Iterable<Long>> readIds = ArgumentCaptor.captor();
+        verify(playerRepository).findAllById(readIds.capture());
+        assertThat(readIds.getValue()).containsExactly(2L);
 
         assertThat(response.nickname()).isEqualTo("민식");
         assertThat(response.games()).isEqualTo(3);
@@ -136,14 +142,14 @@ class PlayerTeammateStatsQueryServiceTest {
         Player frequentPartner = player(3L, "스톰");
         Player rival = player(4L, "리드");
 
-        List<MatchParticipant> participants = new ArrayList<>();
-        participants.addAll(match(5L, "HOME", target, strongPartner, rival));
-        participants.addAll(match(4L, "HOME", target, frequentPartner, rival));
-        participants.addAll(match(3L, "HOME", target, frequentPartner, rival));
-        participants.addAll(match(2L, "AWAY", target, frequentPartner, rival));
+        List<TeammateMatchRow> rows = new ArrayList<>();
+        rows.addAll(match(5L, "HOME", target, strongPartner, rival));
+        rows.addAll(match(4L, "HOME", target, frequentPartner, rival));
+        rows.addAll(match(3L, "HOME", target, frequentPartner, rival));
+        rows.addAll(match(2L, "AWAY", target, frequentPartner, rival));
         when(playerRepository.findByIdAndGroup_Id(1L, 1L)).thenReturn(Optional.of(target));
-        when(matchParticipantRepository.findByGroupIdAndPlayerMatchesOrderByPlayedAtDesc(1L, 1L))
-            .thenReturn(participants);
+        when(matchParticipantRepository.findTeammateMatchRows(1L, 1L)).thenReturn(rows);
+        roster(target, strongPartner, frequentPartner, rival);
 
         GroupPlayerTeammateStatsResponse response = playerTeammateStatsQueryService.getTeammateStats(1L, 1L);
 
@@ -167,12 +173,12 @@ class PlayerTeammateStatsQueryServiceTest {
         withdrawn.setActive(false);
         Player rival = player(4L, "리드");
 
-        List<MatchParticipant> participants = new ArrayList<>();
-        participants.addAll(match(3L, "HOME", target, withdrawn, rival));
-        participants.addAll(match(2L, "HOME", target, partner, rival));
+        List<TeammateMatchRow> rows = new ArrayList<>();
+        rows.addAll(match(3L, "HOME", target, withdrawn, rival));
+        rows.addAll(match(2L, "HOME", target, partner, rival));
         when(playerRepository.findByIdAndGroup_Id(1L, 1L)).thenReturn(Optional.of(target));
-        when(matchParticipantRepository.findByGroupIdAndPlayerMatchesOrderByPlayedAtDesc(1L, 1L))
-            .thenReturn(participants);
+        when(matchParticipantRepository.findTeammateMatchRows(1L, 1L)).thenReturn(rows);
+        roster(target, partner, withdrawn, rival);
 
         GroupPlayerTeammateStatsResponse response = playerTeammateStatsQueryService.getTeammateStats(1L, 1L);
 
@@ -193,17 +199,17 @@ class PlayerTeammateStatsQueryServiceTest {
         Player mostlyLoses = player(4L, "리드");
         Player rival = player(5L, "제이");
 
-        List<MatchParticipant> participants = new ArrayList<>();
-        participants.addAll(match(7L, "HOME", target, alwaysWins, rival));
-        participants.addAll(match(6L, "HOME", target, alwaysWins, rival));
-        participants.addAll(match(5L, "HOME", target, evenRecord, rival));
-        participants.addAll(match(4L, "AWAY", target, evenRecord, rival));
-        participants.addAll(match(3L, "HOME", target, mostlyLoses, rival));
-        participants.addAll(match(2L, "AWAY", target, mostlyLoses, rival));
-        participants.addAll(match(1L, "AWAY", target, mostlyLoses, rival));
+        List<TeammateMatchRow> rows = new ArrayList<>();
+        rows.addAll(match(7L, "HOME", target, alwaysWins, rival));
+        rows.addAll(match(6L, "HOME", target, alwaysWins, rival));
+        rows.addAll(match(5L, "HOME", target, evenRecord, rival));
+        rows.addAll(match(4L, "AWAY", target, evenRecord, rival));
+        rows.addAll(match(3L, "HOME", target, mostlyLoses, rival));
+        rows.addAll(match(2L, "AWAY", target, mostlyLoses, rival));
+        rows.addAll(match(1L, "AWAY", target, mostlyLoses, rival));
         when(playerRepository.findByIdAndGroup_Id(1L, 1L)).thenReturn(Optional.of(target));
-        when(matchParticipantRepository.findByGroupIdAndPlayerMatchesOrderByPlayedAtDesc(1L, 1L))
-            .thenReturn(participants);
+        when(matchParticipantRepository.findTeammateMatchRows(1L, 1L)).thenReturn(rows);
+        roster(target, alwaysWins, evenRecord, mostlyLoses, rival);
 
         GroupPlayerTeammateStatsResponse response = playerTeammateStatsQueryService.getOwnTeammateStats(1L, 1L);
 

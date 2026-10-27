@@ -39,6 +39,28 @@ public interface MatchParticipantRepository extends JpaRepository<MatchParticipa
         @Param("playerId") Long playerId
     );
 
+    /**
+     * The same rows as findByGroupIdAndPlayerMatchesOrderByPlayedAtDesc, newest match first, with
+     * only what a teammate record needs of each (TeammateMatchRow).
+     */
+    @Query("""
+        select new com.balancify.backend.repository.TeammateMatchRow(m.id, mp.team, m.winningTeam, p.id)
+        from MatchParticipant mp
+        join mp.match m
+        join mp.player p
+        where p.group.id = :groupId
+          and m.id in (
+            select mp2.match.id
+            from MatchParticipant mp2
+            where mp2.player.id = :playerId
+          )
+        order by m.playedAt desc, m.id desc, mp.id desc
+        """)
+    List<TeammateMatchRow> findTeammateMatchRows(
+        @Param("groupId") Long groupId,
+        @Param("playerId") Long playerId
+    );
+
     @Query(value = """
         select
             mp.player_id as "playerId",
