@@ -88,6 +88,7 @@ class CaptainDraftServiceTest {
     private OperationAuditLogService operationAuditLogService;
 
     private CaptainDraftService captainDraftService;
+    private final CaptainDraftVersions captainDraftVersions = new CaptainDraftVersions();
 
     @BeforeEach
     void setUp() {
@@ -98,7 +99,8 @@ class CaptainDraftServiceTest {
             captainDraftParticipantRepository,
             captainDraftEntryRepository,
             captainDraftLineupRepository,
-            operationAuditLogService
+            operationAuditLogService,
+            captainDraftVersions
         );
     }
 
@@ -615,8 +617,15 @@ class CaptainDraftServiceTest {
         when(captainDraftRepository.findByIdAndGroup_Id(100L, 1L)).thenReturn(Optional.of(draft));
         when(captainDraftParticipantRepository.findByDraftIdWithPlayer(100L)).thenReturn(participants);
         when(captainDraftEntryRepository.findByDraftIdWithPlayers(100L)).thenReturn(List.of(named, other));
+        String copyBefore = captainDraftVersions.tag(100L, null);
 
         CaptainDraftResponse response = captainDraftService.unpickPlayer(1L, 100L, new CaptainDraftUnpickRequest(3L), null);
+
+        // A copy polled before the change is read afresh; reading the draft changes nothing.
+        assertThat(captainDraftVersions.isCurrent(100L, null, copyBefore)).isFalse();
+        String copyAfter = captainDraftVersions.tag(100L, null);
+        captainDraftService.getDraft(1L, 100L, null);
+        assertThat(captainDraftVersions.isCurrent(100L, null, copyAfter)).isTrue();
 
         assertThat(response.participants())
             .filteredOn(participant -> participant.playerId().equals(3L))

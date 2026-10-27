@@ -13,18 +13,22 @@ import com.balancify.backend.security.AuthenticatedRequestResolver;
 import com.balancify.backend.security.AuthenticatedRequestResolver.ResolvedRequestIdentity;
 import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.CaptainDraftService;
+import com.balancify.backend.service.CaptainDraftVersions;
 import com.balancify.backend.service.exception.CaptainDraftLineupForbiddenException;
 import com.balancify.backend.service.exception.CaptainDraftResultLockedException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.NoSuchElementException;
 import java.util.UUID;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -46,15 +50,18 @@ import org.springframework.web.server.ResponseStatusException;
 public class CaptainDraftController {
 
     private final CaptainDraftService captainDraftService;
+    private final CaptainDraftVersions captainDraftVersions;
     private final AccessControlService accessControlService;
     private final AuthenticatedRequestResolver authenticatedRequestResolver;
 
     public CaptainDraftController(
         CaptainDraftService captainDraftService,
+        CaptainDraftVersions captainDraftVersions,
         AccessControlService accessControlService,
         AuthenticatedRequestResolver authenticatedRequestResolver
     ) {
         this.captainDraftService = captainDraftService;
+        this.captainDraftVersions = captainDraftVersions;
         this.accessControlService = accessControlService;
         this.authenticatedRequestResolver = authenticatedRequestResolver;
     }
@@ -101,14 +108,26 @@ public class CaptainDraftController {
         }
     }
 
+    /**
+     * The page asks for its draft every few seconds while it is open. An ask that brings back the
+     * tag of a copy still current (If-None-Match) is answered 304 without reading the draft again;
+     * any other gets the draft with its tag (CaptainDraftVersions).
+     */
     @GetMapping("/{groupId}/captain-drafts/{draftId}")
-    public CaptainDraftResponse getDraft(
+    public ResponseEntity<CaptainDraftResponse> getDraft(
         @PathVariable Long groupId,
         @PathVariable Long draftId,
+        @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch,
         HttpServletRequest httpRequest
     ) {
+        UUID viewer = viewer(httpRequest);
+        if (captainDraftVersions.isCurrent(draftId, viewer, ifNoneMatch)) {
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(ifNoneMatch.trim()).build();
+        }
+        // Tagged before the draft is read, so a change landing meanwhile leaves this tag behind.
+        String tag = captainDraftVersions.tag(draftId, viewer);
         try {
-            return captainDraftService.getDraft(groupId, draftId, viewer(httpRequest));
+            return ResponseEntity.ok().eTag(tag).body(captainDraftService.getDraft(groupId, draftId, viewer));
         } catch (NoSuchElementException noSuchElementException) {
             throw new ResponseStatusException(
                 HttpStatus.NOT_FOUND,

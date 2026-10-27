@@ -104,6 +104,7 @@ import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.AccountDeletionService;
 import com.balancify.backend.service.AttendanceMenu;
 import com.balancify.backend.service.CaptainDraftService;
+import com.balancify.backend.service.CaptainDraftVersions;
 import com.balancify.backend.service.DashboardQueryService;
 import com.balancify.backend.service.GroupMatchAdminService;
 import com.balancify.backend.service.LedgerExpenseAdminService;
@@ -212,7 +213,7 @@ import org.springframework.test.web.servlet.ResultMatcher;
     PrizeEventController.class,
     com.balancify.backend.api.access.AccessPeopleController.class
 })
-@Import({ AdminKeyFilter.class, ServiceAccessFilter.class, AdminKeyProperties.class })
+@Import({ AdminKeyFilter.class, ServiceAccessFilter.class, AdminKeyProperties.class, CaptainDraftVersions.class })
 @TestPropertySource(properties = {
     "balancify.admin.emails=admin@hei.gg,ops@hei.gg",
     "balancify.admin.super-emails=superadmin@hei.gg",
