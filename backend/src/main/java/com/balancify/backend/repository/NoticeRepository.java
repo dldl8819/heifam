@@ -11,7 +11,13 @@ import org.springframework.data.repository.query.Param;
 
 public interface NoticeRepository extends JpaRepository<Notice, Long> {
 
-    List<Notice> findByGroupIdOrderByCreatedAtDescIdDesc(Long groupId);
+    /** A group's notices for its list, newest first, without their text (NoticeListRow). */
+    @Query(
+        "select new com.balancify.backend.repository.NoticeListRow("
+            + "n.id, n.title, n.authorEmail, n.createdAt, n.adminOnly, n.revision, n.voteStatus) "
+            + "from Notice n where n.groupId = :groupId order by n.createdAt desc, n.id desc"
+    )
+    List<NoticeListRow> findListRows(@Param("groupId") Long groupId);
 
     Optional<Notice> findByIdAndGroupId(Long id, Long groupId);
 

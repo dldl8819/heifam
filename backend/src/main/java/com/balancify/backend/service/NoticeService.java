@@ -12,6 +12,7 @@ import com.balancify.backend.domain.Notice;
 import com.balancify.backend.domain.NoticeComment;
 import com.balancify.backend.repository.NoticeCommentRepository;
 import com.balancify.backend.repository.NoticeEngagementRepository;
+import com.balancify.backend.repository.NoticeListRow;
 import com.balancify.backend.repository.NoticeRepository;
 import com.balancify.backend.repository.NoticeVoteRepository;
 import com.balancify.backend.repository.NoticeVoteRepository.OptionRow;
@@ -83,9 +84,9 @@ public class NoticeService {
 
     @Transactional(readOnly = true)
     public List<NoticeTitleResponse> listTitles(Long groupId) {
-        return noticeRepository.findByGroupIdOrderByCreatedAtDescIdDesc(groupId).stream()
-            .filter(notice -> !notice.isAdminOnly())
-            .map(notice -> new NoticeTitleResponse(notice.getTitle(), notice.getCreatedAt()))
+        return noticeRepository.findListRows(groupId).stream()
+            .filter(notice -> !notice.adminOnly())
+            .map(notice -> new NoticeTitleResponse(notice.title(), notice.createdAt()))
             .toList();
     }
 
@@ -93,10 +94,10 @@ public class NoticeService {
     public NoticeListResponse list(Long groupId, String email) {
         String reader = normalizeEmail(email);
         boolean admin = accessControlService.isAdminEmail(reader);
-        List<Notice> notices = noticeRepository.findByGroupIdOrderByCreatedAtDescIdDesc(groupId).stream()
-            .filter(notice -> admin || !notice.isAdminOnly())
+        List<NoticeListRow> notices = noticeRepository.findListRows(groupId).stream()
+            .filter(notice -> admin || !notice.adminOnly())
             .toList();
-        List<Long> noticeIds = notices.stream().map(Notice::getId).toList();
+        List<Long> noticeIds = notices.stream().map(NoticeListRow::id).toList();
         Set<Long> readIds = noticeEngagementRepository.findReadNoticeIds(reader, noticeIds);
         Map<Long, Long> likeCounts = noticeEngagementRepository.countLikes(noticeIds);
         Map<Long, Long> viewCounts = noticeEngagementRepository.countReads(noticeIds);
@@ -106,23 +107,23 @@ public class NoticeService {
             noticeCommentRepository.countByNotice(noticeIds)
                 .forEach(count -> commentCounts.put(count.getNoticeId(), count.getTotal()));
         }
-        Map<String, String> nicknames = nicknames(notices.stream().map(Notice::getAuthorEmail).toList());
+        Map<String, String> nicknames = nicknames(notices.stream().map(NoticeListRow::authorEmail).toList());
 
         List<NoticeListItemResponse> items = notices.stream()
             .map(notice -> new NoticeListItemResponse(
-                notice.getId(),
-                notice.getTitle(),
-                nicknames.get(normalizeEmail(notice.getAuthorEmail())),
-                notice.getCreatedAt(),
-                notice.isAdminOnly(),
-                readIds.contains(notice.getId()),
-                notice.getRevision() > 0,
-                likeCounts.getOrDefault(notice.getId(), 0L),
-                commentCounts.getOrDefault(notice.getId(), 0L),
-                NoticeVotes.OPEN.equals(notice.getVoteStatus()),
-                viewCounts.getOrDefault(notice.getId(), 0L),
+                notice.id(),
+                notice.title(),
+                nicknames.get(normalizeEmail(notice.authorEmail())),
+                notice.createdAt(),
+                notice.adminOnly(),
+                readIds.contains(notice.id()),
+                notice.revision() > 0,
+                likeCounts.getOrDefault(notice.id(), 0L),
+                commentCounts.getOrDefault(notice.id(), 0L),
+                NoticeVotes.OPEN.equals(notice.voteStatus()),
+                viewCounts.getOrDefault(notice.id(), 0L),
                 // A vote that was taken off the notice keeps its votes but shows none of them.
-                asksForVote(notice) ? voterCounts.getOrDefault(notice.getId(), 0L) : null
+                NoticeVotes.asksForVote(notice.voteStatus()) ? voterCounts.getOrDefault(notice.id(), 0L) : null
             ))
             .toList();
         int readCount = (int) items.stream().filter(NoticeListItemResponse::read).count();
