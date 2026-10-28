@@ -1811,6 +1811,16 @@
       "lockedHint": "결과가 입력된 세트는 운영진과 경기 결과 수정 권한자만 고칠 수 있습니다.",
       "recordedBy": "입력 {nickname}"
     },
+    "games": {
+      "title": "선수별 경기 수",
+      "helper": "정규 {rounds}라운드 엔트리에 들어간 경기 수입니다. 에이스 결정전은 세지 않습니다.",
+      "target": "1인당 {target}경기",
+      "places": "{filled}/{places}자리 배정",
+      "count": "{count}경기",
+      "reached": "목표 채움",
+      "over": "{count}경기 초과",
+      "hidden": "양 팀 엔트리가 공개되면 보입니다."
+    },
     "messages": {
       "createSuccess": "정기 감전 드래프트가 생성되었습니다.",
       "entriesSaved": "엔트리가 저장되었습니다."
