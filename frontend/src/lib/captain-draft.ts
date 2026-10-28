@@ -1,5 +1,4 @@
 import { t } from '@/lib/i18n'
-import { toTierOrder } from '@/lib/player-tier'
 import type {
   CaptainDraftEntry,
   CaptainDraftLineupRequest,
@@ -644,22 +643,32 @@ export function setupDiffersFromDraft(
 }
 
 /**
- * Draft players in the order a captain picks by: captains first, then the highest tier (live tier
- * as on the tier board) down to unassigned, then those no longer on the roster; by nickname within
- * a tier.
+ * Each roster player's place in the ranking (랭킹), from the roster as the backend sends it to
+ * everyone, highest MMR first: the ranking puts unassigned players last and keeps the rest in that
+ * order. No MMR is read, so members who may not see MMR get the same order, which the ranking page
+ * already shows them.
  */
-export function sortByTier<T extends { playerId: number | null; nickname: string; captain: boolean }>(
+export function rosterRanking(players: readonly PlayerRosterItem[]): Map<number, number> {
+  const unassigned = (player: PlayerRosterItem) => player.tier === 'UNASSIGNED'
+  const ranked = [...players.filter((player) => !unassigned(player)), ...players.filter(unassigned)]
+  return new Map(ranked.map((player, index) => [player.id, index]))
+}
+
+/**
+ * Draft players in ranking order, captains first when asked; those no longer on the roster go last,
+ * by nickname.
+ */
+export function sortByRanking<T extends { playerId: number | null; nickname: string; captain: boolean }>(
   participants: readonly T[],
-  playerMap: ReadonlyMap<number, PlayerRosterItem>,
+  ranking: ReadonlyMap<number, number>,
+  captainsFirst = false,
 ): T[] {
-  const rank = (participant: T): number => {
-    const player = typeof participant.playerId === 'number' ? playerMap.get(participant.playerId) : undefined
-    return player ? toTierOrder(player.liveTier ?? player.tier ?? 'UNASSIGNED') : Number.MAX_SAFE_INTEGER
-  }
+  const place = (participant: T): number =>
+    (typeof participant.playerId === 'number' ? ranking.get(participant.playerId) : undefined) ?? Number.MAX_SAFE_INTEGER
   return [...participants].sort(
     (left, right) =>
-      Number(right.captain) - Number(left.captain) ||
-      rank(left) - rank(right) ||
+      (captainsFirst ? Number(right.captain) - Number(left.captain) : 0) ||
+      place(left) - place(right) ||
       left.nickname.localeCompare(right.nickname, 'ko'),
   )
 }
