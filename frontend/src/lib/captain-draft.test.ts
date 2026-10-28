@@ -17,6 +17,7 @@ import {
   dropLineupEdits,
   effectiveEntry,
   entryKey,
+  gamesByPlayer,
   hasAnyLineup,
   hasAnyResult,
   hasLoneLineup,
@@ -36,6 +37,7 @@ import {
   sortByTier,
   stageLineups,
   stageOf,
+  teamGameTarget,
   stagesWithLineupEdits,
   teamsByPlayer,
   withSlot,
@@ -322,6 +324,35 @@ describe('captain draft sets', () => {
     expect([...playersInRound(sheet, 1)].sort((a, b) => a - b)).toEqual([1, 2, 4, 5, 6, 7])
   })
 
+  it('counts the regular games each player plays, and shares a team\'s places out evenly', () => {
+    // 7 rounds of two 2:2 sets for 7 players a team: 28 places, 4 games each.
+    const rounds = Array.from({ length: 7 }, (_, index) => [
+      entry(index + 1, 1, [null, null], [null, null]),
+      entry(index + 1, 2, [null, null], [null, null]),
+    ]).flat()
+    const empty = rounds.map((set) => effectiveEntry(set, undefined))
+    expect(teamGameTarget(empty, 'HOME', 7)).toEqual({ rounds: 7, places: 28, filled: 0, low: 4, high: 4 })
+    expect(gamesByPlayer(empty).size).toBe(0)
+
+    const sheet = [
+      effectiveEntry(entry(1, 1, [1, 3], [2, 4]), undefined),
+      effectiveEntry(entry(1, 2, [5, null], [6, 8]), undefined),
+      effectiveEntry(entry(2, 1, [1, 5], [2, null]), undefined),
+      // The ace decider is played only when the rounds end level, and is not counted.
+      effectiveEntry(ace(entry(3, 1, [1], [2])), undefined),
+    ]
+    expect(Object.fromEntries(gamesByPlayer(sheet))).toEqual({ 1: 2, 2: 2, 3: 1, 4: 1, 5: 2, 6: 1, 8: 1 })
+    // 6 home places for 4 players: 1 or 2 games each.
+    expect(teamGameTarget(sheet, 'HOME', 4)).toEqual({ rounds: 2, places: 6, filled: 5, low: 1, high: 2 })
+    expect(teamGameTarget(sheet, 'AWAY', 0)).toBeNull()
+  })
+
+  it('counts the places of a side kept from the viewer, though not who fills them', () => {
+    const sheet = [hiding(entry(1, 1, [1, 3], [2, 4]), 'AWAY')].map((set) => effectiveEntry(set, undefined))
+    expect(teamGameTarget(sheet, 'AWAY', 2)).toEqual({ rounds: 1, places: 2, filled: 0, low: 1, high: 1 })
+    expect(gamesByPlayer(sheet).has(2)).toBe(false)
+  })
+
   it('tells, team by team, a group playing a set together again in a later round, in whichever set', () => {
     const sheet = (sets: CaptainDraftEntry[]) => sets.map((set) => effectiveEntry(set, undefined))
 
@@ -419,6 +450,8 @@ describe('captain draft sets', () => {
     expect(draftPlayerTags(rosterPlayer({ tier: 'UNASSIGNED' })).tier).toBe('배정 필요')
     expect(draftPlayerTags(undefined, 'Z')).toEqual({ tier: null, races: 'Z' })
     expect(draftPlayerOptionLabel('Ace', { tier: 'A+', races: 'PT' })).toBe('Ace · A+ · PT')
+    expect(draftPlayerOptionLabel('Ace', { tier: 'A+', races: 'PT' }, 3)).toBe('Ace · A+ · PT · 3경기')
+    expect(draftPlayerOptionLabel('Ace', { tier: null, races: 'Z' }, 0)).toBe('Ace · Z · 0경기')
   })
 
   it('orders players for picking: captains, then the highest live tier down, then off the roster', () => {

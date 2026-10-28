@@ -367,6 +367,50 @@ export function countSetWins(entries: EffectiveEntry[]): SetWins {
   return wins
 }
 
+/** The regular sets (not the ace decider) each player is placed in on the sheet: the games they play. */
+export function gamesByPlayer(sheet: readonly EffectiveEntry[]): Map<number, number> {
+  const games = new Map<number, number>()
+  for (const set of sheet) {
+    if (set.aceDecider) {
+      continue
+    }
+    for (const playerId of [...set.homePlayerIds, ...set.awayPlayerIds]) {
+      if (typeof playerId === 'number') {
+        games.set(playerId, (games.get(playerId) ?? 0) + 1)
+      }
+    }
+  }
+  return games
+}
+
+// A team's places in the regular sets shared out evenly among its players: 7 rounds of two 2:2 sets
+// are 28 places, 4 games each for 7 players. low and high differ when the places do not share out
+// evenly (26 places for 7 players: 3 or 4 games each).
+export type TeamGameTarget = {
+  rounds: number
+  places: number
+  filled: number
+  low: number
+  high: number
+}
+
+/** The games each player of a team plays when its places are shared out evenly; null without players. */
+export function teamGameTarget(sheet: readonly EffectiveEntry[], team: TeamSide, players: number): TeamGameTarget | null {
+  if (players <= 0) {
+    return null
+  }
+  const regular = sheet.filter((set) => !set.aceDecider)
+  const sides = regular.map((set) => (team === 'HOME' ? set.homePlayerIds : set.awayPlayerIds))
+  const places = sides.reduce((sum, side) => sum + side.length, 0)
+  return {
+    rounds: new Set(regular.map((set) => set.roundNumber)).size,
+    places,
+    filled: sides.reduce((sum, side) => sum + side.filter((playerId) => typeof playerId === 'number').length, 0),
+    low: Math.floor(places / players),
+    high: Math.ceil(places / players),
+  }
+}
+
 /** Players already placed in a round, so a select offers each one for a single slot of the round. */
 export function playersInRound(entries: EffectiveEntry[], roundNumber: number): Set<number> {
   const placed = new Set<number>()
@@ -620,9 +664,13 @@ export function sortByTier<T extends { playerId: number | null; nickname: string
   )
 }
 
-/** A player in a select: the nickname with their tier and races, so a set can be filled by race. */
-export function draftPlayerOptionLabel(nickname: string, tags: DraftPlayerTags): string {
-  return [nickname, tags.tier, tags.races].filter((part): part is string => Boolean(part)).join(' · ')
+/**
+ * A player in a select: the nickname with their tier and races, so a set can be filled by race, and
+ * the games they already play when given, so the games can be shared out evenly.
+ */
+export function draftPlayerOptionLabel(nickname: string, tags: DraftPlayerTags, games?: number): string {
+  const played = games === undefined ? null : t('captainDraft.games.count', { count: games })
+  return [nickname, tags.tier, tags.races, played].filter((part): part is string => Boolean(part)).join(' · ')
 }
 
 export type DraftRecordState = 'drafting' | 'playing' | 'finished'

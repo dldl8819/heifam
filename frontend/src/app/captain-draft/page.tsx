@@ -5,6 +5,7 @@ import { apiClient, isApiConflictError, isApiForbiddenError, isApiNotFoundError 
 import { useAdminAuth } from '@/lib/admin-auth'
 import { TierParticipantBoard } from '@/components/tier-participant-board'
 import { CaptainDraftEntrySheet } from '@/components/captain-draft-entry-sheet'
+import { CaptainDraftGameCounts } from '@/components/captain-draft-game-counts'
 import { CaptainDraftRecords } from '@/components/captain-draft-records'
 import { CaptainDraftRoundSettings } from '@/components/captain-draft-round-settings'
 import { CaptainDraftTeamBoard } from '@/components/captain-draft-team-board'
@@ -1140,6 +1141,7 @@ export default function CaptainDraftPage() {
                   <p className="text-xs">{t('captainDraft.entry.repeatedLineupAdvice')}</p>
                 </div>
               )}
+              <CaptainDraftGameCounts sheet={sheet} teamMembers={teamMembers} playerMap={playerMap} controls={controls} />
               <CaptainDraftEntrySheet
                 rounds={roundGroups}
                 sheet={sheet}

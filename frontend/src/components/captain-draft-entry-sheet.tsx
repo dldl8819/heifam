@@ -5,6 +5,7 @@ import {
   compositionsOfSize,
   draftPlayerOptionLabel,
   draftPlayerTags,
+  gamesByPlayer,
   playersInRound,
   requiredTierPresets,
   teamSubmitted,
@@ -80,6 +81,8 @@ export function CaptainDraftEntrySheet({
   onChangeRoundCode,
   lineups,
 }: CaptainDraftEntrySheetProps) {
+  // The games each player already plays, beside their name in the selects.
+  const games = gamesByPlayer(sheet)
   // The players a slot can take: that team's players not yet placed elsewhere in the round.
   const playerOptions = (team: TeamSide, set: EffectiveEntry, slot: number) => {
     const placed = playersInRound(sheet, set.roundNumber)
@@ -88,7 +91,11 @@ export function CaptainDraftEntrySheet({
       .filter((participant) => participant.playerId === current || !placed.has(participant.playerId))
       .map((participant) => (
         <option key={`${team}-${set.key}-${slot}-${participant.playerId}`} value={participant.playerId}>
-          {draftPlayerOptionLabel(participant.nickname, draftPlayerTags(playerMap.get(participant.playerId), participant.race))}
+          {draftPlayerOptionLabel(
+            participant.nickname,
+            draftPlayerTags(playerMap.get(participant.playerId), participant.race),
+            games.get(participant.playerId) ?? 0,
+          )}
         </option>
       ))
   }
