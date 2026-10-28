@@ -32,6 +32,7 @@ public class PlayerAdminService {
     private final PlayerRepository playerRepository;
     private final OperationAuditLogService operationAuditLogService;
     private final GroupReadCacheService groupReadCacheService;
+    private final GroupRosterCache groupRosterCache;
     private final AccountDeletionService accountDeletionService;
     private final AccessControlService accessControlService;
     private final Clock clock;
@@ -44,6 +45,7 @@ public class PlayerAdminService {
         PlayerRepository playerRepository,
         OperationAuditLogService operationAuditLogService,
         GroupReadCacheService groupReadCacheService,
+        GroupRosterCache groupRosterCache,
         AccountDeletionService accountDeletionService,
         AccessControlService accessControlService
     ) {
@@ -51,6 +53,7 @@ public class PlayerAdminService {
             playerRepository,
             operationAuditLogService,
             groupReadCacheService,
+            groupRosterCache,
             accountDeletionService,
             accessControlService,
             Clock.systemUTC()
@@ -61,6 +64,7 @@ public class PlayerAdminService {
         PlayerRepository playerRepository,
         OperationAuditLogService operationAuditLogService,
         GroupReadCacheService groupReadCacheService,
+        GroupRosterCache groupRosterCache,
         AccountDeletionService accountDeletionService,
         AccessControlService accessControlService,
         Clock clock
@@ -68,6 +72,7 @@ public class PlayerAdminService {
         this.playerRepository = playerRepository;
         this.operationAuditLogService = operationAuditLogService;
         this.groupReadCacheService = groupReadCacheService;
+        this.groupRosterCache = groupRosterCache;
         this.accountDeletionService = accountDeletionService;
         this.accessControlService = accessControlService;
         this.clock = clock == null ? Clock.systemUTC() : clock;
@@ -201,6 +206,8 @@ public class PlayerAdminService {
             TransactionAfterCommit.runNowAndAfterCommit(
                 () -> groupReadCacheService.evictGroup(groupId)
             );
+            // A bulk update: Hibernate does not see it, so the roster copy is dropped here.
+            groupRosterCache.changed();
             operationAuditLogService.recordPlayerActivityUpdate(
                 actorEmail,
                 actorNickname,

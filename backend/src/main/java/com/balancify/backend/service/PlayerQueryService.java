@@ -5,7 +5,6 @@ import com.balancify.backend.api.group.dto.GroupPlayerTierBoardResponse;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.domain.PlayerStats;
 import com.balancify.backend.domain.PlayerTierPolicy;
-import com.balancify.backend.repository.PlayerRepository;
 import com.balancify.backend.repository.PlayerStatsRepository;
 import java.time.Clock;
 import java.time.OffsetDateTime;
@@ -22,27 +21,27 @@ import org.springframework.stereotype.Service;
 @Service
 public class PlayerQueryService {
 
-    private final PlayerRepository playerRepository;
+    private final GroupRosterCache groupRosterCache;
     private final PlayerStatsRepository playerStatsRepository;
     private final GroupReadCacheService groupReadCacheService;
     private final Clock clock;
 
     @Autowired
     public PlayerQueryService(
-        PlayerRepository playerRepository,
+        GroupRosterCache groupRosterCache,
         PlayerStatsRepository playerStatsRepository,
         GroupReadCacheService groupReadCacheService
     ) {
-        this(playerRepository, playerStatsRepository, groupReadCacheService, Clock.systemUTC());
+        this(groupRosterCache, playerStatsRepository, groupReadCacheService, Clock.systemUTC());
     }
 
     PlayerQueryService(
-        PlayerRepository playerRepository,
+        GroupRosterCache groupRosterCache,
         PlayerStatsRepository playerStatsRepository,
         GroupReadCacheService groupReadCacheService,
         Clock clock
     ) {
-        this.playerRepository = playerRepository;
+        this.groupRosterCache = groupRosterCache;
         this.playerStatsRepository = playerStatsRepository;
         this.groupReadCacheService = groupReadCacheService;
         this.clock = clock == null ? Clock.systemUTC() : clock;
@@ -67,8 +66,9 @@ public class PlayerQueryService {
         boolean includeDormant,
         UUID requesterAuthUserId
     ) {
-        // Player identity changes must be visible immediately across application instances.
-        // The local read cache cannot be invalidated reliably after withdrawal or anonymization.
+        // Built afresh on every call from the roster copy, which every player change drops at once
+        // (GroupRosterCache): a withdrawal or anonymization shows on the next read, and what depends
+        // on the time (an identity's retention) is judged now.
         return List.copyOf(loadGroupPlayers(groupId, includeInactive, includeDormant, requesterAuthUserId));
     }
 
@@ -79,7 +79,7 @@ public class PlayerQueryService {
         UUID requesterAuthUserId
     ) {
         OffsetDateTime now = OffsetDateTime.now(clock);
-        List<Player> players = new ArrayList<>(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId)
+        List<Player> players = new ArrayList<>(groupRosterCache.roster(groupId)
             .stream()
             .filter(player -> !PlayerIdentityPolicy.isIdentityHidden(player)
                 || (includeInactive
@@ -222,7 +222,7 @@ public class PlayerQueryService {
 
     private List<GroupPlayerTierBoardResponse> loadGroupPlayerTierBoard(Long groupId) {
         List<Player> players = new ArrayList<>(
-            playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId)
+            groupRosterCache.roster(groupId)
                 .stream()
                 .filter(PlayerRosterPolicy::isOnRoster)
                 .toList()

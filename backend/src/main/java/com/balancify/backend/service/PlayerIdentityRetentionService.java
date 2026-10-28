@@ -20,18 +20,21 @@ public class PlayerIdentityRetentionService {
     private final PlayerRepository playerRepository;
     private final AccountPersonalDataRepository accountPersonalDataRepository;
     private final GroupReadCacheService groupReadCacheService;
+    private final GroupRosterCache groupRosterCache;
     private final Clock clock;
 
     @Autowired
     public PlayerIdentityRetentionService(
         PlayerRepository playerRepository,
         AccountPersonalDataRepository accountPersonalDataRepository,
-        GroupReadCacheService groupReadCacheService
+        GroupReadCacheService groupReadCacheService,
+        GroupRosterCache groupRosterCache
     ) {
         this(
             playerRepository,
             accountPersonalDataRepository,
             groupReadCacheService,
+            groupRosterCache,
             Clock.systemUTC()
         );
     }
@@ -40,11 +43,13 @@ public class PlayerIdentityRetentionService {
         PlayerRepository playerRepository,
         AccountPersonalDataRepository accountPersonalDataRepository,
         GroupReadCacheService groupReadCacheService,
+        GroupRosterCache groupRosterCache,
         Clock clock
     ) {
         this.playerRepository = playerRepository;
         this.accountPersonalDataRepository = accountPersonalDataRepository;
         this.groupReadCacheService = groupReadCacheService;
+        this.groupRosterCache = groupRosterCache;
         this.clock = clock == null ? Clock.systemUTC() : clock;
     }
 
@@ -100,6 +105,8 @@ public class PlayerIdentityRetentionService {
         TransactionAfterCommit.runNowAndAfterCommit(
             () -> committedGroupIds.forEach(groupReadCacheService::evictGroup)
         );
+        // Bulk updates: Hibernate does not see them, so the roster copy is dropped here.
+        groupRosterCache.changed();
         return playerIds.size();
     }
 

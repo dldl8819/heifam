@@ -37,15 +37,19 @@ class PlayerQueryServiceTest {
     @Mock
     private PlayerStatsRepository playerStatsRepository;
 
+    private GroupRosterCache groupRosterCache;
+
     private PlayerQueryService playerQueryService;
 
     @BeforeEach
     void setUp() {
+        Clock clock = Clock.fixed(Instant.parse("2026-07-12T03:00:00Z"), ZoneOffset.UTC);
+        groupRosterCache = new GroupRosterCache(playerRepository, clock);
         playerQueryService = new PlayerQueryService(
-            playerRepository,
+            groupRosterCache,
             playerStatsRepository,
             new GroupReadCacheService(0),
-            Clock.fixed(Instant.parse("2026-07-12T03:00:00Z"), ZoneOffset.UTC)
+            clock
         );
     }
 
@@ -393,12 +397,26 @@ class PlayerQueryServiceTest {
     }
 
     @Test
-    void bypassesReadCacheForPlayerRosterSoIdentityChangesAreImmediate() {
-        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L)).thenReturn(List.of());
+    void readsTheRosterOnceUntilAPlayerChangesAndThenAfresh() {
+        Group group = new Group();
+        group.setId(1L);
+        Player before = player(1L, group, "Alpha", "P", "A", 1500);
+        Player withdrawn = player(1L, group, "Alpha", "P", "A", 1500);
+        withdrawn.setActive(false);
+        withdrawn.setAnonymizedAt(FIXED_NOW);
+        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
+            .thenReturn(List.of(before), List.of(withdrawn));
 
-        playerQueryService.getGroupPlayers(1L, false);
-        playerQueryService.getGroupPlayers(1L, false);
+        // The list and the tier board share one read of the roster.
+        assertThat(playerQueryService.getGroupPlayers(1L, false)).extracting(GroupPlayerResponse::nickname)
+            .containsExactly("Alpha");
+        assertThat(playerQueryService.getGroupPlayerTierBoard(1L)).hasSize(1);
+        verify(playerRepository, times(1)).findByGroup_IdOrderByMmrDescIdAsc(1L);
 
+        // A withdrawal drops the copy: the very next read no longer shows them.
+        groupRosterCache.changed();
+
+        assertThat(playerQueryService.getGroupPlayers(1L, false)).isEmpty();
         verify(playerRepository, times(2)).findByGroup_IdOrderByMmrDescIdAsc(1L);
     }
 

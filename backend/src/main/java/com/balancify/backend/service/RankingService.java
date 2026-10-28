@@ -5,7 +5,6 @@ import com.balancify.backend.domain.Player;
 import com.balancify.backend.domain.PlayerMonthlyStats;
 import com.balancify.backend.domain.PlayerTierPolicy;
 import com.balancify.backend.repository.PlayerMonthlyStatsRepository;
-import com.balancify.backend.repository.PlayerRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -26,27 +25,27 @@ public class RankingService {
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final Duration NEW_PLAYER_WINDOW = Duration.ofDays(14);
 
-    private final PlayerRepository playerRepository;
+    private final GroupRosterCache groupRosterCache;
     private final PlayerMonthlyStatsRepository playerMonthlyStatsRepository;
     private final GroupReadCacheService groupReadCacheService;
     private final Clock clock;
 
     @Autowired
     public RankingService(
-        PlayerRepository playerRepository,
+        GroupRosterCache groupRosterCache,
         PlayerMonthlyStatsRepository playerMonthlyStatsRepository,
         GroupReadCacheService groupReadCacheService
     ) {
-        this(playerRepository, playerMonthlyStatsRepository, groupReadCacheService, Clock.system(KST));
+        this(groupRosterCache, playerMonthlyStatsRepository, groupReadCacheService, Clock.system(KST));
     }
 
     RankingService(
-        PlayerRepository playerRepository,
+        GroupRosterCache groupRosterCache,
         PlayerMonthlyStatsRepository playerMonthlyStatsRepository,
         GroupReadCacheService groupReadCacheService,
         Clock clock
     ) {
-        this.playerRepository = playerRepository;
+        this.groupRosterCache = groupRosterCache;
         this.playerMonthlyStatsRepository = playerMonthlyStatsRepository;
         this.groupReadCacheService = groupReadCacheService;
         this.clock = clock == null ? Clock.system(KST) : clock;
@@ -59,7 +58,7 @@ public class RankingService {
 
     private List<RankingItemResponse> loadGroupRanking(Long groupId, LocalDate statMonth) {
         // Dormant players (휴면) are off the ranking until an admin wakes them.
-        List<Player> players = playerRepository.findByGroup_IdOrderByMmrDescIdAsc(groupId)
+        List<Player> players = groupRosterCache.roster(groupId)
             .stream()
             .filter(PlayerRosterPolicy::isOnRoster)
             .toList();

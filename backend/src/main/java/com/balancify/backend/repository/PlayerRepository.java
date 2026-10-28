@@ -13,6 +13,11 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+/**
+ * Readers of a whole roster go through GroupRosterCache. Its copies are dropped when Hibernate
+ * commits a change to a Player; the bulk updates here (@Modifying) bypass that, so whoever calls
+ * one calls GroupRosterCache.changed() too.
+ */
 public interface PlayerRepository extends JpaRepository<Player, Long> {
 
     List<Player> findByGroup_IdOrderByMmrDescIdAsc(Long groupId);
