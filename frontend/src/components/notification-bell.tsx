@@ -56,11 +56,20 @@ function NotificationCenter() {
   const [pushError, setPushError] = useState<boolean>(false)
   const [showInstallHint, setShowInstallHint] = useState<boolean>(false)
   const newestSeenId = useRef<number | null>(null)
+  // The tag of the list last got: an unchanged list then comes back as "not modified", without the
+  // backend reading it again. Opening the bell moves what was read on, so the next ask reads afresh.
+  const etag = useRef<string | null>(null)
   const panelRef = useRef<HTMLDivElement | null>(null)
 
   const load = useCallback(async () => {
     try {
-      const response = await apiClient.getNotifications(TEMP_GROUP_ID)
+      const answer = await apiClient.getNotificationsIfChanged(TEMP_GROUP_ID, etag.current)
+      etag.current = answer.etag
+      const response = answer.list
+      if (!response) {
+        setLoadError(false)
+        return
+      }
       const fresh = freshNotifications(newestSeenId.current, response.notifications)
       newestSeenId.current = newestNotificationId(response.notifications, newestSeenId.current)
       setNotifications(response.notifications)

@@ -6,11 +6,14 @@ import com.balancify.backend.api.notification.dto.PushSubscriptionRequest;
 import com.balancify.backend.security.AuthenticatedRequestResolver;
 import com.balancify.backend.service.NotificationService;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -33,9 +36,23 @@ public class NotificationController {
         this.authenticatedRequestResolver = authenticatedRequestResolver;
     }
 
+    /**
+     * The bell asks every minute. An ask that brings back the tag of a list still current
+     * (If-None-Match) is answered 304 without the list being read; any other gets the list with its
+     * tag.
+     */
     @GetMapping("/api/groups/{groupId}/notifications")
-    public NotificationListResponse list(@PathVariable Long groupId, HttpServletRequest request) {
-        return notificationService.list(groupId, requireEmail(request));
+    public ResponseEntity<NotificationListResponse> list(
+        @PathVariable Long groupId,
+        @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch,
+        HttpServletRequest request
+    ) {
+        NotificationService.TaggedList answer =
+            notificationService.listIfChanged(groupId, requireEmail(request), ifNoneMatch);
+        if (answer.list() == null) {
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(answer.tag()).build();
+        }
+        return ResponseEntity.ok().eTag(answer.tag()).body(answer.list());
     }
 
     @PostMapping("/api/groups/{groupId}/notifications/read")

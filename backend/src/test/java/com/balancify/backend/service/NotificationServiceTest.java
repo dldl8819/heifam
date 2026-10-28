@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -15,6 +16,7 @@ import com.balancify.backend.domain.Notification;
 import com.balancify.backend.domain.NotificationCursor;
 import com.balancify.backend.domain.PushSubscription;
 import com.balancify.backend.repository.NotificationCursorRepository;
+import com.balancify.backend.repository.NotificationListMark;
 import com.balancify.backend.repository.NotificationRepository;
 import com.balancify.backend.repository.PushSubscriptionRepository;
 import java.nio.charset.StandardCharsets;
@@ -199,14 +201,48 @@ class NotificationServiceTest {
         cursor.setLastReadId(5L);
         when(notificationCursorRepository.findById(MEMBER)).thenReturn(Optional.of(cursor));
 
-        NotificationListResponse list = service.list(1L, " Member@hei.gg ");
+        NotificationListResponse list = service.listIfChanged(1L, " Member@hei.gg ", null).list();
 
         verify(notificationRepository).findTop30ByGroupIdAndAudienceInOrderByIdDesc(1L, List.of("MEMBERS"));
         assertThat(list.unreadCount()).isEqualTo(2);
         assertThat(list.notifications()).extracting(item -> item.read()).containsExactly(false, false, true);
 
-        service.list(1L, ADMIN);
+        service.listIfChanged(1L, ADMIN, null);
         verify(notificationRepository).findTop30ByGroupIdAndAudienceInOrderByIdDesc(1L, List.of("MEMBERS", "ADMINS"));
+    }
+
+    @Test
+    void answersAnUnchangedListWithItsTagAloneWithoutReadingIt() {
+        when(notificationRepository.findListMark(eq(1L), anyCollection())).thenReturn(new NotificationListMark(3L, 7L));
+        when(notificationRepository.findTop30ByGroupIdAndAudienceInOrderByIdDesc(eq(1L), anyCollection()))
+            .thenReturn(List.of(notification(7L), notification(6L), notification(5L)));
+        NotificationCursor cursor = new NotificationCursor();
+        cursor.setEmail(MEMBER);
+        cursor.setLastReadId(5L);
+        when(notificationCursorRepository.findById(MEMBER)).thenReturn(Optional.of(cursor));
+
+        NotificationService.TaggedList first = service.listIfChanged(1L, MEMBER, null);
+        assertThat(first.list()).isNotNull();
+
+        // The tag comes back (marked weak by something on the way, too): nothing changed, no list read.
+        NotificationService.TaggedList again = service.listIfChanged(1L, MEMBER, first.tag());
+        NotificationService.TaggedList weak = service.listIfChanged(1L, MEMBER, "W/" + first.tag());
+        assertThat(again.list()).isNull();
+        assertThat(again.tag()).isEqualTo(first.tag());
+        assertThat(weak.list()).isNull();
+        verify(notificationRepository, times(1)).findTop30ByGroupIdAndAudienceInOrderByIdDesc(eq(1L), anyCollection());
+
+        // An admin reads more audiences, so a member's tag is never theirs.
+        assertThat(service.listIfChanged(1L, ADMIN, first.tag()).list()).isNotNull();
+
+        // A new one (newer id), one removed (one fewer) or the bell opened (read further): read again.
+        when(notificationRepository.findListMark(eq(1L), anyCollection())).thenReturn(new NotificationListMark(4L, 8L));
+        assertThat(service.listIfChanged(1L, MEMBER, first.tag()).list()).isNotNull();
+        when(notificationRepository.findListMark(eq(1L), anyCollection())).thenReturn(new NotificationListMark(2L, 7L));
+        assertThat(service.listIfChanged(1L, MEMBER, first.tag()).list()).isNotNull();
+        when(notificationRepository.findListMark(eq(1L), anyCollection())).thenReturn(new NotificationListMark(3L, 7L));
+        cursor.setLastReadId(7L);
+        assertThat(service.listIfChanged(1L, MEMBER, first.tag()).list()).isNotNull();
     }
 
     @Test
