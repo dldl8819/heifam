@@ -72,6 +72,9 @@ const TEAM_LABEL_KEYS: Record<TeamSide, string> = {
 
 const TEMP_GROUP_ID = 1
 const MINIMUM_PARTICIPANT_SLOTS = 8
+// A new draft starts with each captain handing their own team in; the host can still pick filling
+// both teams in, needed when a captain has no site account linked.
+const DEFAULT_ENTRY_MODE: CaptainDraftEntryMode = 'CAPTAINS'
 
 type IdentifiedCaptainDraftParticipant = CaptainDraftParticipant & { playerId: number }
 
@@ -127,7 +130,7 @@ export default function CaptainDraftPage() {
   // Each set's team size in play order, and how many rounds, for the next draft started.
   const [setSizes, setSetSizes] = useState<number[]>([])
   const [roundCount, setRoundCount] = useState<number>(DEFAULT_ROUND_COUNT)
-  const [entryMode, setEntryMode] = useState<CaptainDraftEntryMode>('HOST')
+  const [entryMode, setEntryMode] = useState<CaptainDraftEntryMode>(DEFAULT_ENTRY_MODE)
 
   const [draftTitle, setDraftTitle] = useState<string>(() => defaultDraftTitle())
   const [draft, setDraft] = useState<CaptainDraftResponse | null>(null)
@@ -538,7 +541,7 @@ export default function CaptainDraftPage() {
     setAwayCaptainId(null)
     setSetSizes([])
     setRoundCount(DEFAULT_ROUND_COUNT)
-    setEntryMode('HOST')
+    setEntryMode(DEFAULT_ENTRY_MODE)
     setDraftTitle(defaultDraftTitle())
     setDraft(null)
     setDraftLoading(false)
@@ -967,8 +970,8 @@ export default function CaptainDraftPage() {
                   onChange={(event) => setEntryMode(event.target.value === 'CAPTAINS' ? 'CAPTAINS' : 'HOST')}
                   className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-hidden transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700"
                 >
-                  <option value="HOST">{t('captainDraft.entryMode.host')}</option>
                   <option value="CAPTAINS">{t('captainDraft.entryMode.captains')}</option>
+                  <option value="HOST">{t('captainDraft.entryMode.host')}</option>
                 </select>
                 <span className="mt-1 block font-normal text-slate-500 dark:text-slate-400">
                   {t(entryMode === 'CAPTAINS' ? 'captainDraft.entryMode.captainsHelp' : 'captainDraft.entryMode.hostHelp')}
@@ -1032,8 +1035,8 @@ export default function CaptainDraftPage() {
                     aria-label={t('captainDraft.entryMode.changeLabel')}
                     className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 outline-hidden focus:border-slate-500 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
                   >
-                    <option value="HOST">{t('captainDraft.entryMode.host')}</option>
                     <option value="CAPTAINS">{t('captainDraft.entryMode.captains')}</option>
+                    <option value="HOST">{t('captainDraft.entryMode.host')}</option>
                   </select>
                 </label>
                 {byCaptains && hasLoneLineup(lineups) && (
