@@ -49,6 +49,9 @@ class AccountDeletionDataServiceTest {
     private GroupReadCacheService groupReadCacheService;
 
     @Mock
+    private GroupRosterCache groupRosterCache;
+
+    @Mock
     private AccessControlService accessControlService;
 
     @Mock
@@ -63,6 +66,7 @@ class AccountDeletionDataServiceTest {
             accountPersonalDataRepository,
             playerRepository,
             groupReadCacheService,
+            groupRosterCache,
             accessControlService,
             supabaseAuthAdminClient,
             fixedClock
@@ -570,6 +574,7 @@ class AccountDeletionDataServiceTest {
             AccountDeletionDataService.retentionSubjectHash(PLACEHOLDER_AUTH_USER_ID)
         );
         verify(accountPersonalDataRepository).deletePendingAuthDeletion(PLACEHOLDER_AUTH_USER_ID);
+        verify(groupRosterCache).changed();
     }
 
     @Test

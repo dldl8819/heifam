@@ -36,6 +36,9 @@ class PlayerIdentityRetentionServiceTest {
     @Mock
     private GroupReadCacheService groupReadCacheService;
 
+    @Mock
+    private GroupRosterCache groupRosterCache;
+
     private PlayerIdentityRetentionService retentionService;
 
     @BeforeEach
@@ -44,6 +47,7 @@ class PlayerIdentityRetentionServiceTest {
             playerRepository,
             accountPersonalDataRepository,
             groupReadCacheService,
+            groupRosterCache,
             Clock.fixed(Instant.parse("2031-07-19T03:00:00Z"), ZoneOffset.UTC)
         );
     }
@@ -102,6 +106,7 @@ class PlayerIdentityRetentionServiceTest {
             PlayerIdentityPolicy.HIDDEN_MEMBER_LABEL
         );
         verify(groupReadCacheService).evictGroup(42L);
+        verify(groupRosterCache).changed();
     }
 
     @Test

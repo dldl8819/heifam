@@ -38,12 +38,15 @@ class RankingServiceTest {
     @Mock
     private PlayerMonthlyStatsRepository playerMonthlyStatsRepository;
 
+    private GroupRosterCache groupRosterCache;
+
     private RankingService rankingService;
 
     @BeforeEach
     void setUp() {
+        groupRosterCache = new GroupRosterCache(playerRepository, FIXED_CLOCK);
         rankingService = new RankingService(
-            playerRepository,
+            groupRosterCache,
             playerMonthlyStatsRepository,
             new GroupReadCacheService(0),
             FIXED_CLOCK
@@ -180,24 +183,28 @@ class RankingServiceTest {
     }
 
     @Test
-    void reloadsRankingSoIdentityChangesAreVisibleAcrossInstances() {
-        GroupReadCacheService cache = new GroupReadCacheService(60_000);
-        rankingService = new RankingService(playerRepository, playerMonthlyStatsRepository, cache, FIXED_CLOCK);
-
+    void keepsTheRosterUntilAPlayerChangesButReadsTheMonthsStatsEachTime() {
         Group group = new Group();
         group.setId(1L);
         Player player = player(1L, group, "PlayerAlpha", "P", "B-", 790);
+        Player renamed = player(1L, group, "PlayerAlpha2", "P", "B-", 790);
 
         when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
-            .thenReturn(List.of(player));
+            .thenReturn(List.of(player), List.of(renamed));
         when(playerMonthlyStatsRepository.findByGroupIdAndStatMonth(1L, JULY_2026))
             .thenReturn(List.of());
 
         rankingService.getGroupRanking(1L);
         rankingService.getGroupRanking(1L);
 
-        verify(playerRepository, times(2)).findByGroup_IdOrderByMmrDescIdAsc(1L);
+        verify(playerRepository, times(1)).findByGroup_IdOrderByMmrDescIdAsc(1L);
         verify(playerMonthlyStatsRepository, times(2)).findByGroupIdAndStatMonth(1L, JULY_2026);
+
+        groupRosterCache.changed();
+
+        assertThat(rankingService.getGroupRanking(1L)).extracting(RankingItemResponse::nickname)
+            .containsExactly("PlayerAlpha2");
+        verify(playerRepository, times(2)).findByGroup_IdOrderByMmrDescIdAsc(1L);
     }
 
     private Player player(

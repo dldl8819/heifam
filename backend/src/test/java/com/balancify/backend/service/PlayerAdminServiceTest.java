@@ -47,6 +47,9 @@ class PlayerAdminServiceTest {
 
     private PlayerAdminService playerAdminService;
     @Mock
+    private GroupRosterCache groupRosterCache;
+
+    @Mock
     private AccountDeletionService accountDeletionService;
 
     @Mock
@@ -69,6 +72,7 @@ class PlayerAdminServiceTest {
             playerRepository,
             operationAuditLogService,
             new GroupReadCacheService(0),
+            groupRosterCache,
             accountDeletionService,
             accessControlService
         );
@@ -89,6 +93,7 @@ class PlayerAdminServiceTest {
                 PlayerRepository.class,
                 OperationAuditLogService.class,
                 GroupReadCacheService.class,
+                GroupRosterCache.class,
                 AccountDeletionService.class,
                 AccessControlService.class
             ));
@@ -635,6 +640,8 @@ class PlayerAdminServiceTest {
             org.mockito.ArgumentMatchers.isNull()
         );
         verify(playerRepository, never()).save(any(Player.class));
+        // The bulk update is unseen by Hibernate, so the roster copy is dropped by hand.
+        verify(groupRosterCache).changed();
     }
 
     @Test

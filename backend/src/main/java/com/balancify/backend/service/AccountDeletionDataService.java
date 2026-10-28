@@ -33,6 +33,7 @@ public class AccountDeletionDataService {
     private final AccountPersonalDataRepository accountPersonalDataRepository;
     private final PlayerRepository playerRepository;
     private final GroupReadCacheService groupReadCacheService;
+    private final GroupRosterCache groupRosterCache;
     private final AccessControlService accessControlService;
     private final SupabaseAuthAdminClient supabaseAuthAdminClient;
     private final Clock clock;
@@ -42,6 +43,7 @@ public class AccountDeletionDataService {
         AccountPersonalDataRepository accountPersonalDataRepository,
         PlayerRepository playerRepository,
         GroupReadCacheService groupReadCacheService,
+        GroupRosterCache groupRosterCache,
         AccessControlService accessControlService,
         SupabaseAuthAdminClient supabaseAuthAdminClient
     ) {
@@ -49,6 +51,7 @@ public class AccountDeletionDataService {
             accountPersonalDataRepository,
             playerRepository,
             groupReadCacheService,
+            groupRosterCache,
             accessControlService,
             supabaseAuthAdminClient,
             Clock.systemUTC()
@@ -59,6 +62,7 @@ public class AccountDeletionDataService {
         AccountPersonalDataRepository accountPersonalDataRepository,
         PlayerRepository playerRepository,
         GroupReadCacheService groupReadCacheService,
+        GroupRosterCache groupRosterCache,
         AccessControlService accessControlService,
         SupabaseAuthAdminClient supabaseAuthAdminClient,
         Clock clock
@@ -66,6 +70,7 @@ public class AccountDeletionDataService {
         this.accountPersonalDataRepository = accountPersonalDataRepository;
         this.playerRepository = playerRepository;
         this.groupReadCacheService = groupReadCacheService;
+        this.groupRosterCache = groupRosterCache;
         this.accessControlService = accessControlService;
         this.supabaseAuthAdminClient = supabaseAuthAdminClient;
         this.clock = clock == null ? Clock.systemUTC() : clock;
@@ -308,6 +313,8 @@ public class AccountDeletionDataService {
     @Transactional
     public void completePendingAuthDeletion(UUID authUserId) {
         playerRepository.clearRetentionSubjectHash(retentionSubjectHash(authUserId));
+        // A bulk update: Hibernate does not see it, so the roster copy is dropped here.
+        groupRosterCache.changed();
         accountPersonalDataRepository.deletePendingAuthDeletion(authUserId);
     }
 
