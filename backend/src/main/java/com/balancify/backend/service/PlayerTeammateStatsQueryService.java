@@ -2,12 +2,13 @@ package com.balancify.backend.service;
 
 import com.balancify.backend.api.group.dto.GroupPlayerTeammateStatResponse;
 import com.balancify.backend.api.group.dto.GroupPlayerTeammateStatsResponse;
-import com.balancify.backend.domain.MatchParticipant;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.repository.MatchParticipantRepository;
 import com.balancify.backend.repository.PlayerRepository;
+import com.balancify.backend.repository.TeammateMatchRow;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,8 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
  * Win rate per teammate: how one player did in the matches they shared a team with each other
  * player.
  *
- * <p>It reads the participants of that player's matches once and aggregates them in memory, so a
- * lookup costs a single query rather than one per teammate. Results are cached per group and player
+ * <p>It reads the sides of that player's matches once (TeammateMatchRow) and aggregates them in
+ * memory, then the teammates' names in one more query, rather than a query per teammate. Results are
+ * cached per group and player
  * for the same short window as the other group reads, and a match result change drops the cache.
  * Withdrawn members are left out, since their nickname is masked everywhere else anyway.
  */
@@ -92,27 +94,24 @@ public class PlayerTeammateStatsQueryService {
             .orElseThrow(() -> new NoSuchElementException("Player not found"));
 
         // Newest match first, which is what the current win streak counts back from.
-        Map<Long, List<MatchParticipant>> participantsByMatchId = new LinkedHashMap<>();
-        for (MatchParticipant participant : matchParticipantRepository
-            .findByGroupIdAndPlayerMatchesOrderByPlayedAtDesc(groupId, playerId)) {
-            if (participant == null || participant.getMatch() == null || participant.getMatch().getId() == null) {
+        Map<Long, List<TeammateMatchRow>> rowsByMatchId = new LinkedHashMap<>();
+        for (TeammateMatchRow row : matchParticipantRepository.findTeammateMatchRows(groupId, playerId)) {
+            if (row == null || row.matchId() == null) {
                 continue;
             }
-            participantsByMatchId
-                .computeIfAbsent(participant.getMatch().getId(), ignored -> new ArrayList<>())
-                .add(participant);
+            rowsByMatchId.computeIfAbsent(row.matchId(), ignored -> new ArrayList<>()).add(row);
         }
 
         int wins = 0;
         int losses = 0;
         Map<Long, TeammateTotals> totalsByTeammateId = new LinkedHashMap<>();
-        for (List<MatchParticipant> matchParticipants : participantsByMatchId.values()) {
-            MatchParticipant own = findOwnParticipant(matchParticipants, playerId);
+        for (List<TeammateMatchRow> matchRows : rowsByMatchId.values()) {
+            TeammateMatchRow own = findOwnRow(matchRows, playerId);
             if (own == null) {
                 continue;
             }
-            String ownTeam = normalizeTeam(own.getTeam());
-            String winningTeam = normalizeTeam(own.getMatch().getWinningTeam());
+            String ownTeam = normalizeTeam(own.team());
+            String winningTeam = normalizeTeam(own.winningTeam());
             if (ownTeam.isEmpty() || winningTeam.isEmpty()) {
                 continue;
             }
@@ -124,22 +123,15 @@ public class PlayerTeammateStatsQueryService {
                 losses++;
             }
 
-            for (MatchParticipant other : matchParticipants) {
-                if (other == null || other.getPlayer() == null || other.getPlayer().getId() == null) {
-                    continue;
-                }
-                if (playerId.equals(other.getPlayer().getId()) || !ownTeam.equals(normalizeTeam(other.getTeam()))) {
-                    continue;
-                }
-                // Withdrawn members are masked everywhere else, so a row for them would only ever
-                // read as the hidden member label.
-                if (PlayerIdentityPolicy.isIdentityHidden(other.getPlayer())) {
+            for (TeammateMatchRow other : matchRows) {
+                if (other.playerId() == null
+                    || playerId.equals(other.playerId())
+                    || !ownTeam.equals(normalizeTeam(other.team()))) {
                     continue;
                 }
 
                 TeammateTotals totals = totalsByTeammateId
-                    .computeIfAbsent(other.getPlayer().getId(), ignored -> new TeammateTotals());
-                totals.nickname = PlayerIdentityPolicy.responseNickname(other.getPlayer());
+                    .computeIfAbsent(other.playerId(), ignored -> new TeammateTotals());
                 if (won) {
                     totals.wins++;
                     if (totals.streakOpen) {
@@ -152,13 +144,26 @@ public class PlayerTeammateStatsQueryService {
             }
         }
 
+        // The rows carry no names, so the teammates' own rows are read once each for them.
+        Map<Long, Player> teammatesById = new HashMap<>();
+        for (Player teammate : playerRepository.findAllById(totalsByTeammateId.keySet())) {
+            teammatesById.put(teammate.getId(), teammate);
+        }
+
         Comparator<GroupPlayerTeammateStatResponse> byWinRate =
             Comparator.comparingDouble(GroupPlayerTeammateStatResponse::winRate).reversed();
         Comparator<GroupPlayerTeammateStatResponse> byGames =
             Comparator.comparingInt(GroupPlayerTeammateStatResponse::games).reversed();
         List<GroupPlayerTeammateStatResponse> teammates = totalsByTeammateId.entrySet()
             .stream()
-            .map(entry -> toResponse(entry.getKey(), entry.getValue()))
+            // Withdrawn members are masked everywhere else, so a row for them would only ever
+            // read as the hidden member label.
+            .filter(entry -> !PlayerIdentityPolicy.isIdentityHidden(teammatesById.get(entry.getKey())))
+            .map(entry -> toResponse(
+                entry.getKey(),
+                PlayerIdentityPolicy.responseNickname(teammatesById.get(entry.getKey())),
+                entry.getValue()
+            ))
             .sorted(byWinRate
                 .thenComparing(byGames)
                 .thenComparing(stat -> safeTrim(stat.nickname()), String.CASE_INSENSITIVE_ORDER))
@@ -175,20 +180,20 @@ public class PlayerTeammateStatsQueryService {
         );
     }
 
-    private MatchParticipant findOwnParticipant(List<MatchParticipant> matchParticipants, Long playerId) {
-        for (MatchParticipant participant : matchParticipants) {
-            if (participant.getPlayer() != null && playerId.equals(participant.getPlayer().getId())) {
-                return participant;
+    private TeammateMatchRow findOwnRow(List<TeammateMatchRow> matchRows, Long playerId) {
+        for (TeammateMatchRow row : matchRows) {
+            if (playerId.equals(row.playerId())) {
+                return row;
             }
         }
         return null;
     }
 
-    private GroupPlayerTeammateStatResponse toResponse(Long teammateId, TeammateTotals totals) {
+    private GroupPlayerTeammateStatResponse toResponse(Long teammateId, String nickname, TeammateTotals totals) {
         int games = totals.wins + totals.losses;
         return new GroupPlayerTeammateStatResponse(
             teammateId,
-            totals.nickname,
+            nickname,
             totals.wins,
             totals.losses,
             games,
@@ -217,7 +222,6 @@ public class PlayerTeammateStatsQueryService {
     }
 
     private static final class TeammateTotals {
-        private String nickname;
         private int wins;
         private int losses;
         private int currentWinStreak;
