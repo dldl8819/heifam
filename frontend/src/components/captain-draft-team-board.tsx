@@ -1,13 +1,15 @@
 'use client'
 
 import { t } from '@/lib/i18n'
-import { draftPlayerTags, sortByTier, type DraftPlayerTags, type SetWins } from '@/lib/captain-draft'
+import { draftPlayerTags, sortByRanking, type DraftPlayerTags, type SetWins } from '@/lib/captain-draft'
 import { cn } from '@/lib/utils'
 import type { CaptainDraftParticipant, CaptainDraftResponse, PlayerRosterItem, TeamSide } from '@/types/api'
 
 type CaptainDraftTeamBoardProps = {
   draft: CaptainDraftResponse
   playerMap: Map<number, PlayerRosterItem>
+  // Each roster player's place in the ranking, which the teams and the players left are listed by.
+  ranking: ReadonlyMap<number, number>
   setWins: SetWins
   // A pick or a take-back in flight; every button waits for it.
   busy: boolean
@@ -57,11 +59,12 @@ function playerTags(participant: CaptainDraftParticipant, playerMap: Map<number,
 /**
  * Who is on which team, captain first, with each player's tier, races and set wins. The host puts
  * the players the captains call out into a team, in any order, and takes back a pick made by mistake.
- * Teams and the players left are listed by tier, highest first, which is how captains pick.
+ * Teams (captain first) and the players left are listed in ranking order, highest MMR first.
  */
 export function CaptainDraftTeamBoard({
   draft,
   playerMap,
+  ranking,
   setWins,
   busy,
   canTakeBack,
@@ -73,18 +76,18 @@ export function CaptainDraftTeamBoard({
       side: 'HOME',
       label: t('captainDraft.scoreboard.homeHeader'),
       wins: setWins.home,
-      members: sortByTier(draft.participants.filter((participant) => participant.team === 'HOME'), playerMap),
+      members: sortByRanking(draft.participants.filter((participant) => participant.team === 'HOME'), ranking, true),
     },
     {
       side: 'AWAY',
       label: t('captainDraft.scoreboard.awayHeader'),
       wins: setWins.away,
-      members: sortByTier(draft.participants.filter((participant) => participant.team === 'AWAY'), playerMap),
+      members: sortByRanking(draft.participants.filter((participant) => participant.team === 'AWAY'), ranking, true),
     },
   ]
-  const remaining = sortByTier(
+  const remaining = sortByRanking(
     draft.participants.filter((participant) => participant.team === 'UNASSIGNED' && !participant.captain),
-    playerMap,
+    ranking,
   )
 
   return (

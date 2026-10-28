@@ -33,8 +33,9 @@ import {
   setLayoutSummary,
   setSizeChoices,
   setTeamSizes,
+  rosterRanking,
   setupDiffersFromDraft,
-  sortByTier,
+  sortByRanking,
   stageLineups,
   stageOf,
   teamGameTarget,
@@ -454,22 +455,22 @@ describe('captain draft sets', () => {
     expect(draftPlayerOptionLabel('Ace', { tier: null, races: 'Z' }, 0)).toBe('Ace · Z · 0경기')
   })
 
-  it('orders players for picking: captains, then the highest live tier down, then off the roster', () => {
-    const roster = new Map<number, PlayerRosterItem>([
-      [1, rosterPlayer({ id: 1, nickname: '다', tier: 'B' })],
-      [2, rosterPlayer({ id: 2, nickname: '나', tier: 'B', liveTier: 'S' })],
-      [3, rosterPlayer({ id: 3, nickname: '가', tier: 'B' })],
-      [4, rosterPlayer({ id: 4, nickname: '라', tier: 'UNASSIGNED' })],
-      [5, rosterPlayer({ id: 5, nickname: '마', tier: 'D-' })],
+  it('orders players as the ranking does: the roster\'s order (highest MMR first), unassigned last, then off the roster', () => {
+    // The roster as the backend sends it, highest MMR first; no MMR on it, as members get it.
+    const ranking = rosterRanking([
+      rosterPlayer({ id: 4, nickname: '라', tier: 'UNASSIGNED' }),
+      rosterPlayer({ id: 2, nickname: '나', tier: 'B', liveTier: 'S' }),
+      rosterPlayer({ id: 5, nickname: '마', tier: 'D-' }),
+      rosterPlayer({ id: 1, nickname: '다', tier: 'B' }),
+      rosterPlayer({ id: 3, nickname: '가', tier: 'A' }),
     ])
+    expect([...ranking.entries()]).toEqual([[2, 0], [5, 1], [1, 2], [3, 3], [4, 4]])
+
     const participant = (playerId: number | null, nickname: string, captain = false) => ({ playerId, nickname, captain })
+    const players = [participant(4, '라'), participant(null, '탈퇴'), participant(1, '다'), participant(5, '마', true), participant(3, '가'), participant(2, '나')]
 
-    const sorted = sortByTier(
-      [participant(4, '라'), participant(null, '탈퇴'), participant(1, '다'), participant(5, '마', true), participant(3, '가'), participant(2, '나')],
-      roster,
-    )
-
-    expect(sorted.map((item) => item.nickname)).toEqual(['마', '나', '가', '다', '라', '탈퇴'])
+    expect(sortByRanking(players, ranking).map((item) => item.nickname)).toEqual(['나', '마', '다', '가', '라', '탈퇴'])
+    expect(sortByRanking(players, ranking, true).map((item) => item.nickname)).toEqual(['마', '나', '다', '가', '라', '탈퇴'])
   })
 
   it('tells when the attendance or captains on screen are not the draft shown, before loading over them', () => {

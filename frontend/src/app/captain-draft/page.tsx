@@ -33,6 +33,7 @@ import {
   setComposition,
   setupDiffersFromDraft,
   stageLineups,
+  rosterRanking,
   stageOf,
   stagesWithLineupEdits,
   teamSubmitted,
@@ -167,6 +168,8 @@ export default function CaptainDraftPage() {
     }
     return map
   }, [players])
+  // The ranking order the team board and the game counts list players by.
+  const ranking = useMemo(() => rosterRanking(players), [players])
 
   const selectedParticipantIds = useMemo(
     () => compactParticipantIds(participantSlots),
@@ -1054,6 +1057,7 @@ export default function CaptainDraftPage() {
             <CaptainDraftTeamBoard
               draft={draft}
               playerMap={playerMap}
+              ranking={ranking}
               setWins={setWins}
               busy={isChangingTeams}
               canTakeBack={canTakeBack}
@@ -1141,7 +1145,7 @@ export default function CaptainDraftPage() {
                   <p className="text-xs">{t('captainDraft.entry.repeatedLineupAdvice')}</p>
                 </div>
               )}
-              <CaptainDraftGameCounts sheet={sheet} teamMembers={teamMembers} playerMap={playerMap} controls={controls} />
+              <CaptainDraftGameCounts sheet={sheet} teamMembers={teamMembers} ranking={ranking} controls={controls} />
               <CaptainDraftEntrySheet
                 rounds={roundGroups}
                 sheet={sheet}

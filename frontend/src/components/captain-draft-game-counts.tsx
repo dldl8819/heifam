@@ -2,9 +2,9 @@
 
 import type { EntrySheetMember } from '@/components/captain-draft-entry-sheet'
 import { t } from '@/lib/i18n'
-import { gamesByPlayer, sortByTier, teamGameTarget, type EffectiveEntry, type SetControls } from '@/lib/captain-draft'
+import { gamesByPlayer, sortByRanking, teamGameTarget, type EffectiveEntry, type SetControls } from '@/lib/captain-draft'
 import { cn } from '@/lib/utils'
-import type { PlayerRosterItem, TeamSide } from '@/types/api'
+import type { TeamSide } from '@/types/api'
 
 const TITLE_ID = 'captain-draft-games-title'
 const TEAMS: Array<{ side: TeamSide; label: string; className: string }> = [
@@ -15,7 +15,8 @@ const TEAMS: Array<{ side: TeamSide; label: string; className: string }> = [
 type CaptainDraftGameCountsProps = {
   sheet: EffectiveEntry[]
   teamMembers: Record<TeamSide, EntrySheetMember[]>
-  playerMap: ReadonlyMap<number, PlayerRosterItem>
+  // Each roster player's place in the ranking: a team's players are listed in ranking order.
+  ranking: ReadonlyMap<number, number>
   // What this viewer may change in each set, by set key: a side kept from them is not counted.
   controls: ReadonlyMap<string, SetControls>
 }
@@ -26,7 +27,7 @@ type CaptainDraftGameCountsProps = {
  * 2:2 sets give 7 players 4 games each. A team's side kept from this viewer (a draft run by its
  * captains, before both line-ups are in) shows the share only.
  */
-export function CaptainDraftGameCounts({ sheet, teamMembers, playerMap, controls }: CaptainDraftGameCountsProps) {
+export function CaptainDraftGameCounts({ sheet, teamMembers, ranking, controls }: CaptainDraftGameCountsProps) {
   const games = gamesByPlayer(sheet)
   const rounds = new Set(sheet.filter((set) => !set.aceDecider).map((set) => set.roundNumber)).size
 
@@ -41,7 +42,7 @@ export function CaptainDraftGameCounts({ sheet, teamMembers, playerMap, controls
       <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{t('captainDraft.games.helper', { rounds })}</p>
       <div className="mt-2 space-y-2">
         {TEAMS.map(({ side, label, className }) => {
-          const members = sortByTier(teamMembers[side], playerMap)
+          const members = sortByRanking(teamMembers[side], ranking)
           const target = teamGameTarget(sheet, side, members.length)
           if (!target) {
             return null
