@@ -37,11 +37,12 @@ import {
   stageLineups,
   stageOf,
   stagesWithLineupEdits,
+  teamsByPlayer,
   withSlot,
   type DraftViewer,
   type StageLineup,
 } from '@/lib/captain-draft'
-import type { CaptainDraftEntry, CaptainDraftLineupStage, PlayerRosterItem } from '@/types/api'
+import type { CaptainDraftEntry, CaptainDraftLineupStage, CaptainDraftParticipant, PlayerRosterItem } from '@/types/api'
 
 function slot(playerId: number | null) {
   return playerId === null ? null : { playerId, nickname: `P${playerId}` }
@@ -456,6 +457,21 @@ describe('captain draft sets', () => {
     // No draft shown: anything typed at all.
     expect(setupDiffersFromDraft(null, [], null, null)).toBe(false)
     expect(setupDiffersFromDraft(null, [5], null, null)).toBe(true)
+  })
+
+  it('gives the tier board the team of every picked player and captain, and none to those still to be picked', () => {
+    const participant = (playerId: number | null, team: CaptainDraftParticipant['team'], captain = false): CaptainDraftParticipant => ({
+      playerId, nickname: `P${playerId}`, race: 'P', team, captain, pickOrder: null,
+    })
+    const teams = teamsByPlayer([
+      participant(1, 'HOME', true),
+      participant(2, 'AWAY', true),
+      participant(3, 'HOME'),
+      participant(4, 'UNASSIGNED'),
+      participant(null, 'AWAY'),
+    ])
+    expect([...teams.entries()]).toEqual([[1, 'HOME'], [2, 'AWAY'], [3, 'HOME']])
+    expect(teamsByPlayer([]).size).toBe(0)
   })
 })
 
