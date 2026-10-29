@@ -1,16 +1,21 @@
+# The production backend as it runs on Render today (Docker runtime, Standard plan: 1 CPU, 2 GB, which
+# the dashboard calls 1c-2g). The service was created in the Render dashboard and is not synced from
+# this file, so editing it does not change the service. When the plan or the runtime is changed in the
+# dashboard, change it here too.
+#
+# The backend uses about 470-540 MB of memory, close to the 512 MB of the Free and Starter plans.
 services:
   - type: web
-    name: hei-backend
-    runtime: java
+    name: heifam
+    runtime: docker
+    region: singapore
     rootDir: backend
-    plan: free
-    buildCommand: ./gradlew clean bootJar
-    startCommand: java -jar build/libs/heifam-backend.jar
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: standard
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:
-      - key: JAVA_VERSION
-        value: "21"
       - key: SPRING_DATASOURCE_URL
         sync: false
       - key: SPRING_DATASOURCE_USERNAME
