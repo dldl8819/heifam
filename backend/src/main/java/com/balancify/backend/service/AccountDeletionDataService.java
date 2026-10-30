@@ -411,6 +411,9 @@ public class AccountDeletionDataService {
             }
             safeGroupIds.forEach(groupReadCacheService::evictGroup);
         });
+        // Bulk updates also took the name off regular drafts this account started or put results in.
+        // With no player linked Hibernate saw no change, and an open draft follows this one.
+        groupRosterCache.changed();
     }
 
     private void addPlayers(Map<Long, Player> target, List<Player> players) {
