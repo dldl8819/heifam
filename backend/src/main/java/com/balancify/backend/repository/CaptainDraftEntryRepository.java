@@ -10,11 +10,14 @@ import org.springframework.data.repository.query.Param;
 
 public interface CaptainDraftEntryRepository extends JpaRepository<CaptainDraftEntry, Long> {
 
+    // A set's players are its draft's participants, and every caller has just read those with their
+    // player (CaptainDraftParticipantRepository.findByDraftIdWithPlayer), so a slot only has to point
+    // at them. Reading the player again with each slot was most of what the database sent out for a
+    // draft (egress).
     @Query("""
         select distinct entry
         from CaptainDraftEntry entry
         left join fetch entry.players slotted
-        left join fetch slotted.player
         where entry.draft.id = :draftId
         order by entry.roundNumber asc, entry.setNumber asc
         """)

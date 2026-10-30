@@ -105,6 +105,7 @@ import com.balancify.backend.service.AccountDeletionService;
 import com.balancify.backend.service.AttendanceMenu;
 import com.balancify.backend.service.CaptainDraftService;
 import com.balancify.backend.service.CaptainDraftVersions;
+import com.balancify.backend.service.GroupRosterCache;
 import com.balancify.backend.service.DashboardQueryService;
 import com.balancify.backend.service.GroupMatchAdminService;
 import com.balancify.backend.service.LedgerExpenseAdminService;
@@ -231,6 +232,9 @@ class AdminKeyFilterTest {
 
     @MockitoBean
     private CaptainDraftService captainDraftService;
+
+    @MockitoBean
+    private GroupRosterCache groupRosterCache;
 
     @MockitoBean
     private ManualMatchService manualMatchService;

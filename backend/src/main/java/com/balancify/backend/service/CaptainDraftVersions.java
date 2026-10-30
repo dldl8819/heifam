@@ -7,6 +7,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongSupplier;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -17,31 +19,35 @@ import org.springframework.stereotype.Component;
  * draft again. What the database sends out is what Supabase meters (egress).
  *
  * Every change made through CaptainDraftService moves its draft's version on, before it commits and
- * again after, so no ask in between keeps a copy from before the change. What changes a draft from
- * elsewhere (a player's tier or nickname, a deleted account) is not followed here, so a copy is
- * trusted for MAX_AGE at most and then read afresh. Versions live in this process only: a tag from
- * before a restart never matches.
+ * again after, so no ask in between keeps a copy from before the change. A draft also shows its
+ * players (a nickname, a linked account, a withdrawal), so a tag holds GroupRosterCache's count of
+ * changes to players too. Only a change made outside the backend (by hand in the database) is not
+ * followed, so a copy is trusted for MAX_AGE at most and then read afresh. Versions live in this
+ * process only: a tag from before a restart never matches.
  */
 @Component
 public class CaptainDraftVersions {
-    static final Duration MAX_AGE = Duration.ofSeconds(30);
+    static final Duration MAX_AGE = Duration.ofMinutes(5);
 
     private final String bootId = Long.toString(ThreadLocalRandom.current().nextLong() & Long.MAX_VALUE, 36);
     private final ConcurrentMap<Long, AtomicLong> versions = new ConcurrentHashMap<>();
+    private final LongSupplier playerChanges;
     private final Clock clock;
 
-    public CaptainDraftVersions() {
-        this(Clock.systemUTC());
+    @Autowired
+    public CaptainDraftVersions(GroupRosterCache groupRosterCache) {
+        this(groupRosterCache::generation, Clock.systemUTC());
     }
 
-    CaptainDraftVersions(Clock clock) {
+    CaptainDraftVersions(LongSupplier playerChanges, Clock clock) {
+        this.playerChanges = playerChanges;
         this.clock = clock;
     }
 
     /** The tag for this reader's copy of the draft as it is now. */
     public String tag(Long draftId, UUID viewer) {
-        return "\"" + bootId + "-" + draftId + "-" + version(draftId) + "-" + viewerKey(viewer) + "-"
-            + clock.instant().getEpochSecond() + "\"";
+        return "\"" + bootId + "-" + draftId + "-" + version(draftId) + "-" + playerChanges.getAsLong() + "-"
+            + viewerKey(viewer) + "-" + clock.instant().getEpochSecond() + "\"";
     }
 
     /**
@@ -60,15 +66,16 @@ public class CaptainDraftVersions {
             return false;
         }
         String[] parts = value.substring(1, value.length() - 1).split("-");
-        if (parts.length != 5) {
+        if (parts.length != 6) {
             return false;
         }
         try {
-            long age = clock.instant().getEpochSecond() - Long.parseLong(parts[4]);
+            long age = clock.instant().getEpochSecond() - Long.parseLong(parts[5]);
             return parts[0].equals(bootId)
                 && parts[1].equals(draftId.toString())
                 && Long.parseLong(parts[2]) == version(draftId)
-                && parts[3].equals(viewerKey(viewer))
+                && Long.parseLong(parts[3]) == playerChanges.getAsLong()
+                && parts[4].equals(viewerKey(viewer))
                 && age >= 0
                 && age < MAX_AGE.toSeconds();
         } catch (NumberFormatException notOurTag) {

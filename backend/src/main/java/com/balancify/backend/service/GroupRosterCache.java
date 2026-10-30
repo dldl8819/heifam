@@ -85,6 +85,11 @@ public class GroupRosterCache {
         TransactionAfterCommit.runNowAndAfterCommit(this::dropAll);
     }
 
+    /** Moves on with every change(): what shows players elsewhere can tell it may be out of date. */
+    public long generation() {
+        return generation.get();
+    }
+
     private void dropAll() {
         generation.incrementAndGet();
         copies.clear();

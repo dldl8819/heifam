@@ -38,6 +38,7 @@ import com.balancify.backend.repository.GroupRepository;
 import com.balancify.backend.repository.PlayerRepository;
 import com.balancify.backend.service.exception.CaptainDraftLineupForbiddenException;
 import com.balancify.backend.service.exception.CaptainDraftResultLockedException;
+import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -88,7 +89,7 @@ class CaptainDraftServiceTest {
     private OperationAuditLogService operationAuditLogService;
 
     private CaptainDraftService captainDraftService;
-    private final CaptainDraftVersions captainDraftVersions = new CaptainDraftVersions();
+    private final CaptainDraftVersions captainDraftVersions = new CaptainDraftVersions(() -> 0L, Clock.systemUTC());
 
     @BeforeEach
     void setUp() {
