@@ -27,6 +27,7 @@ function row(key: string, points: number, params: Record<string, string | number
 /** The ways to earn points, grouped as the policy page lists them, with the amounts and caps in force. */
 export function pointPolicyGroups(policy: PointPolicyResponse): PointPolicyGroup[] {
   const menuVisit = policy.menuVisit ?? { points: 0, dailyCap: 0 }
+  const captainDraft = policy.captainDraft ?? { points: 0, dailyCap: 0 }
   return [
     {
       title: t('points.policy.groups.attendance'),
@@ -45,6 +46,7 @@ export function pointPolicyGroups(policy: PointPolicyResponse): PointPolicyGroup
           cap: policy.matchConfirm.dailyCap,
           hours: policy.matchConfirmWindowHours,
         }),
+        row('captainDraft', captainDraft.points, { cap: captainDraft.dailyCap }),
       ],
     },
     {

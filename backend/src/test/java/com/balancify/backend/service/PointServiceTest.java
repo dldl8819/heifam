@@ -359,6 +359,58 @@ class PointServiceTest {
     }
 
     @Test
+    void paysEachCaptainOfADraftOnceUpToTwoDraftsADay() {
+        stubAccount(ADMIN_EMAIL, 7L);
+        lenient().when(pointTransactionRepository.existsByAccount_IdAndReasonAndReferenceKey(7L, PointService.REASON_CAPTAIN_DRAFT, "captain-draft:100:2"))
+            .thenReturn(true);
+        when(pointTransactionRepository.countByAccount_IdAndReasonAndKstDate(7L, PointService.REASON_CAPTAIN_DRAFT, TODAY))
+            .thenReturn(1L, 2L);
+
+        pointService.grantCaptainDraftPoint(ADMIN_EMAIL, 100L, 1L);
+        // Already paid as this captain of this draft.
+        pointService.grantCaptainDraftPoint(ADMIN_EMAIL, 100L, 2L);
+        // A third draft the same day.
+        pointService.grantCaptainDraftPoint(ADMIN_EMAIL, 101L, 1L);
+        pointService.grantCaptainDraftPoint(ADMIN_EMAIL, null, 1L);
+
+        PointTransaction saved = captureSavedTransaction();
+        assertThat(saved.getReason()).isEqualTo(PointService.REASON_CAPTAIN_DRAFT);
+        assertThat(saved.getAmount()).isEqualTo(3);
+        assertThat(saved.getReferenceKey()).isEqualTo("captain-draft:100:1");
+        assertThat(saved.getKstDate()).isEqualTo(TODAY);
+    }
+
+    @Test
+    void tellsWhetherACaptainWasPaidWhoeverHoldsThePoint() {
+        when(pointTransactionRepository.existsByReasonAndReferenceKey(PointService.REASON_CAPTAIN_DRAFT, "captain-draft:100:1"))
+            .thenReturn(true);
+
+        assertThat(pointService.hasCaptainDraftPoint(100L, 1L)).isTrue();
+        assertThat(pointService.hasCaptainDraftPoint(100L, 2L)).isFalse();
+        assertThat(pointService.hasCaptainDraftPoint(null, 1L)).isFalse();
+    }
+
+    @Test
+    void takesBackEachCaptainsPointForADeletedDraftOnce() {
+        PointAccount captain = stubAccount(MEMBER_EMAIL, 8L);
+        PointTransaction paid = row(PointService.REASON_CAPTAIN_DRAFT, 3, null, "captain-draft:100:1");
+        paid.setAccount(captain);
+        when(pointTransactionRepository.findByReasonAndReferenceKey(PointService.REASON_CAPTAIN_DRAFT, "captain-draft:100:1"))
+            .thenReturn(List.of(paid));
+        // The other captain had no account to be paid into.
+        when(pointTransactionRepository.findByReasonAndReferenceKey(PointService.REASON_CAPTAIN_DRAFT, "captain-draft:100:2"))
+            .thenReturn(List.of());
+
+        pointService.reverseCaptainDraftPoints(100L, List.of(1L, 2L));
+
+        PointTransaction saved = captureSavedTransaction();
+        assertThat(saved.getAccount()).isSameAs(captain);
+        assertThat(saved.getReason()).isEqualTo(PointService.REASON_CAPTAIN_DRAFT_REVERSED);
+        assertThat(saved.getAmount()).isEqualTo(-3);
+        assertThat(saved.getReferenceKey()).isEqualTo("captain-draft:100:1");
+    }
+
+    @Test
     void tellsThePolicyAsConfigured() {
         pointProperties.setBoardPostDailyCap(5);
         pointProperties.setNoticeAction(2);
@@ -375,6 +427,7 @@ class PointServiceTest {
         assertThat(policy.boardPost()).isEqualTo(new PointPolicyResponse.Capped(1, 5));
         assertThat(policy.boardComment()).isEqualTo(new PointPolicyResponse.Capped(1, 10));
         assertThat(policy.boardLike()).isEqualTo(new PointPolicyResponse.Capped(1, 10));
+        assertThat(policy.captainDraft()).isEqualTo(new PointPolicyResponse.Capped(3, 2));
     }
 
     @Test

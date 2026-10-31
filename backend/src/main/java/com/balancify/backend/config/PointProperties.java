@@ -34,6 +34,9 @@ public class PointProperties {
     private int boardCommentDailyCap = 10;
     private int boardLike = 1;
     private int boardLikeDailyCap = 10;
+    // Captaining a regular draft (정기 감전), once a draft, when its first set result is in.
+    private int captainDraft = 3;
+    private int captainDraftDailyCap = 2;
 
     public boolean isMembersEnabled() {
         return membersEnabled;
@@ -185,5 +188,21 @@ public class PointProperties {
 
     public void setBoardLikeDailyCap(int boardLikeDailyCap) {
         this.boardLikeDailyCap = Math.max(0, boardLikeDailyCap);
+    }
+
+    public int getCaptainDraft() {
+        return captainDraft;
+    }
+
+    public void setCaptainDraft(int captainDraft) {
+        this.captainDraft = Math.max(0, captainDraft);
+    }
+
+    public int getCaptainDraftDailyCap() {
+        return captainDraftDailyCap;
+    }
+
+    public void setCaptainDraftDailyCap(int captainDraftDailyCap) {
+        this.captainDraftDailyCap = Math.max(0, captainDraftDailyCap);
     }
 }

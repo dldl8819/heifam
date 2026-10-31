@@ -12,6 +12,8 @@ public interface PointTransactionRepository extends JpaRepository<PointTransacti
 
     boolean existsByAccount_IdAndReasonAndReferenceKey(Long accountId, String reason, String referenceKey);
 
+    boolean existsByReasonAndReferenceKey(String reason, String referenceKey);
+
     long countByAccount_IdAndReasonAndKstDate(Long accountId, String reason, LocalDate kstDate);
 
     List<PointTransaction> findByAccount_IdAndReasonAndKstDate(Long accountId, String reason, LocalDate kstDate);
