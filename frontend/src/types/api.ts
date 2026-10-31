@@ -1378,8 +1378,9 @@ export type BalanceSeriesLineup = {
 
 export type PrizeEventStatus = 'OPEN' | 'CONFIRMED' | 'CANCELLED'
 
-// What ranks a prize event's period: points earned, or finished matches played.
-export type PrizeEventMetric = 'POINTS' | 'GAMES'
+// What ranks a prize event's period: points earned, finished matches played, or numbers counted
+// outside the site that the admin who starts the event enters (MANUAL, e.g. chat messages).
+export type PrizeEventMetric = 'POINTS' | 'GAMES' | 'MANUAL'
 
 // A points event's candidate is a point account; a matches-played one's is a player.
 export type PrizeCandidate = {
@@ -1412,6 +1413,8 @@ export type PrizeEvent = {
   winners: PrizeWinner[]
   // Missing while a backend from before the choice is still answering.
   metric?: PrizeEventMetric
+  // MANUAL only: what its numbers count, as the admin named it.
+  unitLabel?: string | null
 }
 
 export type PrizeEventCreateRequest = {
@@ -1420,6 +1423,15 @@ export type PrizeEventCreateRequest = {
   periodEnd: string
   winnerCount: number
   metric: PrizeEventMetric
+  // MANUAL only.
+  unitLabel?: string
+  entries?: PrizeEventEntry[]
+}
+
+// A player's number in a MANUAL event, as counted outside the site.
+export type PrizeEventEntry = {
+  playerId: number
+  score: number
 }
 
 export type PrizeWinnerPick = {
