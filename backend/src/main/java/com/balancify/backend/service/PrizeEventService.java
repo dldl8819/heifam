@@ -33,8 +33,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Prize events: a super admin names a period, the top point earners of that period are the
- * candidates, and confirming the winners records every paid prize as a donation ledger expense.
+ * Prize events: an admin names a period, the top point earners of that period are the candidates,
+ * and a super admin confirming the winners records every paid prize as a donation ledger expense.
  * The expense carries the event title and place, never the winner's name.
  */
 @Service

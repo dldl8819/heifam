@@ -15,7 +15,7 @@ import { expect, test, type Page } from '@playwright/test'
 const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']
 
 // /auth is left out: it goes straight on to Google's sign-in.
-const VISITOR_PAGES = ['/', '/notices', '/events', '/ads', '/results', '/privacy', '/terms']
+const VISITOR_PAGES = ['/', '/notices', '/ads', '/results', '/privacy', '/terms']
 
 const SIGNED_IN_PAGES = [
   '/players',
@@ -33,7 +33,6 @@ const SIGNED_IN_PAGES = [
   '/points',
   '/points/ranking',
   '/points/policy',
-  '/points/events',
   '/predictions',
   '/events',
   '/ads',

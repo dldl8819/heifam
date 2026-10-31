@@ -9,6 +9,9 @@ import type { PrizeEvent } from '@/types/api'
 
 type PrizeEventsPanelProps = {
   groupId: number
+  // Admins start an event, as they post a notice.
+  canCreate: boolean
+  // Super admins pick the winners and confirm or cancel: confirming writes the donation ledger.
   canManage: boolean
 }
 
@@ -27,7 +30,7 @@ function todayInKorea(): string {
   return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
 }
 
-export function PrizeEventsPanel({ groupId, canManage }: PrizeEventsPanelProps) {
+export function PrizeEventsPanel({ groupId, canCreate, canManage }: PrizeEventsPanelProps) {
   const [events, setEvents] = useState<PrizeEvent[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
@@ -150,7 +153,7 @@ export function PrizeEventsPanel({ groupId, canManage }: PrizeEventsPanelProps) 
       {error && <p role="alert" className="text-xs text-rose-600 dark:text-rose-300">{error}</p>}
       {message && <p className="text-xs text-emerald-700 dark:text-emerald-300">{message}</p>}
 
-      {canManage && (
+      {canCreate && (
         <form onSubmit={handleCreate} className="grid gap-2 rounded-lg bg-slate-50 p-3 dark:bg-slate-800/60 sm:grid-cols-[2fr_1fr_1fr_auto_auto] sm:items-end">
           <label className="space-y-1 text-xs text-slate-600 dark:text-slate-300">
             <span>{t('prizeEvents.form.title')}</span>

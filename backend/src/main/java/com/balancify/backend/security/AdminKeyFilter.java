@@ -179,16 +179,17 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/captain-drafts/{draftId}/ace"),
             AuthType.SERVICE_ACCESS
         ),
-        // Prize events: admins see them while points are tried out, super admins run them.
+        // Prize events (the events page): members see them, admins start one as they post a notice,
+        // and super admins confirm or cancel one, as confirming writes the donation ledger.
         new ProtectedRoute(
             "GET",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/prize-events"),
-            AuthType.ADMIN_EMAIL
+            AuthType.SERVICE_ACCESS
         ),
         new ProtectedRoute(
             "POST",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/prize-events"),
-            AuthType.SUPER_ADMIN_EMAIL
+            AuthType.ADMIN_EMAIL
         ),
         new ProtectedRoute(
             "POST",
