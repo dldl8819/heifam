@@ -1124,6 +1124,8 @@ export type PointReason =
   | 'BOARD_POST_REVERSED'
   | 'BOARD_COMMENT'
   | 'BOARD_LIKE'
+  | 'CAPTAIN_DRAFT'
+  | 'CAPTAIN_DRAFT_REVERSED'
   // Given back when emails were grouped as one person: what was earned twice for the same thing.
   | 'PERSON_MERGE'
 
@@ -1146,6 +1148,8 @@ export type PointPolicyResponse = {
   boardPost: PointPolicyCapped
   boardComment: PointPolicyCapped
   boardLike: PointPolicyCapped
+  // Captaining a regular draft; missing while a backend from before it is still answering.
+  captainDraft?: PointPolicyCapped
 }
 
 /** An email one person signs in with, as 같은 사람 묶기 shows it to super admins. */

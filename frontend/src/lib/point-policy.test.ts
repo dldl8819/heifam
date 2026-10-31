@@ -13,6 +13,7 @@ const POLICY: PointPolicyResponse = {
   boardPost: { points: 2, dailyCap: 3 },
   boardComment: { points: 1, dailyCap: 10 },
   boardLike: { points: 0, dailyCap: 10 },
+  captainDraft: { points: 3, dailyCap: 2 },
 }
 
 describe('point policy', () => {
@@ -26,7 +27,8 @@ describe('point policy', () => {
       '공지사항',
       '게시판 (자유게시판·추천영상)',
     ])
-    expect(groups.map((group) => group.rows.length)).toEqual([1, 2, 1, 4, 3])
+    expect(groups.map((group) => group.rows.length)).toEqual([1, 3, 1, 4, 3])
+    expect(groups[1].rows[2]).toMatchObject({ name: '정기 감전 감독', points: 3, limit: '감전마다 1번, 하루 2번' })
 
     const boards = groups[4].rows
     expect(boards.map((row) => [row.name, row.points, row.limit])).toEqual([
@@ -42,9 +44,10 @@ describe('point policy', () => {
     expect(groups[0].rows[0].detail).toContain('공지사항·자유게시판·익명게시판·추천영상·선수 관리')
   })
 
-  it('shows menu attendance as off while an older backend answers without it', () => {
-    const { menuVisit: _menuVisit, ...older } = POLICY
+  it('shows menu attendance and captaining as off while an older backend answers without them', () => {
+    const { menuVisit: _menuVisit, captainDraft: _captainDraft, ...older } = POLICY
     expect(pointPolicyGroups(older)[0].rows[0].points).toBe(0)
+    expect(pointPolicyGroups(older)[1].rows[2].points).toBe(0)
   })
 
   it('leaves no placeholder unfilled', () => {

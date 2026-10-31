@@ -2334,14 +2334,17 @@ class AdminKeyFilterTest {
             new com.balancify.backend.api.points.dto.PointPolicyResponse.Capped(1, 10);
         when(pointService.getPolicy()).thenReturn(new com.balancify.backend.api.points.dto.PointPolicyResponse(
             tenADay, tenADay, tenADay, 48, tenADay, 1, tenADay,
-            new com.balancify.backend.api.points.dto.PointPolicyResponse.Capped(1, 3), tenADay, tenADay
+            new com.balancify.backend.api.points.dto.PointPolicyResponse.Capped(1, 3), tenADay, tenADay,
+            new com.balancify.backend.api.points.dto.PointPolicyResponse.Capped(3, 2)
         ));
 
         mockMvc
             .perform(get("/api/points/policy").header("X-USER-EMAIL", "member@hei.gg"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.boardPost.points").value(1))
-            .andExpect(jsonPath("$.boardPost.dailyCap").value(3));
+            .andExpect(jsonPath("$.boardPost.dailyCap").value(3))
+            .andExpect(jsonPath("$.captainDraft.points").value(3))
+            .andExpect(jsonPath("$.captainDraft.dailyCap").value(2));
         mockMvc
             .perform(get("/api/points/policy").header("X-USER-EMAIL", "blocked@hei.gg"))
             .andExpect(status().isForbidden());

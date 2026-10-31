@@ -59,6 +59,8 @@ public class PointService {
     public static final String REASON_BOARD_POST_REVERSED = "BOARD_POST_REVERSED";
     public static final String REASON_BOARD_COMMENT = "BOARD_COMMENT";
     public static final String REASON_BOARD_LIKE = "BOARD_LIKE";
+    public static final String REASON_CAPTAIN_DRAFT = "CAPTAIN_DRAFT";
+    public static final String REASON_CAPTAIN_DRAFT_REVERSED = "CAPTAIN_DRAFT_REVERSED";
     private static final List<String> NOTICE_REASONS = List.of(REASON_NOTICE_READ, REASON_NOTICE_LIKE, REASON_NOTICE_COMMENT);
     private static final List<String> PREDICTION_REASONS = List.of(REASON_PREDICTION_HIT, REASON_PREDICTION_HIT_REVERSED);
 
@@ -372,6 +374,48 @@ public class PointService {
         }
     }
 
+    /** Whether this captain of this regular draft was paid for it, whichever account holds the point. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public boolean hasCaptainDraftPoint(Long draftId, Long captainPlayerId) {
+        return draftId != null && captainPlayerId != null && pointTransactionRepository.existsByReasonAndReferenceKey(
+            REASON_CAPTAIN_DRAFT, captainDraftReference(draftId, captainPlayerId)
+        );
+    }
+
+    /**
+     * A captain of a regular draft earns points once a draft, up to a daily cap. CaptainDraftPoints
+     * decides when, and whose account the captain's player belongs to.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void grantCaptainDraftPoint(String email, Long draftId, Long captainPlayerId) {
+        if (draftId != null && captainPlayerId != null) {
+            grantOncePerReference(
+                email,
+                REASON_CAPTAIN_DRAFT,
+                captainDraftReference(draftId, captainPlayerId),
+                pointProperties.getCaptainDraft(),
+                pointProperties.getCaptainDraftDailyCap()
+            );
+        }
+    }
+
+    /** Takes back the captains' points of a deleted draft record; the original rows stay as history. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void reverseCaptainDraftPoints(Long draftId, Collection<Long> captainPlayerIds) {
+        if (draftId == null || captainPlayerIds == null) {
+            return;
+        }
+        for (Long captainPlayerId : captainPlayerIds) {
+            if (captainPlayerId != null) {
+                reverseGrants(
+                    captainDraftReference(draftId, captainPlayerId),
+                    REASON_CAPTAIN_DRAFT,
+                    REASON_CAPTAIN_DRAFT_REVERSED
+                );
+            }
+        }
+    }
+
     /** Every amount, cap and window in force, for the page that explains the rules. */
     public PointPolicyResponse getPolicy() {
         return new PointPolicyResponse(
@@ -384,7 +428,8 @@ public class PointService {
             new PointPolicyResponse.Capped(pointProperties.getNoticeCommentLike(), pointProperties.getNoticeCommentLikeDailyCap()),
             new PointPolicyResponse.Capped(pointProperties.getBoardPost(), pointProperties.getBoardPostDailyCap()),
             new PointPolicyResponse.Capped(pointProperties.getBoardComment(), pointProperties.getBoardCommentDailyCap()),
-            new PointPolicyResponse.Capped(pointProperties.getBoardLike(), pointProperties.getBoardLikeDailyCap())
+            new PointPolicyResponse.Capped(pointProperties.getBoardLike(), pointProperties.getBoardLikeDailyCap()),
+            new PointPolicyResponse.Capped(pointProperties.getCaptainDraft(), pointProperties.getCaptainDraftDailyCap())
         );
     }
 
@@ -675,6 +720,11 @@ public class PointService {
 
     private static String boardPostReference(Long postId) {
         return "board-post:" + postId;
+    }
+
+    // One per captain, so the two captains of a draft are paid and taken back apart.
+    private static String captainDraftReference(Long draftId, Long captainPlayerId) {
+        return "captain-draft:" + draftId + ":" + captainPlayerId;
     }
 
     private static String noticeReadReference(Long noticeId, int revision) {

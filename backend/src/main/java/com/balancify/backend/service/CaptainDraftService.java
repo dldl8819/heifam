@@ -88,6 +88,7 @@ public class CaptainDraftService {
     private final CaptainDraftLineupRepository captainDraftLineupRepository;
     private final OperationAuditLogService operationAuditLogService;
     private final CaptainDraftVersions captainDraftVersions;
+    private final CaptainDraftPoints captainDraftPoints;
 
     public CaptainDraftService(
         GroupRepository groupRepository,
@@ -97,7 +98,8 @@ public class CaptainDraftService {
         CaptainDraftEntryRepository captainDraftEntryRepository,
         CaptainDraftLineupRepository captainDraftLineupRepository,
         OperationAuditLogService operationAuditLogService,
-        CaptainDraftVersions captainDraftVersions
+        CaptainDraftVersions captainDraftVersions,
+        CaptainDraftPoints captainDraftPoints
     ) {
         this.groupRepository = groupRepository;
         this.playerRepository = playerRepository;
@@ -107,6 +109,7 @@ public class CaptainDraftService {
         this.captainDraftLineupRepository = captainDraftLineupRepository;
         this.operationAuditLogService = operationAuditLogService;
         this.captainDraftVersions = captainDraftVersions;
+        this.captainDraftPoints = captainDraftPoints;
     }
 
     /**
@@ -272,6 +275,7 @@ public class CaptainDraftService {
         CaptainDraft draft = loadDraftToChange(groupId, draftId);
         Long id = draft.getId();
         String title = draft.getTitle();
+        captainDraftPoints.takeBack(draft);
         int sets = captainDraftEntryRepository.deleteByDraftId(id);
         int participants = captainDraftParticipantRepository.deleteByDraftId(id);
         captainDraftRepository.deleteDraft(id);
@@ -544,6 +548,10 @@ public class CaptainDraftService {
 
         requireOneSetPerRound(entries);
         captainDraftEntryRepository.saveAll(entries);
+        // A set with a result means the draft is being played, which earns its captains their points.
+        if (entries.stream().anyMatch(entry -> normalizeWinnerTeam(entry.getWinnerTeam()) != null)) {
+            captainDraftPoints.grantWhilePlayed(draft);
+        }
         return toResponse(draft, participants, entries, lineups, viewerUserId);
     }
 

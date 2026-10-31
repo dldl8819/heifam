@@ -154,6 +154,10 @@ balancify:
     board-comment-daily-cap: ${POINTS_BOARD_COMMENT_DAILY_CAP:10}
     board-like: ${POINTS_BOARD_LIKE:1}
     board-like-daily-cap: ${POINTS_BOARD_LIKE_DAILY_CAP:10}
+    # Each captain of a regular draft, once a draft, when its first set result is in; taken back
+    # when the draft record is deleted. Up to the cap a day.
+    captain-draft: ${POINTS_CAPTAIN_DRAFT:3}
+    captain-draft-daily-cap: ${POINTS_CAPTAIN_DRAFT_DAILY_CAP:2}
   tournament:
     # Admins try team tournaments out first. true lets members record tournament games; running
     # tournaments also needs the tournament routes in AdminKeyFilter and the screen opened to members.
