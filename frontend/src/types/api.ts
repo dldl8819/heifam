@@ -1378,11 +1378,17 @@ export type BalanceSeriesLineup = {
 
 export type PrizeEventStatus = 'OPEN' | 'CONFIRMED' | 'CANCELLED'
 
+// What ranks a prize event's period: points earned, or finished matches played.
+export type PrizeEventMetric = 'POINTS' | 'GAMES'
+
+// A points event's candidate is a point account; a matches-played one's is a player.
 export type PrizeCandidate = {
   rank: number
-  pointAccountId: number
+  pointAccountId: number | null
   nickname: string | null
+  // Points earned, or matches played in a GAMES event.
   points: number
+  playerId?: number | null
 }
 
 export type PrizeWinner = {
@@ -1404,6 +1410,8 @@ export type PrizeEvent = {
   confirmedAt: string | null
   candidates: PrizeCandidate[]
   winners: PrizeWinner[]
+  // Missing while a backend from before the choice is still answering.
+  metric?: PrizeEventMetric
 }
 
 export type PrizeEventCreateRequest = {
@@ -1411,11 +1419,19 @@ export type PrizeEventCreateRequest = {
   periodStart: string
   periodEnd: string
   winnerCount: number
+  metric: PrizeEventMetric
+}
+
+export type PrizeWinnerPick = {
+  pointAccountId: number | null
+  playerId: number | null
+  prize: string | null
+  amount: number
 }
 
 export type PrizeEventConfirmRequest = {
   paidOn: string | null
-  winners: Array<{ pointAccountId: number; prize: string | null; amount: number }>
+  winners: PrizeWinnerPick[]
 }
 
 export type TeamScoreEntry = {

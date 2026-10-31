@@ -12,6 +12,31 @@ import org.springframework.data.repository.query.Param;
 
 public interface MatchParticipantRepository extends JpaRepository<MatchParticipant, Long> {
 
+    interface PlayerGameCount {
+        Long getPlayerId();
+
+        Long getGames();
+    }
+
+    /** How many finished matches of the group each player played in [from, to), most first. */
+    @Query("""
+        select participant.player.id as playerId, count(distinct game.id) as games
+        from MatchParticipant participant
+        join participant.match game
+        where game.group.id = :groupId
+          and game.status = com.balancify.backend.domain.MatchStatus.COMPLETED
+          and game.winningTeam is not null
+          and game.playedAt >= :from
+          and game.playedAt < :to
+        group by participant.player.id
+        order by count(distinct game.id) desc, participant.player.id asc
+        """)
+    List<PlayerGameCount> countFinishedGamesByPlayerBetween(
+        @Param("groupId") Long groupId,
+        @Param("from") OffsetDateTime from,
+        @Param("to") OffsetDateTime to
+    );
+
     /**
      * Loads only the participants of matches the given player took part in.
      *

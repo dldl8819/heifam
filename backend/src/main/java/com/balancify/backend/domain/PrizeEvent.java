@@ -39,6 +39,10 @@ public class PrizeEvent {
     @Column(nullable = false, length = 20)
     private PrizeEventStatus status = PrizeEventStatus.OPEN;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private PrizeEventMetric metric = PrizeEventMetric.POINTS;
+
     @Column(name = "confirmed_at")
     private OffsetDateTime confirmedAt;
 
@@ -50,6 +54,14 @@ public class PrizeEvent {
 
     public Long getId() {
         return id;
+    }
+
+    public PrizeEventMetric getMetric() {
+        return metric;
+    }
+
+    public void setMetric(PrizeEventMetric metric) {
+        this.metric = metric;
     }
 
     public Long getGroupId() {

@@ -244,6 +244,11 @@ public class AccountPersonalDataRepository {
                 .addValue("deletedMemberLabel", deletedMemberLabel)
                 .addValue("playerIds", playerIds)
         );
+        // So does a prize event won by matches played (an email winner's name goes on withdrawal).
+        jdbcTemplate.update(
+            "UPDATE prize_event_winners SET nickname = NULL WHERE player_id IN (:playerIds)",
+            new MapSqlParameterSource("playerIds", playerIds)
+        );
     }
 
     public void deleteAccountIdentity(UUID authUserId, String normalizedEmail) {

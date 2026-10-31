@@ -2407,9 +2407,9 @@ class AdminKeyFilterTest {
         when(pointService.canUsePoints("member@hei.gg")).thenReturn(true);
         when(prizeEventService.list(1L)).thenReturn(new PrizeEventListResponse(List.of()));
         when(prizeEventService.create(eq(1L), any(), eq("admin@hei.gg"), any()))
-            .thenReturn(new PrizeEventResponse(5L, "10월", null, null, 3, "OPEN", null, List.of(), List.of()));
+            .thenReturn(new PrizeEventResponse(5L, "10월", null, null, 3, "OPEN", null, List.of(), List.of(), "POINTS"));
         when(prizeEventService.create(eq(1L), any(), eq("superadmin@hei.gg"), any()))
-            .thenReturn(new PrizeEventResponse(6L, "11월", null, null, 3, "OPEN", null, List.of(), List.of()));
+            .thenReturn(new PrizeEventResponse(6L, "11월", null, null, 3, "OPEN", null, List.of(), List.of(), "POINTS"));
         String body = "{\"title\":\"10월\",\"periodStart\":\"2026-10-01\",\"periodEnd\":\"2026-10-31\",\"winnerCount\":3}";
 
         mockMvc
