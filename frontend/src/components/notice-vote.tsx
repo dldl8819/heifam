@@ -10,6 +10,8 @@ type NoticeVoteViewProps = {
   vote: NoticeVote
   // Left out, nothing can be pressed: the form shows the vote this way before it exists.
   onPress?: (option: NoticeVoteOption) => void
+  // In a vote that takes several choices: pressing a chosen option takes that choice off.
+  onUnpress?: (option: NoticeVoteOption) => void
   onWithdraw?: () => void
   // Answers whether the option was added, so the box is emptied only then.
   onAddOption?: (label: string) => Promise<boolean>
@@ -117,10 +119,19 @@ function tintOf(label: string, index: number): Tint {
  * A vote read at a glance: one large button per option that says what it is and how many chose
  * it, each in its own colour, and one bar split between them. The reader's option is filled and
  * checked. Choosing works like radio buttons, so pressing the chosen option again does nothing;
- * taking the vote back is its own, smaller button. An anonymous vote shows counts only; a named
+ * taking the vote back is its own, smaller button. In a vote that takes several choices the
+ * options work like checkboxes instead: pressing a chosen one takes it off. An anonymous vote shows counts only; a named
  * one lists who chose what underneath. Where the reader may, an option can be added or taken away.
  */
-export function NoticeVoteView({ vote, onPress, onWithdraw, onAddOption, onRemoveOption, busy = false }: NoticeVoteViewProps) {
+export function NoticeVoteView({
+  vote,
+  onPress,
+  onUnpress,
+  onWithdraw,
+  onAddOption,
+  onRemoveOption,
+  busy = false,
+}: NoticeVoteViewProps) {
   const [draft, setDraft] = useState<string>('')
   const [draftError, setDraftError] = useState<string | null>(null)
 
@@ -134,6 +145,7 @@ export function NoticeVoteView({ vote, onPress, onWithdraw, onAddOption, onRemov
   const canPress = open && Boolean(onPress) && !busy
   const canRemove = open && vote.canRemoveOptions && Boolean(onRemoveOption)
   const myOption = options.find((option) => option.mine)
+  const multiple = vote.multiple === true
 
   const handleAdd = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -181,15 +193,16 @@ export function NoticeVoteView({ vote, onPress, onWithdraw, onAddOption, onRemov
             <div key={option.id} className="relative">
               <button
                 type="button"
-                // Chosen already: pressing it again changes nothing, as with a radio button.
-                onClick={() => (option.mine ? undefined : onPress?.(option))}
+                // Chosen already: pressing it again changes nothing, as with a radio button, or in
+                // a vote that takes several choices takes this one off, as with a checkbox.
+                onClick={() => (option.mine ? (multiple ? onUnpress?.(option) : undefined) : onPress?.(option))}
                 disabled={!canPress}
                 aria-pressed={option.mine}
                 className={`min-h-14 w-full rounded-lg border-2 px-3 py-2 text-left transition-colors disabled:cursor-default ${
                   canRemove ? 'pr-9' : ''
                 } ${
                   option.mine
-                    ? `cursor-default ${tint.chosen}`
+                    ? `${multiple ? '' : 'cursor-default '}${tint.chosen}`
                     : `border-slate-200 bg-white text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 ${tint.hover}`
                 }`}
               >
@@ -279,7 +292,11 @@ export function NoticeVoteView({ vote, onPress, onWithdraw, onAddOption, onRemov
 
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <p className="text-xs text-slate-500 dark:text-slate-400">
-          {t(named ? 'notices.posts.voteFooterNamed' : 'notices.posts.voteFooterAnonymous', { total })}
+          {multiple
+            ? t(named ? 'notices.posts.voteFooterMultipleNamed' : 'notices.posts.voteFooterMultipleAnonymous', {
+                voters: vote.totalVoters ?? 0,
+              })
+            : t(named ? 'notices.posts.voteFooterNamed' : 'notices.posts.voteFooterAnonymous', { total })}
         </p>
         {open && myOption && onWithdraw && (
           <button
@@ -347,6 +364,7 @@ export function NoticeVotePanel({ groupId, noticeId, vote, onChange, onClosed }:
       <NoticeVoteView
         vote={vote}
         onPress={(option) => void run(() => apiClient.setNoticeVote(groupId, noticeId, option.id))}
+        onUnpress={(option) => void run(() => apiClient.setNoticeVote(groupId, noticeId, option.id, false))}
         onWithdraw={() => void run(() => apiClient.setNoticeVote(groupId, noticeId, null))}
         onAddOption={(label) => run(() => apiClient.addNoticeVoteOption(groupId, noticeId, label))}
         onRemoveOption={handleRemove}

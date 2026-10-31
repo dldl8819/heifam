@@ -138,6 +138,7 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
   // Anonymous unless the writer says otherwise, as every vote was before there was a choice.
   const [voteAnonymous, setVoteAnonymous] = useState<boolean>(true)
   const [voteAllowAdditions, setVoteAllowAdditions] = useState<boolean>(false)
+  const [voteMultiple, setVoteMultiple] = useState<boolean>(false)
   const [saving, setSaving] = useState<boolean>(false)
   const [imageUploading, setImageUploading] = useState<boolean>(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -202,7 +203,7 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
           adminOnly,
           voteStatus: withVote ? 'OPEN' : 'NONE',
           ...(withVote
-            ? { voteOptions: cleanNoticeVoteOptions(voteOptions), voteAnonymous, voteAllowAdditions }
+            ? { voteOptions: cleanNoticeVoteOptions(voteOptions), voteAnonymous, voteAllowAdditions, voteMultiple }
             : {}),
         })
         setTitle('')
@@ -212,6 +213,7 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
         setVoteOptions(NOTICE_VOTE_DEFAULT_OPTIONS)
         setVoteAnonymous(true)
         setVoteAllowAdditions(false)
+        setVoteMultiple(false)
         setComposing(false)
         setSuccessMessage(t('notices.posts.saveSuccess'))
         await loadNotices()
@@ -226,7 +228,7 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
         setSaving(false)
       }
     },
-    [adminOnly, content, loadNotices, title, voteAllowAdditions, voteAnonymous, voteOptions, withVote]
+    [adminOnly, content, loadNotices, title, voteAllowAdditions, voteAnonymous, voteMultiple, voteOptions, withVote]
   )
 
   const filterButtonClassFor = (selected: boolean) =>
@@ -338,10 +340,16 @@ function MemberNotices({ isAdmin }: { isAdmin: boolean }) {
                     onAnonymousChange={setVoteAnonymous}
                     allowAdditions={voteAllowAdditions}
                     onAllowAdditionsChange={setVoteAllowAdditions}
+                    multiple={voteMultiple}
+                    onMultipleChange={setVoteMultiple}
                   />
                   <p className="text-xs text-slate-500 dark:text-slate-400">{t('notices.posts.votePreview')}</p>
                   <NoticeVoteView
-                    vote={previewNoticeVote(voteOptions, { anonymous: voteAnonymous, allowAdditions: voteAllowAdditions })}
+                    vote={previewNoticeVote(voteOptions, {
+                      anonymous: voteAnonymous,
+                      allowAdditions: voteAllowAdditions,
+                      multiple: voteMultiple,
+                    })}
                   />
                 </div>
               )}

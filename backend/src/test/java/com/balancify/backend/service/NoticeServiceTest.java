@@ -662,6 +662,37 @@ class NoticeServiceTest {
     }
 
     @Test
+    void addsAndTakesOffChoicesOneByOneInAVoteThatTakesSeveral() {
+        Notice notice = stubVote(2L, "OPEN", MINUTES);
+        notice.setVoteMultiple(true);
+        when(noticeVoteRepository.findVotedOptionIds(2L, MEMBER)).thenReturn(List.of(21L, 23L));
+        when(noticeVoteRepository.countVoters(2L)).thenReturn(4L);
+
+        noticeService.castVote(1L, 2L, MEMBER, 21L, null);
+        NoticeDetailResponse detail = noticeService.unvoteOption(1L, 2L, MEMBER, 22L);
+
+        verify(noticeVoteRepository).addVote(2L, MEMBER, 21L);
+        verify(noticeVoteRepository).removeVote(2L, MEMBER, 22L);
+        verify(noticeVoteRepository, never()).castVote(any(), any(), any());
+        NoticeVoteResponse vote = detail.vote();
+        assertThat(vote.multiple()).isTrue();
+        assertThat(vote.myOptionIds()).containsExactly(21L, 23L);
+        assertThat(vote.options()).extracting(NoticeVoteOptionResponse::mine).containsExactly(true, false, true);
+        // People, not choices: the five votes on the options came from four.
+        assertThat(vote.totalVoters()).isEqualTo(4L);
+    }
+
+    @Test
+    void takingOneOptionOffAVoteOfOneChoiceTakesTheVoteBack() {
+        stubVote(2L, "OPEN", MINUTES);
+
+        noticeService.unvoteOption(1L, 2L, MEMBER, 21L);
+
+        verify(noticeVoteRepository).withdrawVote(2L, MEMBER);
+        verify(noticeVoteRepository, never()).removeVote(any(), any(), any());
+    }
+
+    @Test
     void takesForOrAgainstFromAnOlderPage() {
         stubVote(2L, "OPEN", FOR_OR_AGAINST);
 
@@ -832,7 +863,7 @@ class NoticeServiceTest {
         NoticeDetailResponse forMember = noticeService.open(1L, 2L, MEMBER);
 
         assertThat(forAdmin.vote()).isNull();
-        assertThat(forAdmin.voteKept()).isEqualTo(new NoticeVoteKeptResponse(List.of("30분", "25분", "24분"), 5L, false, true));
+        assertThat(forAdmin.voteKept()).isEqualTo(new NoticeVoteKeptResponse(List.of("30분", "25분", "24분"), 5L, false, true, false));
         assertThat(forMember.vote()).isNull();
         assertThat(forMember.voteKept()).isNull();
 

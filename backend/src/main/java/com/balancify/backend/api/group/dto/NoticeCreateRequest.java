@@ -13,6 +13,8 @@ public record NoticeCreateRequest(
     // Left out, the vote is anonymous: counts are shown, who chose what is not.
     Boolean voteAnonymous,
     // Voters may add options of their own. Left out, they may not.
-    Boolean voteAllowAdditions
+    Boolean voteAllowAdditions,
+    // A voter may choose more than one option. Left out, one.
+    Boolean voteMultiple
 ) {
 }
