@@ -17,19 +17,14 @@ describe('route access', () => {
     })
   })
 
-  it('allows events archive without login', () => {
-    const decision = getRouteAccessDecision('/events', {
-      isLoggedIn: false,
-      canAccess: false,
-      isAdmin: false,
-      isSuperAdmin: false,
-    })
+  it('keeps the events (prize events by points) with members', () => {
+    const visitor = { isLoggedIn: false, canAccess: false, isAdmin: false, isSuperAdmin: false }
+    const member = { isLoggedIn: true, canAccess: true, isAdmin: false, isSuperAdmin: false }
 
-    expect(decision).toEqual({
-      allowed: true,
-      redirectTo: null,
-      blocked: false,
-    })
+    expect(isPublicRoute('/events')).toBe(false)
+    expect(getRouteAccessDecision('/events', visitor)).toEqual({ allowed: false, redirectTo: '/', blocked: false })
+    expect(getRouteAccessDecision('/events', { ...member, canAccess: false }).blocked).toBe(true)
+    expect(getRouteAccessDecision('/events', member)).toEqual({ allowed: true, redirectTo: null, blocked: false })
   })
 
   it('redirects admins away from temporarily disabled dashboard', () => {
@@ -189,18 +184,13 @@ describe('route access', () => {
     expect(isPublicRoute('/captain-draft')).toBe(false)
   })
 
-  it('opens a member\'s points and the monthly ranking to members and keeps the prize events with admins', () => {
+  it('opens a member\'s points, the monthly ranking and the old prize events link to members', () => {
     const member = { isLoggedIn: true, canAccess: true, isAdmin: false, isSuperAdmin: false }
 
-    for (const path of ['/points', '/points/ranking', '/points/policy']) {
+    // /points/events only sends an old link on to /events.
+    for (const path of ['/points', '/points/ranking', '/points/policy', '/points/events']) {
       expect(getRouteAccessDecision(path, member).allowed).toBe(true)
     }
-    expect(getRouteAccessDecision('/points/events', member)).toEqual({
-      allowed: false,
-      redirectTo: '/players',
-      blocked: false,
-    })
-    expect(getRouteAccessDecision('/points/events', { ...member, isAdmin: true }).allowed).toBe(true)
   })
 
   it('keeps every one of the three access pages with super admins', () => {

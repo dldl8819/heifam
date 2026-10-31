@@ -26,7 +26,8 @@ describe('navigation items', () => {
   it('shows visitors the public pages and the plain notices link, and no menu', () => {
     const items = getVisibleNavItems(VISITOR)
 
-    expect(bar(items)).toEqual(['/', '/notices', '/events', '/ads', '/results'])
+    // The events are prize events by points, for members.
+    expect(bar(items)).toEqual(['/', '/notices', '/ads', '/results'])
   })
 
   it('shows nothing to a signed-in account without access', () => {
@@ -89,15 +90,10 @@ describe('navigation items', () => {
     }
   })
 
-  it('puts a member\'s points, the monthly ranking and the policy under one menu, with the prize events for admins', () => {
-    expect(menu(getVisibleNavItems(MEMBER), '/points')).toEqual(['/points', '/points/ranking', '/points/policy'])
-    for (const context of [ADMIN, SUPER_ADMIN]) {
-      expect(menu(getVisibleNavItems(context), '/points')).toEqual([
-        '/points',
-        '/points/ranking',
-        '/points/policy',
-        '/points/events',
-      ])
+  it('puts a member\'s points, the monthly ranking and the policy under one menu; the prize events are the events link', () => {
+    for (const context of [MEMBER, ADMIN, SUPER_ADMIN]) {
+      expect(menu(getVisibleNavItems(context), '/points')).toEqual(['/points', '/points/ranking', '/points/policy'])
+      expect(linkHrefs(getVisibleNavItems(context))).not.toContain('/points/events')
     }
   })
 
@@ -119,7 +115,7 @@ describe('navigation items', () => {
       expect(new Set(hrefs).size).toBe(hrefs.length)
     }
     const memberHrefs = linkHrefs(getVisibleNavItems(MEMBER))
-    for (const adminOnly of ['/tournaments', '/points/events', '/admin/audit', '/admin/access/admins']) {
+    for (const adminOnly of ['/tournaments', '/admin/audit', '/admin/access/admins']) {
       expect(memberHrefs).not.toContain(adminOnly)
     }
     expect(linkHrefs(getVisibleNavItems(MEMBER))).not.toContain('/dashboard')
@@ -137,6 +133,7 @@ describe('findActiveNavHref', () => {
     expect(findActiveNavHref('/tournaments', items)).toBe('/tournaments')
     expect(findActiveNavHref('/points/ranking', items)).toBe('/points/ranking')
     expect(findActiveNavHref('/points/policy', items)).toBe('/points/policy')
+    expect(findActiveNavHref('/events', items)).toBe('/events')
     expect(findActiveNavHref('/admin/access/allowed', items)).toBe('/admin/access/allowed')
     expect(findActiveNavHref('/admin/audit', items)).toBe('/admin/audit')
     expect(findActiveNavHref('/admin/access/people', items)).toBe('/admin/access/people')
@@ -146,7 +143,6 @@ describe('findActiveNavHref', () => {
     expect(findActiveNavHref('/balance/multi', items)).toBe('/balance/multi')
     expect(findActiveNavHref('/balance', items)).toBe('/balance')
     expect(findActiveNavHref('/points', items)).toBe('/points')
-    expect(findActiveNavHref('/points/events', items)).toBe('/points/events')
   })
 
   it('falls back to the menu for a page under it that no link covers', () => {

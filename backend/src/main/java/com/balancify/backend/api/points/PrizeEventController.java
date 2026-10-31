@@ -21,7 +21,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-/** Prize events are seen by whoever can use points; only super admins create, confirm or cancel them. */
+/**
+ * Prize events are seen by whoever can use points. Admins create them, as they post notices; only
+ * super admins confirm or cancel them, as confirming writes the donation ledger.
+ */
 @RestController
 @RequestMapping("/api/groups/{groupId}/prize-events")
 public class PrizeEventController {
@@ -58,7 +61,7 @@ public class PrizeEventController {
         @RequestBody PrizeEventCreateRequest requestBody,
         HttpServletRequest request
     ) {
-        String requestEmail = requireSuperAdmin(request);
+        String requestEmail = requireAdmin(request);
         return handle(() -> prizeEventService.create(groupId, requestBody, requestEmail, resolveNickname(requestEmail)));
     }
 
@@ -87,6 +90,14 @@ public class PrizeEventController {
     ) {
         String requestEmail = requireSuperAdmin(request);
         return handle(() -> prizeEventService.cancel(groupId, eventId, requestEmail, resolveNickname(requestEmail)));
+    }
+
+    private String requireAdmin(HttpServletRequest request) {
+        String requestEmail = requireRequestEmail(request);
+        if (!accessControlService.isAdminEmail(requestEmail)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin role required");
+        }
+        return requestEmail;
     }
 
     private String requireSuperAdmin(HttpServletRequest request) {

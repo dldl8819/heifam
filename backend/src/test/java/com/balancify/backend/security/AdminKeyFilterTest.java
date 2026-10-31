@@ -2400,33 +2400,45 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void letsSuperAdminsRunPrizeEventsAndAdminsSeeThem() throws Exception {
-        when(pointService.canUsePoints("admin@hei.gg")).thenReturn(true);
+    void showsPrizeEventsToMembersLetsAdminsStartThemAndSuperAdminsConfirmThem() throws Exception {
+        when(pointService.canUsePoints("member@hei.gg")).thenReturn(true);
         when(prizeEventService.list(1L)).thenReturn(new PrizeEventListResponse(List.of()));
-        when(prizeEventService.create(eq(1L), any(), eq("superadmin@hei.gg"), any()))
+        when(prizeEventService.create(eq(1L), any(), eq("admin@hei.gg"), any()))
             .thenReturn(new PrizeEventResponse(5L, "10월", null, null, 3, "OPEN", null, List.of(), List.of()));
+        when(prizeEventService.create(eq(1L), any(), eq("superadmin@hei.gg"), any()))
+            .thenReturn(new PrizeEventResponse(6L, "11월", null, null, 3, "OPEN", null, List.of(), List.of()));
         String body = "{\"title\":\"10월\",\"periodStart\":\"2026-10-01\",\"periodEnd\":\"2026-10-31\",\"winnerCount\":3}";
 
         mockMvc
-            .perform(get("/api/groups/1/prize-events").header("X-USER-EMAIL", "member@hei.gg"))
+            .perform(get("/api/groups/1/prize-events"))
             .andExpect(status().isForbidden());
         mockMvc
-            .perform(get("/api/groups/1/prize-events").header("X-USER-EMAIL", "admin@hei.gg"))
+            .perform(get("/api/groups/1/prize-events").header("X-USER-EMAIL", "member@hei.gg"))
             .andExpect(status().isOk());
+        mockMvc
+            .perform(post("/api/groups/1/prize-events").header("X-USER-EMAIL", "member@hei.gg")
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isForbidden());
         mockMvc
             .perform(post("/api/groups/1/prize-events").header("X-USER-EMAIL", "admin@hei.gg")
                 .contentType(MediaType.APPLICATION_JSON).content(body))
-            .andExpect(status().isForbidden());
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.eventId").value(5));
+        mockMvc
+            .perform(post("/api/groups/1/prize-events").header("X-USER-EMAIL", "superadmin@hei.gg")
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.eventId").value(6));
+        // Confirming writes the donation ledger, which only super admins change.
         mockMvc
             .perform(post("/api/groups/1/prize-events/5/confirm").header("X-USER-EMAIL", "admin@hei.gg")
                 .contentType(MediaType.APPLICATION_JSON).content("{\"winners\":[]}"))
             .andExpect(status().isForbidden());
         mockMvc
-            .perform(post("/api/groups/1/prize-events").header("X-USER-EMAIL", "superadmin@hei.gg")
-                .contentType(MediaType.APPLICATION_JSON).content(body))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.eventId").value(5));
+            .perform(post("/api/groups/1/prize-events/5/cancel").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isForbidden());
         verify(prizeEventService, never()).confirm(any(), any(), any(), any(), any());
+        verify(prizeEventService, never()).cancel(any(), any(), any(), any());
     }
 
     @Test
