@@ -4,8 +4,14 @@ import { FormEvent, useCallback, useEffect, useState } from 'react'
 import { apiClient } from '@/lib/api'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
-import { buildPrizeWinners, initialPrizeDrafts, type PrizeDraft } from '@/lib/prize-events'
-import type { PrizeEvent } from '@/types/api'
+import {
+  buildPrizeWinners,
+  initialPrizeDrafts,
+  prizeCandidateKey,
+  prizeEventMetric,
+  type PrizeDraft,
+} from '@/lib/prize-events'
+import type { PrizeEvent, PrizeEventMetric } from '@/types/api'
 
 type PrizeEventsPanelProps = {
   groupId: number
@@ -26,6 +32,11 @@ function describeError(error: unknown, fallback: string): string {
   return error instanceof Error && error.message.trim().length > 0 ? `${fallback} (${error.message})` : fallback
 }
 
+// Points earned show as "12p", matches played as "12경기".
+function formatScore(metric: PrizeEventMetric, value: number): string {
+  return t(metric === 'GAMES' ? 'prizeEvents.games' : 'prizeEvents.points', { value: value.toLocaleString('ko-KR') })
+}
+
 function todayInKorea(): string {
   return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
 }
@@ -40,7 +51,8 @@ export function PrizeEventsPanel({ groupId, canCreate, canManage }: PrizeEventsP
   const [periodStart, setPeriodStart] = useState<string>('')
   const [periodEnd, setPeriodEnd] = useState<string>('')
   const [winnerCount, setWinnerCount] = useState<string>('3')
-  const [drafts, setDrafts] = useState<Record<number, Record<number, PrizeDraft>>>({})
+  const [metric, setMetric] = useState<PrizeEventMetric>('POINTS')
+  const [drafts, setDrafts] = useState<Record<number, Record<string, PrizeDraft>>>({})
   const [paidOn, setPaidOn] = useState<Record<number, string>>({})
 
   const load = useCallback(async () => {
@@ -78,6 +90,7 @@ export function PrizeEventsPanel({ groupId, canCreate, canManage }: PrizeEventsP
         periodStart,
         periodEnd,
         winnerCount: Number(winnerCount),
+        metric,
       })
       setTitle('')
       await load()
@@ -88,12 +101,12 @@ export function PrizeEventsPanel({ groupId, canCreate, canManage }: PrizeEventsP
     }
   }
 
-  const updateDraft = (eventId: number, accountId: number, change: Partial<PrizeDraft>) => {
+  const updateDraft = (eventId: number, candidateKey: string, change: Partial<PrizeDraft>) => {
     setDrafts((previous) => ({
       ...previous,
       [eventId]: {
         ...previous[eventId],
-        [accountId]: { ...(previous[eventId]?.[accountId] ?? { selected: false, prize: '', amount: '' }), ...change },
+        [candidateKey]: { ...(previous[eventId]?.[candidateKey] ?? { selected: false, prize: '', amount: '' }), ...change },
       },
     }))
   }
@@ -154,7 +167,7 @@ export function PrizeEventsPanel({ groupId, canCreate, canManage }: PrizeEventsP
       {message && <p className="text-xs text-emerald-700 dark:text-emerald-300">{message}</p>}
 
       {canCreate && (
-        <form onSubmit={handleCreate} className="grid gap-2 rounded-lg bg-slate-50 p-3 dark:bg-slate-800/60 sm:grid-cols-[2fr_1fr_1fr_auto_auto] sm:items-end">
+        <form onSubmit={handleCreate} className="grid gap-2 rounded-lg bg-slate-50 p-3 dark:bg-slate-800/60 sm:grid-cols-[2fr_1fr_1fr_auto_auto_auto] sm:items-end">
           <label className="space-y-1 text-xs text-slate-600 dark:text-slate-300">
             <span>{t('prizeEvents.form.title')}</span>
             <input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={100} required className={`${INPUT_CLASS} w-full`} placeholder={t('prizeEvents.form.titlePlaceholder')} />
@@ -166,6 +179,13 @@ export function PrizeEventsPanel({ groupId, canCreate, canManage }: PrizeEventsP
           <label className="space-y-1 text-xs text-slate-600 dark:text-slate-300">
             <span>{t('prizeEvents.form.end')}</span>
             <input type="date" value={periodEnd} onChange={(event) => setPeriodEnd(event.target.value)} required className={`${INPUT_CLASS} w-full`} />
+          </label>
+          <label className="space-y-1 text-xs text-slate-600 dark:text-slate-300">
+            <span>{t('prizeEvents.form.metric')}</span>
+            <select value={metric} onChange={(event) => setMetric(event.target.value as PrizeEventMetric)} className={`${INPUT_CLASS} w-full`}>
+              <option value="POINTS">{t('prizeEvents.form.metricPoints')}</option>
+              <option value="GAMES">{t('prizeEvents.form.metricGames')}</option>
+            </select>
           </label>
           <label className="space-y-1 text-xs text-slate-600 dark:text-slate-300">
             <span>{t('prizeEvents.form.winners')}</span>
@@ -181,13 +201,20 @@ export function PrizeEventsPanel({ groupId, canCreate, canManage }: PrizeEventsP
       {!loading && events.length === 0 && <p className="text-sm text-slate-500 dark:text-slate-400">{t('prizeEvents.empty')}</p>}
 
       <ul className="space-y-3">
-        {events.map((event) => (
+        {events.map((event) => {
+          const eventMetric = prizeEventMetric(event)
+          return (
           <li key={event.eventId} className="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{event.title}</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {t('prizeEvents.period', { start: event.periodStart, end: event.periodEnd, count: event.winnerCount })}
+                  {t('prizeEvents.period', {
+                    start: event.periodStart,
+                    end: event.periodEnd,
+                    count: event.winnerCount,
+                    metric: t(`prizeEvents.metric.${eventMetric}`),
+                  })}
                 </p>
               </div>
               <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200">
@@ -206,36 +233,37 @@ export function PrizeEventsPanel({ groupId, canCreate, canManage }: PrizeEventsP
                         {canManage && <th className="py-1 pr-2">{t('prizeEvents.table.pick')}</th>}
                         <th className="py-1 pr-2">{t('prizeEvents.table.rank')}</th>
                         <th className="py-1 pr-2">{t('prizeEvents.table.nickname')}</th>
-                        <th className="py-1 pr-2">{t('prizeEvents.table.points')}</th>
+                        <th className="py-1 pr-2">{t(eventMetric === 'GAMES' ? 'prizeEvents.table.games' : 'prizeEvents.table.points')}</th>
                         {canManage && <th className="py-1 pr-2">{t('prizeEvents.table.prize')}</th>}
                         {canManage && <th className="py-1 pr-2">{t('prizeEvents.table.amount')}</th>}
                       </tr>
                     </thead>
                     <tbody>
                       {event.candidates.map((candidate) => {
-                        const draft = drafts[event.eventId]?.[candidate.pointAccountId]
+                        const candidateKey = prizeCandidateKey(candidate)
+                        const draft = drafts[event.eventId]?.[candidateKey]
                         return (
-                          <tr key={candidate.pointAccountId} className="border-t border-slate-100 dark:border-slate-800">
+                          <tr key={candidateKey} className="border-t border-slate-100 dark:border-slate-800">
                             {canManage && (
                               <td className="py-1 pr-2">
                                 <input
                                   type="checkbox"
                                   checked={draft?.selected ?? false}
-                                  onChange={(change) => updateDraft(event.eventId, candidate.pointAccountId, { selected: change.target.checked })}
+                                  onChange={(change) => updateDraft(event.eventId, candidateKey, { selected: change.target.checked })}
                                   aria-label={t('prizeEvents.table.pick')}
                                 />
                               </td>
                             )}
                             <td className="py-1 pr-2 font-medium">{candidate.rank}</td>
                             <td className="py-1 pr-2">{candidate.nickname ?? t('prizeEvents.unknownNickname')}</td>
-                            <td className="py-1 pr-2">{`${candidate.points.toLocaleString('ko-KR')}p`}</td>
+                            <td className="py-1 pr-2">{formatScore(eventMetric, candidate.points)}</td>
                             {canManage && (
                               <td className="py-1 pr-2">
                                 <input
                                   value={draft?.prize ?? ''}
                                   aria-label={t('a11y.fields.ofRow', { row: candidate.nickname ?? t('prizeEvents.unknownNickname'), field: t('prizeEvents.table.prize') })}
                                   maxLength={100}
-                                  onChange={(change) => updateDraft(event.eventId, candidate.pointAccountId, { prize: change.target.value })}
+                                  onChange={(change) => updateDraft(event.eventId, candidateKey, { prize: change.target.value })}
                                   placeholder={t('prizeEvents.table.prizePlaceholder')}
                                   className={`${INPUT_CLASS} w-36`}
                                 />
@@ -247,7 +275,7 @@ export function PrizeEventsPanel({ groupId, canCreate, canManage }: PrizeEventsP
                                   inputMode="numeric"
                                   value={draft?.amount ?? ''}
                                   aria-label={t('a11y.fields.ofRow', { row: candidate.nickname ?? t('prizeEvents.unknownNickname'), field: t('prizeEvents.table.amount') })}
-                                  onChange={(change) => updateDraft(event.eventId, candidate.pointAccountId, { amount: change.target.value })}
+                                  onChange={(change) => updateDraft(event.eventId, candidateKey, { amount: change.target.value })}
                                   placeholder="0"
                                   className={`${INPUT_CLASS} w-24`}
                                 />
@@ -287,7 +315,7 @@ export function PrizeEventsPanel({ groupId, canCreate, canManage }: PrizeEventsP
                   <li key={winner.place} className="flex flex-wrap items-baseline gap-2">
                     <span className="font-semibold text-slate-900 dark:text-slate-100">{t('prizeEvents.place', { place: winner.place })}</span>
                     <span className="text-slate-800 dark:text-slate-200">{winner.nickname ?? t('prizeEvents.leftMember')}</span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400">{`${winner.points.toLocaleString('ko-KR')}p`}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">{formatScore(eventMetric, winner.points)}</span>
                     {winner.prize && <span className="text-xs text-slate-700 dark:text-slate-300">{winner.prize}</span>}
                     {winner.amount > 0 && (
                       <span className="text-xs text-slate-500 dark:text-slate-400">
@@ -300,7 +328,8 @@ export function PrizeEventsPanel({ groupId, canCreate, canManage }: PrizeEventsP
               </ol>
             )}
           </li>
-        ))}
+          )
+        })}
       </ul>
     </section>
   )

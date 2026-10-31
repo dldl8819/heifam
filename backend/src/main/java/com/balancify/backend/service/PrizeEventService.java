@@ -9,9 +9,13 @@ import com.balancify.backend.api.points.dto.PrizeEventListResponse;
 import com.balancify.backend.api.points.dto.PrizeEventResponse;
 import com.balancify.backend.api.points.dto.PrizeWinnerRequest;
 import com.balancify.backend.api.points.dto.PrizeWinnerResponse;
+import com.balancify.backend.domain.Player;
 import com.balancify.backend.domain.PrizeEvent;
+import com.balancify.backend.domain.PrizeEventMetric;
 import com.balancify.backend.domain.PrizeEventStatus;
 import com.balancify.backend.domain.PrizeEventWinner;
+import com.balancify.backend.repository.MatchParticipantRepository;
+import com.balancify.backend.repository.PlayerRepository;
 import com.balancify.backend.repository.PointTransactionRepository;
 import com.balancify.backend.repository.PrizeEventRepository;
 import com.balancify.backend.repository.PrizeEventWinnerRepository;
@@ -25,6 +29,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
@@ -33,9 +38,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Prize events: an admin names a period, the top point earners of that period are the candidates,
- * and a super admin confirming the winners records every paid prize as a donation ledger expense.
- * The expense carries the event title and place, never the winner's name.
+ * Prize events: an admin names a period and what ranks it, points earned (the candidates are point
+ * accounts) or finished matches played (the candidates are players), and a super admin confirming
+ * the winners records every paid prize as a donation ledger expense. The expense carries the event
+ * title and place, never the winner's name.
  */
 @Service
 public class PrizeEventService {
@@ -52,6 +58,8 @@ public class PrizeEventService {
     private final PrizeEventRepository prizeEventRepository;
     private final PrizeEventWinnerRepository prizeEventWinnerRepository;
     private final PointTransactionRepository pointTransactionRepository;
+    private final MatchParticipantRepository matchParticipantRepository;
+    private final PlayerRepository playerRepository;
     private final AccessControlService accessControlService;
     private final LedgerExpenseAdminService ledgerExpenseAdminService;
     private final OperationAuditLogService operationAuditLogService;
@@ -62,6 +70,8 @@ public class PrizeEventService {
         PrizeEventRepository prizeEventRepository,
         PrizeEventWinnerRepository prizeEventWinnerRepository,
         PointTransactionRepository pointTransactionRepository,
+        MatchParticipantRepository matchParticipantRepository,
+        PlayerRepository playerRepository,
         AccessControlService accessControlService,
         LedgerExpenseAdminService ledgerExpenseAdminService,
         OperationAuditLogService operationAuditLogService
@@ -70,6 +80,8 @@ public class PrizeEventService {
             prizeEventRepository,
             prizeEventWinnerRepository,
             pointTransactionRepository,
+            matchParticipantRepository,
+            playerRepository,
             accessControlService,
             ledgerExpenseAdminService,
             operationAuditLogService,
@@ -81,6 +93,8 @@ public class PrizeEventService {
         PrizeEventRepository prizeEventRepository,
         PrizeEventWinnerRepository prizeEventWinnerRepository,
         PointTransactionRepository pointTransactionRepository,
+        MatchParticipantRepository matchParticipantRepository,
+        PlayerRepository playerRepository,
         AccessControlService accessControlService,
         LedgerExpenseAdminService ledgerExpenseAdminService,
         OperationAuditLogService operationAuditLogService,
@@ -89,6 +103,8 @@ public class PrizeEventService {
         this.prizeEventRepository = prizeEventRepository;
         this.prizeEventWinnerRepository = prizeEventWinnerRepository;
         this.pointTransactionRepository = pointTransactionRepository;
+        this.matchParticipantRepository = matchParticipantRepository;
+        this.playerRepository = playerRepository;
         this.accessControlService = accessControlService;
         this.ledgerExpenseAdminService = ledgerExpenseAdminService;
         this.operationAuditLogService = operationAuditLogService;
@@ -133,6 +149,7 @@ public class PrizeEventService {
         if (winnerCount < 1 || winnerCount > MAX_WINNERS) {
             throw new IllegalArgumentException("당첨 인원은 1~" + MAX_WINNERS + "명으로 정해 주세요.");
         }
+        PrizeEventMetric metric = resolveMetric(request.metric());
 
         PrizeEvent event = new PrizeEvent();
         event.setGroupId(groupId);
@@ -140,6 +157,7 @@ public class PrizeEventService {
         event.setPeriodStart(start);
         event.setPeriodEnd(end);
         event.setWinnerCount(winnerCount);
+        event.setMetric(metric);
         prizeEventRepository.save(event);
         operationAuditLogService.recordPrizeEvent(
             OperationAuditLogService.ACTION_PRIZE_EVENT_CREATED,
@@ -148,7 +166,7 @@ public class PrizeEventService {
             event.getId(),
             groupId,
             title,
-            start + "~" + end + ", winners=" + winnerCount
+            start + "~" + end + ", winners=" + winnerCount + ", by=" + metric
         );
         return toResponse(event, List.of());
     }
@@ -176,16 +194,18 @@ public class PrizeEventService {
         }
         LocalDate paidOn = request.paidOn() == null ? LocalDate.now(clock.withZone(KST)) : request.paidOn();
 
+        boolean byGames = event.getMetric() == PrizeEventMetric.GAMES;
         Map<Long, Candidate> candidates = new HashMap<>();
-        candidates(event).forEach(candidate -> candidates.put(candidate.accountId(), candidate));
+        candidates(event).forEach(candidate -> candidates.put(byGames ? candidate.playerId() : candidate.accountId(), candidate));
         Set<Long> seen = new HashSet<>();
         List<PrizeEventWinner> winners = new ArrayList<>();
         long total = 0;
         for (int index = 0; index < requested.size(); index++) {
             PrizeWinnerRequest winnerRequest = requested.get(index);
-            Long accountId = winnerRequest == null ? null : winnerRequest.pointAccountId();
-            Candidate candidate = accountId == null ? null : candidates.get(accountId);
-            if (candidate == null || !seen.add(accountId)) {
+            Long candidateId = winnerRequest == null ? null
+                : byGames ? winnerRequest.playerId() : winnerRequest.pointAccountId();
+            Candidate candidate = candidateId == null ? null : candidates.get(candidateId);
+            if (candidate == null || !seen.add(candidateId)) {
                 throw new IllegalArgumentException("후보 목록에 있는 사람만 한 번씩 고를 수 있습니다.");
             }
             long amount = winnerRequest.amount() == null ? 0 : winnerRequest.amount();
@@ -204,6 +224,7 @@ public class PrizeEventService {
             winner.setEventId(event.getId());
             winner.setPlace(index + 1);
             winner.setNormalizedEmail(candidate.email());
+            winner.setPlayerId(candidate.playerId());
             winner.setNickname(candidate.nickname());
             winner.setPoints((int) Math.min(Integer.MAX_VALUE, candidate.points()));
             winner.setPrize(prize);
@@ -264,8 +285,47 @@ public class PrizeEventService {
         return toResponse(event, List.of());
     }
 
-    // The period's top earners by net points; equal totals share a place, so ties at the cut all count.
     private List<Candidate> candidates(PrizeEvent event) {
+        return event.getMetric() == PrizeEventMetric.GAMES ? playerCandidates(event) : accountCandidates(event);
+    }
+
+    /**
+     * The players who played the most finished matches of the group in the period, Korean days from
+     * the first to the last; equal counts share a place, so ties at the cut all count. A player who
+     * left or was anonymized is no candidate.
+     */
+    private List<Candidate> playerCandidates(PrizeEvent event) {
+        List<MatchParticipantRepository.PlayerGameCount> counts = matchParticipantRepository.countFinishedGamesByPlayerBetween(
+            event.getGroupId(),
+            event.getPeriodStart().atStartOfDay(KST).toOffsetDateTime(),
+            event.getPeriodEnd().plusDays(1).atStartOfDay(KST).toOffsetDateTime()
+        );
+        Map<Long, Player> players = new HashMap<>();
+        playerRepository.findAllById(counts.stream().map(MatchParticipantRepository.PlayerGameCount::getPlayerId).toList())
+            .forEach(player -> players.put(player.getId(), player));
+        List<Candidate> candidates = new ArrayList<>();
+        long previous = Long.MIN_VALUE;
+        int rank = 0;
+        for (MatchParticipantRepository.PlayerGameCount count : counts) {
+            Player player = players.get(count.getPlayerId());
+            if (PlayerIdentityPolicy.isIdentityHidden(player)) {
+                continue;
+            }
+            long games = count.getGames() == null ? 0 : count.getGames();
+            if (games != previous) {
+                rank = candidates.size() + 1;
+                previous = games;
+            }
+            if (rank > event.getWinnerCount()) {
+                break;
+            }
+            candidates.add(new Candidate(rank, null, player.getId(), null, player.getNickname(), games));
+        }
+        return candidates;
+    }
+
+    // The period's top earners by net points; equal totals share a place, so ties at the cut all count.
+    private List<Candidate> accountCandidates(PrizeEvent event) {
         List<PointTransactionRepository.AccountPointTotal> totals =
             pointTransactionRepository.sumPositiveAccountTotalsBetween(event.getPeriodStart(), event.getPeriodEnd());
         List<PointTransactionRepository.AccountPointTotal> ranked = new ArrayList<>();
@@ -293,6 +353,7 @@ public class PrizeEventService {
             candidates.add(new Candidate(
                 ranks.get(index),
                 total.getAccountId(),
+                null,
                 total.getNormalizedEmail(),
                 nicknames.get(total.getNormalizedEmail()),
                 total.getPoints() == null ? 0 : total.getPoints()
@@ -308,7 +369,8 @@ public class PrizeEventService {
                     candidate.rank(),
                     candidate.accountId(),
                     candidate.nickname(),
-                    candidate.points()
+                    candidate.points(),
+                    candidate.playerId()
                 ))
                 .toList()
             : List.of();
@@ -330,10 +392,23 @@ public class PrizeEventService {
                     winner.getAmount(),
                     winner.getLedgerExpenseId() != null
                 ))
-                .toList()
+                .toList(),
+            event.getMetric().name()
         );
     }
 
-    private record Candidate(int rank, Long accountId, String email, String nickname, long points) {
+    private static PrizeEventMetric resolveMetric(String metric) {
+        if (metric == null || metric.isBlank()) {
+            return PrizeEventMetric.POINTS;
+        }
+        try {
+            return PrizeEventMetric.valueOf(metric.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException unknown) {
+            throw new IllegalArgumentException("순위 기준은 포인트(POINTS) 또는 경기 수(GAMES)로 정해 주세요.");
+        }
+    }
+
+    // accountId and email for a points event; playerId for a matches-played one.
+    private record Candidate(int rank, Long accountId, Long playerId, String email, String nickname, long points) {
     }
 }

@@ -1,4 +1,4 @@
-import type { PrizeCandidate } from '@/types/api'
+import type { PrizeCandidate, PrizeEventMetric, PrizeWinnerPick } from '@/types/api'
 
 export type PrizeDraft = {
   selected: boolean
@@ -6,11 +6,24 @@ export type PrizeDraft = {
   amount: string
 }
 
+/**
+ * Who a candidate is, as a key for the drafts: a point account in a points event, a player in a
+ * matches-played one.
+ */
+export function prizeCandidateKey(candidate: PrizeCandidate): string {
+  return candidate.playerId != null ? `player:${candidate.playerId}` : `account:${candidate.pointAccountId}`
+}
+
+/** What ranks an event; an event from before the choice is ranked by points. */
+export function prizeEventMetric(event: { metric?: PrizeEventMetric | null }): PrizeEventMetric {
+  return event.metric === 'GAMES' ? 'GAMES' : 'POINTS'
+}
+
 /** The first winnerCount candidates start ticked; anyone tied below the cut can be swapped in. */
-export function initialPrizeDrafts(candidates: PrizeCandidate[], winnerCount: number): Record<number, PrizeDraft> {
-  const drafts: Record<number, PrizeDraft> = {}
+export function initialPrizeDrafts(candidates: PrizeCandidate[], winnerCount: number): Record<string, PrizeDraft> {
+  const drafts: Record<string, PrizeDraft> = {}
   candidates.forEach((candidate, index) => {
-    drafts[candidate.pointAccountId] = { selected: index < winnerCount, prize: '', amount: '' }
+    drafts[prizeCandidateKey(candidate)] = { selected: index < winnerCount, prize: '', amount: '' }
   })
   return drafts
 }
@@ -31,11 +44,11 @@ export function parsePrizeAmount(value: string): number | null {
 /** Ticked candidates in candidate order, which sets their places. */
 export function buildPrizeWinners(
   candidates: PrizeCandidate[],
-  drafts: Record<number, PrizeDraft>,
-): Array<{ pointAccountId: number; prize: string | null; amount: number }> | null {
-  const winners: Array<{ pointAccountId: number; prize: string | null; amount: number }> = []
+  drafts: Record<string, PrizeDraft>,
+): PrizeWinnerPick[] | null {
+  const winners: PrizeWinnerPick[] = []
   for (const candidate of candidates) {
-    const draft = drafts[candidate.pointAccountId]
+    const draft = drafts[prizeCandidateKey(candidate)]
     if (!draft?.selected) {
       continue
     }
@@ -44,7 +57,12 @@ export function buildPrizeWinners(
       return null
     }
     const prize = draft.prize.trim()
-    winners.push({ pointAccountId: candidate.pointAccountId, prize: prize.length > 0 ? prize : null, amount })
+    winners.push({
+      pointAccountId: candidate.pointAccountId,
+      playerId: candidate.playerId ?? null,
+      prize: prize.length > 0 ? prize : null,
+      amount,
+    })
   }
   return winners
 }

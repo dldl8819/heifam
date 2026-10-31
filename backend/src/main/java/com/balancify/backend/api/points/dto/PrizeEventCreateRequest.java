@@ -6,6 +6,8 @@ public record PrizeEventCreateRequest(
     String title,
     LocalDate periodStart,
     LocalDate periodEnd,
-    Integer winnerCount
+    Integer winnerCount,
+    // POINTS (default) or GAMES.
+    String metric
 ) {
 }

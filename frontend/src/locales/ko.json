@@ -2162,12 +2162,18 @@
   },
   "prizeEvents": {
     "title": "상품 이벤트",
-    "description": "기간 동안 포인트를 많이 모은 사람이 후보로 나옵니다. 최고 관리자가 당첨자와 상품을 확정하면 금액이 있는 상품은 후원금 장부 지출(이벤트 상품)로 기록됩니다.",
+    "description": "기간 동안 포인트를 많이 모은 사람, 또는 내전 경기를 가장 많이 뛴 사람이 후보로 나옵니다. 최고 관리자가 당첨자와 상품을 확정하면 금액이 있는 상품은 후원금 장부 지출(이벤트 상품)로 기록됩니다.",
     "loadError": "상품 이벤트를 불러오지 못했습니다.",
     "saveError": "상품 이벤트를 저장하지 못했습니다.",
     "empty": "아직 상품 이벤트가 없습니다.",
     "noCandidates": "이 기간에 포인트를 모은 사람이 없습니다.",
-    "period": "{start} ~ {end} · {count}명",
+    "period": "{start} ~ {end} · {metric} · {count}명",
+    "metric": {
+      "POINTS": "포인트 순위",
+      "GAMES": "내전 경기 수 순위"
+    },
+    "points": "{value}p",
+    "games": "{value}경기",
     "unknownNickname": "알 수 없음",
     "leftMember": "탈퇴한 회원",
     "place": "{place}위",
@@ -2192,6 +2198,9 @@
       "start": "시작일",
       "end": "종료일",
       "winners": "당첨 인원",
+      "metric": "순위 기준",
+      "metricPoints": "기간 포인트",
+      "metricGames": "내전 경기 수",
       "create": "이벤트 만들기"
     },
     "table": {
@@ -2199,6 +2208,7 @@
       "rank": "순위",
       "nickname": "닉네임",
       "points": "기간 포인트",
+      "games": "경기 수",
       "prize": "상품",
       "prizePlaceholder": "예: 커피 쿠폰",
       "amount": "금액(원)"
