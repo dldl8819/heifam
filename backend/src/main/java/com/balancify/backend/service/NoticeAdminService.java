@@ -74,6 +74,7 @@ public class NoticeAdminService {
         // Anonymous unless the writer says otherwise, as every vote was before there was a choice.
         notice.setVoteAnonymous(request == null || !Boolean.FALSE.equals(request.voteAnonymous()));
         notice.setVoteAllowAdditions(request != null && Boolean.TRUE.equals(request.voteAllowAdditions()));
+        notice.setVoteMultiple(request != null && Boolean.TRUE.equals(request.voteMultiple()));
         noticeRepository.save(notice);
         if (!voteOptions.isEmpty()) {
             noticeVoteRepository.replaceOptions(notice.getId(), voteOptions, notice.getAuthorEmail());
@@ -218,6 +219,13 @@ public class NoticeAdminService {
                 throw new NoticeVoteConflictException("익명으로 받은 투표는 기명 투표로 바꿀 수 없습니다.");
             }
             notice.setVoteAnonymous(request.voteAnonymous());
+        }
+        // One choice again only while nobody holds more than one: their choices would have to go.
+        if (request != null && request.voteMultiple() != null && request.voteMultiple() != notice.isVoteMultiple()) {
+            if (!request.voteMultiple() && noticeVoteRepository.hasVoterWithSeveralChoices(notice.getId())) {
+                throw new NoticeVoteConflictException("여러 항목에 투표한 사람이 있어 중복 투표를 끌 수 없습니다.");
+            }
+            notice.setVoteMultiple(request.voteMultiple());
         }
         if (request != null && request.voteAllowAdditions() != null) {
             notice.setVoteAllowAdditions(request.voteAllowAdditions());

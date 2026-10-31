@@ -54,6 +54,7 @@ export default function NoticeDetailPage() {
   const [voteOptions, setVoteOptions] = useState<string[]>(NOTICE_VOTE_DEFAULT_OPTIONS)
   const [voteAnonymous, setVoteAnonymous] = useState<boolean>(true)
   const [voteAllowAdditions, setVoteAllowAdditions] = useState<boolean>(false)
+  const [voteMultiple, setVoteMultiple] = useState<boolean>(false)
   // Off for every edit: announcing again is a choice, not something a typo fix should do.
   const [notifyAgain, setNotifyAgain] = useState<boolean>(false)
   const [saving, setSaving] = useState<boolean>(false)
@@ -70,6 +71,7 @@ export default function NoticeDetailPage() {
     setVoteOptions(stored?.options ?? NOTICE_VOTE_DEFAULT_OPTIONS)
     setVoteAnonymous(stored?.anonymous ?? true)
     setVoteAllowAdditions(stored?.allowAdditions ?? false)
+    setVoteMultiple(stored?.multiple ?? false)
   }, [])
 
   const loadNotice = useCallback(async () => {
@@ -161,7 +163,7 @@ export default function NoticeDetailPage() {
           notify: notifyAgain,
           voteStatus,
           ...(sendVoteOptions ? { voteOptions: cleanNoticeVoteOptions(voteOptions) } : {}),
-          ...(voteStatus !== 'NONE' ? { voteAnonymous, voteAllowAdditions } : {}),
+          ...(voteStatus !== 'NONE' ? { voteAnonymous, voteAllowAdditions, voteMultiple } : {}),
         })
         setNotice((prev) =>
           prev
@@ -202,6 +204,7 @@ export default function NoticeDetailPage() {
       title,
       voteAllowAdditions,
       voteAnonymous,
+      voteMultiple,
       voteOptions,
       voteOptionsLocked,
       voteStatus,
@@ -388,6 +391,8 @@ export default function NoticeDetailPage() {
                 anonymousLocked={voteAnonymousLocked}
                 allowAdditions={voteAllowAdditions}
                 onAllowAdditionsChange={setVoteAllowAdditions}
+                multiple={voteMultiple}
+                onMultipleChange={setVoteMultiple}
               />
               <p className="text-xs text-slate-500 dark:text-slate-400">{t('notices.posts.votePreview')}</p>
               <NoticeVoteView
@@ -395,6 +400,7 @@ export default function NoticeDetailPage() {
                   status: voteStatus,
                   anonymous: voteAnonymous,
                   allowAdditions: voteAllowAdditions,
+                  multiple: voteMultiple,
                 })}
               />
             </div>

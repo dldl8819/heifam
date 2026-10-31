@@ -325,7 +325,7 @@ class NoticeAdminServiceTest {
     void aVoteGetsTheOptionsItsWriterNamedOrForAndAgainst() {
         noticeAdminService.createNotice(
             1L,
-            new NoticeCreateRequest("How long may a game take?", "", null, "OPEN", Arrays.asList(" 30분 ", "25분", "  ", null, "24분"), null, null),
+            new NoticeCreateRequest("How long may a game take?", "", null, "OPEN", Arrays.asList(" 30분 ", "25분", "  ", null, "24분"), null, null, null),
             "ops@hei.gg",
             "OpsUser"
         );
@@ -339,7 +339,7 @@ class NoticeAdminServiceTest {
     void aNoticeWithoutAVoteGetsNoOptionsWhateverWasSent() {
         noticeAdminService.createNotice(
             1L,
-            new NoticeCreateRequest("YOUR_TITLE", "YOUR_CONTENT", null, null, List.of("only one"), false, true),
+            new NoticeCreateRequest("YOUR_TITLE", "YOUR_CONTENT", null, null, List.of("only one"), false, true, null),
             "ops@hei.gg",
             "OpsUser"
         );
@@ -364,7 +364,7 @@ class NoticeAdminServiceTest {
 
         for (List<String> options : refused) {
             assertThatThrownBy(() -> noticeAdminService.createNotice(
-                1L, new NoticeCreateRequest("YOUR_QUESTION", "", null, "OPEN", options, null, null), "ops@hei.gg", "OpsUser"
+                1L, new NoticeCreateRequest("YOUR_QUESTION", "", null, "OPEN", options, null, null, null), "ops@hei.gg", "OpsUser"
             )).isInstanceOf(IllegalArgumentException.class);
         }
         // Nothing of a refused vote is kept: no notice, no options, no announcement.
@@ -374,7 +374,7 @@ class NoticeAdminServiceTest {
 
         noticeAdminService.createNotice(
             1L,
-            new NoticeCreateRequest("YOUR_QUESTION", "", null, "OPEN", tooMany.subList(0, NoticeVotes.MAX_OPTIONS), null, null),
+            new NoticeCreateRequest("YOUR_QUESTION", "", null, "OPEN", tooMany.subList(0, NoticeVotes.MAX_OPTIONS), null, null, null),
             "ops@hei.gg",
             "OpsUser"
         );
@@ -391,7 +391,7 @@ class NoticeAdminServiceTest {
         assertThat(saved.getValue().isVoteAllowAdditions()).isFalse();
 
         noticeAdminService.createNotice(
-            1L, new NoticeCreateRequest("YOUR_QUESTION", "", null, "OPEN", null, false, true), "ops@hei.gg", "OpsUser"
+            1L, new NoticeCreateRequest("YOUR_QUESTION", "", null, "OPEN", null, false, true, null), "ops@hei.gg", "OpsUser"
         );
         verify(noticeRepository, times(2)).save(saved.capture());
         assertThat(saved.getValue().isVoteAnonymous()).isFalse();
@@ -513,6 +513,35 @@ class NoticeAdminServiceTest {
     }
 
     @Test
+    void aVoteTakesMoreThanOneChoiceOnlyWhenItsWriterSaysSo() {
+        noticeAdminService.createNotice(1L, createRequest("YOUR_QUESTION", "", null, "OPEN"), "ops@hei.gg", "OpsUser");
+        noticeAdminService.createNotice(1L, new NoticeCreateRequest("YOUR_QUESTION", "", null, "OPEN", null, null, null, true), "ops@hei.gg", "OpsUser");
+
+        ArgumentCaptor<Notice> saved = ArgumentCaptor.forClass(Notice.class);
+        verify(noticeRepository, times(2)).save(saved.capture());
+        assertThat(saved.getAllValues()).extracting(Notice::isVoteMultiple).containsExactly(false, true);
+    }
+
+    @Test
+    void anEditTurnsMultipleChoiceOffOnlyWhileNobodyHoldsSeveralChoices() {
+        Notice notice = existingNotice(5L, false);
+        notice.setVoteStatus("OPEN");
+        notice.setVoteMultiple(true);
+        when(noticeVoteRepository.listOptions(5L)).thenReturn(List.of(new OptionRow(1L, "30분", 0, 3), new OptionRow(2L, "25분", 1, 2)));
+        when(noticeVoteRepository.hasVoterWithSeveralChoices(5L)).thenReturn(true, false);
+
+        assertThatThrownBy(() -> noticeAdminService.updateNotice(1L, 5L, multipleEdit(false), "ops@hei.gg", "OpsUser"))
+            .isInstanceOf(NoticeVoteConflictException.class);
+        assertThat(notice.isVoteMultiple()).isTrue();
+
+        noticeAdminService.updateNotice(1L, 5L, multipleEdit(false), "ops@hei.gg", "OpsUser");
+        assertThat(notice.isVoteMultiple()).isFalse();
+        // Back on at any time.
+        noticeAdminService.updateNotice(1L, 5L, multipleEdit(true), "ops@hei.gg", "OpsUser");
+        assertThat(notice.isVoteMultiple()).isTrue();
+    }
+
+    @Test
     void aNoticeThatAsksForAVoteNeedsNoTextButAnyOtherDoes() {
         NoticeResponse questionOnly = noticeAdminService.createNotice(
             1L, createRequest("YOUR_QUESTION", "  ", null, "OPEN"), "ops@hei.gg", "OpsUser"
@@ -623,19 +652,24 @@ class NoticeAdminServiceTest {
 
     /** A new notice that says nothing about the vote's options and settings: they are the defaults. */
     private static NoticeCreateRequest createRequest(String title, String content, Boolean adminOnly, String voteStatus) {
-        return new NoticeCreateRequest(title, content, adminOnly, voteStatus, null, null, null);
+        return new NoticeCreateRequest(title, content, adminOnly, voteStatus, null, null, null, null);
     }
 
     /** An edit that says nothing about the vote's options and settings: they stay as they are. */
     private static NoticeUpdateRequest updateRequest(
         String title, String content, Boolean adminOnly, Boolean announceAgain, String voteStatus
     ) {
-        return new NoticeUpdateRequest(title, content, adminOnly, announceAgain, voteStatus, null, null, null);
+        return new NoticeUpdateRequest(title, content, adminOnly, announceAgain, voteStatus, null, null, null, null);
+    }
+
+    /** An edit that changes only whether the vote takes more than one choice. */
+    private static NoticeUpdateRequest multipleEdit(boolean multiple) {
+        return new NoticeUpdateRequest("t", "c", null, null, null, null, null, null, multiple);
     }
 
     /** An edit that changes nothing but the vote. */
     private static NoticeUpdateRequest voteEdit(String voteStatus, List<String> options, Boolean anonymous, Boolean allowAdditions) {
-        return new NoticeUpdateRequest("t", "c", null, null, voteStatus, options, anonymous, allowAdditions);
+        return new NoticeUpdateRequest("t", "c", null, null, voteStatus, options, anonymous, allowAdditions, null);
     }
 
     private Notice existingNotice(Long id, boolean adminOnly) {

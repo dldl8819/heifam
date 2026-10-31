@@ -6,7 +6,7 @@ export const NOTICE_VOTE_MIN_OPTIONS = 2
 export const NOTICE_VOTE_MAX_OPTIONS = 10
 export const NOTICE_VOTE_OPTION_MAX_LENGTH = 50
 
-/** What a vote starts with in the form: for or against, ready to be typed over. */
+/** What a vote starts with in the form, and what 초기화 puts back: for or against, ready to be typed over. */
 export const NOTICE_VOTE_DEFAULT_OPTIONS = ['찬성', '반대']
 
 export type NoticeVoteProblem = {
@@ -95,12 +95,14 @@ export function noticeVotePercents(counts: number[]): number[] {
 /** The vote as the form shows it before it exists: the options typed so far, nobody having voted. */
 export function previewNoticeVote(
   drafts: string[],
-  settings: { status?: NoticeVoteStatus; anonymous: boolean; allowAdditions: boolean }
+  settings: { status?: NoticeVoteStatus; anonymous: boolean; allowAdditions: boolean; multiple?: boolean }
 ): NoticeVote {
   return {
     status: settings.status === 'CLOSED' ? 'CLOSED' : 'OPEN',
     anonymous: settings.anonymous,
     allowAdditions: settings.allowAdditions,
+    multiple: settings.multiple ?? false,
+    myOptionIds: [],
     canAddOption: false,
     canRemoveOptions: false,
     totalVoters: 0,
@@ -127,6 +129,7 @@ export function storedNoticeVote(notice: Pick<NoticeDetail, 'vote' | 'voteKept'>
       totalVoters: notice.vote.totalVoters ?? 0,
       anonymous: notice.vote.anonymous ?? true,
       allowAdditions: notice.vote.allowAdditions ?? false,
+      multiple: notice.vote.multiple ?? false,
     }
   }
   return notice.voteKept ?? null
@@ -140,7 +143,7 @@ export function storedNoticeVote(notice: Pick<NoticeDetail, 'vote' | 'voteKept'>
 export function editPreviewNoticeVote(
   current: NoticeVote | null | undefined,
   drafts: string[],
-  settings: { status?: NoticeVoteStatus; anonymous: boolean; allowAdditions: boolean }
+  settings: { status?: NoticeVoteStatus; anonymous: boolean; allowAdditions: boolean; multiple?: boolean }
 ): NoticeVote {
   const options = current?.options ?? []
   if (!current || !sameNoticeVoteOptions(drafts, options.map((option) => option.label))) {
@@ -151,6 +154,7 @@ export function editPreviewNoticeVote(
     status: settings.status === 'CLOSED' ? 'CLOSED' : 'OPEN',
     anonymous: settings.anonymous,
     allowAdditions: settings.allowAdditions,
+    multiple: settings.multiple ?? false,
     canAddOption: false,
     canRemoveOptions: false,
     options: options.map((option) => ({ ...option, voters: settings.anonymous ? null : (option.voters ?? []) })),

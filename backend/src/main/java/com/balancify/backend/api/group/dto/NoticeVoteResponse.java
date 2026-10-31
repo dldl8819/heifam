@@ -26,6 +26,10 @@ public record NoticeVoteResponse(
     long totalVoters,
     // Null when the reader has not voted.
     Long myOptionId,
-    List<NoticeVoteOptionResponse> options
+    List<NoticeVoteOptionResponse> options,
+    // A voter may choose more than one option; totalVoters then counts people, not choices.
+    boolean multiple,
+    // Every option the reader chose (at most one unless multiple).
+    List<Long> myOptionIds
 ) {
 }
