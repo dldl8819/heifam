@@ -209,6 +209,24 @@ class PrizeEventServiceTest {
     }
 
     @Test
+    void deletesOnlyAnEventThatWasCancelled() {
+        PrizeEvent event = openEvent();
+
+        assertThatThrownBy(() -> service.delete(1L, 5L, SUPER, null)).isInstanceOf(MatchConflictException.class);
+        event.setStatus(PrizeEventStatus.CONFIRMED);
+        assertThatThrownBy(() -> service.delete(1L, 5L, SUPER, null)).isInstanceOf(MatchConflictException.class);
+        verify(prizeEventRepository, never()).delete(any());
+
+        event.setStatus(PrizeEventStatus.CANCELLED);
+        service.delete(1L, 5L, SUPER, null);
+
+        verify(prizeEventRepository).delete(event);
+        verify(operationAuditLogService).recordPrizeEvent(
+            eq(OperationAuditLogService.ACTION_PRIZE_EVENT_DELETED), eq(SUPER), any(), eq(5L), eq(1L), any(), any()
+        );
+    }
+
+    @Test
     void ranksAGamesEventByFinishedMatchesPlayedLeavingOutPlayersWhoLeft() {
         Player left = player(21L, "떠난");
         left.setActive(false);

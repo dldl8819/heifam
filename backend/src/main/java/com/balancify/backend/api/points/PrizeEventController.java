@@ -13,6 +13,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.NoSuchElementException;
 import java.util.function.Supplier;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,7 +24,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Prize events are seen by whoever can use points. Admins create them, as they post notices; only
- * super admins confirm or cancel them, as confirming writes the donation ledger.
+ * super admins confirm or cancel them, as confirming writes the donation ledger, and delete one they
+ * cancelled.
  */
 @RestController
 @RequestMapping("/api/groups/{groupId}/prize-events")
@@ -90,6 +92,16 @@ public class PrizeEventController {
     ) {
         String requestEmail = requireSuperAdmin(request);
         return handle(() -> prizeEventService.cancel(groupId, eventId, requestEmail, resolveNickname(requestEmail)));
+    }
+
+    @DeleteMapping("/{eventId}")
+    public PrizeEventListResponse delete(
+        @PathVariable Long groupId,
+        @PathVariable Long eventId,
+        HttpServletRequest request
+    ) {
+        String requestEmail = requireSuperAdmin(request);
+        return handle(() -> prizeEventService.delete(groupId, eventId, requestEmail, resolveNickname(requestEmail)));
     }
 
     private String requireAdmin(HttpServletRequest request) {

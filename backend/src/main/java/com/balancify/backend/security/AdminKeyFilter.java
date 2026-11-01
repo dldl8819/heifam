@@ -180,7 +180,8 @@ public class AdminKeyFilter extends OncePerRequestFilter {
             AuthType.SERVICE_ACCESS
         ),
         // Prize events (the events page): members see them, admins start one as they post a notice,
-        // and super admins confirm or cancel one, as confirming writes the donation ledger.
+        // and super admins confirm or cancel one, as confirming writes the donation ledger, and delete
+        // one they cancelled.
         new ProtectedRoute(
             "GET",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/prize-events"),
@@ -199,6 +200,11 @@ public class AdminKeyFilter extends OncePerRequestFilter {
         new ProtectedRoute(
             "POST",
             PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/prize-events/{eventId}/cancel"),
+            AuthType.SUPER_ADMIN_EMAIL
+        ),
+        new ProtectedRoute(
+            "DELETE",
+            PathPatternParser.defaultInstance.parse("/api/groups/{groupId}/prize-events/{eventId}"),
             AuthType.SUPER_ADMIN_EMAIL
         ),
         // Members predict (balancify.predictions.members-enabled); closing a match early stays with admins.

@@ -1028,6 +1028,7 @@
       "prizeEventCreated": "상품 이벤트 생성",
       "prizeEventConfirmed": "상품 이벤트 확정",
       "prizeEventCancelled": "상품 이벤트 취소",
+      "prizeEventDeleted": "상품 이벤트 삭제",
       "prizeDrawSaved": "추첨 결과 저장",
       "prizeDrawDeleted": "추첨 기록 삭제",
       "captainDraftDeleted": "정기 감전 기록 삭제"
@@ -2192,6 +2193,8 @@
     "amountInvalid": "상품 금액은 0 이상의 정수로 입력해 주세요.",
     "confirmPrompt": "{count}명을 당첨으로 확정할까요? 상품 금액 합계 {total}원은 후원금 장부 지출로 기록됩니다.",
     "cancelPrompt": "'{title}' 이벤트를 취소할까요?",
+    "delete": "삭제",
+    "deletePrompt": "취소한 '{title}' 이벤트를 목록에서 삭제할까요? 되돌릴 수 없습니다.",
     "confirmed": "'{title}' 당첨자를 확정했습니다.",
     "status": {
       "OPEN": "후보 확인 중",

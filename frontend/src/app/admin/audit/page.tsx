@@ -153,6 +153,8 @@ function getActionLabel(action: string): string {
       return t('audit.actions.prizeEventConfirmed')
     case 'PRIZE_EVENT_CANCELLED':
       return t('audit.actions.prizeEventCancelled')
+    case 'PRIZE_EVENT_DELETED':
+      return t('audit.actions.prizeEventDeleted')
     case 'PRIZE_DRAW_SAVED':
       return t('audit.actions.prizeDrawSaved')
     case 'PRIZE_DRAW_DELETED':

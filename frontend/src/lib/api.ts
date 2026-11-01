@@ -1941,6 +1941,12 @@ export const apiClient = {
       { method: 'POST' },
       { requireUserEmail: true, includeUserEmail: true }
     ),
+  deletePrizeEvent: (groupId: number, eventId: number) =>
+    apiRequest<{ events: PrizeEvent[] }>(
+      `/api/groups/${groupId}/prize-events/${eventId}`,
+      { method: 'DELETE' },
+      { requireUserEmail: true, includeUserEmail: true }
+    ),
   getTeamScores: (groupId: number) =>
     apiRequest<TeamScoreBoard>(`/api/groups/${groupId}/team-scores`, undefined, {
       requireUserEmail: true,
