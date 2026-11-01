@@ -267,7 +267,8 @@ public class PrizeEventService {
                         paidOn,
                         LEDGER_EXPENSE_TYPE,
                         LEDGER_CATEGORY,
-                        null,
+                        // Named as on the event, and cleared with it when the winner withdraws.
+                        candidate.nickname(),
                         amount,
                         event.getTitle() + " " + (index + 1) + "위" + (prize == null ? "" : " · " + prize)
                     ),
