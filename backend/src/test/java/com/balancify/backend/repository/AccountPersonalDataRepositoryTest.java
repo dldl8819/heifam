@@ -49,6 +49,12 @@ class AccountPersonalDataRepositoryTest {
         assertThat(sql).contains(
             "UPDATE prize_event_winners SET normalized_email = NULL, nickname = NULL WHERE normalized_email = :email"
         );
+        // The ledger expense naming the winner is cleared first, while the winner row still says who it was.
+        int ledger = sql.indexOf(AccountPersonalDataRepository.LEDGER_PRIZE_TARGET_CLEAR
+            + "WHERE normalized_email = :email AND ledger_expense_id IS NOT NULL)");
+        assertThat(ledger).isNotNegative().isLessThan(sql.indexOf(
+            "UPDATE prize_event_winners SET normalized_email = NULL, nickname = NULL WHERE normalized_email = :email"
+        ));
         assertThat(sql).anySatisfy(statement -> assertThat(statement)
             .startsWith("UPDATE point_transactions SET created_by_email = NULL"));
     }
@@ -160,6 +166,8 @@ class AccountPersonalDataRepositoryTest {
         );
         assertThat(index).isNotNegative();
         assertThat(parameters.getAllValues().get(index).getValue("deletedMemberLabel")).isEqualTo("탈퇴한 팸원");
+        assertThat(statements.getAllValues()).contains(AccountPersonalDataRepository.LEDGER_PRIZE_TARGET_CLEAR
+            + "WHERE player_id IN (:playerIds) AND ledger_expense_id IS NOT NULL)");
         assertThat(parameters.getAllValues().get(index).getValue("playerIds")).isEqualTo(List.of(7L, 8L));
     }
 

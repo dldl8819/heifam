@@ -12,6 +12,11 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class AccountPersonalDataRepository {
 
+    // Clears the winner's name on the ledger expenses paying their prize events; the caller ends the
+    // prize_event_winners condition and closes the subquery.
+    static final String LEDGER_PRIZE_TARGET_CLEAR =
+        "UPDATE ledger_expense_entries SET target = NULL WHERE id IN (SELECT ledger_expense_id FROM prize_event_winners ";
+
     private final NamedParameterJdbcTemplate jdbcTemplate;
 
     public AccountPersonalDataRepository(NamedParameterJdbcTemplate jdbcTemplate) {
@@ -244,7 +249,12 @@ public class AccountPersonalDataRepository {
                 .addValue("deletedMemberLabel", deletedMemberLabel)
                 .addValue("playerIds", playerIds)
         );
-        // So does a prize event won by matches played (an email winner's name goes on withdrawal).
+        // So does a prize event won by matches played (an email winner's name goes on withdrawal),
+        // and the ledger expense paying it, which names the winner.
+        jdbcTemplate.update(
+            LEDGER_PRIZE_TARGET_CLEAR + "WHERE player_id IN (:playerIds) AND ledger_expense_id IS NOT NULL)",
+            new MapSqlParameterSource("playerIds", playerIds)
+        );
         jdbcTemplate.update(
             "UPDATE prize_event_winners SET nickname = NULL WHERE player_id IN (:playerIds)",
             new MapSqlParameterSource("playerIds", playerIds)
@@ -338,6 +348,10 @@ public class AccountPersonalDataRepository {
                 parameters
             );
             // The prize stays in the event and the ledger; who won it does not.
+            jdbcTemplate.update(
+                LEDGER_PRIZE_TARGET_CLEAR + "WHERE normalized_email = :email AND ledger_expense_id IS NOT NULL)",
+                parameters
+            );
             jdbcTemplate.update(
                 "UPDATE prize_event_winners SET normalized_email = NULL, nickname = NULL WHERE normalized_email = :email",
                 parameters

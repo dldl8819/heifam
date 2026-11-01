@@ -170,8 +170,8 @@ class PrizeEventServiceTest {
         assertThat(expense.getValue().category()).isEqualTo(PrizeEventService.LEDGER_CATEGORY);
         assertThat(expense.getValue().amount()).isEqualTo(15000L);
         assertThat(expense.getValue().entryDate()).isEqualTo(LocalDate.of(2026, 11, 1));
-        assertThat(expense.getValue().target()).isNull();
-        assertThat(expense.getValue().memo()).isEqualTo("10월 이벤트 1위 · 커피 쿠폰").doesNotContain("A");
+        assertThat(expense.getValue().target()).isEqualTo("A");
+        assertThat(expense.getValue().memo()).isEqualTo("10월 이벤트 1위 · 커피 쿠폰");
         ArgumentCaptor<PrizeEventWinner> winner = ArgumentCaptor.forClass(PrizeEventWinner.class);
         verify(prizeEventWinnerRepository, times(2)).save(winner.capture());
         assertThat(winner.getAllValues().getFirst().getNormalizedEmail()).isEqualTo("a@example.com");
