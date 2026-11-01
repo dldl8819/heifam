@@ -43,6 +43,10 @@ public class PrizeEvent {
     @Column(nullable = false, length = 20)
     private PrizeEventMetric metric = PrizeEventMetric.POINTS;
 
+    // What a MANUAL event's numbers count, as the admin named it (e.g. 채팅); null otherwise.
+    @Column(name = "unit_label", length = 20)
+    private String unitLabel;
+
     @Column(name = "confirmed_at")
     private OffsetDateTime confirmedAt;
 
@@ -62,6 +66,14 @@ public class PrizeEvent {
 
     public void setMetric(PrizeEventMetric metric) {
         this.metric = metric;
+    }
+
+    public String getUnitLabel() {
+        return unitLabel;
+    }
+
+    public void setUnitLabel(String unitLabel) {
+        this.unitLabel = unitLabel;
     }
 
     public Long getGroupId() {

@@ -37,6 +37,9 @@ import com.balancify.backend.domain.Player;
 import com.balancify.backend.domain.PrizeEventMetric;
 import com.balancify.backend.repository.MatchParticipantRepository;
 import com.balancify.backend.repository.PlayerRepository;
+import com.balancify.backend.repository.PrizeEventEntryRepository;
+import com.balancify.backend.api.points.dto.PrizeEventEntryRequest;
+import com.balancify.backend.domain.PrizeEventEntry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -60,6 +63,9 @@ class PrizeEventServiceTest {
 
     @Mock
     private PrizeEventWinnerRepository prizeEventWinnerRepository;
+
+    @Mock
+    private PrizeEventEntryRepository prizeEventEntryRepository;
 
     @Mock
     private PointTransactionRepository pointTransactionRepository;
@@ -86,6 +92,7 @@ class PrizeEventServiceTest {
         service = new PrizeEventService(
             prizeEventRepository,
             prizeEventWinnerRepository,
+            prizeEventEntryRepository,
             pointTransactionRepository,
             matchParticipantRepository,
             playerRepository,
@@ -118,7 +125,7 @@ class PrizeEventServiceTest {
 
     @Test
     void opensAnEventWithTheTopEarnersAsCandidatesTiesIncluded() {
-        PrizeEventResponse response = service.create(1L, new PrizeEventCreateRequest(" 10월 이벤트 ", START, END, 2, null), SUPER, null);
+        PrizeEventResponse response = service.create(1L, new PrizeEventCreateRequest(" 10월 이벤트 ", START, END, 2, null, null, null), SUPER, null);
 
         assertThat(response.status()).isEqualTo("OPEN");
         assertThat(response.title()).isEqualTo("10월 이벤트");
@@ -132,13 +139,13 @@ class PrizeEventServiceTest {
 
     @Test
     void refusesEventsItCannotRun() {
-        assertThatThrownBy(() -> service.create(1L, new PrizeEventCreateRequest(" ", START, END, 2, null), SUPER, null))
+        assertThatThrownBy(() -> service.create(1L, new PrizeEventCreateRequest(" ", START, END, 2, null, null, null), SUPER, null))
             .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> service.create(1L, new PrizeEventCreateRequest("t", END, START, 2, null), SUPER, null))
+        assertThatThrownBy(() -> service.create(1L, new PrizeEventCreateRequest("t", END, START, 2, null, null, null), SUPER, null))
             .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> service.create(1L, new PrizeEventCreateRequest("t", START, END, 0, null), SUPER, null))
+        assertThatThrownBy(() -> service.create(1L, new PrizeEventCreateRequest("t", START, END, 0, null, null, null), SUPER, null))
             .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> service.create(1L, new PrizeEventCreateRequest("t", START, END.plusYears(2), 3, null), SUPER, null))
+        assertThatThrownBy(() -> service.create(1L, new PrizeEventCreateRequest("t", START, END.plusYears(2), 3, null, null, null), SUPER, null))
             .isInstanceOf(IllegalArgumentException.class);
         verify(prizeEventRepository, never()).save(any());
     }
@@ -214,7 +221,7 @@ class PrizeEventServiceTest {
             left, player(22L, "민식"), player(23L, "보이"), player(24L, "스톰"), player(25L, "리드")
         ));
 
-        PrizeEventResponse response = service.create(1L, new PrizeEventCreateRequest("10월 최다 출전", START, END, 2, "games"), SUPER, null);
+        PrizeEventResponse response = service.create(1L, new PrizeEventCreateRequest("10월 최다 출전", START, END, 2, "games", null, null), SUPER, null);
 
         assertThat(response.metric()).isEqualTo("GAMES");
         // The one who left is no candidate; 보이 and 스톰 share second place.
@@ -222,7 +229,7 @@ class PrizeEventServiceTest {
             .extracting(PrizeCandidateResponse::rank, PrizeCandidateResponse::playerId, PrizeCandidateResponse::pointAccountId, PrizeCandidateResponse::nickname, PrizeCandidateResponse::points)
             .containsExactly(tuple(1, 22L, null, "민식", 20L), tuple(2, 23L, null, "보이", 12L), tuple(2, 24L, null, "스톰", 12L));
         verify(pointTransactionRepository, never()).sumPositiveAccountTotalsBetween(any(), any());
-        assertThatThrownBy(() -> service.create(1L, new PrizeEventCreateRequest("t", START, END, 2, "MMR"), SUPER, null))
+        assertThatThrownBy(() -> service.create(1L, new PrizeEventCreateRequest("t", START, END, 2, "MMR", null, null), SUPER, null))
             .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -249,6 +256,78 @@ class PrizeEventServiceTest {
         verify(prizeEventWinnerRepository).save(winner.capture());
         assertThat(winner.getValue().getPlayerId()).isEqualTo(22L);
         assertThat(winner.getValue().getNormalizedEmail()).isNull();
+    }
+
+    @Test
+    void opensAnEventRankedByNumbersCountedOutsideTheSite() {
+        when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(23L, 22L, 24L)))
+            .thenReturn(List.of(player(22L, "노바"), player(23L, "민트"), player(24L, "방구")));
+        when(playerRepository.findAllById(List.of(22L, 23L, 24L)))
+            .thenReturn(List.of(player(22L, "노바"), player(23L, "민트"), player(24L, "방구")));
+        when(prizeEventEntryRepository.findByEventIdOrderByScoreDescPlayerIdAsc(5L))
+            .thenReturn(List.of(entry(22L, 427), entry(23L, 359), entry(24L, 297)));
+
+        PrizeEventResponse response = service.create(1L, new PrizeEventCreateRequest(
+            "10월 채팅 이벤트", START, END, 2, "manual", " 채팅 ",
+            List.of(new PrizeEventEntryRequest(23L, 359L), new PrizeEventEntryRequest(22L, 427L), new PrizeEventEntryRequest(24L, 297L))
+        ), SUPER, null);
+
+        assertThat(response.metric()).isEqualTo("MANUAL");
+        assertThat(response.unitLabel()).isEqualTo("채팅");
+        assertThat(response.candidates())
+            .extracting(PrizeCandidateResponse::rank, PrizeCandidateResponse::playerId, PrizeCandidateResponse::nickname, PrizeCandidateResponse::points)
+            .containsExactly(tuple(1, 22L, "노바", 427L), tuple(2, 23L, "민트", 359L));
+        ArgumentCaptor<PrizeEventEntry> saved = ArgumentCaptor.forClass(PrizeEventEntry.class);
+        verify(prizeEventEntryRepository, times(3)).save(saved.capture());
+        assertThat(saved.getAllValues()).extracting(PrizeEventEntry::getEventId, PrizeEventEntry::getPlayerId, PrizeEventEntry::getScore)
+            .containsExactly(tuple(5L, 23L, 359L), tuple(5L, 22L, 427L), tuple(5L, 24L, 297L));
+    }
+
+    @Test
+    void refusesAManualEventWithoutAUnitOrWithEntriesOffTheRoster() {
+        List<PrizeEventEntryRequest> two = List.of(new PrizeEventEntryRequest(22L, 3L), new PrizeEventEntryRequest(23L, 1L));
+        when(playerRepository.findByGroup_IdAndIdIn(1L, List.of(22L, 23L))).thenReturn(List.of(player(22L, "노바")));
+
+        assertThatThrownBy(() -> service.create(1L, new PrizeEventCreateRequest("t", START, END, 2, "MANUAL", " ", two), SUPER, null))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.create(1L, new PrizeEventCreateRequest("t", START, END, 2, "MANUAL", "채팅", List.of()), SUPER, null))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.create(1L, new PrizeEventCreateRequest("t", START, END, 2, "MANUAL", "채팅", List.of(
+            new PrizeEventEntryRequest(22L, 3L), new PrizeEventEntryRequest(22L, 1L)
+        )), SUPER, null)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.create(1L, new PrizeEventCreateRequest("t", START, END, 2, "MANUAL", "채팅", List.of(
+            new PrizeEventEntryRequest(22L, -1L)
+        )), SUPER, null)).isInstanceOf(IllegalArgumentException.class);
+        // Player 23 is not on the group's roster.
+        assertThatThrownBy(() -> service.create(1L, new PrizeEventCreateRequest("t", START, END, 2, "MANUAL", "채팅", two), SUPER, null))
+            .isInstanceOf(IllegalArgumentException.class);
+        verify(prizeEventRepository, never()).save(any());
+        verify(prizeEventEntryRepository, never()).save(any());
+    }
+
+    @Test
+    void confirmsAManualEventsWinnersByPlayer() {
+        PrizeEvent event = openEvent();
+        event.setMetric(PrizeEventMetric.MANUAL);
+        event.setUnitLabel("채팅");
+        when(prizeEventEntryRepository.findByEventIdOrderByScoreDescPlayerIdAsc(5L)).thenReturn(List.of(entry(22L, 427)));
+        when(playerRepository.findAllById(List.of(22L))).thenReturn(List.of(player(22L, "노바")));
+
+        PrizeEventResponse response = service.confirm(1L, 5L, new PrizeEventConfirmRequest(
+            null, List.of(new PrizeWinnerRequest(null, 22L, "배민상품권", 0L))
+        ), SUPER, null);
+
+        assertThat(response.winners()).extracting(PrizeWinnerResponse::place, PrizeWinnerResponse::nickname, PrizeWinnerResponse::points)
+            .containsExactly(tuple(1, "노바", 427));
+        assertThat(response.unitLabel()).isEqualTo("채팅");
+    }
+
+    private static PrizeEventEntry entry(Long playerId, long score) {
+        PrizeEventEntry entry = new PrizeEventEntry();
+        entry.setEventId(5L);
+        entry.setPlayerId(playerId);
+        entry.setScore(score);
+        return entry;
     }
 
     private static Player player(Long id, String nickname) {

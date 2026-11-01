@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { buildPrizeWinners, initialPrizeDrafts, parsePrizeAmount, prizeEventMetric } from '@/lib/prize-events'
+import {
+  buildPrizeWinners,
+  initialPrizeDrafts,
+  parseManualEntries,
+  parsePrizeAmount,
+  prizeEventMetric,
+} from '@/lib/prize-events'
 import type { PrizeCandidate } from '@/types/api'
 
 const candidates: PrizeCandidate[] = [
@@ -50,5 +56,27 @@ describe('prize event helpers', () => {
     expect(prizeEventMetric({ metric: 'GAMES' })).toBe('GAMES')
     // An event from before the choice.
     expect(prizeEventMetric({})).toBe('POINTS')
+  })
+
+  it('reads a ranking pasted from another app against the roster', () => {
+    const roster = [
+      { id: 1, nickname: 'YOUR_USERNAME_1' },
+      { id: 2, nickname: 'YOUR_USERNAME_2' },
+      { id: 3, nickname: 'YOUR_USERNAME_3' },
+    ]
+    const parsed = parseManualEntries(
+      ['1위 YOUR_USERNAME_1 1,427', '', 'your_username_2\t359회', '3. YOUR_USERNAME_3 : 297', 'YOUR_OTHER 10', 'YOUR_USERNAME_1 5', '제목 줄'].join('\n'),
+      roster,
+    )
+
+    expect(parsed.entries).toEqual([
+      { playerId: 1, score: 1427 },
+      { playerId: 2, score: 359 },
+      { playerId: 3, score: 297 },
+    ])
+    expect(parsed.unknown).toEqual(['YOUR_OTHER'])
+    expect(parsed.repeated).toEqual(['YOUR_USERNAME_1'])
+    expect(parsed.unreadable).toEqual(['제목 줄'])
+    expect(prizeEventMetric({ metric: 'MANUAL' })).toBe('MANUAL')
   })
 })

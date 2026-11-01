@@ -1,17 +1,18 @@
 'use client'
 
-import { FormEvent, useCallback, useEffect, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { apiClient } from '@/lib/api'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { t } from '@/lib/i18n'
 import {
   buildPrizeWinners,
   initialPrizeDrafts,
+  parseManualEntries,
   prizeCandidateKey,
   prizeEventMetric,
   type PrizeDraft,
 } from '@/lib/prize-events'
-import type { PrizeEvent, PrizeEventMetric } from '@/types/api'
+import type { PlayerRosterItem, PrizeEvent, PrizeEventMetric } from '@/types/api'
 
 type PrizeEventsPanelProps = {
   groupId: number
@@ -32,9 +33,21 @@ function describeError(error: unknown, fallback: string): string {
   return error instanceof Error && error.message.trim().length > 0 ? `${fallback} (${error.message})` : fallback
 }
 
-// Points earned show as "12p", matches played as "12경기".
-function formatScore(metric: PrizeEventMetric, value: number): string {
-  return t(metric === 'GAMES' ? 'prizeEvents.games' : 'prizeEvents.points', { value: value.toLocaleString('ko-KR') })
+// Points earned show as "12p", matches played as "12경기", an entered number with its unit ("427 채팅").
+function formatScore(event: PrizeEvent, value: number): string {
+  const metric = prizeEventMetric(event)
+  const shown = value.toLocaleString('ko-KR')
+  if (metric === 'MANUAL') {
+    return t('prizeEvents.manualScore', { value: shown, unit: event.unitLabel ?? '' })
+  }
+  return t(metric === 'GAMES' ? 'prizeEvents.games' : 'prizeEvents.points', { value: shown })
+}
+
+function metricLabel(event: PrizeEvent): string {
+  const metric = prizeEventMetric(event)
+  return metric === 'MANUAL'
+    ? t('prizeEvents.metricManual', { unit: event.unitLabel ?? '' })
+    : t(`prizeEvents.metric.${metric}`)
 }
 
 function todayInKorea(): string {
@@ -52,6 +65,9 @@ export function PrizeEventsPanel({ groupId, canCreate, canManage }: PrizeEventsP
   const [periodEnd, setPeriodEnd] = useState<string>('')
   const [winnerCount, setWinnerCount] = useState<string>('3')
   const [metric, setMetric] = useState<PrizeEventMetric>('POINTS')
+  const [unitLabel, setUnitLabel] = useState<string>('채팅')
+  const [manualText, setManualText] = useState<string>('')
+  const [roster, setRoster] = useState<PlayerRosterItem[] | null>(null)
   const [drafts, setDrafts] = useState<Record<number, Record<string, PrizeDraft>>>({})
   const [paidOn, setPaidOn] = useState<Record<number, string>>({})
 
@@ -80,8 +96,42 @@ export function PrizeEventsPanel({ groupId, canCreate, canManage }: PrizeEventsP
     void load()
   }, [load])
 
+  // The roster names what is pasted for a MANUAL event; read once, when that kind is picked.
+  useEffect(() => {
+    if (metric !== 'MANUAL' || roster !== null) {
+      return
+    }
+    let cancelled = false
+    apiClient
+      .getGroupPlayers(groupId)
+      .then((players) => {
+        if (!cancelled) {
+          setRoster(players)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError(t('prizeEvents.form.rosterError'))
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [groupId, metric, roster])
+
+  const manual = useMemo(() => parseManualEntries(manualText, roster ?? []), [manualText, roster])
+  const manualProblems = [
+    manual.unknown.length > 0 ? t('prizeEvents.form.manualUnknown', { names: manual.unknown.join(', ') }) : null,
+    manual.repeated.length > 0 ? t('prizeEvents.form.manualRepeated', { names: manual.repeated.join(', ') }) : null,
+    manual.unreadable.length > 0 ? t('prizeEvents.form.manualUnreadable', { lines: manual.unreadable.join(' / ') }) : null,
+  ].filter((problem): problem is string => problem !== null)
+
   const handleCreate = async (formEvent: FormEvent<HTMLFormElement>) => {
     formEvent.preventDefault()
+    if (metric === 'MANUAL' && (manual.entries.length === 0 || manualProblems.length > 0)) {
+      setError(manualProblems[0] ?? t('prizeEvents.form.manualEmpty'))
+      return
+    }
     setBusy(true)
     setMessage(null)
     try {
@@ -91,8 +141,10 @@ export function PrizeEventsPanel({ groupId, canCreate, canManage }: PrizeEventsP
         periodEnd,
         winnerCount: Number(winnerCount),
         metric,
+        ...(metric === 'MANUAL' ? { unitLabel: unitLabel.trim(), entries: manual.entries } : {}),
       })
       setTitle('')
+      setManualText('')
       await load()
     } catch (createError) {
       setError(describeError(createError, t('prizeEvents.saveError')))
@@ -185,6 +237,7 @@ export function PrizeEventsPanel({ groupId, canCreate, canManage }: PrizeEventsP
             <select value={metric} onChange={(event) => setMetric(event.target.value as PrizeEventMetric)} className={`${INPUT_CLASS} w-full`}>
               <option value="POINTS">{t('prizeEvents.form.metricPoints')}</option>
               <option value="GAMES">{t('prizeEvents.form.metricGames')}</option>
+              <option value="MANUAL">{t('prizeEvents.form.metricManual')}</option>
             </select>
           </label>
           <label className="space-y-1 text-xs text-slate-600 dark:text-slate-300">
@@ -194,6 +247,30 @@ export function PrizeEventsPanel({ groupId, canCreate, canManage }: PrizeEventsP
           <button type="submit" disabled={busy} className={PRIMARY_BUTTON_CLASS}>
             {t('prizeEvents.form.create')}
           </button>
+          {metric === 'MANUAL' && (
+            <div className="space-y-2 sm:col-span-full">
+              <label className="block space-y-1 text-xs text-slate-600 dark:text-slate-300">
+                <span>{t('prizeEvents.form.unit')}</span>
+                <input value={unitLabel} onChange={(event) => setUnitLabel(event.target.value)} maxLength={20} required className={`${INPUT_CLASS} w-32`} />
+              </label>
+              <label className="block space-y-1 text-xs text-slate-600 dark:text-slate-300">
+                <span>{t('prizeEvents.form.manualEntries')}</span>
+                <textarea
+                  value={manualText}
+                  onChange={(event) => setManualText(event.target.value)}
+                  rows={6}
+                  placeholder={t('prizeEvents.form.manualPlaceholder')}
+                  className={`${INPUT_CLASS} w-full font-mono`}
+                />
+              </label>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {roster === null ? t('common.loading') : t('prizeEvents.form.manualCount', { count: manual.entries.length })}
+              </p>
+              {manualProblems.map((problem) => (
+                <p key={problem} className="text-xs text-rose-600 dark:text-rose-300">{problem}</p>
+              ))}
+            </div>
+          )}
         </form>
       )}
 
@@ -213,7 +290,7 @@ export function PrizeEventsPanel({ groupId, canCreate, canManage }: PrizeEventsP
                     start: event.periodStart,
                     end: event.periodEnd,
                     count: event.winnerCount,
-                    metric: t(`prizeEvents.metric.${eventMetric}`),
+                    metric: metricLabel(event),
                   })}
                 </p>
               </div>
@@ -233,7 +310,11 @@ export function PrizeEventsPanel({ groupId, canCreate, canManage }: PrizeEventsP
                         {canManage && <th className="py-1 pr-2">{t('prizeEvents.table.pick')}</th>}
                         <th className="py-1 pr-2">{t('prizeEvents.table.rank')}</th>
                         <th className="py-1 pr-2">{t('prizeEvents.table.nickname')}</th>
-                        <th className="py-1 pr-2">{t(eventMetric === 'GAMES' ? 'prizeEvents.table.games' : 'prizeEvents.table.points')}</th>
+                        <th className="py-1 pr-2">
+                          {eventMetric === 'MANUAL'
+                            ? event.unitLabel
+                            : t(eventMetric === 'GAMES' ? 'prizeEvents.table.games' : 'prizeEvents.table.points')}
+                        </th>
                         {canManage && <th className="py-1 pr-2">{t('prizeEvents.table.prize')}</th>}
                         {canManage && <th className="py-1 pr-2">{t('prizeEvents.table.amount')}</th>}
                       </tr>
@@ -256,7 +337,7 @@ export function PrizeEventsPanel({ groupId, canCreate, canManage }: PrizeEventsP
                             )}
                             <td className="py-1 pr-2 font-medium">{candidate.rank}</td>
                             <td className="py-1 pr-2">{candidate.nickname ?? t('prizeEvents.unknownNickname')}</td>
-                            <td className="py-1 pr-2">{formatScore(eventMetric, candidate.points)}</td>
+                            <td className="py-1 pr-2">{formatScore(event, candidate.points)}</td>
                             {canManage && (
                               <td className="py-1 pr-2">
                                 <input
@@ -315,7 +396,7 @@ export function PrizeEventsPanel({ groupId, canCreate, canManage }: PrizeEventsP
                   <li key={winner.place} className="flex flex-wrap items-baseline gap-2">
                     <span className="font-semibold text-slate-900 dark:text-slate-100">{t('prizeEvents.place', { place: winner.place })}</span>
                     <span className="text-slate-800 dark:text-slate-200">{winner.nickname ?? t('prizeEvents.leftMember')}</span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400">{formatScore(eventMetric, winner.points)}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">{formatScore(event, winner.points)}</span>
                     {winner.prize && <span className="text-xs text-slate-700 dark:text-slate-300">{winner.prize}</span>}
                     {winner.amount > 0 && (
                       <span className="text-xs text-slate-500 dark:text-slate-400">
