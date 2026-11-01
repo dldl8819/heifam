@@ -285,7 +285,30 @@ public class NoticeService {
             chosen = options.stream().filter(option -> option.label().equals(label)).findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("투표할 항목을 골라 주세요."));
         }
-        noticeVoteRepository.castVote(notice.getId(), voter, chosen.id());
+        if (notice.isVoteMultiple()) {
+            noticeVoteRepository.addVote(notice.getId(), voter, chosen.id());
+        } else {
+            noticeVoteRepository.castVote(notice.getId(), voter, chosen.id());
+        }
+        return detail(notice, voter);
+    }
+
+    /**
+     * Takes the reader's vote off one option of a vote that takes more than one choice; their other
+     * choices stay. In a vote of one choice it takes the vote back, as withdrawing does.
+     */
+    @Transactional
+    public NoticeDetailResponse unvoteOption(Long groupId, Long noticeId, String email, Long optionId) {
+        String voter = normalizeEmail(email);
+        Notice notice = requireOpenVote(noticeRepository.findByIdAndGroupIdForShare(noticeId, groupId), voter);
+        if (optionId == null) {
+            throw new IllegalArgumentException("투표를 취소할 항목을 골라 주세요.");
+        }
+        if (notice.isVoteMultiple()) {
+            noticeVoteRepository.removeVote(notice.getId(), voter, optionId);
+        } else {
+            noticeVoteRepository.withdrawVote(notice.getId(), voter);
+        }
         return detail(notice, voter);
     }
 
@@ -373,7 +396,11 @@ public class NoticeService {
             return null;
         }
         List<OptionRow> options = noticeVoteRepository.listOptions(notice.getId());
-        Long myOptionId = noticeVoteRepository.findVotedOptionId(notice.getId(), reader).orElse(null);
+        boolean multiple = notice.isVoteMultiple();
+        List<Long> myOptionIds = multiple
+            ? noticeVoteRepository.findVotedOptionIds(notice.getId(), reader)
+            : noticeVoteRepository.findVotedOptionId(notice.getId(), reader).stream().toList();
+        Long myOptionId = myOptionIds.isEmpty() ? null : myOptionIds.get(0);
         // Looked up only for a named vote: an anonymous one never loads who voted for what.
         Map<Long, List<String>> voters = notice.isVoteAnonymous() ? null : votersByOption(notice.getId());
         boolean open = NoticeVotes.OPEN.equals(status);
@@ -382,7 +409,7 @@ public class NoticeService {
         long disagreeCount = 0;
         String myChoice = null;
         for (OptionRow option : options) {
-            boolean mine = option.id().equals(myOptionId);
+            boolean mine = myOptionIds.contains(option.id());
             if (NoticeVotes.AGREE_LABEL.equals(option.label())) {
                 agreeCount = option.voteCount();
                 myChoice = mine ? NoticeVotes.AGREE : myChoice;
@@ -400,17 +427,19 @@ public class NoticeService {
             notice.isVoteAllowAdditions(),
             open && options.size() < NoticeVotes.MAX_OPTIONS && (admin || notice.isVoteAllowAdditions()),
             open && admin && options.size() > NoticeVotes.MIN_OPTIONS,
-            options.stream().mapToLong(OptionRow::voteCount).sum(),
+            multiple ? noticeVoteRepository.countVoters(notice.getId()) : options.stream().mapToLong(OptionRow::voteCount).sum(),
             myOptionId,
             options.stream()
                 .map(option -> new NoticeVoteOptionResponse(
                     option.id(),
                     option.label(),
                     option.voteCount(),
-                    option.id().equals(myOptionId),
+                    myOptionIds.contains(option.id()),
                     voters == null ? null : voters.getOrDefault(option.id(), List.of())
                 ))
-                .toList()
+                .toList(),
+            multiple,
+            myOptionIds
         );
     }
 
@@ -436,9 +465,10 @@ public class NoticeService {
         }
         return new NoticeVoteKeptResponse(
             options.stream().map(OptionRow::label).toList(),
-            options.stream().mapToLong(OptionRow::voteCount).sum(),
+            notice.isVoteMultiple() ? noticeVoteRepository.countVoters(notice.getId()) : options.stream().mapToLong(OptionRow::voteCount).sum(),
             notice.isVoteAnonymous(),
-            notice.isVoteAllowAdditions()
+            notice.isVoteAllowAdditions(),
+            notice.isVoteMultiple()
         );
     }
 

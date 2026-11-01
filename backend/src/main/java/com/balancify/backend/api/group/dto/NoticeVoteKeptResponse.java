@@ -10,6 +10,7 @@ public record NoticeVoteKeptResponse(
     List<String> options,
     long totalVoters,
     boolean anonymous,
-    boolean allowAdditions
+    boolean allowAdditions,
+    boolean multiple
 ) {
 }

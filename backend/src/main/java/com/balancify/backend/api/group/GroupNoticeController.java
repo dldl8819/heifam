@@ -139,6 +139,9 @@ public class GroupNoticeController {
         HttpServletRequest request
     ) {
         String requestEmail = requireRequestEmail(request);
+        if (requestBody != null && Boolean.FALSE.equals(requestBody.selected())) {
+            return handle(() -> noticeService.unvoteOption(groupId, noticeId, requestEmail, requestBody.optionId()));
+        }
         return handle(() -> noticeService.castVote(
             groupId,
             noticeId,

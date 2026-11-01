@@ -3134,7 +3134,17 @@ class AdminKeyFilterTest {
                     .content("{\"label\":\"26분\"}")
             )
             .andExpect(status().isOk());
+        // In a vote that takes several choices, one is taken off by sending it as not selected.
+        mockMvc
+            .perform(
+                put("/api/groups/1/notices/5/vote")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"optionId\":22,\"selected\":false}")
+            )
+            .andExpect(status().isOk());
         verify(noticeService).castVote(1L, 5L, "member@hei.gg", 21L, null);
+        verify(noticeService).unvoteOption(1L, 5L, "member@hei.gg", 22L);
         verify(noticeService).addVoteOption(1L, 5L, "member@hei.gg", "26분");
 
         // Taking an option away: a member and a visitor are turned back before the service is asked.

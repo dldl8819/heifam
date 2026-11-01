@@ -1693,11 +1693,14 @@ export const apiClient = {
       { method: liked ? 'PUT' : 'DELETE' },
       { requireUserEmail: true, includeUserEmail: true }
     ),
-  // An option casts or moves the member's vote; null takes it back.
-  setNoticeVote: (groupId: number, noticeId: number, optionId: number | null) =>
+  // An option casts or moves the member's vote; null takes it back. In a vote that takes several
+  // choices, an option adds to them, and selected false takes that one choice off.
+  setNoticeVote: (groupId: number, noticeId: number, optionId: number | null, selected = true) =>
     apiRequest<NoticeDetail>(
       `/api/groups/${groupId}/notices/${noticeId}/vote`,
-      optionId === null ? { method: 'DELETE' } : { method: 'PUT', body: JSON.stringify({ optionId }) },
+      optionId === null
+        ? { method: 'DELETE' }
+        : { method: 'PUT', body: JSON.stringify(selected ? { optionId } : { optionId, selected: false }) },
       { requireUserEmail: true, includeUserEmail: true }
     ),
   // For admins, and for members when the vote allows additions.

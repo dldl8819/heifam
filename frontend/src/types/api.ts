@@ -707,6 +707,10 @@ export type NoticeVote = {
   totalVoters: number
   myOptionId?: number | null
   options: NoticeVoteOption[]
+  // A voter may choose more than one option; totalVoters then counts people, not choices.
+  // Missing while a backend from before multiple choice is still answering.
+  multiple?: boolean
+  myOptionIds?: number[]
 }
 
 /** A vote taken off its notice but kept; only admins are sent it, for the edit form. */
@@ -715,6 +719,7 @@ export type NoticeVoteKept = {
   totalVoters: number
   anonymous: boolean
   allowAdditions: boolean
+  multiple?: boolean
 }
 
 export type NoticeTitle = {
