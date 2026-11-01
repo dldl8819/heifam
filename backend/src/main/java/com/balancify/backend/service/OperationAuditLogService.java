@@ -69,6 +69,7 @@ public class OperationAuditLogService {
     public static final String ACTION_PRIZE_EVENT_CREATED = "PRIZE_EVENT_CREATED";
     public static final String ACTION_PRIZE_EVENT_CONFIRMED = "PRIZE_EVENT_CONFIRMED";
     public static final String ACTION_PRIZE_EVENT_CANCELLED = "PRIZE_EVENT_CANCELLED";
+    public static final String ACTION_PRIZE_EVENT_DELETED = "PRIZE_EVENT_DELETED";
     public static final String ACTION_PRIZE_DRAW_SAVED = "PRIZE_DRAW_SAVED";
     public static final String ACTION_PRIZE_DRAW_DELETED = "PRIZE_DRAW_DELETED";
     public static final String ACTION_CAPTAIN_DRAFT_DELETED = "CAPTAIN_DRAFT_DELETED";
@@ -845,6 +846,7 @@ public class OperationAuditLogService {
         log.setSummary(switch (action) {
             case ACTION_PRIZE_EVENT_CONFIRMED -> "상품 이벤트 확정";
             case ACTION_PRIZE_EVENT_CANCELLED -> "상품 이벤트 취소";
+            case ACTION_PRIZE_EVENT_DELETED -> "상품 이벤트 삭제";
             default -> "상품 이벤트 생성";
         });
         log.setDetails(details);

@@ -208,6 +208,21 @@ export function PrizeEventsPanel({ groupId, canCreate, canManage }: PrizeEventsP
     }
   }
 
+  const handleDelete = async (event: PrizeEvent) => {
+    if (!window.confirm(t('prizeEvents.deletePrompt', { title: event.title }))) {
+      return
+    }
+    setBusy(true)
+    try {
+      await apiClient.deletePrizeEvent(groupId, event.eventId)
+      await load()
+    } catch (deleteError) {
+      setError(describeError(deleteError, t('prizeEvents.saveError')))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <section className={`${CARD_CLASS} space-y-4`}>
       <div className="space-y-1">
@@ -294,9 +309,16 @@ export function PrizeEventsPanel({ groupId, canCreate, canManage }: PrizeEventsP
                   })}
                 </p>
               </div>
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                {t(`prizeEvents.status.${event.status}`)}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                  {t(`prizeEvents.status.${event.status}`)}
+                </span>
+                {canManage && event.status === 'CANCELLED' && (
+                  <button type="button" disabled={busy} onClick={() => void handleDelete(event)} className={SECONDARY_BUTTON_CLASS}>
+                    {t('prizeEvents.delete')}
+                  </button>
+                )}
+              </div>
             </div>
 
             {event.status === 'OPEN' && (

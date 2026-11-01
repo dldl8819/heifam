@@ -2440,8 +2440,18 @@ class AdminKeyFilterTest {
         mockMvc
             .perform(post("/api/groups/1/prize-events/5/cancel").header("X-USER-EMAIL", "admin@hei.gg"))
             .andExpect(status().isForbidden());
+        mockMvc
+            .perform(delete("/api/groups/1/prize-events/5").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isForbidden());
         verify(prizeEventService, never()).confirm(any(), any(), any(), any(), any());
         verify(prizeEventService, never()).cancel(any(), any(), any(), any());
+        verify(prizeEventService, never()).delete(any(), any(), any(), any());
+
+        when(prizeEventService.delete(eq(1L), eq(5L), eq("superadmin@hei.gg"), any())).thenReturn(new PrizeEventListResponse(List.of()));
+        mockMvc
+            .perform(delete("/api/groups/1/prize-events/5").header("X-USER-EMAIL", "superadmin@hei.gg"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.events").isArray());
     }
 
     @Test

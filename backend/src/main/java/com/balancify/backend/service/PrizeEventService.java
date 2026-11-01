@@ -316,6 +316,29 @@ public class PrizeEventService {
         return toResponse(event, List.of());
     }
 
+    // Only a cancelled event goes: it has no winners and wrote nothing to the ledger. Its entries go
+    // with it (on delete cascade); the audit log keeps that it was there.
+    @Transactional
+    public PrizeEventListResponse delete(Long groupId, Long eventId, String actorEmail, String actorNickname) {
+        PrizeEvent event = prizeEventRepository.findForUpdate(eventId, groupId)
+            .orElseThrow(() -> new NoSuchElementException("Prize event not found: " + eventId));
+        if (event.getStatus() != PrizeEventStatus.CANCELLED) {
+            throw new MatchConflictException("취소한 이벤트만 삭제할 수 있습니다.");
+        }
+        prizeEventRepository.delete(event);
+        prizeEventRepository.flush();
+        operationAuditLogService.recordPrizeEvent(
+            OperationAuditLogService.ACTION_PRIZE_EVENT_DELETED,
+            actorEmail,
+            actorNickname,
+            event.getId(),
+            groupId,
+            event.getTitle(),
+            null
+        );
+        return list(groupId);
+    }
+
     private List<Candidate> candidates(PrizeEvent event) {
         return switch (event.getMetric()) {
             case GAMES -> playerCandidates(event);
