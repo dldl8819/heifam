@@ -86,6 +86,25 @@ public interface MatchParticipantRepository extends JpaRepository<MatchParticipa
         @Param("playerId") Long playerId
     );
 
+    /**
+     * Each player's highest and lowest MMR over their decided matches, before or after any of them:
+     * one row a player, three numbers, worked out by the database. The ranking adds the player's MMR
+     * now (RankingService), which a change outside matches (an admin's edit, a tier change) moves.
+     */
+    @Query(value = """
+        select
+            mp.player_id as "playerId",
+            max(greatest(mp.mmr_before, mp.mmr_after)) as "peakMmr",
+            min(least(mp.mmr_before, mp.mmr_after)) as "lowestMmr"
+        from match_participants mp
+        join matches m on m.id = mp.match_id
+        join players p on p.id = mp.player_id
+        where p.group_id = :groupId
+          and m.status = 'COMPLETED'
+        group by mp.player_id
+        """, nativeQuery = true)
+    List<PlayerMmrRangeProjection> findMmrRangesByGroupId(@Param("groupId") Long groupId);
+
     @Query(value = """
         select
             mp.player_id as "playerId",
@@ -151,6 +170,12 @@ public interface MatchParticipantRepository extends JpaRepository<MatchParticipa
     interface PlayerLastPlayedAtProjection {
         Long getPlayerId();
         Instant getLastPlayedAt();
+    }
+
+    interface PlayerMmrRangeProjection {
+        Long getPlayerId();
+        Integer getPeakMmr();
+        Integer getLowestMmr();
     }
 
 }

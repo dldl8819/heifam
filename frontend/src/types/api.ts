@@ -237,6 +237,10 @@ export type RankingItem = {
   last10: string
   mmrDelta?: number
   isNew?: boolean
+  // The highest and lowest MMR the player has had, over their matches and now. Left out with no
+  // match yet, and for a reader who may not see MMR.
+  peakMmr?: number
+  lowestMmr?: number
 }
 
 export type RankingResponse = RankingItem[]

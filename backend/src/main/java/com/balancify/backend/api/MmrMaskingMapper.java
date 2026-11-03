@@ -138,7 +138,9 @@ public final class MmrMaskingMapper {
                     response.streak(),
                     response.last10(),
                     null,
-                    response.isNew()
+                    response.isNew(),
+                    null,
+                    null
                 )
             )
             .toList();
