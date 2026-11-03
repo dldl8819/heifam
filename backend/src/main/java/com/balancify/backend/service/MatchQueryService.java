@@ -69,7 +69,7 @@ public class MatchQueryService {
         int normalizedLimit = normalizeLimit(limit);
         int normalizedOffset = normalizeOffset(offset);
         int page = normalizedOffset / normalizedLimit;
-        List<Match> matches = matchRepository.findRecentByGroupId(
+        List<Match> matches = matchRepository.findRecentByGroupIdByResultInput(
             groupId,
             PageRequest.of(page, normalizedLimit)
         );

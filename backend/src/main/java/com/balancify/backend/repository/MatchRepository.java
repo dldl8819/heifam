@@ -93,6 +93,21 @@ public interface MatchRepository extends JpaRepository<Match, Long>, JpaSpecific
         """)
     List<Match> findRecentByGroupId(@Param("groupId") Long groupId, Pageable pageable);
 
+    /**
+     * The results page's list: completed matches by when their result went in, newest first, which
+     * is the time the list shows and the order their MMR moved in. A match set up early and decided
+     * late sits where its result came in, not where it was set up. Editing a result later keeps it
+     * where it was: only the first result sets the time.
+     */
+    @Query("""
+        select m
+        from Match m
+        where m.group.id = :groupId
+          and m.status = com.balancify.backend.domain.MatchStatus.COMPLETED
+        order by m.resultRecordedAt desc nulls last, m.playedAt desc, m.id desc
+        """)
+    List<Match> findRecentByGroupIdByResultInput(@Param("groupId") Long groupId, Pageable pageable);
+
     @Query("""
         select m
         from Match m
