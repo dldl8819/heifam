@@ -201,7 +201,7 @@ export default function RankingPage() {
   const resolveDisplayTier = (row: RankingItem): PlayerTierStatus =>
     tierByNickname.get(row.nickname) ?? row.tier
 
-  const tableColumnCount = showMmr ? 13 : 11
+  const tableColumnCount = showMmr ? 15 : 11
 
   const handleOpenGameTypeStats = useCallback(async (row: RankingItem) => {
     const playerId = playerIdByNickname.get(row.nickname)
@@ -259,6 +259,8 @@ export default function RankingPage() {
               <th className="px-4 py-3">{t('ranking.table.race')}</th>
               <th className="px-4 py-3">{t('ranking.table.tier')}</th>
               {showMmr && <th className="px-4 py-3">{t('ranking.table.currentMmr')}</th>}
+              {showMmr && <th className="px-4 py-3">{t('ranking.table.peakMmr')}</th>}
+              {showMmr && <th className="px-4 py-3">{t('ranking.table.lowestMmr')}</th>}
               <th className="px-4 py-3">{t('ranking.table.wins')}</th>
               <th className="px-4 py-3">{t('ranking.table.losses')}</th>
               <th className="px-4 py-3">{t('ranking.table.games')}</th>
@@ -341,6 +343,16 @@ export default function RankingPage() {
                     {showMmr && (
                       <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
                         {typeof row.currentMmr === 'number' ? row.currentMmr : '-'}
+                      </td>
+                    )}
+                    {showMmr && (
+                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                        {typeof row.peakMmr === 'number' ? row.peakMmr : '-'}
+                      </td>
+                    )}
+                    {showMmr && (
+                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                        {typeof row.lowestMmr === 'number' ? row.lowestMmr : '-'}
                       </td>
                     )}
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{row.wins}</td>

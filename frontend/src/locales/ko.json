@@ -2053,6 +2053,8 @@
       "race": "종족",
       "tier": "티어",
       "currentMmr": "현재 MMR",
+      "peakMmr": "최고 MMR",
+      "lowestMmr": "최저 MMR",
       "wins": "승",
       "losses": "패",
       "games": "경기수",
