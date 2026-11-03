@@ -91,26 +91,22 @@ public interface MatchParticipantRepository extends JpaRepository<MatchParticipa
      * one row a player, three numbers, worked out by the database. The ranking adds the player's MMR
      * now (RankingService), which a change outside matches (an admin's edit, a tier change) moves.
      *
-     * V22 (deployed 2026-04-30 09:08 UTC) doubled every player's MMR but left the matches already
-     * played on the old scale, so a match decided before then counts at twice its numbers. No match
-     * was decided within two hours of that time.
+     * Only matches decided since V22 (deployed 2026-04-30 09:08 UTC) count. That day the MMR scale was
+     * doubled and its rules changed too (a match moved MMR by other amounts), and the matches before
+     * kept their old numbers, which no factor turns into today's. No match was decided within two
+     * hours of that time. A player who played only before then has no range.
      */
     @Query(value = """
         select
             mp.player_id as "playerId",
-            max(greatest(mp.mmr_before, mp.mmr_after) * case
-                when coalesce(m.result_recorded_at, m.played_at) < timestamptz '2026-04-30 09:08:17+00' then 2
-                else 1
-            end) as "peakMmr",
-            min(least(mp.mmr_before, mp.mmr_after) * case
-                when coalesce(m.result_recorded_at, m.played_at) < timestamptz '2026-04-30 09:08:17+00' then 2
-                else 1
-            end) as "lowestMmr"
+            max(greatest(mp.mmr_before, mp.mmr_after)) as "peakMmr",
+            min(least(mp.mmr_before, mp.mmr_after)) as "lowestMmr"
         from match_participants mp
         join matches m on m.id = mp.match_id
         join players p on p.id = mp.player_id
         where p.group_id = :groupId
           and m.status = 'COMPLETED'
+          and coalesce(m.result_recorded_at, m.played_at) >= timestamptz '2026-04-30 09:08:17+00'
         group by mp.player_id
         """, nativeQuery = true)
     List<PlayerMmrRangeProjection> findMmrRangesByGroupId(@Param("groupId") Long groupId);
