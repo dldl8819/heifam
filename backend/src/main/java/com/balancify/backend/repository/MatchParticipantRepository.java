@@ -90,12 +90,22 @@ public interface MatchParticipantRepository extends JpaRepository<MatchParticipa
      * Each player's highest and lowest MMR over their decided matches, before or after any of them:
      * one row a player, three numbers, worked out by the database. The ranking adds the player's MMR
      * now (RankingService), which a change outside matches (an admin's edit, a tier change) moves.
+     *
+     * V22 (deployed 2026-04-30 09:08 UTC) doubled every player's MMR but left the matches already
+     * played on the old scale, so a match decided before then counts at twice its numbers. No match
+     * was decided within two hours of that time.
      */
     @Query(value = """
         select
             mp.player_id as "playerId",
-            max(greatest(mp.mmr_before, mp.mmr_after)) as "peakMmr",
-            min(least(mp.mmr_before, mp.mmr_after)) as "lowestMmr"
+            max(greatest(mp.mmr_before, mp.mmr_after) * case
+                when coalesce(m.result_recorded_at, m.played_at) < timestamptz '2026-04-30 09:08:17+00' then 2
+                else 1
+            end) as "peakMmr",
+            min(least(mp.mmr_before, mp.mmr_after) * case
+                when coalesce(m.result_recorded_at, m.played_at) < timestamptz '2026-04-30 09:08:17+00' then 2
+                else 1
+            end) as "lowestMmr"
         from match_participants mp
         join matches m on m.id = mp.match_id
         join players p on p.id = mp.player_id
