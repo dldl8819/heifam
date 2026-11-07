@@ -63,6 +63,9 @@ class MatchConfirmationServiceTest {
     @Mock
     private AccessControlService accessControlService;
 
+    @Mock
+    private GroupRosterCache groupRosterCache;
+
     private MatchConfirmationService service;
     private Group group;
 
@@ -73,13 +76,13 @@ class MatchConfirmationServiceTest {
             matchParticipantRepository,
             pointService,
             accessControlService,
+            groupRosterCache,
             new PointProperties(),
             Clock.fixed(Instant.from(NOW), ZoneOffset.UTC)
         );
         group = new Group();
         group.setId(1L);
         lenient().when(accessControlService.resolveDisplayNickname(ME)).thenReturn(MY_NICKNAME);
-        lenient().when(matchRepository.findBalancedResultsRecordedSince(eq(1L), any())).thenReturn(List.of());
         lenient().when(pointService.getMatchConfirmState(eq(ME), any())).thenReturn(new PointService.MatchConfirmState(Set.of(), 0));
     }
 
@@ -93,7 +96,6 @@ class MatchConfirmationServiceTest {
         seriesGame.setSeriesGameNumber(2);
         List<MatchParticipant> seriesPlayers = participants(seriesGame, 3);
         seriesPlayers.get(1).getPlayer().setNickname(" your_username ");
-        Match someoneElses = recorded(12L, NOW.minusHours(3), "HOME");
         Match twoOnTwo = recorded(13L, NOW.minusHours(4), "HOME");
         List<MatchParticipant> twoOnTwoPlayers = participants(twoOnTwo, 2);
         twoOnTwoPlayers.get(0).getPlayer().setAuthUserId(MY_LOGIN);
@@ -105,16 +107,16 @@ class MatchConfirmationServiceTest {
         List<MatchParticipant> expiredPlayers = participants(expired, 3);
         expiredPlayers.get(0).getPlayer().setAuthUserId(MY_LOGIN);
 
-        when(matchRepository.findBalancedResultsRecordedSince(1L, NOW.minusHours(48)))
-            .thenReturn(List.of(linked, seriesGame, someoneElses, twoOnTwo, manual, expired));
         List<MatchParticipant> all = new ArrayList<>();
         all.addAll(linkedPlayers);
         all.addAll(seriesPlayers);
-        all.addAll(participants(someoneElses, 3));
         all.addAll(twoOnTwoPlayers);
         all.addAll(manualPlayers);
         all.addAll(expiredPlayers);
-        when(matchParticipantRepository.findByMatchIdInWithPlayerAndMatch(anyList())).thenReturn(all);
+        when(groupRosterCache.roster(1L)).thenReturn(all.stream().map(MatchParticipant::getPlayer).toList());
+        when(matchRepository.findBalancedResultsOfPlayersRecordedSince(1L, List.of(104L, 111L, 130L, 140L, 150L), NOW.minusHours(48)))
+            .thenReturn(List.of(linked, seriesGame, twoOnTwo, manual, expired));
+        when(matchParticipantRepository.findByMatchIdInWithPlayerAndMatch(List.of(10L, 11L, 13L, 14L, 15L))).thenReturn(all);
         when(pointService.getMatchConfirmState(ME, List.of(10L, 11L)))
             .thenReturn(new PointService.MatchConfirmState(Set.of(10L), 3));
 
@@ -139,6 +141,22 @@ class MatchConfirmationServiceTest {
         assertThat(response.points()).isEqualTo(1);
         assertThat(response.windowHours()).isEqualTo(48);
         assertThat(response.toString()).doesNotContain("@");
+    }
+
+    @Test
+    void readsNoMatchForSomeoneWithoutAPlayerInTheGroup() {
+        Match someoneElses = recorded(10L, NOW.minusHours(1), "HOME");
+        when(groupRosterCache.roster(1L))
+            .thenReturn(participants(someoneElses, 3).stream().map(MatchParticipant::getPlayer).toList());
+        when(pointService.getMatchConfirmState(ME, List.of()))
+            .thenReturn(new PointService.MatchConfirmState(Set.of(), 2));
+
+        MatchConfirmationListResponse response = service.list(1L, ME, MY_LOGIN.toString());
+
+        assertThat(response.matches()).isEmpty();
+        assertThat(response.confirmedToday()).isEqualTo(2);
+        verify(matchRepository, never()).findBalancedResultsOfPlayersRecordedSince(any(), any(), any());
+        verify(matchParticipantRepository, never()).findByMatchIdInWithPlayerAndMatch(anyList());
     }
 
     @Test
