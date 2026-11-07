@@ -43,6 +43,29 @@ class OwnPlayerPolicyTest {
         assertThat(OwnPlayerPolicy.findOwn(List.of(), LOGIN.toString(), "p0")).isNull();
     }
 
+    @Test
+    void ownPlayersAreTheLinkedOneAndEveryOneNamedLikeTheAccount() {
+        List<Player> players = participants().stream().map(MatchParticipant::getPlayer).toList();
+        players.get(1).setAuthUserId(LOGIN);
+        players.get(2).setNickname(" Your_Username ");
+        players.get(4).setNickname("YOUR_USERNAME");
+
+        assertThat(OwnPlayerPolicy.findOwnPlayers(players, LOGIN.toString(), "your_username"))
+            .containsExactly(players.get(1), players.get(2), players.get(4));
+        assertThat(OwnPlayerPolicy.findOwnPlayers(players, "not-a-uuid", " your_username "))
+            .containsExactly(players.get(2), players.get(4));
+    }
+
+    @Test
+    void ownPlayersAreNoOneForSomeoneElseOrAnAccountWithoutANickname() {
+        List<Player> players = participants().stream().map(MatchParticipant::getPlayer).toList();
+        players.get(0).setNickname(" ");
+
+        assertThat(OwnPlayerPolicy.findOwnPlayers(players, LOGIN.toString(), "someone")).isEmpty();
+        assertThat(OwnPlayerPolicy.findOwnPlayers(players, null, " ")).isEmpty();
+        assertThat(OwnPlayerPolicy.findOwnPlayers(players, null, null)).isEmpty();
+    }
+
     private List<MatchParticipant> participants() {
         List<MatchParticipant> participants = new ArrayList<>();
         for (int index = 0; index < 6; index++) {
