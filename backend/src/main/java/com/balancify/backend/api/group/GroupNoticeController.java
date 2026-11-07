@@ -7,6 +7,8 @@ import com.balancify.backend.api.group.dto.NoticeTitleResponse;
 import com.balancify.backend.api.group.dto.NoticeVoteOptionRequest;
 import com.balancify.backend.api.group.dto.NoticeVoteRequest;
 import com.balancify.backend.security.AuthenticatedRequestResolver;
+import com.balancify.backend.security.VisitorReadLimiter;
+import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.NoticeService;
 import com.balancify.backend.service.exception.CommentLimitException;
 import com.balancify.backend.service.exception.NoticeForbiddenException;
@@ -37,14 +39,27 @@ public class GroupNoticeController {
 
     private final NoticeService noticeService;
     private final AuthenticatedRequestResolver authenticatedRequestResolver;
+    private final AccessControlService accessControlService;
+    private final VisitorReadLimiter visitorReadLimiter;
 
-    public GroupNoticeController(NoticeService noticeService, AuthenticatedRequestResolver authenticatedRequestResolver) {
+    public GroupNoticeController(
+        NoticeService noticeService,
+        AuthenticatedRequestResolver authenticatedRequestResolver,
+        AccessControlService accessControlService,
+        VisitorReadLimiter visitorReadLimiter
+    ) {
         this.noticeService = noticeService;
         this.authenticatedRequestResolver = authenticatedRequestResolver;
+        this.accessControlService = accessControlService;
+        this.visitorReadLimiter = visitorReadLimiter;
     }
 
+    // Visitors (no member access) get only so many answers a minute, all of them together.
     @GetMapping("/{groupId}/notice-titles")
-    public List<NoticeTitleResponse> getNoticeTitles(@PathVariable Long groupId) {
+    public List<NoticeTitleResponse> getNoticeTitles(@PathVariable Long groupId, HttpServletRequest request) {
+        if (!accessControlService.isServiceAccessAllowed(authenticatedRequestResolver.resolve(request).email())) {
+            visitorReadLimiter.requireAllowance();
+        }
         return noticeService.listTitles(groupId);
     }
 

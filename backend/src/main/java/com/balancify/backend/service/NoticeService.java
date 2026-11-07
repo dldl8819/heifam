@@ -61,6 +61,7 @@ public class NoticeService {
     private final NoticeVoteRepository noticeVoteRepository;
     private final OperationAuditLogService operationAuditLogService;
     private final CommentQuotaService commentQuotaService;
+    private final GroupReadCacheService groupReadCacheService;
 
     public NoticeService(
         NoticeRepository noticeRepository,
@@ -70,7 +71,8 @@ public class NoticeService {
         PointService pointService,
         NoticeVoteRepository noticeVoteRepository,
         OperationAuditLogService operationAuditLogService,
-        CommentQuotaService commentQuotaService
+        CommentQuotaService commentQuotaService,
+        GroupReadCacheService groupReadCacheService
     ) {
         this.noticeRepository = noticeRepository;
         this.noticeCommentRepository = noticeCommentRepository;
@@ -80,14 +82,22 @@ public class NoticeService {
         this.noticeVoteRepository = noticeVoteRepository;
         this.operationAuditLogService = operationAuditLogService;
         this.commentQuotaService = commentQuotaService;
+        this.groupReadCacheService = groupReadCacheService;
     }
 
+    /**
+     * The titles open to anyone, the same for every reader. Visitors ask for them without signing
+     * in, so they are kept for GroupReadCacheService's usual time: however often visitors ask, the
+     * database is read about twice a minute at most, and a notice changed meanwhile shows within it.
+     */
     @Transactional(readOnly = true)
     public List<NoticeTitleResponse> listTitles(Long groupId) {
-        return noticeRepository.findListRows(groupId).stream()
-            .filter(notice -> !notice.adminOnly())
-            .map(notice -> new NoticeTitleResponse(notice.title(), notice.createdAt()))
-            .toList();
+        return groupReadCacheService.get("notice-titles:group:" + groupId + ":", () ->
+            noticeRepository.findListRows(groupId).stream()
+                .filter(notice -> !notice.adminOnly())
+                .map(notice -> new NoticeTitleResponse(notice.title(), notice.createdAt()))
+                .toList()
+        );
     }
 
     @Transactional(readOnly = true)
