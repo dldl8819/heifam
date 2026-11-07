@@ -14,6 +14,10 @@ public record PrizeEventResponse(
     String status,
     OffsetDateTime confirmedAt,
     List<PrizeCandidateResponse> candidates,
-    List<PrizeWinnerResponse> winners
+    List<PrizeWinnerResponse> winners,
+    // POINTS, GAMES or MANUAL: what the candidates' and winners' points count.
+    String metric,
+    // MANUAL only: what its numbers count, as the admin named it.
+    String unitLabel
 ) {
 }

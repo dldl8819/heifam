@@ -105,6 +105,7 @@ import com.balancify.backend.service.AccountDeletionService;
 import com.balancify.backend.service.AttendanceMenu;
 import com.balancify.backend.service.CaptainDraftService;
 import com.balancify.backend.service.CaptainDraftVersions;
+import com.balancify.backend.service.GroupRosterCache;
 import com.balancify.backend.service.DashboardQueryService;
 import com.balancify.backend.service.GroupMatchAdminService;
 import com.balancify.backend.service.LedgerExpenseAdminService;
@@ -213,7 +214,13 @@ import org.springframework.test.web.servlet.ResultMatcher;
     PrizeEventController.class,
     com.balancify.backend.api.access.AccessPeopleController.class
 })
-@Import({ AdminKeyFilter.class, ServiceAccessFilter.class, AdminKeyProperties.class, CaptainDraftVersions.class })
+@Import({
+    AdminKeyFilter.class,
+    ServiceAccessFilter.class,
+    AdminKeyProperties.class,
+    CaptainDraftVersions.class,
+    VisitorReadLimiter.class
+})
 @TestPropertySource(properties = {
     "balancify.admin.emails=admin@hei.gg,ops@hei.gg",
     "balancify.admin.super-emails=superadmin@hei.gg",
@@ -231,6 +238,9 @@ class AdminKeyFilterTest {
 
     @MockitoBean
     private CaptainDraftService captainDraftService;
+
+    @MockitoBean
+    private GroupRosterCache groupRosterCache;
 
     @MockitoBean
     private ManualMatchService manualMatchService;
@@ -1589,7 +1599,9 @@ class AdminKeyFilterTest {
                         "W2",
                         "WWL",
                         16,
-                        true
+                        true,
+                        null,
+                        null
                     )
                 )
             );
@@ -1626,7 +1638,9 @@ class AdminKeyFilterTest {
                         "W2",
                         "WWL",
                         16,
-                        true
+                        true,
+                        null,
+                        null
                     )
                 )
             );
@@ -1661,7 +1675,9 @@ class AdminKeyFilterTest {
                         "W2",
                         "WWL",
                         16,
-                        true
+                        true,
+                        null,
+                        null
                     )
                 )
             );
@@ -1696,7 +1712,9 @@ class AdminKeyFilterTest {
                         "W2",
                         "WWL",
                         16,
-                        true
+                        true,
+                        null,
+                        null
                     )
                 )
             );
@@ -2330,14 +2348,17 @@ class AdminKeyFilterTest {
             new com.balancify.backend.api.points.dto.PointPolicyResponse.Capped(1, 10);
         when(pointService.getPolicy()).thenReturn(new com.balancify.backend.api.points.dto.PointPolicyResponse(
             tenADay, tenADay, tenADay, 48, tenADay, 1, tenADay,
-            new com.balancify.backend.api.points.dto.PointPolicyResponse.Capped(1, 3), tenADay, tenADay
+            new com.balancify.backend.api.points.dto.PointPolicyResponse.Capped(1, 3), tenADay, tenADay,
+            new com.balancify.backend.api.points.dto.PointPolicyResponse.Capped(3, 2)
         ));
 
         mockMvc
             .perform(get("/api/points/policy").header("X-USER-EMAIL", "member@hei.gg"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.boardPost.points").value(1))
-            .andExpect(jsonPath("$.boardPost.dailyCap").value(3));
+            .andExpect(jsonPath("$.boardPost.dailyCap").value(3))
+            .andExpect(jsonPath("$.captainDraft.points").value(3))
+            .andExpect(jsonPath("$.captainDraft.dailyCap").value(2));
         mockMvc
             .perform(get("/api/points/policy").header("X-USER-EMAIL", "blocked@hei.gg"))
             .andExpect(status().isForbidden());
@@ -2396,33 +2417,55 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void letsSuperAdminsRunPrizeEventsAndAdminsSeeThem() throws Exception {
-        when(pointService.canUsePoints("admin@hei.gg")).thenReturn(true);
+    void showsPrizeEventsToMembersLetsAdminsStartThemAndSuperAdminsConfirmThem() throws Exception {
+        when(pointService.canUsePoints("member@hei.gg")).thenReturn(true);
         when(prizeEventService.list(1L)).thenReturn(new PrizeEventListResponse(List.of()));
+        when(prizeEventService.create(eq(1L), any(), eq("admin@hei.gg"), any()))
+            .thenReturn(new PrizeEventResponse(5L, "10월", null, null, 3, "OPEN", null, List.of(), List.of(), "POINTS", null));
         when(prizeEventService.create(eq(1L), any(), eq("superadmin@hei.gg"), any()))
-            .thenReturn(new PrizeEventResponse(5L, "10월", null, null, 3, "OPEN", null, List.of(), List.of()));
+            .thenReturn(new PrizeEventResponse(6L, "11월", null, null, 3, "OPEN", null, List.of(), List.of(), "POINTS", null));
         String body = "{\"title\":\"10월\",\"periodStart\":\"2026-10-01\",\"periodEnd\":\"2026-10-31\",\"winnerCount\":3}";
 
         mockMvc
-            .perform(get("/api/groups/1/prize-events").header("X-USER-EMAIL", "member@hei.gg"))
+            .perform(get("/api/groups/1/prize-events"))
             .andExpect(status().isForbidden());
         mockMvc
-            .perform(get("/api/groups/1/prize-events").header("X-USER-EMAIL", "admin@hei.gg"))
+            .perform(get("/api/groups/1/prize-events").header("X-USER-EMAIL", "member@hei.gg"))
             .andExpect(status().isOk());
+        mockMvc
+            .perform(post("/api/groups/1/prize-events").header("X-USER-EMAIL", "member@hei.gg")
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isForbidden());
         mockMvc
             .perform(post("/api/groups/1/prize-events").header("X-USER-EMAIL", "admin@hei.gg")
                 .contentType(MediaType.APPLICATION_JSON).content(body))
-            .andExpect(status().isForbidden());
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.eventId").value(5));
+        mockMvc
+            .perform(post("/api/groups/1/prize-events").header("X-USER-EMAIL", "superadmin@hei.gg")
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.eventId").value(6));
+        // Confirming writes the donation ledger, which only super admins change.
         mockMvc
             .perform(post("/api/groups/1/prize-events/5/confirm").header("X-USER-EMAIL", "admin@hei.gg")
                 .contentType(MediaType.APPLICATION_JSON).content("{\"winners\":[]}"))
             .andExpect(status().isForbidden());
         mockMvc
-            .perform(post("/api/groups/1/prize-events").header("X-USER-EMAIL", "superadmin@hei.gg")
-                .contentType(MediaType.APPLICATION_JSON).content(body))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.eventId").value(5));
+            .perform(post("/api/groups/1/prize-events/5/cancel").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(delete("/api/groups/1/prize-events/5").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isForbidden());
         verify(prizeEventService, never()).confirm(any(), any(), any(), any(), any());
+        verify(prizeEventService, never()).cancel(any(), any(), any(), any());
+        verify(prizeEventService, never()).delete(any(), any(), any(), any());
+
+        when(prizeEventService.delete(eq(1L), eq(5L), eq("superadmin@hei.gg"), any())).thenReturn(new PrizeEventListResponse(List.of()));
+        mockMvc
+            .perform(delete("/api/groups/1/prize-events/5").header("X-USER-EMAIL", "superadmin@hei.gg"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.events").isArray());
     }
 
     @Test
@@ -3115,7 +3158,17 @@ class AdminKeyFilterTest {
                     .content("{\"label\":\"26분\"}")
             )
             .andExpect(status().isOk());
+        // In a vote that takes several choices, one is taken off by sending it as not selected.
+        mockMvc
+            .perform(
+                put("/api/groups/1/notices/5/vote")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"optionId\":22,\"selected\":false}")
+            )
+            .andExpect(status().isOk());
         verify(noticeService).castVote(1L, 5L, "member@hei.gg", 21L, null);
+        verify(noticeService).unvoteOption(1L, 5L, "member@hei.gg", 22L);
         verify(noticeService).addVoteOption(1L, 5L, "member@hei.gg", "26분");
 
         // Taking an option away: a member and a visitor are turned back before the service is asked.
@@ -4216,6 +4269,28 @@ class AdminKeyFilterTest {
                     .header("X-USER-EMAIL", "member@hei.gg")
             )
             .andExpect(status().isOk());
+    }
+
+    @Test
+    void givesVisitorsTheKeptRecentResultsAndMembersTheirOwn() throws Exception {
+        when(matchQueryService.getVisitorRecentMatches(eq(1L), any(), any())).thenReturn(List.of());
+        when(matchQueryService.getRecentMatches(eq(1L), any(), any(), any())).thenReturn(List.of());
+
+        mockMvc
+            .perform(get("/api/groups/1/matches/recent").param("limit", "10").param("offset", "10"))
+            .andExpect(status().isOk());
+        // Signed in, but without access to the site: a visitor as well.
+        mockMvc
+            .perform(get("/api/groups/1/matches/recent").header("X-USER-EMAIL", "blocked@hei.gg"))
+            .andExpect(status().isOk());
+        verify(matchQueryService).getVisitorRecentMatches(1L, 10, 10);
+        verify(matchQueryService).getVisitorRecentMatches(1L, null, null);
+        verify(matchQueryService, never()).getRecentMatches(any(), any(), any(), any());
+
+        mockMvc
+            .perform(get("/api/groups/1/matches/recent").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk());
+        verify(matchQueryService).getRecentMatches(1L, null, null, "member@hei.gg");
     }
 
     @Test

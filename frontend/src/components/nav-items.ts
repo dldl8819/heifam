@@ -44,8 +44,8 @@ function boardsMenu(): NavItem {
   }
 }
 
-/** A member's points, the month's ranking and the rules; and for admins the prize events. */
-function pointsMenu(isAdmin: boolean): NavItem {
+/** A member's points, the month's ranking and the rules. The prize events are on the events page. */
+function pointsMenu(): NavItem {
   return {
     label: t('nav.points'),
     href: '/points',
@@ -53,7 +53,6 @@ function pointsMenu(isAdmin: boolean): NavItem {
       { label: t('nav.myPoints'), href: '/points' },
       { label: t('nav.pointRanking'), href: '/points/ranking' },
       { label: t('nav.pointPolicy'), href: '/points/policy' },
-      ...(isAdmin ? [{ label: t('nav.pointEvents'), href: '/points/events' }] : []),
     ],
   }
 }
@@ -81,9 +80,9 @@ export function getVisibleNavItems(context: NavVisibilityContext): NavItem[] {
   if (!context.isLoggedIn) {
     return [
       { label: t('nav.home'), href: '/' },
-      // Visitors see notice titles only; the notice page shows them nothing else.
+      // Visitors see notice titles only; the notice page shows them nothing else. The events (prize
+      // events by points) are for members.
       { label: t('nav.notices'), href: '/notices' },
-      { label: t('nav.events'), href: '/events' },
       { label: t('nav.ads'), href: '/ads' },
       { label: t('nav.results'), href: '/results' },
     ]
@@ -98,7 +97,7 @@ export function getVisibleNavItems(context: NavVisibilityContext): NavItem[] {
     { label: t('nav.ranking'), href: '/ranking' },
     matchesMenu(context.isAdmin),
     boardsMenu(),
-    pointsMenu(context.isAdmin),
+    pointsMenu(),
     { label: t('nav.predictions'), href: '/predictions' },
     { label: t('nav.events'), href: '/events' },
     { label: t('nav.ads'), href: '/ads' },

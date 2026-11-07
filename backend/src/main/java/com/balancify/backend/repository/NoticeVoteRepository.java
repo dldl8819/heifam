@@ -10,7 +10,8 @@ import org.springframework.stereotype.Repository;
 
 /**
  * The options of a notice's vote and the votes on them. A person has one vote per notice, which
- * points at one option; voting again moves it. Removing an option removes the votes on it
+ * points at one option, and voting again moves it; in a vote that takes more than one choice
+ * (notices.vote_multiple) they have one vote on each option they chose. Removing an option removes the votes on it
  * (ON DELETE CASCADE), and removing the notice removes both.
  */
 @Repository
@@ -81,6 +82,33 @@ public class NoticeVoteRepository {
      */
     public void castVote(Long noticeId, String email, Long optionId) {
         jdbcTemplate.queryForList(PersonSql.LOCK_PERSON, voter(noticeId, email), Long.class);
+        // Whatever else the person had on this notice, under any of their emails, gives way.
+        jdbcTemplate.update(
+            "DELETE FROM notice_votes WHERE notice_id = :noticeId "
+                + "AND " + PersonSql.samePerson("voter_email") + " "
+                + "AND NOT (voter_email = :email AND option_id = :optionId)",
+            voter(noticeId, email).addValue("optionId", optionId)
+        );
+        jdbcTemplate.update(
+            "INSERT INTO notice_votes (notice_id, voter_email, option_id) VALUES (:noticeId, :email, :optionId) "
+                + "ON CONFLICT (notice_id, voter_email, option_id) DO NOTHING",
+            voter(noticeId, email).addValue("optionId", optionId)
+        );
+    }
+
+    /**
+     * Adds an option to what the person chose, in a vote that takes more than one. Their choices
+     * made with another of their emails are brought under this one first, so a person holds each
+     * option once and all their choices together.
+     */
+    public void addVote(Long noticeId, String email, Long optionId) {
+        jdbcTemplate.queryForList(PersonSql.LOCK_PERSON, voter(noticeId, email), Long.class);
+        jdbcTemplate.update(
+            "UPDATE notice_votes SET voter_email = :email WHERE notice_id = :noticeId AND voter_email <> :email "
+                + "AND voter_email IN (" + PersonSql.SAME_PERSON + ") "
+                + "AND option_id NOT IN (SELECT option_id FROM notice_votes WHERE notice_id = :noticeId AND voter_email = :email)",
+            voter(noticeId, email)
+        );
         jdbcTemplate.update(
             "DELETE FROM notice_votes WHERE notice_id = :noticeId AND voter_email <> :email "
                 + "AND voter_email IN (" + PersonSql.SAME_PERSON + ")",
@@ -88,10 +116,49 @@ public class NoticeVoteRepository {
         );
         jdbcTemplate.update(
             "INSERT INTO notice_votes (notice_id, voter_email, option_id) VALUES (:noticeId, :email, :optionId) "
-                + "ON CONFLICT (notice_id, voter_email) DO UPDATE SET option_id = EXCLUDED.option_id, updated_at = now() "
-                + "WHERE notice_votes.option_id <> EXCLUDED.option_id",
+                + "ON CONFLICT (notice_id, voter_email, option_id) DO NOTHING",
             voter(noticeId, email).addValue("optionId", optionId)
         );
+    }
+
+    /** Takes the person's vote off one option, whichever of their emails cast it. */
+    public void removeVote(Long noticeId, String email, Long optionId) {
+        jdbcTemplate.update(
+            "DELETE FROM notice_votes WHERE notice_id = :noticeId AND option_id = :optionId "
+                + "AND " + PersonSql.samePerson("voter_email"),
+            voter(noticeId, email).addValue("optionId", optionId)
+        );
+    }
+
+    /** Every option the person chose on the notice, with any of their emails, in the order of the options. */
+    public List<Long> findVotedOptionIds(Long noticeId, String email) {
+        return jdbcTemplate.queryForList(
+            "SELECT v.option_id FROM notice_votes v JOIN notice_vote_options o ON o.id = v.option_id "
+                + "WHERE v.notice_id = :noticeId AND " + PersonSql.samePerson("v.voter_email") + " "
+                + "GROUP BY v.option_id, o.position ORDER BY o.position ASC, v.option_id ASC",
+            voter(noticeId, email),
+            Long.class
+        );
+    }
+
+    /** How many people voted, however many options each chose. */
+    public long countVoters(Long noticeId) {
+        Long count = jdbcTemplate.queryForObject(
+            "SELECT count(DISTINCT voter_email) FROM notice_votes WHERE notice_id = :noticeId",
+            new MapSqlParameterSource("noticeId", noticeId),
+            Long.class
+        );
+        return count == null ? 0 : count;
+    }
+
+    /** Whether anyone chose more than one option, which keeps a vote taking more than one. */
+    public boolean hasVoterWithSeveralChoices(Long noticeId) {
+        Boolean found = jdbcTemplate.queryForObject(
+            "SELECT EXISTS (SELECT 1 FROM notice_votes WHERE notice_id = :noticeId GROUP BY voter_email HAVING count(*) > 1)",
+            new MapSqlParameterSource("noticeId", noticeId),
+            Boolean.class
+        );
+        return Boolean.TRUE.equals(found);
     }
 
     public void withdrawVote(Long noticeId, String email) {

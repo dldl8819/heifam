@@ -34,6 +34,8 @@ describe('points helpers', () => {
     expect(pointReasonKey('BOARD_POST_REVERSED')).toBe('points.reasons.boardPostReversed')
     expect(pointReasonKey('BOARD_COMMENT')).toBe('points.reasons.boardComment')
     expect(pointReasonKey('BOARD_LIKE')).toBe('points.reasons.boardLike')
+    expect(pointReasonKey('CAPTAIN_DRAFT')).toBe('points.reasons.captainDraft')
+    expect(pointReasonKey('CAPTAIN_DRAFT_REVERSED')).toBe('points.reasons.captainDraftReversed')
     expect(pointReasonKey('SOMETHING_NEW')).toBeNull()
   })
 

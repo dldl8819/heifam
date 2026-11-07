@@ -9,6 +9,8 @@ import com.balancify.backend.api.group.dto.RankingItemResponse;
 import com.balancify.backend.domain.Group;
 import com.balancify.backend.domain.Player;
 import com.balancify.backend.domain.PlayerMonthlyStats;
+import com.balancify.backend.repository.MatchParticipantRepository;
+import com.balancify.backend.repository.MatchParticipantRepository.PlayerMmrRangeProjection;
 import com.balancify.backend.repository.PlayerRepository;
 import com.balancify.backend.repository.PlayerMonthlyStatsRepository;
 import java.time.Clock;
@@ -38,6 +40,9 @@ class RankingServiceTest {
     @Mock
     private PlayerMonthlyStatsRepository playerMonthlyStatsRepository;
 
+    @Mock
+    private MatchParticipantRepository matchParticipantRepository;
+
     private GroupRosterCache groupRosterCache;
 
     private RankingService rankingService;
@@ -48,6 +53,7 @@ class RankingServiceTest {
         rankingService = new RankingService(
             groupRosterCache,
             playerMonthlyStatsRepository,
+            matchParticipantRepository,
             new GroupReadCacheService(0),
             FIXED_CLOCK
         );
@@ -73,6 +79,40 @@ class RankingServiceTest {
         assertThat(response.get(1).tier()).isEqualTo("UNASSIGNED");
         assertThat(response.get(1).currentMmr()).isEqualTo(0);
         verify(playerMonthlyStatsRepository).findByGroupIdAndStatMonth(1L, JULY_2026);
+    }
+
+    @Test
+    void givesEachPlayerTheHighestAndLowestMmrOfTheirMatchesAndNow() {
+        Group group = new Group();
+        group.setId(1L);
+        // Within what the matches reached.
+        Player steady = player(1L, group, "PlayerAlpha", "P", "A", 900);
+        // An admin raised the MMR past anything a match reached.
+        Player raised = player(2L, group, "PlayerBravo", "T", "A", 1000);
+        // Below anything a match reached (as an MMR decay once did).
+        Player lowered = player(3L, group, "PlayerCharlie", "Z", "B", 600);
+        // No match yet: no range.
+        Player newcomer = player(4L, group, "PlayerDelta", "P", "C", 500);
+
+        when(playerRepository.findByGroup_IdOrderByMmrDescIdAsc(1L))
+            .thenReturn(List.of(raised, steady, lowered, newcomer));
+        when(playerMonthlyStatsRepository.findByGroupIdAndStatMonth(1L, JULY_2026)).thenReturn(List.of());
+        when(matchParticipantRepository.findMmrRangesByGroupId(1L)).thenReturn(List.of(
+            range(1L, 950, 820),
+            range(2L, 980, 860),
+            range(3L, 780, 640)
+        ));
+
+        List<RankingItemResponse> response = rankingService.getGroupRanking(1L);
+
+        assertThat(response)
+            .extracting(RankingItemResponse::nickname, RankingItemResponse::peakMmr, RankingItemResponse::lowestMmr)
+            .containsExactly(
+                org.assertj.core.groups.Tuple.tuple("PlayerBravo", 1000, 860),
+                org.assertj.core.groups.Tuple.tuple("PlayerAlpha", 950, 820),
+                org.assertj.core.groups.Tuple.tuple("PlayerCharlie", 780, 600),
+                org.assertj.core.groups.Tuple.tuple("PlayerDelta", null, null)
+            );
     }
 
     @Test
@@ -205,6 +245,25 @@ class RankingServiceTest {
         assertThat(rankingService.getGroupRanking(1L)).extracting(RankingItemResponse::nickname)
             .containsExactly("PlayerAlpha2");
         verify(playerRepository, times(2)).findByGroup_IdOrderByMmrDescIdAsc(1L);
+    }
+
+    private static PlayerMmrRangeProjection range(Long playerId, int peak, int lowest) {
+        return new PlayerMmrRangeProjection() {
+            @Override
+            public Long getPlayerId() {
+                return playerId;
+            }
+
+            @Override
+            public Integer getPeakMmr() {
+                return peak;
+            }
+
+            @Override
+            public Integer getLowestMmr() {
+                return lowest;
+            }
+        };
     }
 
     private Player player(

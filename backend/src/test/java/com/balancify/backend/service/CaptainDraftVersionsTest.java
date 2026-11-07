@@ -6,6 +6,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 
 class CaptainDraftVersionsTest {
@@ -13,7 +14,8 @@ class CaptainDraftVersionsTest {
     private static final UUID OTHER_READER = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
     private final MutableClock clock = new MutableClock(Instant.parse("2026-10-27T12:00:00Z"));
-    private final CaptainDraftVersions versions = new CaptainDraftVersions(clock);
+    private final AtomicLong playerChanges = new AtomicLong();
+    private final CaptainDraftVersions versions = new CaptainDraftVersions(playerChanges::get, clock);
 
     @Test
     void keepsACopyCurrentForItsReaderUntilTheDraftChanges() {
@@ -33,13 +35,24 @@ class CaptainDraftVersionsTest {
     }
 
     @Test
-    void readsAfreshAfterMaxAgeWhateverChangedElsewhere() {
+    void readsAfreshAtOnceWhenAPlayerChanged() {
+        String tag = versions.tag(100L, READER);
+
+        // A draft shows its players, whichever draft and however soon after the copy.
+        playerChanges.incrementAndGet();
+
+        assertThat(versions.isCurrent(100L, READER, tag)).isFalse();
+        assertThat(versions.isCurrent(100L, READER, versions.tag(100L, READER))).isTrue();
+    }
+
+    @Test
+    void readsAfreshAfterMaxAgeWhateverChangedOutsideTheBackend() {
         String tag = versions.tag(100L, null);
 
         clock.advanceSeconds(CaptainDraftVersions.MAX_AGE.toSeconds() - 1);
         assertThat(versions.isCurrent(100L, null, tag)).isTrue();
 
-        // Changes made elsewhere (a player's tier) show within MAX_AGE.
+        // A change by hand in the database shows within MAX_AGE.
         clock.advanceSeconds(1);
         assertThat(versions.isCurrent(100L, null, tag)).isFalse();
     }
@@ -47,7 +60,7 @@ class CaptainDraftVersionsTest {
     @Test
     void neverTrustsATagFromAnotherProcessOrNotItsOwn() {
         String tag = versions.tag(100L, null);
-        CaptainDraftVersions afterRestart = new CaptainDraftVersions(clock);
+        CaptainDraftVersions afterRestart = new CaptainDraftVersions(playerChanges::get, clock);
 
         assertThat(afterRestart.isCurrent(100L, null, tag)).isFalse();
         assertThat(versions.isCurrent(100L, null, null)).isFalse();

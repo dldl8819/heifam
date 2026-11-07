@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -38,6 +39,7 @@ import com.balancify.backend.repository.GroupRepository;
 import com.balancify.backend.repository.PlayerRepository;
 import com.balancify.backend.service.exception.CaptainDraftLineupForbiddenException;
 import com.balancify.backend.service.exception.CaptainDraftResultLockedException;
+import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -87,8 +89,11 @@ class CaptainDraftServiceTest {
     @Mock
     private OperationAuditLogService operationAuditLogService;
 
+    @Mock
+    private CaptainDraftPoints captainDraftPoints;
+
     private CaptainDraftService captainDraftService;
-    private final CaptainDraftVersions captainDraftVersions = new CaptainDraftVersions();
+    private final CaptainDraftVersions captainDraftVersions = new CaptainDraftVersions(() -> 0L, Clock.systemUTC());
 
     @BeforeEach
     void setUp() {
@@ -100,7 +105,8 @@ class CaptainDraftServiceTest {
             captainDraftEntryRepository,
             captainDraftLineupRepository,
             operationAuditLogService,
-            captainDraftVersions
+            captainDraftVersions,
+            captainDraftPoints
         );
     }
 
@@ -159,6 +165,10 @@ class CaptainDraftServiceTest {
         assertThat(cleared.entries().get(0).resultRecordedByNickname()).isNull();
         assertThat(cleared.entries().get(0).resultRecordedAt()).isNull();
         assertThat(set.getResultRecordedByEmail()).isNull();
+
+        // The three saves that left a result in paid the captains (once each, CaptainDraftPoints
+        // sees to that); the save that took it out did not.
+        verify(captainDraftPoints, times(3)).grantWhilePlayed(draft);
     }
 
     @Test
@@ -383,7 +393,9 @@ class CaptainDraftServiceTest {
         CaptainDraftListResponse response = captainDraftService.deleteDraft(1L, 100L, "admin@hei.gg", "Ops");
 
         assertThat(response.drafts()).isEmpty();
-        InOrder order = inOrder(captainDraftEntryRepository, captainDraftParticipantRepository, captainDraftRepository);
+        InOrder order = inOrder(captainDraftPoints, captainDraftEntryRepository, captainDraftParticipantRepository, captainDraftRepository);
+        // The captains' points go back with the record.
+        order.verify(captainDraftPoints).takeBack(draft);
         order.verify(captainDraftEntryRepository).deleteByDraftId(100L);
         order.verify(captainDraftParticipantRepository).deleteByDraftId(100L);
         order.verify(captainDraftRepository).deleteDraft(100L);
@@ -401,7 +413,7 @@ class CaptainDraftServiceTest {
         verify(captainDraftEntryRepository, never()).deleteByDraftId(any());
         verify(captainDraftParticipantRepository, never()).deleteByDraftId(any());
         verify(captainDraftRepository, never()).deleteDraft(any());
-        verifyNoInteractions(operationAuditLogService);
+        verifyNoInteractions(operationAuditLogService, captainDraftPoints);
     }
 
     @Test

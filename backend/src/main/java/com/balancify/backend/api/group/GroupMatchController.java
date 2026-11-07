@@ -5,6 +5,8 @@ import com.balancify.backend.api.group.dto.GroupMatchPageResponse;
 import com.balancify.backend.api.group.dto.GroupRecentMatchResponse;
 import com.balancify.backend.security.AuthenticatedRequestResolver;
 import com.balancify.backend.security.MmrAccessRequestResolver;
+import com.balancify.backend.security.VisitorReadLimiter;
+import com.balancify.backend.service.AccessControlService;
 import com.balancify.backend.service.MatchQueryService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDate;
@@ -25,17 +27,27 @@ public class GroupMatchController {
     private final MatchQueryService matchQueryService;
     private final MmrAccessRequestResolver mmrAccessRequestResolver;
     private final AuthenticatedRequestResolver authenticatedRequestResolver;
+    private final AccessControlService accessControlService;
+    private final VisitorReadLimiter visitorReadLimiter;
 
     public GroupMatchController(
         MatchQueryService matchQueryService,
         MmrAccessRequestResolver mmrAccessRequestResolver,
-        AuthenticatedRequestResolver authenticatedRequestResolver
+        AuthenticatedRequestResolver authenticatedRequestResolver,
+        AccessControlService accessControlService,
+        VisitorReadLimiter visitorReadLimiter
     ) {
         this.matchQueryService = matchQueryService;
         this.mmrAccessRequestResolver = mmrAccessRequestResolver;
         this.authenticatedRequestResolver = authenticatedRequestResolver;
+        this.accessControlService = accessControlService;
+        this.visitorReadLimiter = visitorReadLimiter;
     }
 
+    /**
+     * Open without signing in. A visitor (no member access) gets the newest results kept for every
+     * visitor, never with MMR, and only so many answers a minute for all visitors together.
+     */
     @GetMapping("/{groupId}/matches/recent")
     public List<GroupRecentMatchResponse> getRecentMatches(
         @PathVariable Long groupId,
@@ -44,6 +56,10 @@ public class GroupMatchController {
         HttpServletRequest request
     ) {
         String requesterEmail = authenticatedRequestResolver.resolve(request).email();
+        if (!accessControlService.isServiceAccessAllowed(requesterEmail)) {
+            visitorReadLimiter.requireAllowance();
+            return MmrMaskingMapper.maskRecentMatches(matchQueryService.getVisitorRecentMatches(groupId, limit, offset));
+        }
         List<GroupRecentMatchResponse> response =
             matchQueryService.getRecentMatches(groupId, limit, offset, requesterEmail);
         if (mmrAccessRequestResolver.canViewMmr(request)) {

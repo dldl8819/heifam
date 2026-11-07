@@ -12,6 +12,31 @@ import org.springframework.data.repository.query.Param;
 
 public interface MatchParticipantRepository extends JpaRepository<MatchParticipant, Long> {
 
+    interface PlayerGameCount {
+        Long getPlayerId();
+
+        Long getGames();
+    }
+
+    /** How many finished matches of the group each player played in [from, to), most first. */
+    @Query("""
+        select participant.player.id as playerId, count(distinct game.id) as games
+        from MatchParticipant participant
+        join participant.match game
+        where game.group.id = :groupId
+          and game.status = com.balancify.backend.domain.MatchStatus.COMPLETED
+          and game.winningTeam is not null
+          and game.playedAt >= :from
+          and game.playedAt < :to
+        group by participant.player.id
+        order by count(distinct game.id) desc, participant.player.id asc
+        """)
+    List<PlayerGameCount> countFinishedGamesByPlayerBetween(
+        @Param("groupId") Long groupId,
+        @Param("from") OffsetDateTime from,
+        @Param("to") OffsetDateTime to
+    );
+
     /**
      * Loads only the participants of matches the given player took part in.
      *
@@ -60,6 +85,31 @@ public interface MatchParticipantRepository extends JpaRepository<MatchParticipa
         @Param("groupId") Long groupId,
         @Param("playerId") Long playerId
     );
+
+    /**
+     * Each player's highest and lowest MMR over their decided matches, before or after any of them:
+     * one row a player, three numbers, worked out by the database. The ranking adds the player's MMR
+     * now (RankingService), which a change outside matches (an admin's edit, a tier change) moves.
+     *
+     * Only matches decided since V22 (deployed 2026-04-30 09:08 UTC) count. That day the MMR scale was
+     * doubled and its rules changed too (a match moved MMR by other amounts), and the matches before
+     * kept their old numbers, which no factor turns into today's. No match was decided within two
+     * hours of that time. A player who played only before then has no range.
+     */
+    @Query(value = """
+        select
+            mp.player_id as "playerId",
+            max(greatest(mp.mmr_before, mp.mmr_after)) as "peakMmr",
+            min(least(mp.mmr_before, mp.mmr_after)) as "lowestMmr"
+        from match_participants mp
+        join matches m on m.id = mp.match_id
+        join players p on p.id = mp.player_id
+        where p.group_id = :groupId
+          and m.status = 'COMPLETED'
+          and coalesce(m.result_recorded_at, m.played_at) >= timestamptz '2026-04-30 09:08:17+00'
+        group by mp.player_id
+        """, nativeQuery = true)
+    List<PlayerMmrRangeProjection> findMmrRangesByGroupId(@Param("groupId") Long groupId);
 
     @Query(value = """
         select
@@ -126,6 +176,12 @@ public interface MatchParticipantRepository extends JpaRepository<MatchParticipa
     interface PlayerLastPlayedAtProjection {
         Long getPlayerId();
         Instant getLastPlayedAt();
+    }
+
+    interface PlayerMmrRangeProjection {
+        Long getPlayerId();
+        Integer getPeakMmr();
+        Integer getLowestMmr();
     }
 
 }

@@ -19,6 +19,9 @@ type NoticeVoteSettingsProps = {
   anonymousLocked?: boolean
   allowAdditions: boolean
   onAllowAdditionsChange: (allowAdditions: boolean) => void
+  // A voter may choose more than one option (중복 투표).
+  multiple: boolean
+  onMultipleChange: (multiple: boolean) => void
 }
 
 const smallButtonClass =
@@ -26,7 +29,7 @@ const smallButtonClass =
 
 /**
  * What the writer of a notice sets about its vote: the options to choose between, whether voters
- * may add options of their own, and whether the vote is anonymous. Used when a notice is written
+ * may choose more than one and add options of their own, and whether the vote is anonymous. Used when a notice is written
  * and when it is edited.
  */
 export function NoticeVoteSettings({
@@ -38,6 +41,8 @@ export function NoticeVoteSettings({
   anonymousLocked = false,
   allowAdditions,
   onAllowAdditionsChange,
+  multiple,
+  onMultipleChange,
 }: NoticeVoteSettingsProps) {
   const setOption = (index: number, value: string) =>
     onOptionsChange(options.map((option, position) => (position === index ? value : option)))
@@ -97,6 +102,14 @@ export function NoticeVoteSettings({
             </p>
           </div>
         )}
+      </div>
+
+      <div className="space-y-1">
+        <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200">
+          <input type="checkbox" checked={multiple} onChange={(event) => onMultipleChange(event.target.checked)} />
+          {t('notices.posts.voteMultipleLabel')}
+        </label>
+        <p className="pl-5 text-xs text-slate-500 dark:text-slate-400">{t('notices.posts.voteMultipleHint')}</p>
       </div>
 
       <div className="space-y-1">

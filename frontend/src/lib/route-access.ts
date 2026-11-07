@@ -15,10 +15,13 @@ type RouteRequirement = 'public' | 'member' | 'admin' | 'super_admin' | 'disable
 
 const AUTH_PATH_PREFIX = '/auth'
 const DISABLED_PATHS = ['/dashboard']
-const PUBLIC_PATHS = ['/', '/events', '/ads', '/results', '/privacy', '/terms']
+const PUBLIC_PATHS = ['/', '/ads', '/results', '/privacy', '/terms']
 // /balance covers /balance/multi as well. /captain-draft: members run the regular draft too; a
 // result already in is changed only by admins and match result editors (held to by the backend).
+// /events: the prize events, which admins start and super admins confirm (held to by the backend);
+// /points/events only sends an old link there.
 const MEMBER_PATHS = [
+  '/events',
   '/balance',
   '/players',
   '/ranking',
@@ -31,8 +34,7 @@ const MEMBER_PATHS = [
   '/captain-draft',
 ]
 // Admins see only what match result editors did on /admin/audit; the backend narrows the logs.
-// /points/events: the prize events, inside the members' /points.
-const ADMIN_PATHS = ['/import', '/players/import', '/tournaments', '/admin/audit', '/points/events']
+const ADMIN_PATHS = ['/import', '/players/import', '/tournaments', '/admin/audit']
 // Anyone may see the notice titles; opening a notice needs member access (MEMBER_PATHS).
 const PUBLIC_EXACT_PATHS = ['/notices']
 const SUPER_ADMIN_PATHS = ['/admin/access']

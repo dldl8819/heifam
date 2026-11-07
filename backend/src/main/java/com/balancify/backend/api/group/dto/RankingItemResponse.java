@@ -16,6 +16,10 @@ public record RankingItemResponse(
     String streak,
     String last10,
     Integer mmrDelta,
-    boolean isNew
+    boolean isNew,
+    // The highest and lowest MMR the player has had: over their matches and now. Null with no match
+    // yet, and for a reader who may not see MMR (MmrMaskingMapper).
+    Integer peakMmr,
+    Integer lowestMmr
 ) {
 }

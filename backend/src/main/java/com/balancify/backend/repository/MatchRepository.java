@@ -70,6 +70,7 @@ public interface MatchRepository extends JpaRepository<Match, Long>, JpaSpecific
         @Param("fromInclusive") OffsetDateTime fromInclusive
     );
 
+    /** Balanced matches of the given players whose result came in since the given time, newest first. */
     @Query("""
         select m
         from Match m
@@ -77,10 +78,16 @@ public interface MatchRepository extends JpaRepository<Match, Long>, JpaSpecific
           and m.source = com.balancify.backend.domain.MatchSource.BALANCED
           and m.winningTeam is not null
           and m.resultRecordedAt >= :fromInclusive
+          and m.id in (
+            select mp.match.id
+            from MatchParticipant mp
+            where mp.player.id in :playerIds
+          )
         order by m.resultRecordedAt desc, m.id desc
         """)
-    List<Match> findBalancedResultsRecordedSince(
+    List<Match> findBalancedResultsOfPlayersRecordedSince(
         @Param("groupId") Long groupId,
+        @Param("playerIds") List<Long> playerIds,
         @Param("fromInclusive") OffsetDateTime fromInclusive
     );
 
@@ -92,6 +99,21 @@ public interface MatchRepository extends JpaRepository<Match, Long>, JpaSpecific
         order by m.playedAt desc, m.id desc
         """)
     List<Match> findRecentByGroupId(@Param("groupId") Long groupId, Pageable pageable);
+
+    /**
+     * The results page's list: completed matches by when their result went in, newest first, which
+     * is the time the list shows and the order their MMR moved in. A match set up early and decided
+     * late sits where its result came in, not where it was set up. Editing a result later keeps it
+     * where it was: only the first result sets the time.
+     */
+    @Query("""
+        select m
+        from Match m
+        where m.group.id = :groupId
+          and m.status = com.balancify.backend.domain.MatchStatus.COMPLETED
+        order by m.resultRecordedAt desc nulls last, m.playedAt desc, m.id desc
+        """)
+    List<Match> findRecentByGroupIdByResultInput(@Param("groupId") Long groupId, Pageable pageable);
 
     @Query("""
         select m

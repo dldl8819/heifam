@@ -21,25 +21,42 @@ public final class OwnPlayerPolicy {
             return null;
         }
         UUID authUserId = parseUuid(userId);
-        if (authUserId != null) {
-            for (MatchParticipant participant : participants) {
-                Player player = participant.getPlayer();
-                if (player != null && authUserId.equals(player.getAuthUserId())) {
-                    return participant;
-                }
+        for (MatchParticipant participant : participants) {
+            if (isLinked(participant.getPlayer(), authUserId)) {
+                return participant;
             }
         }
-        String nickname = accountNickname == null ? "" : accountNickname.trim();
-        if (nickname.isEmpty()) {
-            return null;
-        }
+        String nickname = normalizeNickname(accountNickname);
         for (MatchParticipant participant : participants) {
-            Player player = participant.getPlayer();
-            if (player != null && player.getNickname() != null && nickname.equalsIgnoreCase(player.getNickname().trim())) {
+            if (isNamed(participant.getPlayer(), nickname)) {
                 return participant;
             }
         }
         return null;
+    }
+
+    /** Which of the players are the person's own: every one findOwn could pick in a match of theirs. */
+    public static List<Player> findOwnPlayers(List<Player> players, String userId, String accountNickname) {
+        UUID authUserId = parseUuid(userId);
+        String nickname = normalizeNickname(accountNickname);
+        return players.stream()
+            .filter(player -> isLinked(player, authUserId) || isNamed(player, nickname))
+            .toList();
+    }
+
+    private static boolean isLinked(Player player, UUID authUserId) {
+        return player != null && authUserId != null && authUserId.equals(player.getAuthUserId());
+    }
+
+    private static boolean isNamed(Player player, String nickname) {
+        return player != null
+            && !nickname.isEmpty()
+            && player.getNickname() != null
+            && nickname.equalsIgnoreCase(player.getNickname().trim());
+    }
+
+    private static String normalizeNickname(String value) {
+        return value == null ? "" : value.trim();
     }
 
     private static UUID parseUuid(String value) {

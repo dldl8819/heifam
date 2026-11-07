@@ -29,6 +29,11 @@ public class PrizeEventWinner {
     @Column(length = 100)
     private String nickname;
 
+    // A matches-played event's winner; null for a points event, whose winner is the email above.
+    @Column(name = "player_id")
+    private Long playerId;
+
+    // What ranked the winner: points earned, or matches played (PrizeEvent.metric).
     @Column(nullable = false)
     private int points;
 
@@ -78,6 +83,14 @@ public class PrizeEventWinner {
 
     public void setNickname(String nickname) {
         this.nickname = nickname;
+    }
+
+    public Long getPlayerId() {
+        return playerId;
+    }
+
+    public void setPlayerId(Long playerId) {
+        this.playerId = playerId;
     }
 
     public int getPoints() {

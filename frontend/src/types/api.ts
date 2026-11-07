@@ -237,6 +237,10 @@ export type RankingItem = {
   last10: string
   mmrDelta?: number
   isNew?: boolean
+  // The highest and lowest MMR the player has had, over their matches and now. Left out with no
+  // match yet, and for a reader who may not see MMR.
+  peakMmr?: number
+  lowestMmr?: number
 }
 
 export type RankingResponse = RankingItem[]
@@ -707,6 +711,10 @@ export type NoticeVote = {
   totalVoters: number
   myOptionId?: number | null
   options: NoticeVoteOption[]
+  // A voter may choose more than one option; totalVoters then counts people, not choices.
+  // Missing while a backend from before multiple choice is still answering.
+  multiple?: boolean
+  myOptionIds?: number[]
 }
 
 /** A vote taken off its notice but kept; only admins are sent it, for the edit form. */
@@ -715,6 +723,7 @@ export type NoticeVoteKept = {
   totalVoters: number
   anonymous: boolean
   allowAdditions: boolean
+  multiple?: boolean
 }
 
 export type NoticeTitle = {
@@ -1124,6 +1133,8 @@ export type PointReason =
   | 'BOARD_POST_REVERSED'
   | 'BOARD_COMMENT'
   | 'BOARD_LIKE'
+  | 'CAPTAIN_DRAFT'
+  | 'CAPTAIN_DRAFT_REVERSED'
   // Given back when emails were grouped as one person: what was earned twice for the same thing.
   | 'PERSON_MERGE'
 
@@ -1146,6 +1157,8 @@ export type PointPolicyResponse = {
   boardPost: PointPolicyCapped
   boardComment: PointPolicyCapped
   boardLike: PointPolicyCapped
+  // Captaining a regular draft; missing while a backend from before it is still answering.
+  captainDraft?: PointPolicyCapped
 }
 
 /** An email one person signs in with, as 같은 사람 묶기 shows it to super admins. */
@@ -1374,11 +1387,18 @@ export type BalanceSeriesLineup = {
 
 export type PrizeEventStatus = 'OPEN' | 'CONFIRMED' | 'CANCELLED'
 
+// What ranks a prize event's period: points earned, finished matches played, or numbers counted
+// outside the site that the admin who starts the event enters (MANUAL, e.g. chat messages).
+export type PrizeEventMetric = 'POINTS' | 'GAMES' | 'MANUAL'
+
+// A points event's candidate is a point account; a matches-played one's is a player.
 export type PrizeCandidate = {
   rank: number
-  pointAccountId: number
+  pointAccountId: number | null
   nickname: string | null
+  // Points earned, or matches played in a GAMES event.
   points: number
+  playerId?: number | null
 }
 
 export type PrizeWinner = {
@@ -1400,6 +1420,10 @@ export type PrizeEvent = {
   confirmedAt: string | null
   candidates: PrizeCandidate[]
   winners: PrizeWinner[]
+  // Missing while a backend from before the choice is still answering.
+  metric?: PrizeEventMetric
+  // MANUAL only: what its numbers count, as the admin named it.
+  unitLabel?: string | null
 }
 
 export type PrizeEventCreateRequest = {
@@ -1407,11 +1431,28 @@ export type PrizeEventCreateRequest = {
   periodStart: string
   periodEnd: string
   winnerCount: number
+  metric: PrizeEventMetric
+  // MANUAL only.
+  unitLabel?: string
+  entries?: PrizeEventEntry[]
+}
+
+// A player's number in a MANUAL event, as counted outside the site.
+export type PrizeEventEntry = {
+  playerId: number
+  score: number
+}
+
+export type PrizeWinnerPick = {
+  pointAccountId: number | null
+  playerId: number | null
+  prize: string | null
+  amount: number
 }
 
 export type PrizeEventConfirmRequest = {
   paidOn: string | null
-  winners: Array<{ pointAccountId: number; prize: string | null; amount: number }>
+  winners: PrizeWinnerPick[]
 }
 
 export type TeamScoreEntry = {

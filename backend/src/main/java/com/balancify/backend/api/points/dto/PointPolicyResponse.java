@@ -11,7 +11,8 @@ public record PointPolicyResponse(
     Capped noticeCommentLike,
     Capped boardPost,
     Capped boardComment,
-    Capped boardLike
+    Capped boardLike,
+    Capped captainDraft
 ) {
 
     /** Points per time, and the most times a day (for predictions, the most points a day). */

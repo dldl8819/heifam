@@ -455,6 +455,16 @@ class AccountDeletionDataServiceTest {
             TransactionSynchronizationManager.clearSynchronization();
         }
     }
+
+    @Test
+    void anOpenDraftFollowsAWithdrawalWithNoLinkedPlayer() {
+        // No player changes, yet the name comes off the drafts this account started or put results in.
+        accountDeletionDataService.anonymizeWithdrawnAccount(PLACEHOLDER_AUTH_USER_ID, PLACEHOLDER_EMAIL);
+
+        verify(playerRepository, never()).saveAllAndFlush(org.mockito.ArgumentMatchers.any());
+        verify(groupRosterCache).changed();
+    }
+
     @Test
     void retainsInactivePlayerAndRemovesSoleLinkedAccountIdentity() {
         Group group = new Group();

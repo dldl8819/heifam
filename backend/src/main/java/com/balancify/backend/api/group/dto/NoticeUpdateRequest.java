@@ -18,6 +18,8 @@ public record NoticeUpdateRequest(
     // Left out, it stays as it is. An anonymous vote that has votes cannot be made a named one.
     Boolean voteAnonymous,
     // Left out, it stays as it is.
-    Boolean voteAllowAdditions
+    Boolean voteAllowAdditions,
+    // Left out, it stays as it is. It can be turned off only while nobody has chosen more than one.
+    Boolean voteMultiple
 ) {
 }

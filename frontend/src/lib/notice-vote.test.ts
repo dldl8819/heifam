@@ -152,6 +152,8 @@ describe('storedNoticeVote', () => {
       totalVoters: 3,
       anonymous: false,
       allowAdditions: true,
+      // One choice, as every vote from before multiple choice.
+      multiple: false,
     })
   })
 

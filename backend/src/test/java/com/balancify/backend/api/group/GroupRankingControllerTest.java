@@ -25,6 +25,8 @@ class GroupRankingControllerTest {
 
         assertThat(item.currentMmr()).isEqualTo(1500);
         assertThat(item.mmrDelta()).isEqualTo(12);
+        assertThat(item.peakMmr()).isEqualTo(1550);
+        assertThat(item.lowestMmr()).isEqualTo(1380);
     }
 
     @Test
@@ -33,6 +35,8 @@ class GroupRankingControllerTest {
 
         assertThat(item.currentMmr()).isEqualTo(1500);
         assertThat(item.mmrDelta()).isEqualTo(12);
+        assertThat(item.peakMmr()).isEqualTo(1550);
+        assertThat(item.lowestMmr()).isEqualTo(1380);
     }
 
     @Test
@@ -41,6 +45,8 @@ class GroupRankingControllerTest {
 
         assertThat(item.currentMmr()).isNull();
         assertThat(item.mmrDelta()).isNull();
+        assertThat(item.peakMmr()).isNull();
+        assertThat(item.lowestMmr()).isNull();
         assertThat(item.wins()).isEqualTo(7);
     }
 
@@ -50,6 +56,8 @@ class GroupRankingControllerTest {
 
         assertThat(item.currentMmr()).isNull();
         assertThat(item.mmrDelta()).isNull();
+        assertThat(item.peakMmr()).isNull();
+        assertThat(item.lowestMmr()).isNull();
     }
 
     private List<RankingItemResponse> rankingResponseFor(AccessProfile accessProfile) {
@@ -63,7 +71,7 @@ class GroupRankingControllerTest {
         );
         when(accessControlService.resolveAccessProfile(EMAIL)).thenReturn(accessProfile);
         when(rankingService.getGroupRanking(1L)).thenReturn(List.of(
-            new RankingItemResponse(1, "YOUR_USERNAME", "P", "A", 1500, 7, 3, 10, 0.7, "W2", "WWLWWLWWLW", 12, false)
+            new RankingItemResponse(1, "YOUR_USERNAME", "P", "A", 1500, 7, 3, 10, 0.7, "W2", "WWLWWLWWLW", 12, false, 1550, 1380)
         ));
 
         GroupRankingController controller = new GroupRankingController(

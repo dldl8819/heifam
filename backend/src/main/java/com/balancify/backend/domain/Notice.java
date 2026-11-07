@@ -60,6 +60,10 @@ public class Notice {
     @Column(name = "vote_allow_additions", nullable = false)
     private boolean voteAllowAdditions;
 
+    // A voter may choose more than one option (중복 투표).
+    @Column(name = "vote_multiple", nullable = false)
+    private boolean voteMultiple;
+
     public boolean isVoteAnonymous() {
         return voteAnonymous;
     }
@@ -74,6 +78,14 @@ public class Notice {
 
     public void setVoteAllowAdditions(boolean voteAllowAdditions) {
         this.voteAllowAdditions = voteAllowAdditions;
+    }
+
+    public boolean isVoteMultiple() {
+        return voteMultiple;
+    }
+
+    public void setVoteMultiple(boolean voteMultiple) {
+        this.voteMultiple = voteMultiple;
     }
 
     public boolean isAdminOnly() {

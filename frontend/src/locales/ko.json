@@ -65,7 +65,6 @@
     "myPoints": "내 포인트",
     "pointRanking": "포인트 월간 랭킹",
     "pointPolicy": "포인트 정책",
-    "pointEvents": "포인트 이벤트",
     "predictions": "승부 예측",
     "draws": "상품 추첨",
     "tournaments": "토너먼트"
@@ -523,6 +522,8 @@
       "voteMine": "내 선택",
       "voteFooterAnonymous": "참여 {total}명 · 익명 투표",
       "voteFooterNamed": "참여 {total}명 · 기명 투표",
+      "voteFooterMultipleAnonymous": "참여 {voters}명 · 중복 투표 · 익명 투표",
+      "voteFooterMultipleNamed": "참여 {voters}명 · 중복 투표 · 기명 투표",
       "voteNamedNotice": "기명 투표입니다. 누가 어느 항목에 투표했는지 이 공지를 볼 수 있는 모두에게 보입니다.",
       "voteVoterUnnamed": "운영진",
       "voteOptionAdd": "항목 추가",
@@ -532,7 +533,7 @@
       "voteChangedHint": "투표가 마감되었거나 항목이 바뀌었습니다. 최신 상태를 불러왔습니다.",
       "voteAddNotAllowed": "지금은 할 수 없습니다. 투표 설정이 바뀌어 최신 상태를 불러왔습니다.",
       "voteOptionsLabel": "투표 항목",
-      "voteOptionsPreset": "찬성·반대로 채우기",
+      "voteOptionsPreset": "초기화",
       "voteOptionPlaceholder": "항목 {number}",
       "voteOptionRowRemove": "삭제",
       "voteOptionRowAdd": "+ 항목 추가",
@@ -540,6 +541,8 @@
       "voteOptionsLockedHint": "이미 투표한 사람이 있어 항목을 바꿀 수 없습니다. 항목 추가·삭제는 공지 화면의 투표에서 할 수 있습니다.",
       "voteAllowAdditionsLabel": "항목 추가 허용",
       "voteAllowAdditionsHint": "투표하는 사람이 직접 항목을 추가할 수 있습니다. 운영진은 이 설정과 관계없이 항목을 추가·삭제할 수 있습니다.",
+      "voteMultipleLabel": "중복 투표 허용",
+      "voteMultipleHint": "한 사람이 여러 항목을 고를 수 있습니다. 누군가 여러 항목에 투표한 뒤에는 끌 수 없습니다.",
       "voteAnonymousLabel": "익명 투표",
       "voteAnonymousOnHint": "항목별 인원만 보이고, 누가 어느 항목을 골랐는지는 운영진을 포함해 누구에게도 보이지 않습니다.",
       "voteAnonymousOffHint": "기명 투표입니다. 누가 어느 항목을 골랐는지 이 공지를 볼 수 있는 모두에게 보입니다.",
@@ -1025,6 +1028,7 @@
       "prizeEventCreated": "상품 이벤트 생성",
       "prizeEventConfirmed": "상품 이벤트 확정",
       "prizeEventCancelled": "상품 이벤트 취소",
+      "prizeEventDeleted": "상품 이벤트 삭제",
       "prizeDrawSaved": "추첨 결과 저장",
       "prizeDrawDeleted": "추첨 기록 삭제",
       "captainDraftDeleted": "정기 감전 기록 삭제"
@@ -2049,6 +2053,8 @@
       "race": "종족",
       "tier": "티어",
       "currentMmr": "현재 MMR",
+      "peakMmr": "최고 MMR",
+      "lowestMmr": "최저 MMR",
       "wins": "승",
       "losses": "패",
       "games": "경기수",
@@ -2158,14 +2164,25 @@
       "rank": "{rank}위"
     }
   },
+  "events": {
+    "description": "포인트를 많이 모은 팸원에게 상품을 주는 이벤트입니다. 운영진이 이벤트를 열고, 최고 관리자가 당첨자를 확정합니다."
+  },
   "prizeEvents": {
     "title": "상품 이벤트",
-    "description": "기간 동안 포인트를 많이 모은 사람이 후보로 나옵니다. 최고 관리자가 당첨자와 상품을 확정하면 금액이 있는 상품은 후원금 장부 지출(이벤트 상품)로 기록됩니다.",
+    "description": "기간 동안 포인트를 많이 모은 사람, 내전 경기를 가장 많이 뛴 사람, 또는 운영진이 다른 앱에서 확인해 직접 입력한 순위(채팅 수 등)대로 후보가 나옵니다. 최고 관리자가 당첨자와 상품을 확정하면 금액이 있는 상품은 후원금 장부 지출(이벤트 상품)로 기록됩니다.",
     "loadError": "상품 이벤트를 불러오지 못했습니다.",
     "saveError": "상품 이벤트를 저장하지 못했습니다.",
     "empty": "아직 상품 이벤트가 없습니다.",
     "noCandidates": "이 기간에 포인트를 모은 사람이 없습니다.",
-    "period": "{start} ~ {end} · {count}명",
+    "period": "{start} ~ {end} · {metric} · {count}명",
+    "metric": {
+      "POINTS": "포인트 순위",
+      "GAMES": "내전 경기 수 순위"
+    },
+    "points": "{value}p",
+    "games": "{value}경기",
+    "manualScore": "{value} {unit}",
+    "metricManual": "{unit} 순위 (외부 집계, 운영진 직접 입력)",
     "unknownNickname": "알 수 없음",
     "leftMember": "탈퇴한 회원",
     "place": "{place}위",
@@ -2178,6 +2195,8 @@
     "amountInvalid": "상품 금액은 0 이상의 정수로 입력해 주세요.",
     "confirmPrompt": "{count}명을 당첨으로 확정할까요? 상품 금액 합계 {total}원은 후원금 장부 지출로 기록됩니다.",
     "cancelPrompt": "'{title}' 이벤트를 취소할까요?",
+    "delete": "삭제",
+    "deletePrompt": "취소한 '{title}' 이벤트를 목록에서 삭제할까요? 되돌릴 수 없습니다.",
     "confirmed": "'{title}' 당첨자를 확정했습니다.",
     "status": {
       "OPEN": "후보 확인 중",
@@ -2190,6 +2209,19 @@
       "start": "시작일",
       "end": "종료일",
       "winners": "당첨 인원",
+      "metric": "순위 기준",
+      "metricPoints": "기간 포인트",
+      "metricGames": "내전 경기 수",
+      "metricManual": "직접 입력 (채팅 수 등)",
+      "unit": "숫자 단위",
+      "manualEntries": "순위 붙여 넣기 (한 줄에 한 명: 닉네임 숫자)",
+      "manualPlaceholder": "노바 427\n민트 359\n방구 297",
+      "manualCount": "명단과 맞춘 선수 {count}명",
+      "manualUnknown": "명단에 없는 닉네임: {names}",
+      "manualRepeated": "두 번 넣은 닉네임: {names}",
+      "manualUnreadable": "숫자를 읽지 못한 줄: {lines}",
+      "manualEmpty": "순위에 넣을 선수와 숫자를 입력해 주세요.",
+      "rosterError": "선수 명단을 불러오지 못했습니다.",
       "create": "이벤트 만들기"
     },
     "table": {
@@ -2197,6 +2229,7 @@
       "rank": "순위",
       "nickname": "닉네임",
       "points": "기간 포인트",
+      "games": "경기 수",
       "prize": "상품",
       "prizePlaceholder": "예: 커피 쿠폰",
       "amount": "금액(원)"
@@ -2326,6 +2359,11 @@
           "detail": "내가 뛴 3:3 경기의 결과를 승부 예측 화면에서 확인할 때 받습니다. 결과가 입력된 뒤 {hours}시간 안에 확인해야 합니다.",
           "limit": "하루 {cap}경기"
         },
+        "captainDraft": {
+          "name": "정기 감전 감독",
+          "detail": "감독을 맡은 정기 감전에 첫 세트 결과가 들어가면 두 감독이 받습니다. 선수 명단의 본인 기록과 연결된 계정으로 받습니다.",
+          "limit": "감전마다 1번, 하루 {cap}번"
+        },
         "predictionHit": {
           "name": "예측 적중",
           "detail": "포인트를 걸지 않는 무료 예측입니다. 그 경기를 확정한 사람과 결과를 입력하거나 수정한 사람은 맞혀도 받지 않습니다.",
@@ -2371,7 +2409,7 @@
       "corrections": {
         "title": "바로잡기와 회수",
         "one": "경기 결과가 바뀌면 그 경기의 예측 적중 포인트가 새 결과에 맞게 바로잡힙니다.",
-        "two": "경기가 삭제되면 그 경기로 받은 결과 입력·결과 확인·예측 적중 포인트를 회수합니다.",
+        "two": "경기가 삭제되면 그 경기로 받은 결과 입력·결과 확인·예측 적중 포인트를, 정기 감전 기록이 삭제되면 감독 포인트를 회수합니다.",
         "three": "게시판 글이 삭제되면 글 작성 포인트를 회수합니다. 그 글에 댓글·좋아요로 다른 사람이 받은 포인트는 그대로입니다.",
         "four": "좋아요를 취소하거나 댓글을 지워도 받은 포인트는 그대로이고, 다시 눌러도 더 받지 않습니다.",
         "five": "회수는 원래 내역을 지우지 않고 마이너스 내역으로 남습니다."
@@ -2384,9 +2422,6 @@
         "four": "포인트는 사고팔거나 주고받을 수 없고, 현금으로 바꿀 수 없습니다.",
         "five": "포인트 상위자에게 주는 상품은 운영진 재량의 이벤트로 진행하며, 열릴 때 따로 공지합니다."
       }
-    },
-    "events": {
-      "description": "포인트를 많이 모은 팸원에게 상품을 주는 이벤트입니다. 운영진에게만 보입니다."
     },
     "loadError": "포인트를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
     "forbidden": "아직 포인트를 쓸 수 없는 계정입니다.",
@@ -2429,6 +2464,8 @@
       "boardPostReversed": "게시판 글 삭제로 회수",
       "boardComment": "게시판 댓글",
       "boardLike": "게시판 좋아요",
+      "captainDraft": "정기 감전 감독",
+      "captainDraftReversed": "감전 기록 삭제로 회수",
       "personMerge": "같은 사람 묶기 정리"
     },
     "ranking": {

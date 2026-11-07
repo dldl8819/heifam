@@ -349,7 +349,7 @@ public class AccountDeletionDataService {
     private ResolvedAccountIdentity resolveInactiveAccountIdentity(Player player) {
         UUID linkedAuthUserId = player.getAuthUserId();
         if (linkedAuthUserId != null) {
-            // public.users only holds accounts the optional profile sync wrote; ask Supabase Auth otherwise.
+            // public.users holds only the few accounts an old profile sync wrote; ask Supabase Auth otherwise.
             String linkedEmail = accountPersonalDataRepository
                 .findAccountEmail(linkedAuthUserId)
                 .or(() -> supabaseAuthAdminClient.findUserEmail(linkedAuthUserId))
@@ -411,6 +411,9 @@ public class AccountDeletionDataService {
             }
             safeGroupIds.forEach(groupReadCacheService::evictGroup);
         });
+        // Bulk updates also took the name off regular drafts this account started or put results in.
+        // With no player linked Hibernate saw no change, and an open draft follows this one.
+        groupRosterCache.changed();
     }
 
     private void addPlayers(Map<Long, Player> target, List<Player> players) {

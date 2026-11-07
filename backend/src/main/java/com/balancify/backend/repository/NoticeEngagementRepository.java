@@ -114,8 +114,20 @@ public class NoticeEngagementRepository {
     }
 
     /** How many people have voted on each notice, whatever they chose; a notice without votes is left out. */
+    // People, not votes: in a vote that takes more than one choice a person has a vote on each.
     public Map<Long, Long> countVoters(Collection<Long> noticeIds) {
-        return countPerNotice("notice_votes", noticeIds);
+        Map<Long, Long> counts = new HashMap<>();
+        if (noticeIds.isEmpty()) {
+            return counts;
+        }
+        jdbcTemplate.query(
+            "SELECT notice_id, count(DISTINCT voter_email) AS total FROM notice_votes WHERE notice_id IN (:noticeIds) GROUP BY notice_id",
+            new MapSqlParameterSource("noticeIds", noticeIds),
+            row -> {
+                counts.put(row.getLong("notice_id"), row.getLong("total"));
+            }
+        );
+        return counts;
     }
 
     private Map<Long, Long> countPerNotice(String table, Collection<Long> noticeIds) {
