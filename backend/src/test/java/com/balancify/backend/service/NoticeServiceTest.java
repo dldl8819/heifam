@@ -106,7 +106,8 @@ class NoticeServiceTest {
             pointService,
             noticeVoteRepository,
             operationAuditLogService,
-            commentQuotaService
+            commentQuotaService,
+            new GroupReadCacheService(0)
         );
         when(accessControlService.isAdminEmail(ADMIN)).thenReturn(true);
         when(accessControlService.resolveDisplayNickname(ADMIN)).thenReturn("OpsUser");
