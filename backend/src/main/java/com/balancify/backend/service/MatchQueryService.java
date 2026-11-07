@@ -37,19 +37,49 @@ public class MatchQueryService {
     // than the member/admin-facing "recent matches" endpoint above.
     private static final int MAX_HISTORY_PAGE_SIZE = 200;
     private static final ZoneOffset HISTORY_FILTER_ZONE_OFFSET = ZoneOffset.ofHours(9);
+    // What a visitor may see of the recent results: the newest this many, as the results page
+    // shows anyone, kept for every visitor this long unless a result changes first.
+    static final int VISITOR_WINDOW = 30;
+    static final long VISITOR_KEEP_MILLIS = 5 * 60_000L;
 
     private final MatchRepository matchRepository;
     private final MatchParticipantRepository matchParticipantRepository;
     private final AccessControlService accessControlService;
+    private final GroupReadCacheService groupReadCacheService;
 
     public MatchQueryService(
         MatchRepository matchRepository,
         MatchParticipantRepository matchParticipantRepository,
-        AccessControlService accessControlService
+        AccessControlService accessControlService,
+        GroupReadCacheService groupReadCacheService
     ) {
         this.matchRepository = matchRepository;
         this.matchParticipantRepository = matchParticipantRepository;
         this.accessControlService = accessControlService;
+        this.groupReadCacheService = groupReadCacheService;
+    }
+
+    /**
+     * The recent results for a visitor (anyone without member access): a slice of the group's
+     * newest VISITOR_WINDOW. They are read once for every visitor and kept until a result changes
+     * (GroupReadCacheService.evictGroup) or VISITOR_KEEP_MILLIS pass, so however often visitors
+     * ask, the database is read no more than that. Nothing past the window is given; the results
+     * page shows no more to anyone. No visitor may change a result, and the MMR is the caller's
+     * to mask.
+     */
+    public List<GroupRecentMatchResponse> getVisitorRecentMatches(Long groupId, Integer limit, Integer offset) {
+        List<GroupRecentMatchResponse> newest = groupReadCacheService.get(
+            "visitor-recent-matches:group:" + groupId + ":",
+            VISITOR_KEEP_MILLIS,
+            () -> List.copyOf(buildResponses(
+                matchRepository.findRecentByGroupIdByResultInput(groupId, PageRequest.of(0, VISITOR_WINDOW)),
+                false,
+                null
+            ))
+        );
+        int from = Math.min(normalizeOffset(offset), newest.size());
+        int to = Math.min(from + normalizeLimit(limit), newest.size());
+        return newest.subList(from, to);
     }
 
     public List<GroupRecentMatchResponse> getRecentMatches(Long groupId, Integer limit) {

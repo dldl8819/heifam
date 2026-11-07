@@ -214,7 +214,13 @@ import org.springframework.test.web.servlet.ResultMatcher;
     PrizeEventController.class,
     com.balancify.backend.api.access.AccessPeopleController.class
 })
-@Import({ AdminKeyFilter.class, ServiceAccessFilter.class, AdminKeyProperties.class, CaptainDraftVersions.class })
+@Import({
+    AdminKeyFilter.class,
+    ServiceAccessFilter.class,
+    AdminKeyProperties.class,
+    CaptainDraftVersions.class,
+    VisitorReadLimiter.class
+})
 @TestPropertySource(properties = {
     "balancify.admin.emails=admin@hei.gg,ops@hei.gg",
     "balancify.admin.super-emails=superadmin@hei.gg",
@@ -4263,6 +4269,28 @@ class AdminKeyFilterTest {
                     .header("X-USER-EMAIL", "member@hei.gg")
             )
             .andExpect(status().isOk());
+    }
+
+    @Test
+    void givesVisitorsTheKeptRecentResultsAndMembersTheirOwn() throws Exception {
+        when(matchQueryService.getVisitorRecentMatches(eq(1L), any(), any())).thenReturn(List.of());
+        when(matchQueryService.getRecentMatches(eq(1L), any(), any(), any())).thenReturn(List.of());
+
+        mockMvc
+            .perform(get("/api/groups/1/matches/recent").param("limit", "10").param("offset", "10"))
+            .andExpect(status().isOk());
+        // Signed in, but without access to the site: a visitor as well.
+        mockMvc
+            .perform(get("/api/groups/1/matches/recent").header("X-USER-EMAIL", "blocked@hei.gg"))
+            .andExpect(status().isOk());
+        verify(matchQueryService).getVisitorRecentMatches(1L, 10, 10);
+        verify(matchQueryService).getVisitorRecentMatches(1L, null, null);
+        verify(matchQueryService, never()).getRecentMatches(any(), any(), any(), any());
+
+        mockMvc
+            .perform(get("/api/groups/1/matches/recent").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk());
+        verify(matchQueryService).getRecentMatches(1L, null, null, "member@hei.gg");
     }
 
     @Test

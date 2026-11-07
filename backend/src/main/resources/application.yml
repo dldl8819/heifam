@@ -115,6 +115,10 @@ balancify:
     service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
+  visitor-reads:
+    # Answers visitors (no member access) get a minute from the two routes open without signing in,
+    # all of them together; past it they are told to wait (429). Members are never counted.
+    per-minute: ${VISITOR_READS_PER_MINUTE:120}
   rank:
     dormancy:
       enabled: ${RANK_DORMANCY_ENABLED:true}
