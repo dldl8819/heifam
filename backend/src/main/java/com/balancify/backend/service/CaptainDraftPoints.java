@@ -84,7 +84,7 @@ public class CaptainDraftPoints {
         return captains;
     }
 
-    // public.users only holds accounts the optional profile sync wrote, so Supabase Auth is asked otherwise.
+    // public.users holds only the few accounts an old profile sync wrote, so Supabase Auth is asked otherwise.
     Optional<String> accountEmail(Player player) {
         UUID linkedAuthUserId = player.getAuthUserId();
         if (linkedAuthUserId != null) {
