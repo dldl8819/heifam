@@ -43,6 +43,14 @@ WORKDIR /app
 
 COPY --from=builder /workspace/build/libs/heifam-backend.jar /app/app.jar
 
+# The backend runs as a user of its own, not root: a flaw that let someone run code in it would not
+# hand them the whole container. It writes nothing but its console log and the JVM's temporary files
+# (/tmp, open to every user), and the port it listens on is above 1024. The jar stays root's and
+# read-only to it.
+RUN groupadd --system --gid 10001 heifam \
+    && useradd --system --uid 10001 --gid heifam --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin heifam
+USER 10001:10001
+
 EXPOSE 10000
 
 CMD ["sh", "-c", "java -Dserver.port=${PORT:-10000} -jar /app/app.jar"]
