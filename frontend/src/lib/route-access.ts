@@ -19,7 +19,7 @@ const PUBLIC_PATHS = ['/', '/ads', '/results', '/privacy', '/terms']
 // /balance covers /balance/multi as well. /captain-draft: members run the regular draft too; a
 // result already in is changed only by admins and match result editors (held to by the backend).
 // /events: the prize events, which admins start and super admins confirm (held to by the backend);
-// /points/events only sends an old link there.
+// /points/events only sends an old link there. /updates: the patch notes, written for members.
 const MEMBER_PATHS = [
   '/events',
   '/balance',
@@ -32,6 +32,7 @@ const MEMBER_PATHS = [
   '/draws',
   '/cannon',
   '/captain-draft',
+  '/updates',
 ]
 // Admins see only what match result editors did on /admin/audit; the backend narrows the logs.
 const ADMIN_PATHS = ['/import', '/players/import', '/tournaments', '/admin/audit']
