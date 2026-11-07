@@ -70,6 +70,7 @@ public interface MatchRepository extends JpaRepository<Match, Long>, JpaSpecific
         @Param("fromInclusive") OffsetDateTime fromInclusive
     );
 
+    /** Balanced matches of the given players whose result came in since the given time, newest first. */
     @Query("""
         select m
         from Match m
@@ -77,10 +78,16 @@ public interface MatchRepository extends JpaRepository<Match, Long>, JpaSpecific
           and m.source = com.balancify.backend.domain.MatchSource.BALANCED
           and m.winningTeam is not null
           and m.resultRecordedAt >= :fromInclusive
+          and m.id in (
+            select mp.match.id
+            from MatchParticipant mp
+            where mp.player.id in :playerIds
+          )
         order by m.resultRecordedAt desc, m.id desc
         """)
-    List<Match> findBalancedResultsRecordedSince(
+    List<Match> findBalancedResultsOfPlayersRecordedSince(
         @Param("groupId") Long groupId,
+        @Param("playerIds") List<Long> playerIds,
         @Param("fromInclusive") OffsetDateTime fromInclusive
     );
 

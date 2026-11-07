@@ -7,6 +7,7 @@ import com.balancify.backend.config.PointProperties;
 import com.balancify.backend.domain.Match;
 import com.balancify.backend.domain.MatchParticipant;
 import com.balancify.backend.domain.MatchSource;
+import com.balancify.backend.domain.Player;
 import com.balancify.backend.domain.RankedMatchPolicy;
 import com.balancify.backend.repository.MatchParticipantRepository;
 import com.balancify.backend.repository.MatchRepository;
@@ -43,6 +44,7 @@ public class MatchConfirmationService {
     private final MatchParticipantRepository matchParticipantRepository;
     private final PointService pointService;
     private final AccessControlService accessControlService;
+    private final GroupRosterCache groupRosterCache;
     private final PointProperties pointProperties;
     private final Clock clock;
 
@@ -52,6 +54,7 @@ public class MatchConfirmationService {
         MatchParticipantRepository matchParticipantRepository,
         PointService pointService,
         AccessControlService accessControlService,
+        GroupRosterCache groupRosterCache,
         PointProperties pointProperties
     ) {
         this(
@@ -59,6 +62,7 @@ public class MatchConfirmationService {
             matchParticipantRepository,
             pointService,
             accessControlService,
+            groupRosterCache,
             pointProperties,
             Clock.system(KST)
         );
@@ -69,6 +73,7 @@ public class MatchConfirmationService {
         MatchParticipantRepository matchParticipantRepository,
         PointService pointService,
         AccessControlService accessControlService,
+        GroupRosterCache groupRosterCache,
         PointProperties pointProperties,
         Clock clock
     ) {
@@ -76,19 +81,33 @@ public class MatchConfirmationService {
         this.matchParticipantRepository = matchParticipantRepository;
         this.pointService = pointService;
         this.accessControlService = accessControlService;
+        this.groupRosterCache = groupRosterCache;
         this.pointProperties = pointProperties;
         this.clock = clock;
     }
 
-    /** The matches the person played whose results they can still confirm, newest result first. */
+    /**
+     * The matches the person played whose results they can still confirm, newest result first. Only
+     * those matches are read: the panel asks every minute and after every confirmation, and the
+     * whole group's results of the window came to some 300 KB a read. What the database sends out
+     * is what Supabase meters (egress).
+     */
     @Transactional(readOnly = true)
     public MatchConfirmationListResponse list(Long groupId, String email, String userId) {
         String normalizedEmail = normalizeEmail(email);
         OffsetDateTime now = now();
-        List<Match> recorded = matchRepository.findBalancedResultsRecordedSince(
-            groupId,
-            now.minusHours(pointProperties.getMatchConfirmWindowHours())
-        );
+        String accountNickname = accessControlService.resolveDisplayNickname(normalizedEmail);
+        List<Long> ownPlayerIds = OwnPlayerPolicy.findOwnPlayers(groupRosterCache.roster(groupId), userId, accountNickname)
+            .stream()
+            .map(Player::getId)
+            .toList();
+        List<Match> recorded = ownPlayerIds.isEmpty()
+            ? List.of()
+            : matchRepository.findBalancedResultsOfPlayersRecordedSince(
+                groupId,
+                ownPlayerIds,
+                now.minusHours(pointProperties.getMatchConfirmWindowHours())
+            );
         Map<Long, List<MatchParticipant>> participantsByMatch = new HashMap<>();
         if (!recorded.isEmpty()) {
             for (MatchParticipant participant : matchParticipantRepository.findByMatchIdInWithPlayerAndMatch(
@@ -98,7 +117,6 @@ public class MatchConfirmationService {
             }
         }
 
-        String accountNickname = accessControlService.resolveDisplayNickname(normalizedEmail);
         List<Match> mine = new ArrayList<>();
         Map<Long, String> myTeams = new HashMap<>();
         for (Match match : recorded) {
