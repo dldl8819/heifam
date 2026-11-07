@@ -349,7 +349,7 @@ public class AccountDeletionDataService {
     private ResolvedAccountIdentity resolveInactiveAccountIdentity(Player player) {
         UUID linkedAuthUserId = player.getAuthUserId();
         if (linkedAuthUserId != null) {
-            // public.users only holds accounts the optional profile sync wrote; ask Supabase Auth otherwise.
+            // public.users holds only the few accounts an old profile sync wrote; ask Supabase Auth otherwise.
             String linkedEmail = accountPersonalDataRepository
                 .findAccountEmail(linkedAuthUserId)
                 .or(() -> supabaseAuthAdminClient.findUserEmail(linkedAuthUserId))
