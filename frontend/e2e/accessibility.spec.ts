@@ -37,6 +37,8 @@ const SIGNED_IN_PAGES = [
   '/events',
   '/ads',
   '/results',
+  '/updates',
+  '/updates/26-3',
   '/admin/access/admins',
   '/admin/access/result-editors',
   '/admin/access/allowed',

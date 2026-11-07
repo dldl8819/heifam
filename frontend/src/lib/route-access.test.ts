@@ -27,6 +27,18 @@ describe('route access', () => {
     expect(getRouteAccessDecision('/events', member)).toEqual({ allowed: true, redirectTo: null, blocked: false })
   })
 
+  it('keeps the patch notes with members', () => {
+    const visitor = { isLoggedIn: false, canAccess: false, isAdmin: false, isSuperAdmin: false }
+    const member = { isLoggedIn: true, canAccess: true, isAdmin: false, isSuperAdmin: false }
+
+    for (const path of ['/updates', '/updates/26-3']) {
+      expect(isPublicRoute(path)).toBe(false)
+      expect(getRouteAccessDecision(path, visitor)).toEqual({ allowed: false, redirectTo: '/', blocked: false })
+      expect(getRouteAccessDecision(path, { ...member, canAccess: false }).blocked).toBe(true)
+      expect(getRouteAccessDecision(path, member)).toEqual({ allowed: true, redirectTo: null, blocked: false })
+    }
+  })
+
   it('redirects admins away from temporarily disabled dashboard', () => {
     const decision = getRouteAccessDecision('/dashboard', {
       isLoggedIn: true,

@@ -67,7 +67,32 @@
     "pointPolicy": "포인트 정책",
     "predictions": "승부 예측",
     "draws": "상품 추첨",
-    "tournaments": "토너먼트"
+    "tournaments": "토너먼트",
+    "updates": "패치 노트"
+  },
+  "updates": {
+    "title": "패치 노트",
+    "description": "헤이팸에서 무엇이 바뀌었고, 지금 무엇을 만들고 있는지 알려 드려요.",
+    "patchTitle": "헤이팸 {version} 패치 노트",
+    "category": "업데이트",
+    "date": "{year}년 {month}월 {day}일",
+    "period": "{period} 반영",
+    "latest": "최신",
+    "comment": "작성자 코멘트",
+    "highlight": "패치 하이라이트",
+    "fixes": "버그 수정 및 편의성 개선",
+    "inProgress": "작업 중",
+    "inProgressNote": "만들고 있는 것이라 바뀔 수 있어요.",
+    "others": "다른 패치 노트",
+    "backToList": "패치 노트 목록",
+    "goTo": "바로 가기",
+    "goToPage": "{page} 바로 가기",
+    "before": "변경 전",
+    "after": "변경 후",
+    "tags": {
+      "new": "신규",
+      "changed": "변경"
+    }
   },
   "landing": {
     "title": "Hei`Fam 내전 운영 플랫폼",

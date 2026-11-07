@@ -45,6 +45,7 @@ describe('navigation items', () => {
       '/events',
       '/ads',
       '/results',
+      '/updates',
     ])
   })
 
@@ -60,6 +61,7 @@ describe('navigation items', () => {
         '/events',
         '/ads',
         '/results',
+        '/updates',
         'menu:/admin',
       ])
     }
@@ -134,6 +136,7 @@ describe('findActiveNavHref', () => {
     expect(findActiveNavHref('/points/ranking', items)).toBe('/points/ranking')
     expect(findActiveNavHref('/points/policy', items)).toBe('/points/policy')
     expect(findActiveNavHref('/events', items)).toBe('/events')
+    expect(findActiveNavHref('/updates/26-3', items)).toBe('/updates')
     expect(findActiveNavHref('/admin/access/allowed', items)).toBe('/admin/access/allowed')
     expect(findActiveNavHref('/admin/audit', items)).toBe('/admin/audit')
     expect(findActiveNavHref('/admin/access/people', items)).toBe('/admin/access/people')

@@ -102,6 +102,7 @@ export function getVisibleNavItems(context: NavVisibilityContext): NavItem[] {
     { label: t('nav.events'), href: '/events' },
     { label: t('nav.ads'), href: '/ads' },
     { label: t('nav.results'), href: '/results' },
+    { label: t('nav.updates'), href: '/updates' },
   ]
   if (context.isAdmin) {
     items.push(adminMenu(context.isSuperAdmin))
