@@ -1,9 +1,9 @@
-# The production backend as it runs on Render today (Docker runtime, Standard plan: 1 CPU, 2 GB, which
-# the dashboard calls 1c-2g). The service was created in the Render dashboard and is not synced from
-# this file, so editing it does not change the service. When the plan or the runtime is changed in the
-# dashboard, change it here too.
+# The production backend as it runs on Render today: the Docker runtime on plan 1c-2g (1 CPU, 2 GB).
+# The service was created in the Render dashboard and is not synced from this file, so editing it does
+# not change the service. When the plan, the runtime or the deploy trigger is changed in the dashboard,
+# change it here too.
 #
-# The backend uses about 470-540 MB of memory, close to the 512 MB of the Free and Starter plans.
+# The backend uses about 470-540 MB of memory, close to the 512 MB of the smaller plans.
 services:
   - type: web
     name: heifam
@@ -12,9 +12,9 @@ services:
     rootDir: backend
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    plan: standard
+    plan: 1c-2g
     healthCheckPath: /api/health
-    autoDeploy: true
+    autoDeployTrigger: checksPass
     envVars:
       - key: SPRING_DATASOURCE_URL
         sync: false
