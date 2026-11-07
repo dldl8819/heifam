@@ -22,8 +22,6 @@ type AuthContextType = {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
-const ENABLE_SUPABASE_PROFILE_SYNC =
-  process.env.NEXT_PUBLIC_ENABLE_SUPABASE_PROFILE_SYNC === 'true'
 const INITIAL_SESSION_TIMEOUT_MS = 7000
 const SUPABASE_AUTH_STORAGE_KEY_PREFIX = 'sb-'
 const SUPABASE_AUTH_STORAGE_KEY_SUFFIX = '-auth-token'
@@ -209,13 +207,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Listen for auth changes
     const {
       data: { subscription: authSubscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       applySession(session)
-
-      // If user signed in, save to users table
-      if (event === 'SIGNED_IN' && session?.user && ENABLE_SUPABASE_PROFILE_SYNC) {
-        void saveUserToDatabase(session.user)
-      }
     })
     subscription = authSubscription
 
@@ -275,24 +268,4 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-}
-
-async function saveUserToDatabase(user: User) {
-  try {
-    const { error } = await supabase
-      .from('users')
-      .upsert({
-        id: user.id,
-        email: user.email,
-        avatar_url: user.user_metadata?.avatar_url,
-        created_at: user.created_at,
-        updated_at: new Date().toISOString(),
-      })
-
-    if (error) {
-      console.error('Error saving user to database')
-    }
-  } catch {
-    console.error('Error saving user to database')
-  }
 }
