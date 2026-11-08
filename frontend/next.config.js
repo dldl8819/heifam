@@ -35,9 +35,11 @@ const nextConfig = {
   },
 }
 
-// Sentry (instrumentation-client.ts, sentry.*.config.ts) sends from the live site only. Events go
-// through /monitoring on this site. Source maps are uploaded only where SENTRY_AUTH_TOKEN is set
-// (Vercel's build), so stack traces read as the source; without it the build is as before.
+// Sentry runs in members' browsers on the live site only (instrumentation-client.ts). The site's own
+// functions do not start it: each of their start-ups and requests paid for it in Fluid Active CPU, and
+// they now only draw the four detail pages. Events go through /monitoring on this site. Source maps
+// are uploaded only where SENTRY_AUTH_TOKEN is set (Vercel's build), so stack traces read as the
+// source; without it the build is as before.
 module.exports = withSentryConfig(nextConfig, {
   org: process.env.SENTRY_ORG ?? 'hei-m9',
   project: process.env.SENTRY_PROJECT ?? 'heifam-frontend',
