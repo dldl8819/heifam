@@ -27,8 +27,7 @@ Set these in Vercel Project Settings > Environment Variables:
 ```env
 NEXT_PUBLIC_API_BASE_URL=
 NEXT_PUBLIC_ACCESS_API_BASE_URL=https://heifam.onrender.com
-BACKEND_API_BASE_URLS=https://heifam.onrender.com,https://api.heifam.com
-BACKEND_PROXY_UPSTREAM_TIMEOUT_MS=25000
+BACKEND_API_BASE_URLS=https://heifam.onrender.com
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
 GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
@@ -124,7 +123,7 @@ Ensure Vercel env vars `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` match the s
 - [ ] `https://www.heifam.co.kr` loads (Korean Hei UI visible)
 - [ ] `https://heifam.onrender.com/api/health` returns healthy response
 - [ ] Google login succeeds from frontend
-- [ ] `https://www.heifam.co.kr/api/proxy/api/health` returns healthy response
+- [ ] `https://www.heifam.co.kr/api/proxy/api/health` returns healthy response (the Vercel rewrite to the backend)
 - [ ] CORS allows only `https://heifam.co.kr` and `https://www.heifam.co.kr`
 - [ ] Admin emails can call admin-only actions
 - [ ] Non-admin users are blocked with `403` on admin-only actions
