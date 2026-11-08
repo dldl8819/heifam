@@ -174,6 +174,10 @@ export class ApiRequestError extends Error {
   }
 }
 
+// What the old proxy function answered when it could not reach the backend, kept word for word.
+const BACKEND_UNAVAILABLE_MESSAGE = 'Backend service is temporarily unavailable.'
+const GATEWAY_ERROR_STATUSES = new Set([502, 503, 504])
+
 function extractApiErrorMessage(status: number, rawText: string): string {
   const text = rawText.trim()
   if (text.length === 0) {
@@ -189,7 +193,9 @@ function extractApiErrorMessage(status: number, rawText: string): string {
       }
     }
   } catch {
-    return text
+    // Not the backend's JSON: a gateway on the way (Vercel's ROUTER_EXTERNAL_TARGET_ERROR page, or
+    // the host's page while the backend restarts) answered instead. Its text is not for members.
+    return GATEWAY_ERROR_STATUSES.has(status) ? BACKEND_UNAVAILABLE_MESSAGE : text
   }
 
   return text
@@ -265,13 +271,21 @@ function buildHeaders(
   options: ApiRequestOptions | undefined,
   userEmail: string,
   userNickname: string,
-  accessToken: string
+  accessToken: string,
+  sendIdentityHeaders: boolean
 ): HeadersInit {
   const headers = new Headers(init?.headers)
   headers.set('Content-Type', options?.contentType ?? 'application/json')
 
   if (accessToken.length > 0) {
     headers.set('Authorization', `Bearer ${accessToken}`)
+  }
+
+  // The email and nickname headers serve only a local backend that accepts them in place of a token.
+  // The live backend takes who is asking from the token alone, and the old proxy function dropped
+  // these headers on the way; the CDN now passes every header on, so the live site does not send them.
+  if (!sendIdentityHeaders) {
+    return headers
   }
 
   if (userEmail.length > 0) {
@@ -358,7 +372,7 @@ export async function apiRequest<T>(
   try {
     const response = await fetch(createUrl(path, options?.baseUrlOverride), {
       ...init,
-      headers: buildHeaders(init, options, userEmail, userNickname, accessToken),
+      headers: buildHeaders(init, options, userEmail, userNickname, accessToken, !usesProductionProxy),
       signal: controller.signal,
     })
 

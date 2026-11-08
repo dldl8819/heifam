@@ -1,11 +1,18 @@
 const path = require('path')
 const { withSentryConfig } = require('@sentry/nextjs/config')
+const { apiProxyRewrites } = require('./api-proxy-rewrite.cjs')
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   devIndicators: false,
   poweredByHeader: false,
   outputFileTracingRoot: path.join(__dirname, '..'),
+  // API calls (/api/proxy/...) go from Vercel's CDN straight to the backend, with no function in
+  // between (api-proxy-rewrite.cjs). The backend answers them with "Cache-Control: no-store", or
+  // "private" for notice images, so the CDN keeps none of them.
+  async rewrites() {
+    return apiProxyRewrites(process.env)
+  },
   async headers() {
     return [
       {
