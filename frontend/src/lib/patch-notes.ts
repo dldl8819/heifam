@@ -38,30 +38,28 @@ export type PatchNote = {
   version: string
   /** The day it went out, in Korean time (YYYY-MM-DD). */
   date: string
-  /** The days whose changes it gathers, as read ("10월 26일 ~ 11월 8일"). */
+  /** The days whose changes it gathers, as read ("10월 26일부터 11월 8일까지"). */
   period: string
   summary: string
   comment: string[]
   highlight: { title: string; body: string; href?: string }
   sections: PatchSection[]
   fixes: string[]
-  /** What is being made now; it may still change. */
-  inProgress: string[]
 }
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
     version: '26.3',
     date: '2026-11-08',
-    period: '10월 26일 ~ 11월 8일',
+    period: '10월 26일부터 11월 8일까지',
     summary: '정기 감전 감독 포인트와 이벤트 페이지가 생기고, 정기 감전 화면이 한눈에 보기 쉬워졌어요.',
     comment: [
       '패치 노트 페이지를 새로 열었어요. 그동안 사이트가 꽤 자주 바뀌었는데, 무엇이 바뀌었는지 한곳에서 볼 곳이 없었죠.',
-      '앞으로는 바뀐 것과 만들고 있는 것을 2주쯤마다 여기에 정리해 둘게요. 10월부터 바뀐 것은 26.1과 26.2에 시기별로 묶어 두었어요.',
+      '앞으로는 바뀐 것을 2주쯤마다 여기에 정리해 둘게요. 10월부터 바뀐 것은 26.1과 26.2에 시기별로 묶어 두었어요.',
     ],
     highlight: {
       title: '정기 감전 감독 포인트',
-      body: '정기 감전에서 감독을 맡으면 3p를 받아요. 첫 세트 결과가 저장될 때 들어오고, 하루 두 번까지 받을 수 있어요.',
+      body: '정기 감전에서 감독을 맡으면 3포인트를 받아요. 첫 세트 결과가 저장될 때 들어오고, 하루 두 번까지 받을 수 있어요.',
       href: '/captain-draft',
     },
     sections: [
@@ -74,7 +72,7 @@ export const PATCH_NOTES: readonly PatchNote[] = [
             tag: 'new',
             note: '팀을 꾸리고 이끄는 감독에게도 포인트를 드리려고 만들었어요.',
             changes: [
-              { label: '감독 포인트', before: '없음', after: '3p (첫 세트 결과가 저장될 때, 하루 2번까지)' },
+              { label: '감독 포인트', before: '없음', after: '3포인트 (첫 세트 결과가 저장될 때, 하루 2번까지)' },
               '정기 감전 기록이 지워지면 받은 포인트도 돌아가요.',
             ],
           },
@@ -82,7 +80,7 @@ export const PATCH_NOTES: readonly PatchNote[] = [
             title: '티어표에 팀 색깔',
             tag: 'new',
             note: '누가 뽑혔고 누가 남았는지 한눈에 보이도록 했어요.',
-            changes: ['청팀·백팀에 뽑힌 선수가 왼쪽 티어표에 팀 색깔로 표시돼요. 색만으로 구분하지 않도록 청/백 글자도 함께 붙어요.'],
+            changes: ['청팀이나 백팀에 뽑힌 선수가 왼쪽 티어표에 팀 색깔로 표시돼요. 색만으로 구분하지 않도록 "청", "백" 글자도 함께 붙어요.'],
           },
           {
             title: '선수별 경기 수',
@@ -90,7 +88,7 @@ export const PATCH_NOTES: readonly PatchNote[] = [
             note: '라인업을 짤 때 한 사람에게 경기가 몰리지 않게 하려고요.',
             changes: [
               '라인업 입력 위에 팀마다 1인당 몇 경기씩인지와 선수별 경기 수가 보여요.',
-              '목표를 채운 선수에게는 체크가, 넘친 선수에게는 "n경기 초과"가 붙어요.',
+              '목표를 채운 선수에게는 체크가, 넘친 선수에게는 몇 경기를 넘었는지가 붙어요.',
             ],
           },
           {
@@ -109,7 +107,7 @@ export const PATCH_NOTES: readonly PatchNote[] = [
         ],
       },
       {
-        title: '포인트·이벤트',
+        title: '포인트와 이벤트',
         href: '/events',
         entries: [
           {
@@ -117,7 +115,7 @@ export const PATCH_NOTES: readonly PatchNote[] = [
             tag: 'new',
             changes: [
               '상품 이벤트를 이벤트 메뉴에서 볼 수 있어요.',
-              '이벤트마다 순위를 정하는 기준이 있어요: 기간 동안 모은 포인트, 뛴 경기 수, 또는 다른 앱에서 센 숫자(예: 채팅 수).',
+              '이벤트마다 순위를 정하는 기준이 있어요. 기간 동안 모은 포인트, 뛴 경기 수, 또는 채팅 수처럼 다른 앱에서 센 숫자예요.',
             ],
           },
           {
@@ -158,15 +156,11 @@ export const PATCH_NOTES: readonly PatchNote[] = [
       '정기 감전, 알림, 선수 목록, 공지 목록, 승부 예측의 결과 확인이 서버를 덜 불러서 더 가볍게 열려요.',
       '보안을 강화했어요.',
     ],
-    inProgress: [
-      '사이트를 더 가볍고 빠르게 만드는 작업을 이어 가고 있어요.',
-      '패치 노트는 2주쯤마다 올릴게요.',
-    ],
   },
   {
     version: '26.2',
     date: '2026-10-25',
-    period: '10월 13일 ~ 10월 25일',
+    period: '10월 13일부터 10월 25일까지',
     summary: '정기 감전을 누구나 열 수 있게 되고, 메뉴 출석 포인트와 고대비 모드가 생겼어요.',
     comment: [
       '10월 중순에는 정기 감전을 사이트에서 처음부터 끝까지 치를 수 있게 만들었어요.',
@@ -187,19 +181,19 @@ export const PATCH_NOTES: readonly PatchNote[] = [
             tag: 'changed',
             note: '진행자가 감독을 한 명씩 골라 가며 입력하던 불편을 없앴어요.',
             changes: [
-              '진행자가 양 팀의 픽과 엔트리를 한 화면에서 넣어요. 팀 현황에서 청팀·백팀 버튼으로 선수를 데려와요.',
+              '진행자가 양 팀의 픽과 엔트리를 한 화면에서 넣어요. 팀 현황에서 청팀, 백팀 버튼으로 선수를 데려와요.',
               '픽 순서를 꼭 번갈아 지키지 않아도 돼요. 잘못 뽑은 선수는 되돌릴 수 있어요.',
             ],
           },
           {
             title: '팀 게임 세트',
             tag: 'new',
-            note: '실제 정기 감전처럼 3:3, 2:2, 1:1을 섞어 치를 수 있게 했어요.',
+            note: '실제 정기 감전처럼 3대3, 2대2, 1대1을 섞어 치를 수 있게 했어요.',
             changes: [
-              { label: '세트 구성', before: '1:1', after: '3:3, 2:2, 1:1' },
-              { label: '라운드 수', before: '4라운드', after: '1~7라운드 (기본 4라운드)' },
+              { label: '세트 구성', before: '1대1', after: '3대3, 2대2, 1대1' },
+              { label: '라운드 수', before: '4라운드', after: '1라운드부터 7라운드까지 (기본 4라운드)' },
               '세트마다 종족(P, T, Z, 랜덤)과 필수 티어 메모를 정할 수 있어요.',
-              '종족 구성은 자주 치는 조합만 보여요. 3:3은 PPP, PPT, PPZ, PTZ, PPR, PRR, RRR이에요.',
+              '종족 구성은 자주 치는 조합만 보여요. 3대3은 PPP, PPT, PPZ, PTZ, PPR, PRR, RRR이에요.',
             ],
           },
           {
@@ -215,7 +209,7 @@ export const PATCH_NOTES: readonly PatchNote[] = [
             title: '정기 감전 기록',
             tag: 'new',
             changes: [
-              '지난 정기 감전의 날짜, 감독, 참가 인원, 라운드·세트 점수를 기록으로 볼 수 있어요.',
+              '지난 정기 감전의 날짜, 감독, 참가 인원, 라운드와 세트 점수를 기록으로 볼 수 있어요.',
               '정기 감전 결과는 랭킹에 영향을 주지 않아요.',
             ],
           },
@@ -259,14 +253,14 @@ export const PATCH_NOTES: readonly PatchNote[] = [
             tag: 'new',
             note: '하루 한 번 들어오는 것보다, 여러 메뉴를 둘러볼수록 포인트가 쌓이게 바꿨어요.',
             changes: [
-              { label: '출석 포인트', before: '하루 첫 접속', after: '메뉴 10곳을 하루 처음 열 때마다 1p (하루 최대 10p)' },
-              '대상 메뉴: 공지사항, 자유게시판, 익명게시판, 추천영상, 선수 관리, 랭킹, 승부 예측, 파트너스, 경기 결과, 포인트 정책',
+              { label: '출석 포인트', before: '하루 첫 접속', after: '메뉴 10곳을 하루 처음 열 때마다 1포인트 (하루 최대 10포인트)' },
+              '대상 메뉴는 공지사항, 자유게시판, 익명게시판, 추천영상, 선수 관리, 랭킹, 승부 예측, 파트너스, 경기 결과, 포인트 정책이에요.',
             ],
           },
         ],
       },
       {
-        title: '공지사항·게시판',
+        title: '공지사항과 게시판',
         href: '/boards/free',
         entries: [
           {
@@ -301,16 +295,15 @@ export const PATCH_NOTES: readonly PatchNote[] = [
       '정기 감전과 상품 추첨을 실제로 써 보며 나온 문제들을 고쳤어요.',
       '사이트 기반(서버와 화면)을 최신 버전으로 올리고 보안을 강화했어요.',
     ],
-    inProgress: [],
   },
   {
     version: '26.1',
     date: '2026-10-12',
-    period: '10월 1일 ~ 10월 12일',
+    period: '10월 1일부터 10월 12일까지',
     summary: '포인트, 승부 예측, 알림, 다중 밸런스가 열리고, 게시판과 상품 추첨이 생겼어요.',
     comment: [
       '10월 초에는 포인트, 승부 예측, 알림, 다중 밸런스를 새로 열었어요.',
-      '공지사항을 함께 읽고 이야기할 수 있게 하고, 자유게시판·익명게시판·추천영상도 만들었어요.',
+      '공지사항을 함께 읽고 이야기할 수 있게 하고, 자유게시판, 익명게시판, 추천영상도 만들었어요.',
     ],
     highlight: {
       title: '포인트와 승부 예측',
@@ -326,7 +319,7 @@ export const PATCH_NOTES: readonly PatchNote[] = [
             title: '포인트',
             tag: 'new',
             changes: [
-              '경기 결과 입력, 승부 예측 적중, 공지 읽기·좋아요·댓글 같은 활동으로 포인트가 쌓여요.',
+              '경기 결과 입력, 승부 예측 적중, 공지 읽기, 좋아요, 댓글 같은 활동으로 포인트가 쌓여요.',
               '포인트 월간 랭킹에서 닉네임을 누르면 그 달에 포인트를 어떻게 모았는지 볼 수 있어요.',
               '자세한 기준은 포인트 정책 페이지에 모두 정리돼 있어요.',
             ],
@@ -336,15 +329,15 @@ export const PATCH_NOTES: readonly PatchNote[] = [
             tag: 'new',
             note: '자기 경기는 예측할 수 없어서, 경기를 뛴 선수도 포인트를 받을 수 있게 했어요.',
             changes: [
-              { label: '결과 확인', before: '없음', after: '1p (3:3 밸런스 경기, 결과가 들어온 뒤 48시간 안, 하루 10경기까지)' },
+              { label: '결과 확인', before: '없음', after: '1포인트 (3대3 밸런스 경기, 결과가 들어온 뒤 48시간 안, 하루 10경기까지)' },
             ],
           },
           {
             title: '게시판 활동 포인트',
             tag: 'new',
             changes: [
-              { label: '자유게시판·추천영상 글쓰기', before: '없음', after: '1p (하루 3개까지)' },
-              { label: '다른 사람 글에 댓글·좋아요', before: '없음', after: '각 1p (글마다 한 번, 하루 10개까지)' },
+              { label: '자유게시판과 추천영상 글쓰기', before: '없음', after: '1포인트 (하루 3개까지)' },
+              { label: '다른 사람 글에 댓글과 좋아요', before: '없음', after: '각 1포인트 (글마다 한 번, 하루 10개까지)' },
               '익명게시판은 글쓴이가 드러나지 않도록 포인트가 없어요.',
               '글이 지워지면 그 글로 받은 포인트도 돌아가요.',
             ],
@@ -383,7 +376,7 @@ export const PATCH_NOTES: readonly PatchNote[] = [
         ],
       },
       {
-        title: '밸런스 매치·다중 밸런스',
+        title: '밸런스 매치와 다중 밸런스',
         href: '/balance',
         entries: [
           {
@@ -421,7 +414,7 @@ export const PATCH_NOTES: readonly PatchNote[] = [
         ],
       },
       {
-        title: '선수 관리·랭킹',
+        title: '선수 관리와 랭킹',
         href: '/ranking',
         entries: [
           {
@@ -440,12 +433,12 @@ export const PATCH_NOTES: readonly PatchNote[] = [
           {
             title: '경기 결과의 종족 표시',
             tag: 'new',
-            changes: ['PPT, PPZ, PTZ 경기에서 테란·저그로 기록된 선수 옆에 (T), (Z)가 붙어요.'],
+            changes: ['PPT, PPZ, PTZ 경기에서 테란이나 저그로 기록된 선수 옆에 (T), (Z)가 붙어요.'],
           },
         ],
       },
       {
-        title: '공지사항·게시판',
+        title: '공지사항과 게시판',
         href: '/notices',
         entries: [
           {
@@ -466,12 +459,12 @@ export const PATCH_NOTES: readonly PatchNote[] = [
             ],
           },
           {
-            title: '자유게시판·익명게시판·추천영상',
+            title: '자유게시판, 익명게시판, 추천영상',
             tag: 'new',
             changes: [
-              '자유게시판: 누구나 글을 쓰고 댓글과 좋아요를 남겨요.',
-              '익명게시판: 다른 팸원에게는 글이 보이지 않고, 글쓴이는 누구에게도 드러나지 않아요.',
-              '추천영상: 유튜브 링크를 올리면 글 안에서 바로 재생돼요.',
+              '자유게시판에는 누구나 글을 쓰고 댓글과 좋아요를 남겨요.',
+              '익명게시판의 글은 다른 팸원에게 보이지 않고, 글쓴이는 누구에게도 드러나지 않아요.',
+              '추천영상에 유튜브 링크를 올리면 글 안에서 바로 재생돼요.',
             ],
           },
           {
@@ -482,7 +475,7 @@ export const PATCH_NOTES: readonly PatchNote[] = [
           {
             title: '검색',
             tag: 'new',
-            changes: ['공지사항과 자유게시판에서 제목과 내용을 검색할 수 있어요. 글마다 읽음·댓글·좋아요·투표 수가 보여요.'],
+            changes: ['공지사항과 자유게시판에서 제목과 내용을 검색할 수 있어요. 글마다 읽음, 댓글, 좋아요, 투표 수가 보여요.'],
           },
           {
             title: '댓글은 하루 10개까지',
@@ -492,7 +485,7 @@ export const PATCH_NOTES: readonly PatchNote[] = [
           {
             title: '메뉴 정리',
             tag: 'changed',
-            changes: ['공지사항과 게시판은 게시판 메뉴로, 밸런스·정기 감전·추첨은 매치 메뉴로, 포인트 화면은 포인트 메뉴로 모았어요.'],
+            changes: ['공지사항과 게시판은 게시판 메뉴로, 밸런스, 정기 감전, 추첨은 매치 메뉴로, 포인트 화면은 포인트 메뉴로 모았어요.'],
           },
         ],
       },
@@ -507,7 +500,7 @@ export const PATCH_NOTES: readonly PatchNote[] = [
         ],
       },
       {
-        title: '상품 추첨·대포 뽑기',
+        title: '상품 추첨과 대포 뽑기',
         href: '/draws',
         entries: [
           {
@@ -530,7 +523,6 @@ export const PATCH_NOTES: readonly PatchNote[] = [
       '다른 팸원의 포인트 내역에는 날짜만 보이고 시각은 보이지 않아요.',
       '서버를 최신 버전으로 올리고 보안을 강화했어요.',
     ],
-    inProgress: [],
   },
 ]
 

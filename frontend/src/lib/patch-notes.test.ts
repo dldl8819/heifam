@@ -19,7 +19,6 @@ function allText(note: PatchNote): string[] {
       ]),
     ]),
     ...note.fixes,
-    ...note.inProgress,
   ]
 }
 
@@ -72,6 +71,16 @@ describe('patch notes', () => {
     for (const note of PATCH_NOTES) {
       for (const text of allText(note)) {
         expect(text, `${note.version}: ${text}`).not.toMatch(forbidden)
+      }
+    }
+  })
+
+  // Said in words: a symbol may be read out as its name, or not at all.
+  it('use words where a screen reader could stumble on a symbol', () => {
+    const symbols = /[~·/⇒]|\d:\d|\d+p\b/
+    for (const note of PATCH_NOTES) {
+      for (const text of allText(note)) {
+        expect(text, `${note.version}: ${text}`).not.toMatch(symbols)
       }
     }
   })
