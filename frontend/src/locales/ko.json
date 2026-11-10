@@ -1872,6 +1872,8 @@
         "finished": "완료"
       },
       "startedBy": "{nickname} 시작",
+    "show": "보기",
+    "hide": "접기",
     "loadMore": "이전 기록 {count}개 더 보기",
     "loadingMore": "불러오는 중..."
     }

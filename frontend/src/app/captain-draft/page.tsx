@@ -139,7 +139,10 @@ export default function CaptainDraftPage() {
   const [draftTitle, setDraftTitle] = useState<string>(() => defaultDraftTitle())
   const [draft, setDraft] = useState<CaptainDraftResponse | null>(null)
   const [records, setRecords] = useState<CaptainDraftSummary[] | null>(null)
-  const [recordsLoading, setRecordsLoading] = useState<boolean>(true)
+  // Folded until opened: nothing is read for them before.
+  const [recordsOpen, setRecordsOpen] = useState<boolean>(false)
+  const recordsOpenRef = useRef<boolean>(false)
+  const [recordsLoading, setRecordsLoading] = useState<boolean>(false)
   const [recordsError, setRecordsError] = useState<string | null>(null)
   const [recordsHasMore, setRecordsHasMore] = useState<boolean>(false)
   // How many records the server has sent since the first page: the next page's offset.
@@ -407,9 +410,25 @@ export default function CaptainDraftPage() {
     }
   }
 
-  useEffect(() => {
-    void loadRecords()
+  // The records changed (a draft started, saved or brought up to date): read again now if they are
+  // open, else on the next opening.
+  const recordsChanged = useCallback(() => {
+    if (recordsOpenRef.current) {
+      void loadRecords()
+      return
+    }
+    recordsViewRef.current += 1
+    setRecords(null)
   }, [loadRecords])
+
+  const toggleRecords = () => {
+    const open = !recordsOpenRef.current
+    recordsOpenRef.current = open
+    setRecordsOpen(open)
+    if (open && records === null && !recordsLoading) {
+      void loadRecords()
+    }
+  }
 
   useEffect(() => {
     if (players.length === 0) {
@@ -569,7 +588,7 @@ export default function CaptainDraftPage() {
       setEntryEdits({})
       setLineupEdits({})
       setMessage(t('captainDraft.messages.createSuccess'))
-      void loadRecords()
+      recordsChanged()
     } catch (createError) {
       setError(errorWithReason('captainDraft.validation.createFailed', createError))
     } finally {
@@ -679,7 +698,7 @@ export default function CaptainDraftPage() {
         return
       }
       showDraft(latest)
-      void loadRecords()
+      recordsChanged()
     } catch (refreshError) {
       if (view !== draftViewRef.current) {
         return
@@ -852,7 +871,7 @@ export default function CaptainDraftPage() {
     const view = draftViewRef.current
     try {
       const next = await apiClient.addCaptainDraftAceDecider(TEMP_GROUP_ID, draft.draftId, { teamSize: aceSize })
-      void loadRecords()
+      recordsChanged()
       if (view !== draftViewRef.current) {
         return
       }
@@ -888,7 +907,7 @@ export default function CaptainDraftPage() {
           winnerTeam: set.winnerTeam ? set.winnerTeam : null,
         })),
       })
-      void loadRecords()
+      recordsChanged()
       if (view !== draftViewRef.current) {
         return
       }
@@ -1260,6 +1279,8 @@ export default function CaptainDraftPage() {
       )}
 
       <CaptainDraftRecords
+        open={recordsOpen}
+        onToggle={toggleRecords}
         records={records}
         loading={recordsLoading}
         error={recordsError}
