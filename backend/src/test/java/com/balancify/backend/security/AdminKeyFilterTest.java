@@ -1027,8 +1027,8 @@ class AdminKeyFilterTest {
     }
 
     @Test
-    void showsAdminOnlyTheMatchResultEditorsLogs() throws Exception {
-        when(operationAuditLogService.getResultEditorLogs(anyInt(), anyInt(), any()))
+    void showsAdminsTheAdminViewWithMmrOnlyForThoseAllowedIt() throws Exception {
+        when(operationAuditLogService.getAdminLogs(anyInt(), anyInt(), any(), anyBoolean()))
             .thenReturn(new OperationAuditLogPageResponse(List.of(), 0, 20, 0, 0, true, true));
 
         mockMvc
@@ -1037,8 +1037,15 @@ class AdminKeyFilterTest {
                     .header("X-USER-EMAIL", "admin@hei.gg")
             )
             .andExpect(status().isOk());
+        mockMvc
+            .perform(
+                get("/api/admin/audit-logs")
+                    .header("X-USER-EMAIL", "ops@hei.gg")
+            )
+            .andExpect(status().isOk());
 
-        verify(operationAuditLogService).getResultEditorLogs(anyInt(), anyInt(), any());
+        verify(operationAuditLogService).getAdminLogs(anyInt(), anyInt(), any(), eq(false));
+        verify(operationAuditLogService).getAdminLogs(anyInt(), anyInt(), any(), eq(true));
         verify(operationAuditLogService, never()).getLogs(anyInt(), anyInt());
         verify(operationAuditLogService, never()).getLogs(anyInt(), anyInt(), any());
     }

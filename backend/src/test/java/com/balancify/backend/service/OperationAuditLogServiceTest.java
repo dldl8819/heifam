@@ -2,7 +2,10 @@ package com.balancify.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyChar;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -580,27 +583,146 @@ class OperationAuditLogServiceTest {
     }
 
     @Test
-    void limitsTheResultEditorViewToLogsWrittenByEditorsEvenWithoutFilters() {
+    void limitsTheAdminViewToResultEditorsAndAdminsEvenWithoutFilters() {
         when(operationAuditLogRepository.findAll(any(Specification.class), any(Pageable.class)))
             .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
-        operationAuditLogService.getResultEditorLogs(0, 20, OperationAuditLogService.OperationAuditLogFilter.empty());
+        operationAuditLogService.getAdminLogs(0, 20, OperationAuditLogService.OperationAuditLogFilter.empty(), true);
 
+        verify(operationAuditLogRepository, never())
+            .findAllByCreatedAtGreaterThanEqualOrderByCreatedAtDescIdDesc(any(), any());
+        SpecificationRun run = runCapturedSpecification();
+
+        // A super admin's entries, a member's and those from before roles were recorded stay out.
+        verify(run.actorRole()).in(List.of(
+            AccessControlService.ACTOR_ROLE_RESULT_EDITOR,
+            AccessControlService.ACTOR_ROLE_ADMIN
+        ));
+        verify(run.criteriaBuilder(), never()).equal(any(), eq(AccessControlService.ACTOR_ROLE_SUPER_ADMIN));
+    }
+
+    @Test
+    void takesMmrOutOfTheDetailsForAnAdminWithoutMmrAccess() {
+        OperationAuditLog tierChange = new OperationAuditLog();
+        tierChange.setAction(OperationAuditLogService.ACTION_PLAYER_TIER_UPDATED);
+        tierChange.setActorRole(AccessControlService.ACTOR_ROLE_ADMIN);
+        tierChange.setTargetType("PLAYER");
+        tierChange.setSummary("티어 수정");
+        tierChange.setDetails("tier=A -> S, mmr=1200 -> 1350");
+        tierChange.setCreatedAt(OffsetDateTime.parse("2026-11-09T21:00:00+09:00"));
+        when(operationAuditLogRepository.findAll(any(Specification.class), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(tierChange), PageRequest.of(0, 20), 1));
+
+        var hidden = operationAuditLogService.getAdminLogs(
+            0, 20, OperationAuditLogService.OperationAuditLogFilter.empty(), false
+        );
+        var shown = operationAuditLogService.getAdminLogs(
+            0, 20, OperationAuditLogService.OperationAuditLogFilter.empty(), true
+        );
+
+        assertThat(hidden.items().get(0).details()).isEqualTo("tier=A -> S");
+        assertThat(shown.items().get(0).details()).isEqualTo("tier=A -> S, mmr=1200 -> 1350");
+    }
+
+    @Test
+    void keepsMmrForSuperAdmins() {
+        OperationAuditLog tierChange = new OperationAuditLog();
+        tierChange.setAction(OperationAuditLogService.ACTION_PLAYER_TIER_UPDATED);
+        tierChange.setDetails("tier=A -> S, mmr=1200 -> 1350");
+        tierChange.setCreatedAt(OffsetDateTime.parse("2026-11-09T21:00:00+09:00"));
+        when(operationAuditLogRepository.findAllByCreatedAtGreaterThanEqualOrderByCreatedAtDescIdDesc(
+            any(OffsetDateTime.class),
+            any(Pageable.class)
+        ))
+            .thenReturn(new PageImpl<>(List.of(tierChange), PageRequest.of(0, 20), 1));
+
+        var response = operationAuditLogService.getLogs(0, 20);
+
+        assertThat(response.items().get(0).details()).isEqualTo("tier=A -> S, mmr=1200 -> 1350");
+    }
+
+    @Test
+    void stripsEveryMmrFigureAndNothingElse() {
+        assertThat(OperationAuditLogService.withoutMmr("tier=A -> S, mmr=1200 -> 1350")).isEqualTo("tier=A -> S");
+        assertThat(OperationAuditLogService.withoutMmr("mmr=0 -> 900, tier=UNASSIGNED -> B")).isEqualTo("tier=UNASSIGNED -> B");
+        assertThat(OperationAuditLogService.withoutMmr("mmr=1200 -> 1350")).isNull();
+        assertThat(OperationAuditLogService.withoutMmr("race=P -> T")).isEqualTo("race=P -> T");
+        assertThat(OperationAuditLogService.withoutMmr(null)).isNull();
+    }
+
+    @Test
+    void anAdminWithoutMmrAccessCannotFindAnMmrFigureBySearchingDetails() {
+        when(operationAuditLogRepository.findAll(any(Specification.class), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+        operationAuditLogService.getAdminLogs(0, 20, contentFilter("1350"), false);
+
+        SpecificationRun run = runCapturedSpecification();
+        verify(run.criteriaBuilder()).notLike(any(), eq("%mmr=%"), eq('\\'));
+    }
+
+    @Test
+    void anAdminWithMmrAccessSearchesDetailsAsBefore() {
+        when(operationAuditLogRepository.findAll(any(Specification.class), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+        operationAuditLogService.getAdminLogs(0, 20, contentFilter("1350"), true);
+
+        SpecificationRun run = runCapturedSpecification();
+        verify(run.criteriaBuilder(), never()).notLike(any(), anyString(), anyChar());
+    }
+
+    @Test
+    void anAdminSearchesActorsByNameButNeverByEmail() {
+        when(operationAuditLogRepository.findAll(any(Specification.class), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+        operationAuditLogService.getAdminLogs(0, 20, actorFilter("@gmail"), true);
+
+        SpecificationRun run = runCapturedSpecification();
+        verify(run.root()).get("actorNickname");
+        verify(run.root(), never()).get("actorEmail");
+    }
+
+    @Test
+    void aSuperAdminStillSearchesActorsByEmailToo() {
+        when(operationAuditLogRepository.findAll(any(Specification.class), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+        operationAuditLogService.getLogs(0, 20, actorFilter("ops"));
+
+        SpecificationRun run = runCapturedSpecification();
+        verify(run.root()).get("actorNickname");
+        verify(run.root()).get("actorEmail");
+        verify(run.root(), never()).get("actorRole");
+    }
+
+    private static OperationAuditLogService.OperationAuditLogFilter contentFilter(String content) {
+        return new OperationAuditLogService.OperationAuditLogFilter(null, null, null, null, content, null);
+    }
+
+    private static OperationAuditLogService.OperationAuditLogFilter actorFilter(String actor) {
+        return new OperationAuditLogService.OperationAuditLogFilter(null, null, actor, null, null, null);
+    }
+
+    private record SpecificationRun(Root<OperationAuditLog> root, CriteriaBuilder criteriaBuilder, Path<Object> actorRole) {
+    }
+
+    /** Runs the specification handed to the repository against mocks, to see which columns and tests it uses. */
+    private SpecificationRun runCapturedSpecification() {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Specification<OperationAuditLog>> specificationCaptor =
             ArgumentCaptor.forClass(Specification.class);
-        verify(operationAuditLogRepository).findAll(specificationCaptor.capture(), any(Pageable.class));
-        verify(operationAuditLogRepository, never())
-            .findAllByCreatedAtGreaterThanEqualOrderByCreatedAtDescIdDesc(any(), any());
+        verify(operationAuditLogRepository, atLeastOnce())
+            .findAll(specificationCaptor.capture(), any(Pageable.class));
 
         @SuppressWarnings("unchecked")
         Root<OperationAuditLog> root = mock(Root.class);
         CriteriaBuilder criteriaBuilder = mock(CriteriaBuilder.class);
+        @SuppressWarnings("unchecked")
         Path<Object> actorRole = mock(Path.class);
-        // The spec also reads other columns; only the role column matters here.
         lenient().when(root.get("actorRole")).thenReturn(actorRole);
         specificationCaptor.getValue().toPredicate(root, mock(CriteriaQuery.class), criteriaBuilder);
-
-        verify(criteriaBuilder).equal(actorRole, AccessControlService.ACTOR_ROLE_RESULT_EDITOR);
+        return new SpecificationRun(root, criteriaBuilder, actorRole);
     }
 }

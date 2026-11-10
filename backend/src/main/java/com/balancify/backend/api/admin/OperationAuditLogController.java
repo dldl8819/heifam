@@ -62,7 +62,8 @@ public class OperationAuditLogController {
             if (!accessControlService.isAdminEmail(requestEmail)) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin role required");
             }
-            return operationAuditLogService.getResultEditorLogs(
+            // Admins read what result editors and admins did, with MMR only if they may see it.
+            return operationAuditLogService.getAdminLogs(
                 page,
                 requestedSize,
                 new OperationAuditLogService.OperationAuditLogFilter(
@@ -72,7 +73,8 @@ public class OperationAuditLogController {
                     action,
                     content,
                     target
-                )
+                ),
+                accessControlService.canViewMmr(requestEmail)
             );
         }
 
