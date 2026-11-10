@@ -41,6 +41,11 @@ public class MatchQueryService {
     // shows anyone, kept for every visitor this long unless a result changes first.
     static final int VISITOR_WINDOW = 30;
     static final long VISITOR_KEEP_MILLIS = 5 * 60_000L;
+    // How far back the recent results go for someone with access, as the results page pages them
+    // (frontend/src/lib/recent-match-reach.ts): members, result editors included, the newest 30;
+    // admins the newest 100. Super admins have no such bound; their page reads the full history.
+    static final int MEMBER_REACH = 30;
+    static final int ADMIN_REACH = 100;
 
     private final MatchRepository matchRepository;
     private final MatchParticipantRepository matchParticipantRepository;
@@ -90,6 +95,11 @@ public class MatchQueryService {
         return getRecentMatches(groupId, limit, offset, null);
     }
 
+    /**
+     * A page of the recent results for someone with access, held to their reach (MEMBER_REACH,
+     * ADMIN_REACH, none for super admins) whatever offset they ask for: a page past it is empty and
+     * read from nowhere, and one that runs over it is cut at it.
+     */
     public List<GroupRecentMatchResponse> getRecentMatches(
         Long groupId,
         Integer limit,
@@ -99,12 +109,30 @@ public class MatchQueryService {
         int normalizedLimit = normalizeLimit(limit);
         int normalizedOffset = normalizeOffset(offset);
         int page = normalizedOffset / normalizedLimit;
+        long firstIndex = (long) page * normalizedLimit;
+        long reach = recentReach(requesterEmail);
+        if (firstIndex >= reach) {
+            return List.of();
+        }
+        // The first page can be read short; a later one keeps its size so its offset stays put.
+        int size = page == 0 ? (int) Math.min(normalizedLimit, reach) : normalizedLimit;
         List<Match> matches = matchRepository.findRecentByGroupIdByResultInput(
             groupId,
-            PageRequest.of(page, normalizedLimit)
+            PageRequest.of(page, size)
         );
+        int allowed = (int) Math.min(matches.size(), reach - firstIndex);
+        if (allowed < matches.size()) {
+            matches = matches.subList(0, allowed);
+        }
 
         return buildResponses(matches, canEditAnyMatch(requesterEmail), requesterEmail);
+    }
+
+    private long recentReach(String requesterEmail) {
+        if (accessControlService.isSuperAdminEmail(requesterEmail)) {
+            return Long.MAX_VALUE;
+        }
+        return accessControlService.isAdminEmail(requesterEmail) ? ADMIN_REACH : MEMBER_REACH;
     }
 
     /**
