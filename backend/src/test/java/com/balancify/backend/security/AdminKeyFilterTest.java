@@ -4360,7 +4360,7 @@ class AdminKeyFilterTest {
 
         // An email header names nobody as a reader of a draft (isNull): only a verified token does,
         // so no one sees a team's line-up before both are in by saying who they are.
-        verify(captainDraftService).listDrafts(1L);
+        verify(captainDraftService).listDrafts(eq(1L), isNull(), isNull());
         verify(captainDraftService).getLatestDraft(eq(1L), isNull());
         verify(captainDraftService).getDraft(eq(1L), eq(5L), isNull());
         // Starting a draft and saving its sets name who did it.

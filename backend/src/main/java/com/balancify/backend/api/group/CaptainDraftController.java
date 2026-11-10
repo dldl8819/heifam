@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -90,9 +91,14 @@ public class CaptainDraftController {
         }
     }
 
+    // A page of the records: offset and limit as the recent results take them.
     @GetMapping("/{groupId}/captain-drafts")
-    public CaptainDraftListResponse listDrafts(@PathVariable Long groupId) {
-        return captainDraftService.listDrafts(groupId);
+    public CaptainDraftListResponse listDrafts(
+        @PathVariable Long groupId,
+        @RequestParam(required = false) Integer offset,
+        @RequestParam(required = false) Integer limit
+    ) {
+        return captainDraftService.listDrafts(groupId, offset, limit);
     }
 
     @GetMapping("/{groupId}/captain-drafts/latest")

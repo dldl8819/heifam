@@ -55,6 +55,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.SliceImpl;
 
 @ExtendWith(MockitoExtension.class)
 class CaptainDraftServiceTest {
@@ -350,7 +353,7 @@ class CaptainDraftServiceTest {
             entry(running, 1, "PPP", 1, 3)
         );
 
-        when(captainDraftRepository.findRecentWithCaptains(eq(1L), any())).thenReturn(List.of(running, played));
+        when(captainDraftRepository.findRecentWithCaptains(eq(1L), any())).thenReturn(new SliceImpl<>(List.of(running, played)));
         when(captainDraftEntryRepository.findByDraftIds(List.of(101L, 100L))).thenReturn(entries);
         when(captainDraftParticipantRepository.countByDraftIds(List.of(101L, 100L)))
             .thenReturn(List.of(new ParticipantCount(100L, 10L), new ParticipantCount(101L, 8L)));
@@ -375,8 +378,36 @@ class CaptainDraftServiceTest {
     }
 
     @Test
+    void listsTheRecordsFiveAtATimeAndSaysWhetherOlderOnesFollow() {
+        Group group = group(1L);
+        CaptainDraft older = draft(group, 90L, "READY", 1, "UNASSIGNED", 1L, 2L);
+        when(captainDraftRepository.findRecentWithCaptains(1L, PageRequest.of(1, 5)))
+            .thenReturn(new SliceImpl<>(List.of(older), PageRequest.of(1, 5), true));
+        when(captainDraftEntryRepository.findByDraftIds(List.of(90L))).thenReturn(List.of());
+        when(captainDraftParticipantRepository.countByDraftIds(List.of(90L))).thenReturn(List.of());
+
+        CaptainDraftListResponse response = captainDraftService.listDrafts(1L, 5, null);
+
+        assertThat(response.drafts()).extracting(CaptainDraftSummaryResponse::draftId).containsExactly(90L);
+        assertThat(response.hasMore()).isTrue();
+    }
+
+    @Test
+    void keepsAPageOfRecordsWithinItsBounds() {
+        when(captainDraftRepository.findRecentWithCaptains(eq(1L), any())).thenReturn(new SliceImpl<>(List.of()));
+
+        assertThat(captainDraftService.listDrafts(1L).hasMore()).isFalse();
+        captainDraftService.listDrafts(1L, -3, 0);
+        captainDraftService.listDrafts(1L, 60, 500);
+
+        ArgumentCaptor<Pageable> pages = ArgumentCaptor.forClass(Pageable.class);
+        verify(captainDraftRepository, times(3)).findRecentWithCaptains(eq(1L), pages.capture());
+        assertThat(pages.getAllValues()).containsExactly(PageRequest.of(0, 5), PageRequest.of(0, 5), PageRequest.of(2, 30));
+    }
+
+    @Test
     void listsNoDraftsForAGroupWithoutAny() {
-        when(captainDraftRepository.findRecentWithCaptains(eq(1L), any())).thenReturn(List.of());
+        when(captainDraftRepository.findRecentWithCaptains(eq(1L), any())).thenReturn(new SliceImpl<>(List.of()));
 
         assertThat(captainDraftService.listDrafts(1L).drafts()).isEmpty();
     }
@@ -388,7 +419,7 @@ class CaptainDraftServiceTest {
         when(captainDraftRepository.findByIdAndGroup_Id(100L, 1L)).thenReturn(Optional.of(draft));
         when(captainDraftEntryRepository.deleteByDraftId(100L)).thenReturn(8);
         when(captainDraftParticipantRepository.deleteByDraftId(100L)).thenReturn(10);
-        when(captainDraftRepository.findRecentWithCaptains(eq(1L), any())).thenReturn(List.of());
+        when(captainDraftRepository.findRecentWithCaptains(eq(1L), any())).thenReturn(new SliceImpl<>(List.of()));
 
         CaptainDraftListResponse response = captainDraftService.deleteDraft(1L, 100L, "admin@hei.gg", "Ops");
 
@@ -1175,7 +1206,7 @@ class CaptainDraftServiceTest {
             result(entry(played, 2, "PPT", 1, 3), "AWAY"),
             result(aceSet(played, 3, 1), "AWAY")
         );
-        when(captainDraftRepository.findRecentWithCaptains(eq(1L), any())).thenReturn(List.of(played));
+        when(captainDraftRepository.findRecentWithCaptains(eq(1L), any())).thenReturn(new SliceImpl<>(List.of(played)));
         when(captainDraftEntryRepository.findByDraftIds(List.of(100L))).thenReturn(entries);
         when(captainDraftParticipantRepository.countByDraftIds(List.of(100L))).thenReturn(List.of(new ParticipantCount(100L, 6L)));
 
