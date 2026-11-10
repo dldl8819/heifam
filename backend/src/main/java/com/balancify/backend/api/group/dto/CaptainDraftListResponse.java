@@ -2,8 +2,9 @@ package com.balancify.backend.api.group.dto;
 
 import java.util.List;
 
-/** The latest regular drafts, newest first. */
+/** A page of the regular drafts, newest first, and whether older ones follow it. */
 public record CaptainDraftListResponse(
-    List<CaptainDraftSummaryResponse> drafts
+    List<CaptainDraftSummaryResponse> drafts,
+    boolean hasMore
 ) {
 }

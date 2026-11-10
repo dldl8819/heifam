@@ -684,6 +684,18 @@ export function draftPlayerOptionLabel(nickname: string, tags: DraftPlayerTags, 
 
 export type DraftRecordState = 'drafting' | 'playing' | 'finished'
 
+/** The records come this many at a time, newest first; "더 보기" asks for the next ones. */
+export const DRAFT_RECORDS_PAGE_SIZE = 5
+
+/**
+ * The records shown with the next page under them. A draft started since the last page pushes the
+ * rest down, so the next page can bring one already shown again: it is kept once.
+ */
+export function appendDraftRecords(shown: CaptainDraftSummary[], next: CaptainDraftSummary[]): CaptainDraftSummary[] {
+  const shownIds = new Set(shown.map((record) => record.draftId))
+  return [...shown, ...next.filter((record) => !shownIds.has(record.draftId))]
+}
+
 /** Where a recorded draft stands: still picking teams, playing (some sets left), or every set decided. */
 export function draftRecordState(summary: CaptainDraftSummary): DraftRecordState {
   if (summary.status !== 'READY') {

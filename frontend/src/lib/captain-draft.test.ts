@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   aceDeciderOffer,
+  appendDraftRecords,
   aceSizeChoices,
   canAddSet,
   canonicalComposition,
@@ -520,6 +521,14 @@ describe('captain draft records', () => {
     expect(draftRecordState({ ...summary, status: 'DRAFTING' })).toBe('drafting')
     expect(draftRecordState({ ...summary, decidedSets: 5 })).toBe('playing')
     expect(draftRecordState(summary)).toBe('finished')
+  })
+
+  it('adds the next page under the shown records, each record once', () => {
+    const record = (draftId: number) => ({ ...summary, draftId })
+
+    expect(appendDraftRecords([record(9), record(8)], [record(7), record(6)]).map((shown) => shown.draftId)).toEqual([9, 8, 7, 6])
+    // A draft started meanwhile pushed 8 onto the next page.
+    expect(appendDraftRecords([record(9), record(8)], [record(8), record(7)]).map((shown) => shown.draftId)).toEqual([9, 8, 7])
   })
 
   it('titles a new draft by the Korean date', () => {

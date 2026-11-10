@@ -1871,7 +1871,9 @@
         "playing": "진행 중 {decided}/{total}세트",
         "finished": "완료"
       },
-      "startedBy": "{nickname} 시작"
+      "startedBy": "{nickname} 시작",
+    "loadMore": "이전 기록 {count}개 더 보기",
+    "loadingMore": "불러오는 중..."
     }
   },
   "results": {

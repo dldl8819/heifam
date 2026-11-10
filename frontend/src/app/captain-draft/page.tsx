@@ -14,6 +14,8 @@ import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
 import {
   DEFAULT_ROUND_COUNT,
+  DRAFT_RECORDS_PAGE_SIZE,
+  appendDraftRecords,
   countSetWins,
   defaultDraftTitle,
   defaultSetSizes,
@@ -59,6 +61,7 @@ import { formatKstDateTime } from '@/lib/kst-time'
 import type {
   CaptainDraftEntryMode,
   CaptainDraftLineupStage,
+  CaptainDraftListResponse,
   CaptainDraftParticipant,
   CaptainDraftResponse,
   CaptainDraftSummary,
@@ -138,6 +141,11 @@ export default function CaptainDraftPage() {
   const [records, setRecords] = useState<CaptainDraftSummary[] | null>(null)
   const [recordsLoading, setRecordsLoading] = useState<boolean>(true)
   const [recordsError, setRecordsError] = useState<string | null>(null)
+  const [recordsHasMore, setRecordsHasMore] = useState<boolean>(false)
+  // How many records the server has sent since the first page: the next page's offset.
+  const [recordsFetched, setRecordsFetched] = useState<number>(0)
+  const [recordsLoadingMore, setRecordsLoadingMore] = useState<boolean>(false)
+  const recordsViewRef = useRef<number>(0)
   const [deletingDraftId, setDeletingDraftId] = useState<number | null>(null)
   const [draftLoading, setDraftLoading] = useState<boolean>(true)
 
@@ -353,17 +361,51 @@ export default function CaptainDraftPage() {
     }
   }, [])
 
+  // The records start over from the newest page; a later page asked for before then is dropped.
+  const showFirstRecords = useCallback((page: CaptainDraftListResponse) => {
+    recordsViewRef.current += 1
+    setRecords(page.drafts)
+    setRecordsHasMore(page.hasMore)
+    setRecordsFetched(page.drafts.length)
+  }, [])
+
   const loadRecords = useCallback(async () => {
     setRecordsLoading(true)
     setRecordsError(null)
     try {
-      setRecords((await apiClient.listCaptainDrafts(TEMP_GROUP_ID)).drafts)
+      showFirstRecords(await apiClient.listCaptainDrafts(TEMP_GROUP_ID, 0, DRAFT_RECORDS_PAGE_SIZE))
     } catch {
       setRecordsError(t('captainDraft.records.loadError'))
     } finally {
       setRecordsLoading(false)
     }
-  }, [])
+  }, [showFirstRecords])
+
+  // The next page of the records under the ones shown. The offset counts what the server sent, so
+  // pages stay in step even when a record came twice.
+  const loadMoreRecords = async () => {
+    if (recordsLoadingMore || !recordsHasMore) {
+      return
+    }
+    const view = recordsViewRef.current
+    setRecordsLoadingMore(true)
+    setRecordsError(null)
+    try {
+      const page = await apiClient.listCaptainDrafts(TEMP_GROUP_ID, recordsFetched, DRAFT_RECORDS_PAGE_SIZE)
+      if (view !== recordsViewRef.current) {
+        return
+      }
+      setRecords((shown) => appendDraftRecords(shown ?? [], page.drafts))
+      setRecordsHasMore(page.hasMore)
+      setRecordsFetched((fetched) => fetched + page.drafts.length)
+    } catch {
+      if (view === recordsViewRef.current) {
+        setRecordsError(t('captainDraft.records.loadError'))
+      }
+    } finally {
+      setRecordsLoadingMore(false)
+    }
+  }
 
   useEffect(() => {
     void loadRecords()
@@ -577,7 +619,7 @@ export default function CaptainDraftPage() {
     const view = draftViewRef.current
     try {
       const remaining = await apiClient.deleteCaptainDraft(TEMP_GROUP_ID, record.draftId)
-      setRecords(remaining.drafts)
+      showFirstRecords(remaining)
       if (shownDraftId === record.draftId && view === draftViewRef.current) {
         clearScreen()
       }
@@ -1221,6 +1263,9 @@ export default function CaptainDraftPage() {
         records={records}
         loading={recordsLoading}
         error={recordsError}
+        hasMore={recordsHasMore}
+        loadingMore={recordsLoadingMore}
+        onLoadMore={() => void loadMoreRecords()}
         currentDraftId={draft?.draftId ?? null}
         canDelete={isAdmin}
         deletingDraftId={deletingDraftId}

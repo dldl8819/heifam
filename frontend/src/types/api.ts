@@ -529,8 +529,10 @@ export type CaptainDraftSummary = {
   aceDecider?: boolean
 }
 
+/** A page of the records, newest first, and whether older ones follow it. */
 export type CaptainDraftListResponse = {
   drafts: CaptainDraftSummary[]
+  hasMore: boolean
 }
 
 export type CaptainDraftUnpickRequest = {

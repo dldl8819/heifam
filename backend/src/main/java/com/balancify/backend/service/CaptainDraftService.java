@@ -47,6 +47,7 @@ import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -77,8 +78,10 @@ public class CaptainDraftService {
     private static final int MAX_TITLE_LENGTH = 120;
     // created_by_nickname and result_recorded_by_nickname are varchar(100).
     private static final int MAX_ACTOR_NICKNAME_LENGTH = 100;
-    // Drafts listed as records; older ones stay in the database.
-    private static final int RECORD_LIMIT = 30;
+    // Drafts listed as records a page at a time, newest first; the page asks for older ones as they
+    // are wanted, and each page reads only its own drafts' sets.
+    static final int RECORD_PAGE_SIZE = 5;
+    private static final int RECORD_PAGE_SIZE_MAX = 30;
 
     private final GroupRepository groupRepository;
     private final PlayerRepository playerRepository;
@@ -237,15 +240,25 @@ public class CaptainDraftService {
         return readDraft(draft, viewerUserId);
     }
 
-    /**
-     * The latest drafts with how each went, newest first. A draft's results are kept with it only;
-     * they are never matches and never move anyone's MMR.
-     */
+    /** The first page of the records: the latest RECORD_PAGE_SIZE drafts. */
     @Transactional(readOnly = true)
     public CaptainDraftListResponse listDrafts(Long groupId) {
-        List<CaptainDraft> drafts = captainDraftRepository.findRecentWithCaptains(groupId, PageRequest.of(0, RECORD_LIMIT));
+        return listDrafts(groupId, 0, RECORD_PAGE_SIZE);
+    }
+
+    /**
+     * Drafts with how each went, newest first, a page at a time: from offset, at most limit
+     * (RECORD_PAGE_SIZE when not given), and whether older ones follow. A draft's results are kept
+     * with it only; they are never matches and never move anyone's MMR.
+     */
+    @Transactional(readOnly = true)
+    public CaptainDraftListResponse listDrafts(Long groupId, Integer offset, Integer limit) {
+        int size = limit == null || limit <= 0 ? RECORD_PAGE_SIZE : Math.min(limit, RECORD_PAGE_SIZE_MAX);
+        int page = offset == null || offset <= 0 ? 0 : offset / size;
+        Slice<CaptainDraft> slice = captainDraftRepository.findRecentWithCaptains(groupId, PageRequest.of(page, size));
+        List<CaptainDraft> drafts = slice.getContent();
         if (drafts.isEmpty()) {
-            return new CaptainDraftListResponse(List.of());
+            return new CaptainDraftListResponse(List.of(), false);
         }
         List<Long> draftIds = drafts.stream().map(CaptainDraft::getId).toList();
         Map<Long, List<CaptainDraftEntry>> entriesByDraft = captainDraftEntryRepository.findByDraftIds(draftIds)
@@ -261,14 +274,14 @@ public class CaptainDraftService {
                 entriesByDraft.getOrDefault(draft.getId(), List.of()),
                 participantCounts.getOrDefault(draft.getId(), 0L)
             ))
-            .toList());
+            .toList(), slice.hasNext());
     }
 
     /**
      * Removes a draft with its participants, its sets and their players, such as one made to try
      * the page out. A draft never made a match, so no MMR, point or ranking changes with it. The
      * operation log keeps who removed which, with how many players and sets it had. Answers with
-     * the records as they now are.
+     * the first page of the records as they now are.
      */
     @Transactional
     public CaptainDraftListResponse deleteDraft(Long groupId, Long draftId, String actorEmail, String actorNickname) {

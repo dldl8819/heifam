@@ -1243,8 +1243,9 @@ export const apiClient = {
       method: 'POST',
       body: JSON.stringify(payload),
     }, { includeUserEmail: true }),
-  listCaptainDrafts: (groupId: number) =>
-    apiRequest<CaptainDraftListResponse>(`/api/groups/${groupId}/captain-drafts`, undefined, {
+  // A page of the records: offset is how many the page already has.
+  listCaptainDrafts: (groupId: number, offset: number, limit: number) =>
+    apiRequest<CaptainDraftListResponse>(`/api/groups/${groupId}/captain-drafts?offset=${offset}&limit=${limit}`, undefined, {
       includeUserEmail: true,
     }),
   // Removes a draft with its teams, sets and results (admins only); answers with the records left.

@@ -1,7 +1,7 @@
 'use client'
 
 import { t } from '@/lib/i18n'
-import { draftRecordState, type DraftRecordState } from '@/lib/captain-draft'
+import { DRAFT_RECORDS_PAGE_SIZE, draftRecordState, type DraftRecordState } from '@/lib/captain-draft'
 import { formatKstDateTime } from '@/lib/kst-time'
 import type { CaptainDraftSummary } from '@/types/api'
 
@@ -9,6 +9,10 @@ type CaptainDraftRecordsProps = {
   records: CaptainDraftSummary[] | null
   loading: boolean
   error: string | null
+  // Older records follow the ones shown; onLoadMore asks for the next page.
+  hasMore: boolean
+  loadingMore: boolean
+  onLoadMore: () => void
   currentDraftId: number | null
   // Admins only: removing a record. Members see no delete button (the backend refuses them too).
   canDelete: boolean
@@ -25,14 +29,18 @@ const STATE_STYLES: Record<DraftRecordState, string> = {
 }
 
 /**
- * The regular drafts played so far, newest first, with each one's score. Their results are kept
- * here only: a regular draft is not balanced, so it never moves anyone's MMR. A draft made by
- * mistake or to try the page out can be removed by an admin, with everything in it.
+ * The regular drafts played so far, newest first and a page at a time, with each one's score.
+ * Their results are kept here only: a regular draft is not balanced, so it never moves anyone's
+ * MMR. A draft made by mistake or to try the page out can be removed by an admin, with everything
+ * in it.
  */
 export function CaptainDraftRecords({
   records,
   loading,
   error,
+  hasMore,
+  loadingMore,
+  onLoadMore,
   currentDraftId,
   canDelete,
   deletingDraftId,
@@ -113,6 +121,20 @@ export function CaptainDraftRecords({
             )
           })}
         </ul>
+      )}
+      {records && records.length > 0 && hasMore && (
+        <div className="mt-2 text-center">
+          <button
+            type="button"
+            onClick={onLoadMore}
+            disabled={loadingMore}
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            {loadingMore
+              ? t('captainDraft.records.loadingMore')
+              : t('captainDraft.records.loadMore', { count: DRAFT_RECORDS_PAGE_SIZE })}
+          </button>
+        </div>
       )}
     </article>
   )

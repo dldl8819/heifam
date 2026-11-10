@@ -4,6 +4,7 @@ import com.balancify.backend.domain.CaptainDraft;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -15,6 +16,7 @@ public interface CaptainDraftRepository extends JpaRepository<CaptainDraft, Long
 
     Optional<CaptainDraft> findTopByGroup_IdOrderByCreatedAtDescIdDesc(Long groupId);
 
+    /** A page of the group's drafts, newest first; reading one row past the page tells whether more follow. */
     @Query("""
         select draft
         from CaptainDraft draft
@@ -23,7 +25,7 @@ public interface CaptainDraftRepository extends JpaRepository<CaptainDraft, Long
         where draft.group.id = :groupId
         order by draft.createdAt desc, draft.id desc
         """)
-    List<CaptainDraft> findRecentWithCaptains(@Param("groupId") Long groupId, Pageable pageable);
+    Slice<CaptainDraft> findRecentWithCaptains(@Param("groupId") Long groupId, Pageable pageable);
 
     // Last of a draft's rows to go, after its sets and participants; nothing loaded is kept after it.
     @Modifying(flushAutomatically = true, clearAutomatically = true)
