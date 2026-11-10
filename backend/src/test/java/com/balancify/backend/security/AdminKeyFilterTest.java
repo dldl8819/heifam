@@ -2667,6 +2667,7 @@ class AdminKeyFilterTest {
         verify(notificationService, never()).removePredictionsOpen(8L);
         verify(operationAuditLogService, org.mockito.Mockito.times(1)).recordMatchDeletion(eq("member@hei.gg"), any(), any());
         verify(matchResultService, never()).deleteMatch(any());
+        verify(matchResultService, never()).deleteMatchAs(any(), any());
     }
 
     @Test
@@ -2799,11 +2800,26 @@ class AdminKeyFilterTest {
 
     @Test
     void answersADeletionATournamentStillNeedsWithConflict() throws Exception {
-        when(matchResultService.deleteMatch(1L)).thenThrow(new MatchConflictException("later game recorded"));
+        when(matchResultService.deleteMatchAs(1L, "admin@hei.gg"))
+            .thenThrow(new MatchConflictException("later game recorded"));
 
         mockMvc
             .perform(delete("/api/matches/1").header("X-USER-EMAIL", "admin@hei.gg"))
             .andExpect(status().isConflict());
+    }
+
+    @Test
+    void tellsTheServiceWhoDeletesAndRefusesOncePast48Hours() throws Exception {
+        when(matchResultService.deleteMatchAs(2L, "admin@hei.gg"))
+            .thenThrow(new MatchEditForbiddenException("past 48 hours"));
+
+        mockMvc
+            .perform(delete("/api/matches/2").header("X-USER-EMAIL", "admin@hei.gg"))
+            .andExpect(status().isForbidden());
+
+        verify(matchResultService).deleteMatchAs(2L, "admin@hei.gg");
+        verify(matchResultService, never()).deleteMatch(any());
+        verify(operationAuditLogService, never()).recordMatchDeletion(any(), any(), any());
     }
 
     @Test
