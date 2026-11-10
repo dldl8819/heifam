@@ -400,14 +400,95 @@ class MatchQueryServiceTest {
 
     @Test
     void appliesRecentMatchOffsetForIncrementalLoading() {
+        when(accessControlService.isAdminEmail("admin@hei.gg")).thenReturn(true);
         when(matchRepository.findRecentByGroupIdByResultInput(eq(1L), any())).thenReturn(List.of());
 
-        matchQueryService.getRecentMatches(1L, 20, 40);
+        matchQueryService.getRecentMatches(1L, 20, 40, "admin@hei.gg");
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         verify(matchRepository).findRecentByGroupIdByResultInput(eq(1L), pageableCaptor.capture());
         assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(20);
         assertThat(pageableCaptor.getValue().getOffset()).isEqualTo(40);
+    }
+
+    @Test
+    void givesAMemberNothingPastTheNewest30AndReadsNothingForIt() {
+        List<GroupRecentMatchResponse> responses =
+            matchQueryService.getRecentMatches(1L, 10, 30, "member@hei.gg");
+        List<GroupRecentMatchResponse> farBack =
+            matchQueryService.getRecentMatches(1L, 50, 4000, "member@hei.gg");
+
+        assertThat(responses).isEmpty();
+        assertThat(farBack).isEmpty();
+        verify(matchRepository, never()).findRecentByGroupIdByResultInput(any(), any());
+    }
+
+    @Test
+    void cutsAMembersPageThatRunsPastTheNewest30() {
+        when(matchRepository.findRecentByGroupIdByResultInput(eq(1L), any())).thenReturn(matches(21, 20));
+        when(matchParticipantRepository.findByMatchIdInWithPlayerAndMatch(any())).thenReturn(List.of());
+
+        // Page 1 of 20 is the 21st to the 40th; only the 21st to the 30th are the member's.
+        List<GroupRecentMatchResponse> responses =
+            matchQueryService.getRecentMatches(1L, 20, 20, "member@hei.gg");
+
+        assertThat(responses).extracting(GroupRecentMatchResponse::matchId)
+            .containsExactly(21L, 22L, 23L, 24L, 25L, 26L, 27L, 28L, 29L, 30L);
+    }
+
+    @Test
+    void readsOnlyTheNewest30WhenAMemberAsksFor50AtOnce() {
+        when(matchRepository.findRecentByGroupIdByResultInput(eq(1L), any())).thenReturn(List.of());
+
+        matchQueryService.getRecentMatches(1L, 50, 0, "editor@hei.gg");
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(matchRepository).findRecentByGroupIdByResultInput(eq(1L), pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getOffset()).isZero();
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(MatchQueryService.MEMBER_REACH);
+    }
+
+    @Test
+    void letsAnAdminReachTheNewest100AndNoFurther() {
+        when(accessControlService.isAdminEmail("admin@hei.gg")).thenReturn(true);
+        when(matchRepository.findRecentByGroupIdByResultInput(eq(1L), any())).thenReturn(List.of());
+
+        matchQueryService.getRecentMatches(1L, 10, 90, "admin@hei.gg");
+        List<GroupRecentMatchResponse> past = matchQueryService.getRecentMatches(1L, 10, 100, "admin@hei.gg");
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(matchRepository, times(1)).findRecentByGroupIdByResultInput(eq(1L), pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getOffset()).isEqualTo(90);
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(10);
+        assertThat(past).isEmpty();
+    }
+
+    @Test
+    void leavesASuperAdminsReachUnbounded() {
+        when(accessControlService.isSuperAdminEmail("superadmin@hei.gg")).thenReturn(true);
+        when(matchRepository.findRecentByGroupIdByResultInput(eq(1L), any())).thenReturn(List.of());
+
+        matchQueryService.getRecentMatches(1L, 50, 4000, "superadmin@hei.gg");
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(matchRepository).findRecentByGroupIdByResultInput(eq(1L), pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getOffset()).isEqualTo(4000);
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(50);
+    }
+
+    private static List<Match> matches(long firstId, int count) {
+        Group group = new Group();
+        group.setId(1L);
+        List<Match> matches = new ArrayList<>();
+        for (long id = firstId; id < firstId + count; id++) {
+            Match match = new Match();
+            match.setId(id);
+            match.setGroup(group);
+            match.setWinningTeam("HOME");
+            match.setPlayedAt(OffsetDateTime.parse("2026-03-23T08:00:00Z"));
+            matches.add(match);
+        }
+        return matches;
     }
 
     @Test
