@@ -464,6 +464,40 @@ class MatchQueryServiceTest {
     }
 
     @Test
+    void readsAnAdminsWholeReachAsOnePageOf100() {
+        when(accessControlService.isAdminEmail("admin@hei.gg")).thenReturn(true);
+        when(matchRepository.findRecentByGroupIdByResultInput(eq(1L), any())).thenReturn(List.of());
+
+        matchQueryService.getRecentMatches(1L, 100, 0, "admin@hei.gg");
+        matchQueryService.getRecentMatches(1L, 100, 0, "member@hei.gg");
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(matchRepository, times(2)).findRecentByGroupIdByResultInput(eq(1L), pageableCaptor.capture());
+        assertThat(pageableCaptor.getAllValues()).extracting(Pageable::getPageSize).containsExactly(100, 30);
+        assertThat(pageableCaptor.getAllValues()).extracting(Pageable::getOffset).containsExactly(0L, 0L);
+    }
+
+    @Test
+    void neverReadsMoreThan100AtOnceEvenForASuperAdmin() {
+        when(accessControlService.isSuperAdminEmail("superadmin@hei.gg")).thenReturn(true);
+        when(matchRepository.findRecentByGroupIdByResultInput(eq(1L), any())).thenReturn(List.of());
+
+        matchQueryService.getRecentMatches(1L, 500, 0, "superadmin@hei.gg");
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(matchRepository).findRecentByGroupIdByResultInput(eq(1L), pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(100);
+    }
+
+    @Test
+    void givesAVisitorNoMoreThanTheNewest30EvenAskingFor100() {
+        when(matchRepository.findRecentByGroupIdByResultInput(eq(1L), any())).thenReturn(matches(1, 30));
+        when(matchParticipantRepository.findByMatchIdInWithPlayerAndMatch(any())).thenReturn(List.of());
+
+        assertThat(matchQueryService.getVisitorRecentMatches(1L, 100, 0)).hasSize(30);
+    }
+
+    @Test
     void leavesASuperAdminsReachUnbounded() {
         when(accessControlService.isSuperAdminEmail("superadmin@hei.gg")).thenReturn(true);
         when(matchRepository.findRecentByGroupIdByResultInput(eq(1L), any())).thenReturn(List.of());

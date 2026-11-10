@@ -1,16 +1,15 @@
 'use client'
 
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
+import { PageNav, PageSizeSelect } from '@/components/list-pagination'
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { apiClient, isApiForbiddenError, isApiUnauthorizedError } from '@/lib/api'
 import { t } from '@/lib/i18n'
 import { useAdminAuth } from '@/lib/admin-auth'
+import { DEFAULT_PAGE_SIZE, type PageSize } from '@/lib/list-pagination'
 import type { OperationAuditLogFilters, OperationAuditLogItem } from '@/types/api'
 
-const AUDIT_INITIAL_LIMIT = 10
-const AUDIT_LOAD_MORE_LIMIT = 10
-const AUDIT_MAX_VISIBLE_LOGS = 20
 const AUDIT_ACTION_FILTER_OPTIONS = [
   'ALL',
   'PLAYER_REGISTERED',
@@ -169,77 +168,15 @@ function getActionLabel(action: string): string {
 export default function OperationAuditPage() {
   const { isAdmin, isSuperAdmin, isLoading } = useAdminAuth()
   const [logs, setLogs] = useState<OperationAuditLogItem[]>([])
-  const [nextPage, setNextPage] = useState<number>(0)
+  const [page, setPage] = useState<number>(0)
+  const [pageSize, setPageSize] = useState<PageSize>(DEFAULT_PAGE_SIZE)
+  const [totalPages, setTotalPages] = useState<number>(0)
   const [draftFilters, setDraftFilters] = useState<AuditFilterForm>(() => createEmptyAuditFilters())
   const [appliedFilters, setAppliedFilters] = useState<AuditFilterForm>(() => createEmptyAuditFilters())
   const [totalElements, setTotalElements] = useState<number>(0)
-  const [hasMoreLogs, setHasMoreLogs] = useState<boolean>(false)
   const [loading, setLoading] = useState<boolean>(true)
-  const [loadingMore, setLoadingMore] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
-
-  const loadLogs = async (options: { append?: boolean } = {}) => {
-    const append = options.append ?? false
-    const currentLoadedCount = append ? logs.length : 0
-    const remainingCount = Math.max(0, AUDIT_MAX_VISIBLE_LOGS - currentLoadedCount)
-    const requestedSize = Math.min(
-      append ? AUDIT_LOAD_MORE_LIMIT : AUDIT_INITIAL_LIMIT,
-      remainingCount,
-    )
-
-    if (requestedSize <= 0) {
-      setHasMoreLogs(false)
-      return
-    }
-
-    if (append) {
-      setLoadingMore(true)
-    } else {
-      setLoading(true)
-    }
-    setError(null)
-
-    try {
-      const requestedPage = append ? nextPage : 0
-      const response = await apiClient.getOperationAuditLogPage({
-        page: requestedPage,
-        size: requestedSize,
-        ...toApiFilters(appliedFilters),
-      })
-      const nextLogs = append ? [...logs, ...response.items] : response.items
-      const nextLoadedCount = nextLogs.length
-
-      setLogs(nextLogs)
-      setTotalElements(response.totalElements)
-      setNextPage(requestedPage + 1)
-      setHasMoreLogs(
-        nextLoadedCount < AUDIT_MAX_VISIBLE_LOGS
-        && !response.last
-        && response.items.length === requestedSize,
-      )
-    } catch (loadError) {
-      if (isApiUnauthorizedError(loadError)) {
-        setError(t('common.adminLoginRequired'))
-      } else if (isApiForbiddenError(loadError)) {
-        setError(t('common.permissionDenied'))
-      } else {
-        setError(t('audit.loadError'))
-      }
-
-      if (!append) {
-        setLogs([])
-        setTotalElements(0)
-        setNextPage(0)
-        setHasMoreLogs(false)
-      }
-    } finally {
-      if (append) {
-        setLoadingMore(false)
-      } else {
-        setLoading(false)
-      }
-    }
-  }
+  const listTopRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     if (isLoading) {
@@ -250,9 +187,7 @@ export default function OperationAuditPage() {
     if (!isAdmin) {
       setLogs([])
       setTotalElements(0)
-      setNextPage(0)
-      setHasMoreLogs(false)
-      setLoadingMore(false)
+      setTotalPages(0)
       setLoading(false)
       setError(t('audit.adminOnly'))
       return
@@ -264,24 +199,28 @@ export default function OperationAuditPage() {
       setError(null)
       try {
         const response = await apiClient.getOperationAuditLogPage({
-          page: 0,
-          size: AUDIT_INITIAL_LIMIT,
+          page,
+          size: pageSize,
           ...toApiFilters(appliedFilters),
         })
-        if (active) {
-          setLogs(response.items)
-          setTotalElements(response.totalElements)
-          setNextPage(1)
-          setHasMoreLogs(
-            response.items.length < AUDIT_MAX_VISIBLE_LOGS
-            && !response.last
-            && response.items.length === AUDIT_INITIAL_LIMIT,
-          )
+        if (!active) {
+          return
         }
+        if (response.items.length === 0 && page > 0 && response.totalPages > 0) {
+          // Fewer pages than before (a narrower search, say): go to the last one there is.
+          setPage(Math.min(page, response.totalPages) - 1)
+          return
+        }
+        setLogs(response.items)
+        setTotalElements(response.totalElements)
+        setTotalPages(response.totalPages)
       } catch (loadError) {
         if (!active) {
           return
         }
+        setLogs([])
+        setTotalElements(0)
+        setTotalPages(0)
         if (isApiUnauthorizedError(loadError)) {
           setError(t('common.adminLoginRequired'))
         } else if (isApiForbiddenError(loadError)) {
@@ -300,11 +239,13 @@ export default function OperationAuditPage() {
     return () => {
       active = false
     }
-  }, [appliedFilters, isAdmin, isLoading, isSuperAdmin])
+  }, [appliedFilters, isAdmin, isLoading, isSuperAdmin, page, pageSize])
+
+  const pageCount = Math.max(totalPages, 1)
 
   const handleFilterSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setNextPage(0)
+    setPage(0)
     setAppliedFilters({ ...draftFilters })
   }
 
@@ -312,15 +253,25 @@ export default function OperationAuditPage() {
     const emptyFilters = createEmptyAuditFilters()
     setDraftFilters(emptyFilters)
     setAppliedFilters({ ...emptyFilters })
-    setNextPage(0)
+    setPage(0)
   }
 
-  const handleLoadMore = () => {
-    if (loading || loadingMore || !hasMoreLogs || logs.length >= AUDIT_MAX_VISIBLE_LOGS) {
+  const handlePageSizeChange = (size: PageSize) => {
+    setPageSize(size)
+    setPage(0)
+  }
+
+  const handleGoToPage = (target: number) => {
+    const next = Math.min(Math.max(0, target), pageCount - 1)
+    if (next === page) {
       return
     }
-
-    void loadLogs({ append: true })
+    setPage(next)
+    // Pressed at the bottom of a long page: bring the top of the list back into view.
+    const top = listTopRef.current
+    if (top && top.getBoundingClientRect().top < 0) {
+      top.scrollIntoView({ block: 'start' })
+    }
   }
 
   return (
@@ -343,14 +294,17 @@ export default function OperationAuditPage() {
       )}
 
       <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
-        <div className="flex items-center justify-between gap-3">
+        <div ref={listTopRef} className="flex scroll-mt-4 flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('audit.recentTitle')}</h3>
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('audit.recentDescription')}</p>
           </div>
-          <span className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-300">
-            {t('audit.count', { count: totalElements })}
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-300">
+              {t('audit.count', { count: totalElements })}
+            </span>
+            <PageSizeSelect value={pageSize} onChange={handlePageSizeChange} disabled={loading} />
+          </div>
         </div>
 
         <form onSubmit={handleFilterSubmit} className="mt-4 grid gap-3 border-t border-slate-100 pt-4 dark:border-slate-800 sm:grid-cols-2 lg:grid-cols-6">
@@ -460,7 +414,9 @@ export default function OperationAuditPage() {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {logs.map((log, index) => (
                     <tr key={log.id} className="align-top">
-                      <td className="whitespace-nowrap px-3 py-2 text-slate-500 dark:text-slate-400">{index + 1}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-slate-500 dark:text-slate-400">
+                        {page * pageSize + index + 1}
+                      </td>
                       <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-300">
                         {formatDateTime(log.createdAt)}
                       </td>
@@ -477,27 +433,20 @@ export default function OperationAuditPage() {
                 </tbody>
               </table>
             </div>
-            {(hasMoreLogs || logs.length > 0) && (
-              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {t('audit.pagination.status', {
-                    shown: logs.length,
-                    max: Math.min(totalElements, AUDIT_MAX_VISIBLE_LOGS),
-                  })}
-                </p>
-                {hasMoreLogs && (
-                  <button
-                    type="button"
-                    disabled={loading || loadingMore}
-                    onClick={handleLoadMore}
-                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-                  >
-                    {loadingMore ? t('audit.pagination.loadingMore') : t('audit.pagination.loadMore')}
-                  </button>
-                )}
-              </div>
-            )}
+            <p className="mt-3 text-center text-xs text-slate-500 dark:text-slate-400">
+              {t('common.pagination.status', { page: page + 1, totalPages: pageCount })}
+            </p>
           </>
+        )}
+        {/* Kept outside the table so it stays put while the next page loads. */}
+        {!error && (logs.length > 0 || page > 0) && (
+          <PageNav
+            label={t('audit.pagination.label')}
+            page={page}
+            pageCount={pageCount}
+            onPageChange={handleGoToPage}
+            disabled={loading}
+          />
         )}
       </article>
     </section>
