@@ -31,7 +31,9 @@ import org.springframework.stereotype.Service;
 public class MatchQueryService {
 
     private static final int DEFAULT_LIMIT = 10;
-    private static final int MAX_LIMIT = 50;
+    // A page of up to 100, so an admin can see their whole reach on one page; what anyone gets is
+    // still held to their reach below (MEMBER_REACH, ADMIN_REACH, VISITOR_WINDOW).
+    private static final int MAX_LIMIT = 100;
     private static final int DEFAULT_OFFSET = 0;
     // The full-history endpoint is super-admin only, so it is allowed a much larger page size
     // than the member/admin-facing "recent matches" endpoint above.

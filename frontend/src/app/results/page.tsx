@@ -18,6 +18,8 @@ import { findUniquePlayerByNicknamePrefix } from '@/lib/player-autocomplete'
 import { buildMatchResultUpdateRequest, type ParticipantRaceEdit } from '@/lib/match-result-edit'
 import { resolveRaceCompositionTeamSize } from '@/lib/race-composition'
 import { recentMatchMaxLimit } from '@/lib/recent-match-reach'
+import { DEFAULT_PAGE_SIZE, type PageSize, pageCountWithinReach } from '@/lib/list-pagination'
+import { PageNav, PageSizeSelect } from '@/components/list-pagination'
 import {
   ASSIGNED_RACES,
   formatRecordedRacePlayer,
@@ -33,10 +35,6 @@ import type {
 } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
-const RECENT_MATCH_MEMBER_INITIAL_LIMIT = 10
-const RECENT_MATCH_ADMIN_INITIAL_LIMIT = 20
-const RECENT_MATCH_LOAD_MORE_LIMIT = 10
-const MATCH_HISTORY_PAGE_SIZE = 20
 const winnerTeamOptions: TeamSide[] = ['HOME', 'AWAY']
 const manualTeamSizeOptions = [3, 2] as const
 type OperatorEntryMode = 'existing' | 'manual'
@@ -126,21 +124,6 @@ function formatRaceMatchup(match: RecentMatchItem): string {
     return home === away ? home : `${home} / ${away}`
   }
   return home.length > 0 ? home : away
-}
-
-function appendUniqueRecentMatches(
-  previousMatches: RecentMatchItem[],
-  nextMatches: RecentMatchItem[],
-): RecentMatchItem[] {
-  const seenMatchIds = new Set(previousMatches.map((match) => match.matchId))
-  const uniqueNextMatches = nextMatches.filter((match) => {
-    if (seenMatchIds.has(match.matchId)) {
-      return false
-    }
-    seenMatchIds.add(match.matchId)
-    return true
-  })
-  return [...previousMatches, ...uniqueNextMatches]
 }
 
 function isWinningTeam(team: TeamSide, winningTeam: TeamSide | null): boolean {
@@ -252,12 +235,15 @@ export default function ResultsPage() {
   const [importSuccess, setImportSuccess] = useState<string | null>(null)
   const [recentMatches, setRecentMatches] = useState<RecentMatchItem[]>([])
   const [recentMatchesLoading, setRecentMatchesLoading] = useState<boolean>(true)
-  const [recentMatchesLoadingMore, setRecentMatchesLoadingMore] = useState<boolean>(false)
-  const [recentMatchesHasMore, setRecentMatchesHasMore] = useState<boolean>(false)
-  const [recentMatchesFetchedCount, setRecentMatchesFetchedCount] = useState<number>(0)
   const [recentMatchesError, setRecentMatchesError] = useState<string | null>(null)
   const [appliedSearchSelection, setAppliedSearchSelection] = useState<boolean>(false)
-  const [historyPage, setHistoryPage] = useState<number>(0)
+  // One page of the list for everyone: the recent results within the reader's reach, or for a
+  // super admin the full history.
+  const [listPage, setListPage] = useState<number>(0)
+  const [pageSize, setPageSize] = useState<PageSize>(DEFAULT_PAGE_SIZE)
+  // The recent results come without a total: a page that came back short is the last one.
+  const [recentLastPage, setRecentLastPage] = useState<number | null>(null)
+  const recentListTopRef = useRef<HTMLDivElement | null>(null)
   const [historyTotalPages, setHistoryTotalPages] = useState<number>(0)
   const [historyTotalElements, setHistoryTotalElements] = useState<number>(0)
   const [draftFromDate, setDraftFromDate] = useState<string>('')
@@ -295,12 +281,13 @@ export default function ResultsPage() {
         typeof participant.assignedRace === 'string' && participant.assignedRace.trim().length > 0,
     ) ?? false
 
+  // Numbered across pages, so the 11th result is 11 on page 2 as well.
   const recentMatchDisplayOrderMap = useMemo(
     () =>
       new Map(
-        recentMatches.map((recentMatch, index) => [recentMatch.matchId, index + 1]),
+        recentMatches.map((recentMatch, index) => [recentMatch.matchId, listPage * pageSize + index + 1]),
       ),
-    [recentMatches],
+    [listPage, pageSize, recentMatches],
   )
 
   const selectedRecentMatch = useMemo(
@@ -388,29 +375,26 @@ export default function ResultsPage() {
     [isSuperAdmin, recentMatchDisplayOrderMap],
   )
 
-  const loadRecentMatches = async (options: { append?: boolean } = {}) => {
-    const append = options.append ?? false
-
+  const loadRecentMatches = async () => {
     if (isSuperAdmin) {
-      if (append) {
-        return
-      }
-
       setRecentMatchesLoading(true)
       setRecentMatchesError(null)
 
       try {
         const response = await apiClient.getMatchHistoryPage(TEMP_GROUP_ID, {
-          page: historyPage,
-          size: MATCH_HISTORY_PAGE_SIZE,
+          page: listPage,
+          size: pageSize,
           fromDate: appliedFromDate || undefined,
           toDate: appliedToDate || undefined,
         })
+        if (response.items.length === 0 && listPage > 0 && response.totalPages > 0) {
+          // The page emptied (its last result was deleted, say): go to the last page there is.
+          setListPage(Math.min(listPage, response.totalPages) - 1)
+          return
+        }
         setRecentMatches(response.items)
         setHistoryTotalPages(response.totalPages)
         setHistoryTotalElements(response.totalElements)
-        setRecentMatchesHasMore(false)
-        setRecentMatchesFetchedCount(response.items.length)
 
         if (selectedRecentMatchId !== null) {
           const selectedMatch = response.items.find((match) => match.matchId === selectedRecentMatchId)
@@ -431,8 +415,6 @@ export default function ResultsPage() {
         setRecentMatches([])
         setHistoryTotalPages(0)
         setHistoryTotalElements(0)
-        setRecentMatchesHasMore(false)
-        setRecentMatchesFetchedCount(0)
         setRecentMatchesError(t('results.recent.loadError'))
       } finally {
         setRecentMatchesLoading(false)
@@ -440,46 +422,31 @@ export default function ResultsPage() {
       return
     }
 
-    const initialLimit = isAdmin ? RECENT_MATCH_ADMIN_INITIAL_LIMIT : RECENT_MATCH_MEMBER_INITIAL_LIMIT
-    const maxLimit = recentMatchMaxLimit(isAdmin)
-    const offset = append ? recentMatchesFetchedCount : 0
-    const remainingCount = Math.max(0, maxLimit - offset)
-    const requestedLimit = Math.min(
-      append ? RECENT_MATCH_LOAD_MORE_LIMIT : initialLimit,
-      remainingCount,
-    )
-
-    if (requestedLimit <= 0) {
-      setRecentMatchesHasMore(false)
-      return
-    }
-
-    if (append) {
-      setRecentMatchesLoadingMore(true)
-    } else {
-      setRecentMatchesLoading(true)
-    }
+    // The backend holds every reader to their reach (30 or 100) and cuts a page that runs over it;
+    // asking the page size at its own offset keeps each page where it belongs.
+    setRecentMatchesLoading(true)
     setRecentMatchesError(null)
 
     try {
       const response = await apiClient.getRecentMatches(
         TEMP_GROUP_ID,
-        requestedLimit,
-        offset,
+        pageSize,
+        listPage * pageSize,
       )
       const completedMatches = response.filter(
         (match) => match.winningTeam === 'HOME' || match.winningTeam === 'AWAY',
       )
-      const fetchedCount = append ? offset + response.length : response.length
-      setRecentMatchesFetchedCount(fetchedCount)
-      setRecentMatchesHasMore(
-        fetchedCount < maxLimit && response.length === requestedLimit,
-      )
-      if (append) {
-        setRecentMatches((previousMatches) =>
-          appendUniqueRecentMatches(previousMatches, completedMatches),
-        )
+      if (response.length === 0 && listPage > 0) {
+        // Nothing left here (the last result on the last page was deleted, say): go back a page.
+        setRecentLastPage(listPage - 1)
+        setListPage(listPage - 1)
         return
+      }
+      if (response.length < pageSize) {
+        // Short: this is the last page.
+        setRecentLastPage(listPage)
+      } else {
+        setRecentLastPage((previous) => (previous !== null && listPage >= previous ? null : previous))
       }
 
       setRecentMatches(completedMatches)
@@ -495,33 +462,11 @@ export default function ResultsPage() {
         }
       }
     } catch {
-      if (!append) {
-        setRecentMatches([])
-        setRecentMatchesHasMore(false)
-        setRecentMatchesFetchedCount(0)
-      }
+      setRecentMatches([])
       setRecentMatchesError(t('results.recent.loadError'))
     } finally {
-      if (append) {
-        setRecentMatchesLoadingMore(false)
-      } else {
-        setRecentMatchesLoading(false)
-      }
+      setRecentMatchesLoading(false)
     }
-  }
-
-  const handleLoadMoreRecentMatches = async () => {
-    const maxLimit = recentMatchMaxLimit(isAdmin)
-    if (
-      !canAccess ||
-      recentMatchesLoadingMore ||
-      !recentMatchesHasMore ||
-      recentMatchesFetchedCount >= maxLimit
-    ) {
-      return
-    }
-
-    await loadRecentMatches({ append: true })
   }
 
   useEffect(() => {
@@ -531,23 +476,29 @@ export default function ResultsPage() {
 
     void loadRecentMatches()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminAuthLoading, isAdmin, isSuperAdmin, historyPage, appliedFromDate, appliedToDate])
+  }, [adminAuthLoading, isAdmin, isSuperAdmin, listPage, pageSize, appliedFromDate, appliedToDate])
 
   useEffect(() => {
+    // Whose list it is changed: start again from the first page.
+    setListPage(0)
+    setRecentLastPage(null)
     if (!isSuperAdmin) {
-      setHistoryPage(0)
       setDraftFromDate('')
       setDraftToDate('')
       setAppliedFromDate('')
       setAppliedToDate('')
     }
-  }, [isSuperAdmin])
+  }, [isAdmin, isSuperAdmin])
+
+  const listPageCount = isSuperAdmin
+    ? Math.max(historyTotalPages, 1)
+    : pageCountWithinReach(recentMatchMaxLimit(isAdmin), pageSize, recentLastPage)
 
   const handleApplyHistoryFilters = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setAppliedFromDate(draftFromDate)
     setAppliedToDate(draftToDate)
-    setHistoryPage(0)
+    setListPage(0)
   }
 
   const handleResetHistoryFilters = () => {
@@ -555,15 +506,26 @@ export default function ResultsPage() {
     setDraftToDate('')
     setAppliedFromDate('')
     setAppliedToDate('')
-    setHistoryPage(0)
+    setListPage(0)
   }
 
-  const handlePreviousHistoryPage = () => {
-    setHistoryPage((previous) => Math.max(0, previous - 1))
+  const handlePageSizeChange = (size: PageSize) => {
+    setPageSize(size)
+    setListPage(0)
+    setRecentLastPage(null)
   }
 
-  const handleNextHistoryPage = () => {
-    setHistoryPage((previous) => (previous + 1 < historyTotalPages ? previous + 1 : previous))
+  const handleGoToListPage = (page: number) => {
+    const target = Math.min(Math.max(0, page), listPageCount - 1)
+    if (target === listPage) {
+      return
+    }
+    setListPage(target)
+    // Pressed at the bottom of a long page: bring the top of the list back into view.
+    const top = recentListTopRef.current
+    if (top && top.getBoundingClientRect().top < 0) {
+      top.scrollIntoView({ block: 'start' })
+    }
   }
 
   useEffect(() => {
@@ -1443,6 +1405,20 @@ export default function ResultsPage() {
           </form>
         )}
 
+        {canAccess && (
+          <div
+            ref={recentListTopRef}
+            className="mt-3 flex scroll-mt-4 flex-wrap items-center justify-between gap-2"
+          >
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              {isSuperAdmin
+                ? t('common.pagination.status', { page: listPage + 1, totalPages: listPageCount })
+                : t('results.recent.pagination.reach', { reach: recentMatchMaxLimit(isAdmin) })}
+            </span>
+            <PageSizeSelect value={pageSize} onChange={handlePageSizeChange} disabled={recentMatchesLoading} />
+          </div>
+        )}
+
         {recentActionMessage && (
           <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
             {recentActionMessage}
@@ -1627,49 +1603,17 @@ export default function ResultsPage() {
                 })}
               </tbody>
             </table>
-            {isSuperAdmin ? (
-              <div className="flex items-center justify-between border-t border-slate-100 bg-white px-3 py-3 dark:border-slate-800 dark:bg-slate-900">
-                <button
-                  type="button"
-                  onClick={handlePreviousHistoryPage}
-                  disabled={historyPage <= 0 || recentMatchesLoading}
-                  className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-slate-900 hover:bg-slate-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-300 dark:hover:bg-slate-100 dark:hover:text-slate-900"
-                >
-                  {t('results.recent.history.pagination.previous')}
-                </button>
-                <span className="text-xs text-slate-500 dark:text-slate-400">
-                  {t('results.recent.history.pagination.status', {
-                    page: historyPage + 1,
-                    totalPages: Math.max(historyTotalPages, 1),
-                  })}
-                </span>
-                <button
-                  type="button"
-                  onClick={handleNextHistoryPage}
-                  disabled={historyPage + 1 >= historyTotalPages || recentMatchesLoading}
-                  className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-slate-900 hover:bg-slate-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-300 dark:hover:bg-slate-100 dark:hover:text-slate-900"
-                >
-                  {t('results.recent.history.pagination.next')}
-                </button>
-              </div>
-            ) : (
-              canAccess &&
-              recentMatchesHasMore && (
-                <div className="border-t border-slate-100 bg-white px-3 py-3 text-center dark:border-slate-800 dark:bg-slate-900">
-                  <button
-                    type="button"
-                    onClick={handleLoadMoreRecentMatches}
-                    disabled={recentMatchesLoadingMore}
-                    className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-slate-900 hover:bg-slate-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-300 dark:hover:bg-slate-100 dark:hover:text-slate-900"
-                  >
-                    {recentMatchesLoadingMore
-                      ? t('results.recent.loadingMore')
-                      : t('results.recent.loadMore')}
-                  </button>
-                </div>
-              )
-            )}
           </div>
+        )}
+
+        {canAccess && !recentMatchesError && (recentMatches.length > 0 || listPage > 0) && (
+          <PageNav
+            label={t('results.recent.pagination.label')}
+            page={listPage}
+            pageCount={listPageCount}
+            onPageChange={handleGoToListPage}
+            disabled={recentMatchesLoading}
+          />
         )}
       </article>
 
