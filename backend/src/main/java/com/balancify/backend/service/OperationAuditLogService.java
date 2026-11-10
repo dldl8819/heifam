@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -78,6 +79,13 @@ public class OperationAuditLogService {
     public static final String ACTION_ACCESS_PEOPLE_UNGROUPED = "ACCESS_PEOPLE_UNGROUPED";
 
     private static final int MAX_PAGE_SIZE = 200;
+    static final List<String> ADMIN_VISIBLE_ACTOR_ROLES = List.of(
+        AccessControlService.ACTOR_ROLE_RESULT_EDITOR,
+        AccessControlService.ACTOR_ROLE_ADMIN
+    );
+    // Tier changes write "mmr=<before> -> <after>" into their details (recordPlayerTierUpdate).
+    private static final String MMR_DETAILS_PATTERN = "%mmr=%";
+    private static final Pattern MMR_DETAILS_PART = Pattern.compile("(?:,\\s*)?mmr=[^,]*");
 
     private final OperationAuditLogRepository operationAuditLogRepository;
     private final AccessControlService accessControlService;
@@ -113,19 +121,31 @@ public class OperationAuditLogService {
 
     @Transactional(readOnly = true)
     public OperationAuditLogPageResponse getLogs(int page, int size, OperationAuditLogFilter filter) {
-        return getLogs(page, size, filter, false);
+        return getLogs(page, size, filter, ReadScope.EVERYTHING);
     }
 
+    /**
+     * What an admin who is not a super admin reads: the work of the members granted result editing
+     * and of the admins, their own included, but not a super admin's or a member's. Entries written
+     * before roles were recorded have none and stay out. An admin without MMR access gets every MMR
+     * figure taken out of the details and cannot find one by searching them; and no admin can search
+     * by an actor's email, only by the name shown.
+     */
     @Transactional(readOnly = true)
-    public OperationAuditLogPageResponse getResultEditorLogs(int page, int size, OperationAuditLogFilter filter) {
-        return getLogs(page, size, filter, true);
+    public OperationAuditLogPageResponse getAdminLogs(
+        int page,
+        int size,
+        OperationAuditLogFilter filter,
+        boolean canViewMmr
+    ) {
+        return getLogs(page, size, filter, new ReadScope(ADMIN_VISIBLE_ACTOR_ROLES, false, !canViewMmr));
     }
 
     private OperationAuditLogPageResponse getLogs(
         int page,
         int size,
         OperationAuditLogFilter filter,
-        boolean resultEditorsOnly
+        ReadScope scope
     ) {
         int normalizedPage = Math.max(0, page);
         int normalizedLimit = Math.max(1, Math.min(MAX_PAGE_SIZE, size));
@@ -137,11 +157,11 @@ public class OperationAuditLogService {
         OperationAuditLogFilter normalizedFilter = filter == null ? OperationAuditLogFilter.empty() : filter;
         OffsetDateTime retentionCutoff = OffsetDateTime.now(clock)
             .minusYears(OperationAuditRetentionService.RETENTION_YEARS);
-        Page<OperationAuditLog> logs = normalizedFilter.isEmpty() && !resultEditorsOnly
+        Page<OperationAuditLog> logs = normalizedFilter.isEmpty() && scope.actorRoles() == null
             ? operationAuditLogRepository
                 .findAllByCreatedAtGreaterThanEqualOrderByCreatedAtDescIdDesc(retentionCutoff, pageRequest)
             : operationAuditLogRepository.findAll(
-                buildSpecification(normalizedFilter, retentionCutoff, resultEditorsOnly),
+                buildSpecification(normalizedFilter, retentionCutoff, scope),
                 pageRequest
             );
         // Whoever acted with an email grouped as one person shows as that person, earlier entries included.
@@ -155,7 +175,7 @@ public class OperationAuditLogService {
         Map<String, String> personNames = actors.isEmpty() ? Map.of() : accessControlService.resolveGroupedNames(actors);
         List<OperationAuditLogResponse> items = logs
             .stream()
-            .map(log -> toResponse(log, personNames))
+            .map(log -> toResponse(log, personNames, scope.hideMmr()))
             .toList();
         return new OperationAuditLogPageResponse(
             items,
@@ -171,7 +191,7 @@ public class OperationAuditLogService {
     private Specification<OperationAuditLog> buildSpecification(
         OperationAuditLogFilter filter,
         OffsetDateTime retentionCutoff,
-        boolean resultEditorsOnly
+        ReadScope scope
     ) {
         return (root, query, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
@@ -181,11 +201,8 @@ public class OperationAuditLogService {
                 retentionCutoff
             ));
 
-            if (resultEditorsOnly) {
-                predicates.add(criteriaBuilder.equal(
-                    root.get("actorRole"),
-                    AccessControlService.ACTOR_ROLE_RESULT_EDITOR
-                ));
+            if (scope.actorRoles() != null) {
+                predicates.add(root.get("actorRole").in(scope.actorRoles()));
             }
 
             if (filter.fromDate() != null) {
@@ -203,10 +220,15 @@ public class OperationAuditLogService {
 
             String actor = toLikePattern(filter.actor());
             if (actor != null) {
-                predicates.add(criteriaBuilder.or(
-                    criteriaBuilder.like(criteriaBuilder.lower(root.get("actorEmail")), actor, '\\'),
-                    criteriaBuilder.like(criteriaBuilder.lower(root.get("actorNickname")), actor, '\\')
-                ));
+                Predicate byNickname =
+                    criteriaBuilder.like(criteriaBuilder.lower(root.get("actorNickname")), actor, '\\');
+                // Matching emails would let a reader spell out another admin's address a letter at a time.
+                predicates.add(scope.searchActorEmail()
+                    ? criteriaBuilder.or(
+                        criteriaBuilder.like(criteriaBuilder.lower(root.get("actorEmail")), actor, '\\'),
+                        byNickname
+                    )
+                    : byNickname);
             }
 
             String action = normalizeActionFilter(filter.action());
@@ -216,10 +238,19 @@ public class OperationAuditLogService {
 
             String content = toLikePattern(filter.content());
             if (content != null) {
+                Predicate byDetails =
+                    criteriaBuilder.like(criteriaBuilder.lower(root.get("details")), content, '\\');
+                if (scope.hideMmr()) {
+                    // Searching details that hold an MMR would tell which figure they hold, so they are left out.
+                    byDetails = criteriaBuilder.and(
+                        criteriaBuilder.notLike(criteriaBuilder.lower(root.get("details")), MMR_DETAILS_PATTERN, '\\'),
+                        byDetails
+                    );
+                }
                 predicates.add(criteriaBuilder.or(
                     criteriaBuilder.like(criteriaBuilder.lower(root.get("action")), content, '\\'),
                     criteriaBuilder.like(criteriaBuilder.lower(root.get("summary")), content, '\\'),
-                    criteriaBuilder.like(criteriaBuilder.lower(root.get("details")), content, '\\')
+                    byDetails
                 ));
             }
 
@@ -1007,7 +1038,7 @@ public class OperationAuditLogService {
         };
     }
 
-    private OperationAuditLogResponse toResponse(OperationAuditLog log, Map<String, String> personNames) {
+    private OperationAuditLogResponse toResponse(OperationAuditLog log, Map<String, String> personNames, boolean hideMmr) {
         String actorEmail = trimToNull(log.getActorEmail());
         String personName = actorEmail == null ? null : personNames.get(actorEmail.toLowerCase(Locale.ROOT));
         return new OperationAuditLogResponse(
@@ -1020,9 +1051,21 @@ public class OperationAuditLogService {
             log.getTargetLabel(),
             log.getGroupId(),
             log.getSummary(),
-            log.getDetails(),
+            hideMmr ? withoutMmr(log.getDetails()) : log.getDetails(),
             log.getCreatedAt()
         );
+    }
+
+    /** "tier=A -> S, mmr=1200 -> 1350" becomes "tier=A -> S"; details holding nothing else become none. */
+    static String withoutMmr(String details) {
+        if (details == null) {
+            return null;
+        }
+        String stripped = MMR_DETAILS_PART.matcher(details).replaceAll("").trim();
+        if (stripped.startsWith(",")) {
+            stripped = stripped.substring(1).trim();
+        }
+        return stripped.isEmpty() ? null : stripped;
     }
 
     private String resolveActorNickname(OperationAuditLog log) {
@@ -1058,6 +1101,14 @@ public class OperationAuditLogService {
             return value;
         }
         return value.substring(0, maxLength);
+    }
+
+    /**
+     * Whose entries a reader gets (null: everyone's), whether their actor search also matches
+     * emails, and whether MMR figures are kept from them.
+     */
+    private record ReadScope(List<String> actorRoles, boolean searchActorEmail, boolean hideMmr) {
+        static final ReadScope EVERYTHING = new ReadScope(null, true, false);
     }
 
     public record OperationAuditLogFilter(
