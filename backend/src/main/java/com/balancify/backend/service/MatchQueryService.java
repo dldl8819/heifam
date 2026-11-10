@@ -53,17 +53,20 @@ public class MatchQueryService {
     private final MatchParticipantRepository matchParticipantRepository;
     private final AccessControlService accessControlService;
     private final GroupReadCacheService groupReadCacheService;
+    private final MatchEditWindow matchEditWindow;
 
     public MatchQueryService(
         MatchRepository matchRepository,
         MatchParticipantRepository matchParticipantRepository,
         AccessControlService accessControlService,
-        GroupReadCacheService groupReadCacheService
+        GroupReadCacheService groupReadCacheService,
+        MatchEditWindow matchEditWindow
     ) {
         this.matchRepository = matchRepository;
         this.matchParticipantRepository = matchParticipantRepository;
         this.accessControlService = accessControlService;
         this.groupReadCacheService = groupReadCacheService;
+        this.matchEditWindow = matchEditWindow;
     }
 
     /**
@@ -221,6 +224,8 @@ public class MatchQueryService {
         boolean requesterCanEditAnyMatch,
         String requesterEmail
     ) {
+        // Past 48 hours after its result went in, a match is a super admin's alone to change.
+        boolean editsAnyTime = requesterEmail != null && accessControlService.isSuperAdminEmail(requesterEmail);
         Map<Long, List<MatchParticipant>> participantsByMatchId = loadParticipantsByMatchId(matches);
         Map<String, String> nicknameByRecordedByEmail = loadRecordedByNicknamesByEmail(matches);
 
@@ -280,7 +285,8 @@ public class MatchQueryService {
                 homeMmr,
                 awayMmr,
                 Math.abs(homeMmr - awayMmr),
-                requesterCanEditAnyMatch || isSameRecordedByEmail(match.getResultRecordedByEmail(), requesterEmail),
+                (requesterCanEditAnyMatch || isSameRecordedByEmail(match.getResultRecordedByEmail(), requesterEmail))
+                    && (editsAnyTime || matchEditWindow.isOpen(match)),
                 match.isRacesRecorded()
             ));
         }

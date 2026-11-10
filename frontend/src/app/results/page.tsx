@@ -18,6 +18,7 @@ import { findUniquePlayerByNicknamePrefix } from '@/lib/player-autocomplete'
 import { buildMatchResultUpdateRequest, type ParticipantRaceEdit } from '@/lib/match-result-edit'
 import { resolveRaceCompositionTeamSize } from '@/lib/race-composition'
 import { recentMatchMaxLimit } from '@/lib/recent-match-reach'
+import { RESULT_EDIT_WINDOW_HOURS, isResultEditWindowOpen } from '@/lib/match-edit-window'
 import { DEFAULT_PAGE_SIZE, type PageSize, pageCountWithinReach } from '@/lib/list-pagination'
 import { PageNav, PageSizeSelect } from '@/components/list-pagination'
 import {
@@ -200,6 +201,11 @@ export default function ResultsPage() {
   const showMmr = canViewMmr && mmrVisible
   // Other members may only fix races on their own matches; the backend enforces the same rule.
   const canChangeMatchWinner = isAdmin || isMatchResultEditor
+  // Who may change anyone's results, within 48 hours of each result unless a super admin.
+  const canEditResultsByRole = isAdmin || isMatchResultEditor
+  // A change refused by the backend for time rather than role: tell the reader so.
+  const editRefusedForTime = (match: RecentMatchItem | null) =>
+    !isSuperAdmin && match !== null && !isResultEditWindowOpen(match)
   const canUseManualEntry = canAccess
   const [manualEntryOpen, setManualEntryOpen] = useState<boolean>(false)
   const [operatorEntryMode, setOperatorEntryMode] = useState<OperatorEntryMode>('manual')
@@ -280,6 +286,10 @@ export default function ResultsPage() {
       (participant) =>
         typeof participant.assignedRace === 'string' && participant.assignedRace.trim().length > 0,
     ) ?? false
+
+  // Editors see the column on every row: a button within 48 hours of the result, a note after it.
+  const showRecentActionColumn =
+    canEditResultsByRole || recentMatches.some((recentMatch) => recentMatch.canEditRaceComposition)
 
   // Numbered across pages, so the 11th result is 11 on page 2 as well.
   const recentMatchDisplayOrderMap = useMemo(
@@ -556,6 +566,12 @@ export default function ResultsPage() {
           matchReference: formatMatchReference(matched.matchId),
         })
       )
+      setAppliedSearchSelection(true)
+      return
+    }
+
+    // A link to a match past its 48 hours opens it for viewing only (MatchEditWindow).
+    if (!matched.canEditRaceComposition) {
       setAppliedSearchSelection(true)
       return
     }
@@ -921,7 +937,8 @@ export default function ResultsPage() {
   }
 
   const handlePickRecentMatch = (recentMatch: RecentMatchItem) => {
-    if ((!isAdmin && !recentMatch.canEditRaceComposition) || isRecentSaving || isRecentDeleting) {
+    // The backend says per match who may change it, the 48-hour window included (MatchEditWindow).
+    if (!recentMatch.canEditRaceComposition || isRecentSaving || isRecentDeleting) {
       return
     }
 
@@ -995,8 +1012,8 @@ export default function ResultsPage() {
       return
     }
 
-    if (!isAdmin && !selectedRecentMatch?.canEditRaceComposition) {
-      setError(t('common.adminOnlyAction'))
+    if (!selectedRecentMatch?.canEditRaceComposition) {
+      setError(t(canEditResultsByRole ? 'results.recent.editWindowClosed' : 'common.adminOnlyAction'))
       return
     }
 
@@ -1027,7 +1044,7 @@ export default function ResultsPage() {
       if (isApiTooManyRequestsError(updateError)) {
         setError(t('results.recent.editLimitReached'))
       } else if (isApiForbiddenError(updateError)) {
-        setError(t('common.permissionDenied'))
+        setError(t(editRefusedForTime(selectedRecentMatch) ? 'results.recent.editWindowClosed' : 'common.permissionDenied'))
       } else {
         setError(t('results.recent.updateFailure'))
       }
@@ -1074,7 +1091,7 @@ export default function ResultsPage() {
       await loadRecentMatches()
     } catch (deleteError) {
       if (isApiForbiddenError(deleteError)) {
-        setError(t('common.permissionDenied'))
+        setError(t(editRefusedForTime(selectedRecentMatch) ? 'results.recent.editWindowClosed' : 'common.permissionDenied'))
       } else if (isApiNotFoundError(deleteError)) {
         setError(t('results.recent.deleteNotFound'))
       } else {
@@ -1418,6 +1435,11 @@ export default function ResultsPage() {
             <PageSizeSelect value={pageSize} onChange={handlePageSizeChange} disabled={recentMatchesLoading} />
           </div>
         )}
+        {canEditResultsByRole && !isSuperAdmin && (
+          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+            {t('results.recent.editWindowNote', { hours: RESULT_EDIT_WINDOW_HOURS })}
+          </p>
+        )}
 
         {recentActionMessage && (
           <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
@@ -1465,7 +1487,7 @@ export default function ResultsPage() {
                   <th className="min-w-32 break-keep px-3 py-2">{t('results.recent.table.homeTeam')}</th>
                   <th className="min-w-32 break-keep px-3 py-2">{t('results.recent.table.awayTeam')}</th>
                   {showMmr && <th className="px-3 py-2">{t('results.recent.table.mmrDiff')}</th>}
-                  {(isAdmin || recentMatches.some((recentMatch) => recentMatch.canEditRaceComposition)) && (
+                  {showRecentActionColumn && (
                     <th className="px-3 py-2">{t('results.recent.table.action')}</th>
                   )}
                 </tr>
@@ -1474,7 +1496,7 @@ export default function ResultsPage() {
                 {recentMatches.map((recentMatch) => {
                   const isEditingRecentRaces =
                     selectedRecentMatchId === recentMatch.matchId &&
-                    (isAdmin || recentMatch.canEditRaceComposition) &&
+                    recentMatch.canEditRaceComposition &&
                     selectedRecentTeamSize !== null
 
                   return (
@@ -1552,9 +1574,18 @@ export default function ResultsPage() {
                         {typeof recentMatch.mmrDiff === 'number' ? recentMatch.mmrDiff : '-'}
                       </td>
                     )}
-                    {(isAdmin || recentMatch.canEditRaceComposition) && (
+                    {showRecentActionColumn && (
                       <td className="px-3 py-2">
-                        {selectedRecentMatchId === recentMatch.matchId ? (
+                        {!recentMatch.canEditRaceComposition ? (
+                          canEditResultsByRole && (
+                            <span
+                              className="whitespace-nowrap text-xs text-slate-400 dark:text-slate-500"
+                              title={t('results.recent.editWindowHint', { hours: RESULT_EDIT_WINDOW_HOURS })}
+                            >
+                              {t('results.recent.editWindowPassed')}
+                            </span>
+                          )
+                        ) : selectedRecentMatchId === recentMatch.matchId ? (
                         <div className="flex items-center gap-1.5 whitespace-nowrap">
                           <button
                             type="button"

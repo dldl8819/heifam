@@ -46,22 +46,30 @@ class MatchQueryServiceTest {
     @Mock
     private AccessControlService accessControlService;
 
+    @Mock
+    private MatchEditWindow matchEditWindow;
+
     private MatchQueryService matchQueryService;
 
     @BeforeEach
     void setUp() {
+        // Matches here carry no times; the 48-hour window is tested on its own (MatchEditWindowTest).
+        org.mockito.Mockito.lenient().when(matchEditWindow.isOpen(any())).thenReturn(true);
         matchQueryService = new MatchQueryService(
             matchRepository,
             matchParticipantRepository,
             accessControlService,
-            new GroupReadCacheService(0)
+            new GroupReadCacheService(0),
+            matchEditWindow
         );
     }
 
     @Test
     void givesVisitorsSlicesOfTheNewestResultsReadOnceUntilAResultChanges() {
         GroupReadCacheService cache = new GroupReadCacheService(30_000);
-        matchQueryService = new MatchQueryService(matchRepository, matchParticipantRepository, accessControlService, cache);
+        matchQueryService = new MatchQueryService(
+            matchRepository, matchParticipantRepository, accessControlService, cache, matchEditWindow
+        );
         Group group = new Group();
         group.setId(1L);
         List<Match> newest = new ArrayList<>();
@@ -616,6 +624,35 @@ class MatchQueryServiceTest {
 
         assertThat(responses).hasSize(1);
         assertThat(responses.get(0).canEditRaceComposition()).isTrue();
+    }
+
+    @Test
+    void stopsOfferingEditsOnAResultOlderThan48HoursExceptToSuperAdmins() {
+        List<Match> both = matches(301, 2);
+        Match fresh = both.get(0);
+        Match old = both.get(1);
+        old.setResultRecordedByEmail("recorder@hei.gg");
+        fresh.setResultRecordedByEmail("recorder@hei.gg");
+        when(matchRepository.findRecentByGroupIdByResultInput(eq(1L), any())).thenReturn(both);
+        when(matchParticipantRepository.findByMatchIdInWithPlayerAndMatch(any())).thenReturn(List.of());
+        when(accessControlService.resolveAccessProfile("recorder@hei.gg")).thenReturn(recorderProfile());
+        when(matchEditWindow.isOpen(old)).thenReturn(false);
+        // Each role is asked about every reader below, so these answer per email, not strictly.
+        org.mockito.Mockito.lenient().when(accessControlService.isAdminEmail("admin@hei.gg")).thenReturn(true);
+        org.mockito.Mockito.lenient().when(accessControlService.isMatchResultEditor("editor@hei.gg")).thenReturn(true);
+        org.mockito.Mockito.lenient().when(accessControlService.isSuperAdminEmail("superadmin@hei.gg")).thenReturn(true);
+        // As in AccessControlService, a super admin is an admin too.
+        org.mockito.Mockito.lenient().when(accessControlService.isAdminEmail("superadmin@hei.gg")).thenReturn(true);
+
+        for (String reader : List.of("admin@hei.gg", "editor@hei.gg", "recorder@hei.gg")) {
+            assertThat(matchQueryService.getRecentMatches(1L, 10, 0, reader))
+                .as(reader)
+                .extracting(GroupRecentMatchResponse::canEditRaceComposition)
+                .containsExactly(true, false);
+        }
+        assertThat(matchQueryService.getRecentMatches(1L, 10, 0, "superadmin@hei.gg"))
+            .extracting(GroupRecentMatchResponse::canEditRaceComposition)
+            .containsExactly(true, true);
     }
 
     @Test

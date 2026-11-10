@@ -90,6 +90,9 @@ class MatchResultServiceTest {
     @Mock
     private PredictionService predictionService;
 
+    @Mock
+    private MatchEditWindow matchEditWindow;
+
     private MatchResultService matchResultService;
 
     @BeforeEach
@@ -97,6 +100,8 @@ class MatchResultServiceTest {
         // Most tests exercise the admin-driven flow (matches the previous filter-level
         // admin-only gate); tests for the non-admin recorder path override this per-case.
         lenient().when(accessControlService.isAdminEmail(any())).thenReturn(true);
+        // Matches here carry no times; the 48-hour window has tests of its own below and in MatchEditWindowTest.
+        lenient().when(matchEditWindow.isOpen(any())).thenReturn(true);
         matchResultService = createService(DEFAULT_BASE_K_FACTOR);
     }
 
@@ -125,7 +130,8 @@ class MatchResultServiceTest {
             pointService,
             tournamentProgressService,
             balanceSeriesProgressService,
-            predictionService
+            predictionService,
+            matchEditWindow
         );
     }
 
@@ -667,6 +673,126 @@ class MatchResultServiceTest {
         assertThat(match.getRaceComposition()).isEqualTo("PPP");
         verify(matchParticipantRepository, never()).findByMatchIdWithPlayerAndMatch(any());
         verify(matchRepository, never()).save(any());
+    }
+
+    @Test
+    void refusesAnAdminsEditOnceTheResultIsOlderThan48Hours() {
+        Match match = closedMatch(80L);
+
+        assertThatThrownBy(() -> matchResultService.updateMatchResult(
+            80L,
+            new MatchResultUpdateRequest("AWAY", null),
+            "admin@example.test",
+            "Admin"
+        ))
+            .isInstanceOf(MatchEditForbiddenException.class)
+            .hasMessage(MatchEditWindow.CLOSED_MESSAGE);
+
+        assertThat(match.getWinningTeam()).isEqualTo("HOME");
+        verify(matchParticipantRepository, never()).findByMatchIdWithPlayerAndMatch(any());
+        verify(matchRepository, never()).save(any());
+        verify(operationAuditLogService, never()).recordMatchResultUpdate(any(), any(), any());
+    }
+
+    @Test
+    void refusesAResultEditorsEditOnceTheResultIsOlderThan48HoursWithoutSpendingTheirLimit() {
+        Match match = closedMatch(81L);
+        when(accessControlService.isAdminEmail("editor@example.test")).thenReturn(false);
+        when(accessControlService.isMatchResultEditor("editor@example.test")).thenReturn(true);
+
+        assertThatThrownBy(() -> matchResultService.updateMatchResult(
+            81L,
+            new MatchResultUpdateRequest("AWAY", null),
+            "editor@example.test",
+            "Editor"
+        )).isInstanceOf(MatchEditForbiddenException.class);
+
+        assertThat(match.getWinningTeam()).isEqualTo("HOME");
+        verify(matchResultEditQuotaService, never()).reserve(any(), any());
+        verify(matchRepository, never()).save(any());
+    }
+
+    @Test
+    void refusesARecordersRaceFixOnTheirOwnMatchOnceOlderThan48Hours() {
+        Match match = closedMatch(82L);
+        match.setRaceComposition("PPP");
+        match.setResultRecordedByEmail("recorder@example.test");
+        when(accessControlService.isAdminEmail("recorder@example.test")).thenReturn(false);
+
+        assertThatThrownBy(() -> matchResultService.updateMatchResult(
+            82L,
+            new MatchResultUpdateRequest("HOME", "PPT"),
+            "recorder@example.test",
+            "Recorder"
+        )).isInstanceOf(MatchEditForbiddenException.class);
+
+        assertThat(match.getRaceComposition()).isEqualTo("PPP");
+        verify(matchRepository, never()).save(any());
+    }
+
+    @Test
+    void letsASuperAdminChangeAResultOlderThan48Hours() {
+        Match match = closedMatch(83L);
+        List<MatchParticipant> participants = buildParticipants(match);
+        when(accessControlService.isSuperAdminEmail("super@example.test")).thenReturn(true);
+        when(matchParticipantRepository.findByMatchIdWithPlayerAndMatch(83L)).thenReturn(participants);
+        when(matchParticipantRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(playerRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(mmrHistoryRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        matchResultService.updateMatchResult(83L, new MatchResultUpdateRequest("AWAY", null), "super@example.test", "Super");
+
+        assertThat(match.getWinningTeam()).isEqualTo("AWAY");
+    }
+
+    @Test
+    void refusesAnAdminsDeletionOnceTheResultIsOlderThan48Hours() {
+        closedMatch(84L);
+
+        assertThatThrownBy(() -> matchResultService.deleteMatchAs(84L, "admin@example.test"))
+            .isInstanceOf(MatchEditForbiddenException.class)
+            .hasMessage(MatchEditWindow.CLOSED_MESSAGE);
+
+        verify(matchRepository, never()).delete(any(Match.class));
+        verify(playerRepository, never()).saveAll(any());
+        verify(pointService, never()).reverseMatchResultPoints(any());
+    }
+
+    @Test
+    void letsASuperAdminDeleteAResultOlderThan48Hours() {
+        Match match = closedMatch(85L);
+        when(accessControlService.isSuperAdminEmail("super@example.test")).thenReturn(true);
+
+        matchResultService.deleteMatchAs(85L, "super@example.test");
+
+        verify(matchRepository).delete(match);
+    }
+
+    @Test
+    void letsAnAdminDeleteAResultWithinItsFirst48Hours() {
+        Match match = new Match();
+        match.setId(86L);
+        match.setStatus(MatchStatus.COMPLETED);
+        match.setWinningTeam("HOME");
+        when(matchRepository.findByIdForUpdate(86L)).thenReturn(Optional.of(match));
+
+        matchResultService.deleteMatchAs(86L, "admin@example.test");
+
+        verify(matchRepository).delete(match);
+        verify(accessControlService, never()).isSuperAdminEmail(any());
+    }
+
+    /** A decided match whose 48 hours have run out (the window is a mock here). */
+    private Match closedMatch(Long id) {
+        Match match = new Match();
+        match.setId(id);
+        match.setStatus(MatchStatus.COMPLETED);
+        match.setWinningTeam("HOME");
+        match.setResultRecordedByEmail("someone@example.test");
+        when(matchRepository.findByIdForUpdate(id)).thenReturn(Optional.of(match));
+        when(matchEditWindow.isOpen(match)).thenReturn(false);
+        return match;
     }
 
     @Test

@@ -180,12 +180,16 @@ public class MatchResultController {
         HttpServletRequest httpRequest
     ) {
         try {
-            MatchResultService.DeletedMatchAuditSnapshot snapshot = matchResultService.deleteMatch(matchId);
+            // Held to 48 hours after the result went in, unless a super admin asks (MatchEditWindow).
+            MatchResultService.DeletedMatchAuditSnapshot snapshot =
+                matchResultService.deleteMatchAs(matchId, extractRequestEmail(httpRequest));
             operationAuditLogService.recordMatchDeletion(
                 extractRequestEmail(httpRequest),
                 resolveRecordedByNickname(httpRequest),
                 snapshot
             );
+        } catch (MatchEditForbiddenException exception) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, exception.getMessage());
         } catch (MatchConflictException exception) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, exception.getMessage());
         } catch (NoSuchElementException exception) {

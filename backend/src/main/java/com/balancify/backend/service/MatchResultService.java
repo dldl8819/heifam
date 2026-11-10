@@ -66,6 +66,7 @@ public class MatchResultService {
     private final TournamentProgressService tournamentProgressService;
     private final BalanceSeriesProgressService balanceSeriesProgressService;
     private final PredictionService predictionService;
+    private final MatchEditWindow matchEditWindow;
 
     public MatchResultService(
         MatchRepository matchRepository,
@@ -91,7 +92,8 @@ public class MatchResultService {
         PointService pointService,
         TournamentProgressService tournamentProgressService,
         BalanceSeriesProgressService balanceSeriesProgressService,
-        PredictionService predictionService
+        PredictionService predictionService,
+        MatchEditWindow matchEditWindow
     ) {
         this.matchRepository = matchRepository;
         this.groupRepository = groupRepository;
@@ -117,6 +119,7 @@ public class MatchResultService {
         this.tournamentProgressService = tournamentProgressService;
         this.balanceSeriesProgressService = balanceSeriesProgressService;
         this.predictionService = predictionService;
+        this.matchEditWindow = matchEditWindow;
     }
 
     // An import of past matches: the result is taken whoever played, tier set or not.
@@ -182,6 +185,7 @@ public class MatchResultService {
                 throw new MatchEditForbiddenException("승리 팀 변경은 관리자만 가능합니다.");
             }
         }
+        requireEditWindowOpen(match, recordedByEmail);
 
         ValidatedParticipants validatedParticipants = loadValidatedParticipants(matchId, match);
         RaceCompositionUpdate raceCompositionUpdate = applyRaceCompositionUpdate(
@@ -1043,6 +1047,25 @@ public class MatchResultService {
             throw new MatchConflictException("시리즈 경기는 시리즈에서 취소해 주세요.");
         }
         return deleteMatch(matchId);
+    }
+
+    /**
+     * An admin deleting a match from the results page: held to the same 48 hours as an edit
+     * (MatchEditWindow) unless they are a super admin. Other removals (a match called off before
+     * its result, a series cancelled) go through deleteMatch directly.
+     */
+    @Transactional
+    public DeletedMatchAuditSnapshot deleteMatchAs(Long matchId, String actorEmail) {
+        Match match = matchRepository.findByIdForUpdate(matchId)
+            .orElseThrow(() -> new NoSuchElementException("Match not found: " + matchId));
+        requireEditWindowOpen(match, actorEmail);
+        return deleteMatch(matchId);
+    }
+
+    private void requireEditWindowOpen(Match match, String actorEmail) {
+        if (!matchEditWindow.isOpen(match) && !accessControlService.isSuperAdminEmail(actorEmail)) {
+            throw new MatchEditForbiddenException(MatchEditWindow.CLOSED_MESSAGE);
+        }
     }
 
     @Transactional
