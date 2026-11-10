@@ -17,6 +17,7 @@ import { useMmrVisibility } from '@/lib/mmr-visibility'
 import { findUniquePlayerByNicknamePrefix } from '@/lib/player-autocomplete'
 import { buildMatchResultUpdateRequest, type ParticipantRaceEdit } from '@/lib/match-result-edit'
 import { resolveRaceCompositionTeamSize } from '@/lib/race-composition'
+import { recentMatchMaxLimit } from '@/lib/recent-match-reach'
 import {
   ASSIGNED_RACES,
   formatRecordedRacePlayer,
@@ -35,15 +36,6 @@ const TEMP_GROUP_ID = 1
 const RECENT_MATCH_MEMBER_INITIAL_LIMIT = 10
 const RECENT_MATCH_ADMIN_INITIAL_LIMIT = 20
 const RECENT_MATCH_LOAD_MORE_LIMIT = 10
-/**
- * How far back anyone with service access can page through recent results.
- *
- * <p>Members used to stop at 20 while admins reached 30, which meant a member could not always
- * find a match they had played in to check it was recorded correctly. Everyone granted access now
- * shares the same reach; admins still start with a larger first page. Super admins are not limited
- * by this at all — they read the full history from the paginated view above.
- */
-const RECENT_MATCH_MAX_LIMIT = 30
 const MATCH_HISTORY_PAGE_SIZE = 20
 const winnerTeamOptions: TeamSide[] = ['HOME', 'AWAY']
 const manualTeamSizeOptions = [3, 2] as const
@@ -449,7 +441,7 @@ export default function ResultsPage() {
     }
 
     const initialLimit = isAdmin ? RECENT_MATCH_ADMIN_INITIAL_LIMIT : RECENT_MATCH_MEMBER_INITIAL_LIMIT
-    const maxLimit = RECENT_MATCH_MAX_LIMIT
+    const maxLimit = recentMatchMaxLimit(isAdmin)
     const offset = append ? recentMatchesFetchedCount : 0
     const remainingCount = Math.max(0, maxLimit - offset)
     const requestedLimit = Math.min(
@@ -519,7 +511,7 @@ export default function ResultsPage() {
   }
 
   const handleLoadMoreRecentMatches = async () => {
-    const maxLimit = RECENT_MATCH_MAX_LIMIT
+    const maxLimit = recentMatchMaxLimit(isAdmin)
     if (
       !canAccess ||
       recentMatchesLoadingMore ||
