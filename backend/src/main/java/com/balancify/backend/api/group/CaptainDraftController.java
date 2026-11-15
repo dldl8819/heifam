@@ -1,5 +1,6 @@
 package com.balancify.backend.api.group;
 
+import com.balancify.backend.api.PollTags;
 import com.balancify.backend.api.group.dto.CaptainDraftAceRequest;
 import com.balancify.backend.api.group.dto.CaptainDraftCreateRequest;
 import com.balancify.backend.api.group.dto.CaptainDraftEntriesUpdateRequest;
@@ -116,24 +117,27 @@ public class CaptainDraftController {
 
     /**
      * The page asks for its draft every few seconds while it is open. An ask that brings back the
-     * tag of a copy still current (If-None-Match) is answered 304 without reading the draft again;
-     * any other gets the draft with its tag (CaptainDraftVersions).
+     * tag of a copy still current (PollTags) is answered without reading the draft again; any other
+     * gets the draft with its tag (CaptainDraftVersions).
      */
     @GetMapping("/{groupId}/captain-drafts/{draftId}")
     public ResponseEntity<CaptainDraftResponse> getDraft(
         @PathVariable Long groupId,
         @PathVariable Long draftId,
+        @RequestHeader(value = PollTags.HEADER, required = false) String pollTag,
         @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch,
         HttpServletRequest httpRequest
     ) {
         UUID viewer = viewer(httpRequest);
-        if (captainDraftVersions.isCurrent(draftId, viewer, ifNoneMatch)) {
-            return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(ifNoneMatch.trim()).build();
+        String known = PollTags.known(pollTag, ifNoneMatch);
+        if (captainDraftVersions.isCurrent(draftId, viewer, known)) {
+            // The tag goes back as it came: its age counts from when it was first given out.
+            return PollTags.unchanged(pollTag, known);
         }
         // Tagged before the draft is read, so a change landing meanwhile leaves this tag behind.
         String tag = captainDraftVersions.tag(draftId, viewer);
         try {
-            return ResponseEntity.ok().eTag(tag).body(captainDraftService.getDraft(groupId, draftId, viewer));
+            return PollTags.current(tag, captainDraftService.getDraft(groupId, draftId, viewer));
         } catch (NoSuchElementException noSuchElementException) {
             throw new ResponseStatusException(
                 HttpStatus.NOT_FOUND,

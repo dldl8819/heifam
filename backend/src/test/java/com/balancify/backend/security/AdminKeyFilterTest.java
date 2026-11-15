@@ -1,5 +1,6 @@
 package com.balancify.backend.security;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -24,6 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.balancify.backend.api.HealthController;
+import com.balancify.backend.api.PollTags;
 import com.balancify.backend.api.access.AccessControlController;
 import com.balancify.backend.api.admin.AdminRatingController;
 import com.balancify.backend.api.admin.OperationAuditLogController;
@@ -164,6 +166,7 @@ import java.net.URI;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Locale;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import java.util.NoSuchElementException;
 import java.util.Set;
@@ -2728,6 +2731,43 @@ class AdminKeyFilterTest {
     }
 
     @Test
+    void answersTheBellsPollTagWithNoBodyWhenTheListIsUnchanged() throws Exception {
+        String tag = "\"n-2-9-0-members\"";
+        when(notificationService.canUseNotifications("member@hei.gg")).thenReturn(true);
+        when(notificationService.listIfChanged(1L, "member@hei.gg", null)).thenReturn(
+            new NotificationService.TaggedList(tag, new NotificationListResponse(List.of(), 0))
+        );
+        when(notificationService.listIfChanged(1L, "member@hei.gg", tag)).thenReturn(
+            new NotificationService.TaggedList(tag, null)
+        );
+
+        mockMvc
+            .perform(get("/api/groups/1/notifications").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk())
+            .andExpect(header().string(PollTags.HEADER, tag))
+            .andExpect(header().string("ETag", tag));
+        // The page's own header gets 204 and no body: nothing on the way takes it for a cache answer.
+        mockMvc
+            .perform(
+                get("/api/groups/1/notifications")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .header(PollTags.HEADER, tag)
+            )
+            .andExpect(status().isNoContent())
+            .andExpect(header().string(PollTags.HEADER, tag))
+            .andExpect(content().string(""));
+        // If-None-Match is answered as before.
+        mockMvc
+            .perform(
+                get("/api/groups/1/notifications")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .header("If-None-Match", tag)
+            )
+            .andExpect(status().isNotModified());
+        verify(notificationService, times(2)).listIfChanged(1L, "member@hei.gg", tag);
+    }
+
+    @Test
     void letsMembersRunMultiBalanceSeriesButOnlyAdminsCancelThem() throws Exception {
         when(balanceSeriesService.list(eq(1L), anyBoolean())).thenReturn(new BalanceSeriesListResponse(List.of()));
         when(balanceSeriesService.start(eq(1L), any(), eq("member@hei.gg"), any(), anyBoolean()))
@@ -4362,6 +4402,36 @@ class AdminKeyFilterTest {
             mockMvc.perform(call.header("X-USER-EMAIL", "stranger@hei.gg")).andExpect(status().isForbidden());
         }
         verifyNoInteractions(captainDraftService);
+    }
+
+    @Test
+    void answersTheRegularDraftsPollTagWithoutReadingAnUnchangedDraft() throws Exception {
+        MockHttpServletResponse first = mockMvc
+            .perform(get("/api/groups/1/captain-drafts/7").header("X-USER-EMAIL", "member@hei.gg"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse();
+        String tag = first.getHeader(PollTags.HEADER);
+        assertThat(tag).isNotBlank().isEqualTo(first.getHeader("ETag"));
+
+        mockMvc
+            .perform(
+                get("/api/groups/1/captain-drafts/7")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .header(PollTags.HEADER, tag)
+            )
+            .andExpect(status().isNoContent())
+            .andExpect(header().string(PollTags.HEADER, tag))
+            .andExpect(content().string(""));
+        mockMvc
+            .perform(
+                get("/api/groups/1/captain-drafts/7")
+                    .header("X-USER-EMAIL", "member@hei.gg")
+                    .header("If-None-Match", tag)
+            )
+            .andExpect(status().isNotModified());
+        // Read once, for the first ask only.
+        verify(captainDraftService, times(1)).getDraft(eq(1L), eq(7L), isNull());
     }
 
     @Test

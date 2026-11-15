@@ -302,6 +302,16 @@ function buildHeaders(
   return headers
 }
 
+// The tag of the copy a polling page holds (the bell, the regular draft) goes out and comes back under
+// this header, and the backend answers an unchanged copy with no body (204). If-None-Match did this
+// until the API went through Vercel's CDN; from then on no "not modified" came back.
+export const POLL_TAG_HEADER = 'X-Poll-Tag'
+
+// The tag of the copy an answer carries; ETag alone when the backend predates POLL_TAG_HEADER.
+function readPollTag(headers: Headers): string | null {
+  return headers.get(POLL_TAG_HEADER) ?? headers.get('ETag')
+}
+
 function appendOptionalSearchParam(params: URLSearchParams, key: string, value: string | undefined): void {
   const normalized = value?.trim() ?? ''
   if (normalized.length > 0) {
@@ -377,7 +387,8 @@ export async function apiRequest<T>(
     })
 
     options?.onResponseHeaders?.(response.headers)
-    // Asked with If-None-Match and nothing changed: no body, and the caller keeps what it has.
+    // Asked with a tag and nothing changed (304 here, or 204 to POLL_TAG_HEADER below): no body, and
+    // the caller keeps what it has.
     if (response.status === 304) {
       return undefined as T
     }
@@ -1265,8 +1276,8 @@ export const apiClient = {
     }),
   /**
    * The draft again, for the page's polling: with the tag of the copy shown, the backend answers
-   * "not modified" (draft null) when nothing changed, without reading the draft. The tag to send
-   * next time comes back either way.
+   * "unchanged" (draft null) when nothing changed, without reading the draft. The tag to send next
+   * time comes back either way.
    */
   getCaptainDraftIfChanged: async (
     groupId: number,
@@ -1276,11 +1287,11 @@ export const apiClient = {
     let nextEtag: string | null = null
     const draft = await apiRequest<CaptainDraftResponse | undefined>(
       `/api/groups/${groupId}/captain-drafts/${draftId}`,
-      etag ? { headers: { 'If-None-Match': etag } } : undefined,
+      etag ? { headers: { [POLL_TAG_HEADER]: etag } } : undefined,
       {
         includeUserEmail: true,
         onResponseHeaders: (headers) => {
-          nextEtag = headers.get('ETag')
+          nextEtag = readPollTag(headers)
         },
       }
     )
@@ -2027,7 +2038,7 @@ export const apiClient = {
     ),
   /**
    * The notifications, for the bell's polling: with the tag of the list shown, the backend answers
-   * "not modified" (list null) when nothing changed, without reading the list. The tag to send next
+   * "unchanged" (list null) when nothing changed, without reading the list. The tag to send next
    * time comes back either way.
    */
   getNotificationsIfChanged: async (
@@ -2037,12 +2048,12 @@ export const apiClient = {
     let nextEtag: string | null = null
     const list = await apiRequest<NotificationList | undefined>(
       `/api/groups/${groupId}/notifications`,
-      etag ? { headers: { 'If-None-Match': etag } } : undefined,
+      etag ? { headers: { [POLL_TAG_HEADER]: etag } } : undefined,
       {
         requireUserEmail: true,
         includeUserEmail: true,
         onResponseHeaders: (headers) => {
-          nextEtag = headers.get('ETag')
+          nextEtag = readPollTag(headers)
         },
       }
     )

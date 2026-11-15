@@ -1,5 +1,6 @@
 package com.balancify.backend.config;
 
+import com.balancify.backend.api.PollTags;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
@@ -18,8 +19,8 @@ public class CorsConfig implements WebMvcConfigurer {
             .allowedOrigins(parseAllowedOrigins())
             .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
             .allowedHeaders("*")
-            // Read by the regular draft's polling, to send back as If-None-Match.
-            .exposedHeaders("ETag")
+            // The tag of a polled copy (the bell, the regular draft), read by the page to send back.
+            .exposedHeaders("ETag", PollTags.HEADER)
             .maxAge(3600);
     }
 
