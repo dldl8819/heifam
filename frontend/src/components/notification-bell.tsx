@@ -56,7 +56,7 @@ function NotificationCenter() {
   const [pushError, setPushError] = useState<boolean>(false)
   const [showInstallHint, setShowInstallHint] = useState<boolean>(false)
   const newestSeenId = useRef<number | null>(null)
-  // The tag of the list last got: an unchanged list then comes back as "not modified", without the
+  // The tag of the list last got: an unchanged list then comes back as "unchanged", without the
   // backend reading it again. Opening the bell moves what was read on, so the next ask reads afresh.
   const etag = useRef<string | null>(null)
   const panelRef = useRef<HTMLDivElement | null>(null)

@@ -1,5 +1,6 @@
 package com.balancify.backend.api.notification;
 
+import com.balancify.backend.api.PollTags;
 import com.balancify.backend.api.notification.dto.NotificationListResponse;
 import com.balancify.backend.api.notification.dto.PushConfigResponse;
 import com.balancify.backend.api.notification.dto.PushSubscriptionRequest;
@@ -38,21 +39,24 @@ public class NotificationController {
 
     /**
      * The bell asks every minute. An ask that brings back the tag of a list still current
-     * (If-None-Match) is answered 304 without the list being read; any other gets the list with its
-     * tag.
+     * (PollTags) is answered without the list being read; any other gets the list with its tag.
      */
     @GetMapping("/api/groups/{groupId}/notifications")
     public ResponseEntity<NotificationListResponse> list(
         @PathVariable Long groupId,
+        @RequestHeader(value = PollTags.HEADER, required = false) String pollTag,
         @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch,
         HttpServletRequest request
     ) {
-        NotificationService.TaggedList answer =
-            notificationService.listIfChanged(groupId, requireEmail(request), ifNoneMatch);
+        NotificationService.TaggedList answer = notificationService.listIfChanged(
+            groupId,
+            requireEmail(request),
+            PollTags.known(pollTag, ifNoneMatch)
+        );
         if (answer.list() == null) {
-            return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(answer.tag()).build();
+            return PollTags.unchanged(pollTag, answer.tag());
         }
-        return ResponseEntity.ok().eTag(answer.tag()).body(answer.list());
+        return PollTags.current(answer.tag(), answer.list());
     }
 
     @PostMapping("/api/groups/{groupId}/notifications/read")
