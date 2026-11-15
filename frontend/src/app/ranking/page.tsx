@@ -8,9 +8,67 @@ import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { PlayerGameTypeStatsModal } from '@/components/player-game-type-stats-modal'
 import { t } from '@/lib/i18n'
 import { useMmrVisibility } from '@/lib/mmr-visibility'
+import {
+  DEFAULT_RANKING_SORT,
+  MMR_SORT_KEYS,
+  nextRankingSort,
+  sortRankingRows,
+  type RankingSort,
+  type RankingSortKey,
+} from '@/lib/ranking-sort'
 import type { GroupPlayerRaceStatsItem, PlayerTierStatus, RankingItem } from '@/types/api'
 
 const TEMP_GROUP_ID = 1
+
+const SORT_LABEL_KEYS: Record<RankingSortKey, string> = {
+  rank: 'ranking.table.rank',
+  tier: 'ranking.table.tier',
+  currentMmr: 'ranking.table.currentMmr',
+  peakMmr: 'ranking.table.peakMmr',
+  lowestMmr: 'ranking.table.lowestMmr',
+  wins: 'ranking.table.wins',
+  losses: 'ranking.table.losses',
+  games: 'ranking.table.games',
+  winRate: 'ranking.table.winRate',
+  streak: 'ranking.table.streak',
+  mmrDelta: 'ranking.table.mmrDelta',
+}
+
+// What a screen reader says of a sorted column. A rank runs 1, 2, 3 when the best come first.
+function ariaSortOf(sort: RankingSort): 'ascending' | 'descending' {
+  const highFirst = sort.order === 'high'
+  if (sort.key === 'rank') {
+    return highFirst ? 'ascending' : 'descending'
+  }
+  return highFirst ? 'descending' : 'ascending'
+}
+
+// A column title that orders the table: from the highest on the first click, turned around on the next.
+function SortableHeader({
+  sortKey,
+  sort,
+  onSort,
+}: {
+  sortKey: RankingSortKey
+  sort: RankingSort
+  onSort: (key: RankingSortKey) => void
+}) {
+  const active = sort.key === sortKey
+  return (
+    <th className="px-4 py-3" aria-sort={active ? ariaSortOf(sort) : 'none'}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={`inline-flex items-center gap-1 whitespace-nowrap rounded-sm tracking-wide hover:text-slate-900 dark:hover:text-white ${
+          active ? 'font-semibold text-slate-900 dark:text-white' : ''
+        }`}
+      >
+        {t(SORT_LABEL_KEYS[sortKey])}
+        <span aria-hidden="true">{active ? (sort.order === 'high' ? '▼' : '▲') : '↕'}</span>
+      </button>
+    </th>
+  )
+}
 
 function formatWinRate(value: number): string {
   const percentage = value <= 1 ? value * 100 : value
@@ -130,6 +188,8 @@ export default function RankingPage() {
   const [gameTypeStatsLoading, setGameTypeStatsLoading] = useState<boolean>(false)
   const [gameTypeStatsError, setGameTypeStatsError] = useState<string | null>(null)
   const [monthlyPeriodLabel, setMonthlyPeriodLabel] = useState<string>('')
+  const [sort, setSort] = useState<RankingSort>(DEFAULT_RANKING_SORT)
+  const [sortAnnouncement, setSortAnnouncement] = useState<string>('')
 
   useEffect(() => {
     setMonthlyPeriodLabel(resolveCurrentKstMonthLabel())
@@ -195,8 +255,24 @@ export default function RankingPage() {
     }
   }, [authLoading, canViewMmr, showMmr])
 
-  // The server's rank already orders by MMR and puts unassigned players last.
-  const sortedRows = useMemo(() => [...rows].sort((a, b) => a.rank - b.rank), [rows])
+  // A column hidden from this reader (MMR switched off) orders nothing: the ranking's own order then.
+  const activeSort = useMemo<RankingSort>(
+    () => (!showMmr && MMR_SORT_KEYS.includes(sort.key) ? DEFAULT_RANKING_SORT : sort),
+    [showMmr, sort]
+  )
+  // The server's rank already orders by MMR and puts unassigned players last; a column title reorders.
+  const sortedRows = useMemo(() => sortRankingRows(rows, activeSort), [rows, activeSort])
+
+  const handleSort = useCallback((key: RankingSortKey) => {
+    const next = nextRankingSort(activeSort, key)
+    setSort(next)
+    setSortAnnouncement(
+      t('ranking.sort.announce', {
+        column: t(SORT_LABEL_KEYS[key]),
+        order: t(next.order === 'high' ? 'ranking.sort.high' : 'ranking.sort.low'),
+      })
+    )
+  }, [activeSort])
 
   const resolveDisplayTier = (row: RankingItem): PlayerTierStatus =>
     tierByNickname.get(row.nickname) ?? row.tier
@@ -245,30 +321,33 @@ export default function RankingPage() {
         onClose={handleCloseGameTypeStats}
       />
 
+      <p className="sr-only" aria-live="polite">{sortAnnouncement}</p>
+
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900">
         {monthlyPeriodLabel.length > 0 && (
-          <div className="min-w-full border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 dark:border-slate-800 dark:text-slate-200">
-            {monthlyPeriodLabel}
+          <div className="flex min-w-full flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{monthlyPeriodLabel}</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">{t('ranking.sort.hint')}</span>
           </div>
         )}
         <table className="min-w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs tracking-wide text-slate-500 dark:bg-slate-800/80 dark:text-slate-300">
             <tr>
-              <th className="px-4 py-3">{t('ranking.table.rank')}</th>
+              <SortableHeader sortKey="rank" sort={activeSort} onSort={handleSort} />
               <th className="px-4 py-3">{t('ranking.table.nickname')}</th>
-              <th className="px-4 py-3">{t('ranking.table.race')}</th>
-              <th className="px-4 py-3">{t('ranking.table.tier')}</th>
-              {showMmr && <th className="px-4 py-3">{t('ranking.table.currentMmr')}</th>}
-              {showMmr && <th className="px-4 py-3">{t('ranking.table.peakMmr')}</th>}
-              {showMmr && <th className="px-4 py-3">{t('ranking.table.lowestMmr')}</th>}
-              <th className="px-4 py-3">{t('ranking.table.wins')}</th>
-              <th className="px-4 py-3">{t('ranking.table.losses')}</th>
-              <th className="px-4 py-3">{t('ranking.table.games')}</th>
-              <th className="px-4 py-3">{t('ranking.table.winRate')}</th>
+              <th className="whitespace-nowrap px-4 py-3">{t('ranking.table.race')}</th>
+              <SortableHeader sortKey="tier" sort={activeSort} onSort={handleSort} />
+              {showMmr && <SortableHeader sortKey="currentMmr" sort={activeSort} onSort={handleSort} />}
+              {showMmr && <SortableHeader sortKey="peakMmr" sort={activeSort} onSort={handleSort} />}
+              {showMmr && <SortableHeader sortKey="lowestMmr" sort={activeSort} onSort={handleSort} />}
+              <SortableHeader sortKey="wins" sort={activeSort} onSort={handleSort} />
+              <SortableHeader sortKey="losses" sort={activeSort} onSort={handleSort} />
+              <SortableHeader sortKey="games" sort={activeSort} onSort={handleSort} />
+              <SortableHeader sortKey="winRate" sort={activeSort} onSort={handleSort} />
               <th className="px-4 py-3">{t('ranking.table.gameTypeStats')}</th>
-              <th className="px-4 py-3">{t('ranking.table.streak')}</th>
+              <SortableHeader sortKey="streak" sort={activeSort} onSort={handleSort} />
               <th className="px-4 py-3">{t('ranking.table.last10')}</th>
-              {showMmr && <th className="px-4 py-3">{t('ranking.table.mmrDelta')}</th>}
+              {showMmr && <SortableHeader sortKey="mmrDelta" sort={activeSort} onSort={handleSort} />}
             </tr>
           </thead>
 
@@ -364,7 +443,7 @@ export default function RankingPage() {
                         type="button"
                         disabled={typeof playerId !== 'number' || isStatsLoadingForRow}
                         onClick={() => handleOpenGameTypeStats(row)}
-                        className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-emerald-600 hover:bg-emerald-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:border-emerald-400 dark:hover:bg-emerald-700"
+                        className="whitespace-nowrap rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-emerald-600 hover:bg-emerald-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:border-emerald-400 dark:hover:bg-emerald-700"
                       >
                         {isStatsLoadingForRow ? t('statsModal.buttonLoading') : t('statsModal.button')}
                       </button>

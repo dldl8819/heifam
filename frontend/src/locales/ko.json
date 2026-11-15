@@ -2073,6 +2073,12 @@
       "last10": "최근 10경기",
       "mmrDelta": "MMR 변동"
     },
+    "sort": {
+      "hint": "열 제목을 누르면 높은 순, 한 번 더 누르면 낮은 순으로 정렬됩니다.",
+      "high": "높은 순",
+      "low": "낮은 순",
+      "announce": "{column} {order}으로 정렬했습니다."
+    },
     "streak": {
       "win": "{count}연승",
       "loss": "{count}연패"
