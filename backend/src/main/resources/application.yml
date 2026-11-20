@@ -3,6 +3,13 @@ server:
   forward-headers-strategy: framework
 
 spring:
+  servlet:
+    multipart:
+      # No route takes a multipart upload (notice images come as the raw request body), so no
+      # request is read as one. Left on, any request could make Spring parse parts, a visitor's to
+      # a public route included, and decode their file names with java.util.Base64 (the path to
+      # CVE-2026-114938 found on 2026-11-20).
+      enabled: false
   web:
     # Spring Boot 4 moved these from server.error; the old keys are ignored.
     error:
