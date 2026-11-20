@@ -1,11 +1,13 @@
-# The JDK is Oracle JDK 25.0.5.0.2 (Oracle No-Fee Terms and Conditions). It fixes CVE-2026-91403
-# (JSSE), which no OpenJDK build (Temurin, Corretto, Zulu) carried yet on 2026-10-23. It is pinned
-# by version and checksum: a changed download fails the build. Moving back to an OpenJDK image is
-# a FROM line once one has the fix.
+# The JDK is Oracle JDK 25.0.5.1 (Oracle No-Fee Terms and Conditions). It fixes CVE-2026-114938
+# ("Java4Shell", a heap overflow in the x86-64 Base64 decoder intrinsic, fixed 2026-11-17), on top
+# of CVE-2026-91403 (JSSE), for which Oracle's 25.0.5.0.2 was taken on 2026-10-23 because no OpenJDK
+# build (Temurin, Corretto, Zulu) carried that fix yet. It is pinned by version and checksum (from
+# Oracle's .sha256 file): a changed download fails the build. Moving back to an OpenJDK image is a
+# FROM line once one has both fixes.
 FROM ubuntu:jammy AS jdk
 
-ARG JDK_URL=https://download.oracle.com/java/25/archive/jdk-25.0.5.0.2_linux-x64_bin.tar.gz
-ARG JDK_SHA256=d430d3f9e91435d2d58d366b1dabf14b23fcf8629ed4b041757c1be444055946
+ARG JDK_URL=https://download.oracle.com/java/25/archive/jdk-25.0.5.1_linux-x64_bin.tar.gz
+ARG JDK_SHA256=3d40d69461200594380ac84c17be6224539022028730cffe043ac70c41ffd1d5
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl \
