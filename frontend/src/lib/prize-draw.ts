@@ -1,5 +1,7 @@
 /** Small rules of a prize draw; the backend (PrizeDrawService) enforces the same limits on what is saved. */
 
+import { kstDay } from '@/lib/menu-attendance'
+
 export const PRIZE_DRAW_MIN_ENTRANTS = 2
 export const PRIZE_DRAW_MAX_ENTRANTS = 100
 export const PRIZE_DRAW_MAX_WINNERS = 10
@@ -81,6 +83,74 @@ export function draftEntrantIds(
     }
   }
   return { ids, missing }
+}
+
+/** A saved draw, as far as leaving its winners out of a later draw needs. */
+export type PastDraw = {
+  id: number
+  createdAt: string
+  winners: ReadonlyArray<{ name: string; playerId?: number | null }>
+}
+
+/**
+ * The draws saved on the Korean day of `now`. Several draws are often run one after another (one a
+ * sponsor, say), so all of the day's are left out together unless the member picks otherwise.
+ */
+export function drawIdsOfKstDay(draws: ReadonlyArray<Pick<PastDraw, 'id' | 'createdAt'>>, now: Date = new Date()): number[] {
+  const today = kstDay(now)
+  return draws
+    .filter((draw) => {
+      const savedAt = Date.parse(draw.createdAt)
+      return !Number.isNaN(savedAt) && kstDay(new Date(savedAt)) === today
+    })
+    .map((draw) => draw.id)
+}
+
+/**
+ * Who won one of the chosen draws. A roster player is a past winner picked as that same player,
+ * whatever either was called then or now. A name typed by hand, in the past draw or in this one,
+ * goes by the name, whatever its case. A roster player who only shares a name with a past winner
+ * picked as another player is someone else, and stays in.
+ */
+export function pastWinnerMatcher(draws: ReadonlyArray<PastDraw>, drawIds: ReadonlySet<number>): (entrant: DrawEntrant) => boolean {
+  const playerIds = new Set<number>()
+  const typedNames = new Set<string>()
+  const allNames = new Set<string>()
+  for (const draw of draws) {
+    if (!drawIds.has(draw.id)) {
+      continue
+    }
+    for (const winner of draw.winners) {
+      const name = winner.name.trim().toLowerCase()
+      if (winner.playerId !== undefined && winner.playerId !== null) {
+        playerIds.add(winner.playerId)
+      } else {
+        typedNames.add(name)
+      }
+      allNames.add(name)
+    }
+  }
+  return (entrant) => {
+    const name = entrant.name.trim().toLowerCase()
+    return entrant.playerId === undefined ? allNames.has(name) : playerIds.has(entrant.playerId) || typedNames.has(name)
+  }
+}
+
+/** The entrants who still run, and the past winners left out, each in the order they were put in. */
+export function splitPastWinners(
+  entrants: DrawEntrant[],
+  isPastWinner: (entrant: DrawEntrant) => boolean
+): { entrants: DrawEntrant[]; leftOut: DrawEntrant[] } {
+  const running: DrawEntrant[] = []
+  const leftOut: DrawEntrant[] = []
+  for (const entrant of entrants) {
+    if (isPastWinner(entrant)) {
+      leftOut.push(entrant)
+    } else {
+      running.push(entrant)
+    }
+  }
+  return { entrants: running, leftOut }
 }
 
 /** What stops a draw from being run, or null when it can be. */

@@ -70,7 +70,7 @@ public class PrizeDrawService {
         Map<Long, List<PrizeDrawWinnerResponse>> winners = new HashMap<>();
         for (WinnerRow winner : prizeDrawRepository.listWinners(draws.stream().map(DrawRow::id).toList())) {
             winners.computeIfAbsent(winner.drawId(), id -> new ArrayList<>())
-                .add(new PrizeDrawWinnerResponse(winner.place(), winner.name(), winner.prize()));
+                .add(new PrizeDrawWinnerResponse(winner.place(), winner.name(), winner.playerId(), winner.prize()));
         }
         Set<String> savers = new LinkedHashSet<>();
         draws.forEach(draw -> {
