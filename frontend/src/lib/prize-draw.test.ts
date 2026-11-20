@@ -9,9 +9,13 @@ import {
   ballLabel,
   buildEntrants,
   draftEntrantIds,
+  drawIdsOfKstDay,
   formatDrawClock,
   parseManualEntrants,
+  pastWinnerMatcher,
+  splitPastWinners,
   validatePrizeDraw,
+  type PastDraw,
 } from './prize-draw'
 
 const ROSTER = [
@@ -56,6 +60,85 @@ describe('draftEntrantIds', () => {
       missing: 2,
     })
     expect(draftEntrantIds([], ROSTER)).toEqual({ ids: [], missing: 0 })
+  })
+})
+
+describe('drawIdsOfKstDay', () => {
+  // 2026-11-21 10:00 in Korea.
+  const now = new Date('2026-11-21T01:00:00Z')
+
+  it('takes the draws saved on the same day in Korea, which starts at 15:00 UTC the day before', () => {
+    const draws = [
+      { id: 5, createdAt: '2026-11-21T00:30:00Z' },
+      { id: 4, createdAt: '2026-11-20T15:00:00Z' },
+      { id: 3, createdAt: '2026-11-20T14:59:59Z' },
+      { id: 2, createdAt: '2026-11-21T15:00:00Z' },
+      { id: 1, createdAt: 'not a time' },
+    ]
+
+    expect(drawIdsOfKstDay(draws, now)).toEqual([5, 4])
+  })
+
+  it('is empty when nothing was saved that day', () => {
+    expect(drawIdsOfKstDay([], now)).toEqual([])
+    expect(drawIdsOfKstDay([{ id: 1, createdAt: '2026-11-19T03:00:00Z' }], now)).toEqual([])
+  })
+})
+
+describe('leaving past winners out', () => {
+  const draws: PastDraw[] = [
+    // Picked from the roster as Alpha (1), who is called something else now, and a name typed by hand.
+    { id: 10, createdAt: '2026-11-21T01:00:00Z', winners: [{ name: 'OldAlpha', playerId: 1 }, { name: 'Delta', playerId: null }] },
+    // Picked from the roster as player 4, who was called Bravo then.
+    { id: 11, createdAt: '2026-11-21T02:00:00Z', winners: [{ name: 'Bravo', playerId: 4 }] },
+    { id: 12, createdAt: '2026-11-20T02:00:00Z', winners: [{ name: 'Charlie', playerId: 3 }] },
+  ]
+  const entrants = buildEntrants(ROSTER, new Set([1, 2, 3]), 'delta, Echo')
+
+  it('leaves out the winners of the chosen draws only', () => {
+    const { entrants: running, leftOut } = splitPastWinners(entrants, pastWinnerMatcher(draws, new Set([10])))
+
+    expect(leftOut).toEqual([{ name: 'Alpha', playerId: 1 }, { name: 'delta' }])
+    expect(running).toEqual([{ name: 'Bravo', playerId: 2 }, { name: 'Charlie', playerId: 3 }, { name: 'Echo' }])
+  })
+
+  it('knows a roster winner by the player, whatever the name was', () => {
+    const isPastWinner = pastWinnerMatcher(draws, new Set([10]))
+
+    expect(isPastWinner({ name: 'Alpha', playerId: 1 })).toBe(true)
+    expect(isPastWinner({ name: 'OldAlpha', playerId: 2 })).toBe(false)
+  })
+
+  it('goes by the name, whatever its case, when either side was typed by hand', () => {
+    const isPastWinner = pastWinnerMatcher(draws, new Set([10, 11]))
+
+    // Typed by hand in the past draw, picked from the roster now.
+    expect(isPastWinner({ name: ' DELTA ', playerId: 7 })).toBe(true)
+    // Picked from the roster in the past draw, typed by hand now.
+    expect(isPastWinner({ name: 'bravo' })).toBe(true)
+    expect(isPastWinner({ name: 'oldalpha' })).toBe(true)
+    // Another roster player who only shares the name of a roster winner.
+    expect(isPastWinner({ name: 'Bravo', playerId: 2 })).toBe(false)
+  })
+
+  it('leaves out the winners of several draws together', () => {
+    const { entrants: running, leftOut } = splitPastWinners(entrants, pastWinnerMatcher(draws, new Set([10, 11, 12])))
+
+    expect(leftOut.map((entrant) => entrant.name)).toEqual(['Alpha', 'Charlie', 'delta'])
+    expect(running.map((entrant) => entrant.name)).toEqual(['Bravo', 'Echo'])
+  })
+
+  it('leaves everyone in when no draw is chosen, or a chosen one is gone', () => {
+    expect(splitPastWinners(entrants, pastWinnerMatcher(draws, new Set())).entrants).toEqual(entrants)
+    expect(splitPastWinners(entrants, pastWinnerMatcher(draws, new Set([99]))).leftOut).toEqual([])
+  })
+
+  it('can leave too few to run, which the setup then says', () => {
+    const two = buildEntrants(ROSTER, new Set([1, 3]), '')
+    const { entrants: running } = splitPastWinners(two, pastWinnerMatcher(draws, new Set([10])))
+
+    expect(running).toEqual([{ name: 'Charlie', playerId: 3 }])
+    expect(validatePrizeDraw('t', running, 1, [''])?.key).toBe('entrantsTooFew')
   })
 })
 

@@ -24,7 +24,8 @@ public class PrizeDrawRepository {
     ) {
     }
 
-    public record WinnerRow(Long drawId, int place, String name, String prize) {
+    // playerId: the roster player the winner was picked as, or null for a name typed by hand.
+    public record WinnerRow(Long drawId, int place, String name, Long playerId, String prize) {
     }
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
@@ -106,9 +107,15 @@ public class PrizeDrawRepository {
             return List.of();
         }
         return jdbcTemplate.query(
-            "SELECT draw_id, place, name, prize FROM prize_draw_winners WHERE draw_id IN (:drawIds) ORDER BY draw_id, place",
+            "SELECT draw_id, place, name, player_id, prize FROM prize_draw_winners WHERE draw_id IN (:drawIds) ORDER BY draw_id, place",
             new MapSqlParameterSource("drawIds", drawIds),
-            (row, rowNumber) -> new WinnerRow(row.getLong("draw_id"), row.getInt("place"), row.getString("name"), row.getString("prize"))
+            (row, rowNumber) -> new WinnerRow(
+                row.getLong("draw_id"),
+                row.getInt("place"),
+                row.getString("name"),
+                row.getObject("player_id", Long.class),
+                row.getString("prize")
+            )
         );
     }
 

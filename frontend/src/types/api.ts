@@ -912,6 +912,8 @@ export type PrizeDrawMode = 'FIRST' | 'LAST' | 'CANNON'
 export type PrizeDrawWinner = {
   place: number
   name: string
+  // The roster player the winner was picked as; missing for a name typed by hand, or once the member left.
+  playerId?: number | null
   prize?: string | null
 }
 

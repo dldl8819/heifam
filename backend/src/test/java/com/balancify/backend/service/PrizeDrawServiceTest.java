@@ -197,9 +197,9 @@ class PrizeDrawServiceTest {
             new DrawRow(40L, "first", "FIRST", 30, null, DRAWN.minusDays(7))
         ));
         when(prizeDrawRepository.listWinners(List.of(41L, 40L))).thenReturn(List.of(
-            new WinnerRow(40L, 1, "YOUR_USERNAME", "mouse"),
-            new WinnerRow(40L, 2, "Typed Name", null),
-            new WinnerRow(41L, 1, "OtherUser", null)
+            new WinnerRow(40L, 1, "YOUR_USERNAME", 7L, "mouse"),
+            new WinnerRow(40L, 2, "Typed Name", null, null),
+            new WinnerRow(41L, 1, "OtherUser", 9L, null)
         ));
 
         PrizeDrawListResponse forMember = prizeDrawService.list(1L, MEMBER);
@@ -216,9 +216,9 @@ class PrizeDrawServiceTest {
                 tuple(40L, "first", "FIRST", 30, null, false)
             );
         assertThat(forMember.draws().get(1).winners()).containsExactly(
-            new PrizeDrawWinnerResponse(1, "YOUR_USERNAME", "mouse"), new PrizeDrawWinnerResponse(2, "Typed Name", null)
+            new PrizeDrawWinnerResponse(1, "YOUR_USERNAME", 7L, "mouse"), new PrizeDrawWinnerResponse(2, "Typed Name", null, null)
         );
-        assertThat(forMember.draws().get(0).winners()).containsExactly(new PrizeDrawWinnerResponse(1, "OtherUser", null));
+        assertThat(forMember.draws().get(0).winners()).containsExactly(new PrizeDrawWinnerResponse(1, "OtherUser", 9L, null));
     }
 
     @Test

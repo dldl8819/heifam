@@ -83,7 +83,7 @@ export default function DrawsPage() {
 
       {!loading && !error && list && (
         <>
-          {list.canRun && <PrizeDrawPanel groupId={TEMP_GROUP_ID} onSaved={setList} />}
+          {list.canRun && <PrizeDrawPanel groupId={TEMP_GROUP_ID} draws={list.draws} onSaved={setList} />}
 
           {/* Members get it from the setup when they pick the cannon; this is for anyone the setup is not shown to. */}
           {!list.canRun && <QuickCannon />}
