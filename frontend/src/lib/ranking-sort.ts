@@ -1,10 +1,10 @@
-import { toTierOrder } from '@/lib/player-tier'
 import type { RankingItem } from '@/types/api'
 
-// The ranking's columns a reader can order by: those with a value that runs from high to low.
+// The ranking's columns a reader can order by: those with a value that runs from high to low. The
+// tier is not one: it follows the rank anyway, and the tier shown is the roster's live one, which the
+// rows do not carry, so ordering by the rows' own tier put shown tiers out of order.
 export type RankingSortKey =
   | 'rank'
-  | 'tier'
   | 'currentMmr'
   | 'peakMmr'
   | 'lowestMmr'
@@ -15,7 +15,7 @@ export type RankingSortKey =
   | 'streak'
   | 'mmrDelta'
 
-// 'high': the highest first (the best rank, the top tier, the most games); 'low': the other way.
+// 'high': the highest first (the best rank, the most games); 'low': the other way.
 export type RankingSortOrder = 'high' | 'low'
 
 export type RankingSort = { key: RankingSortKey; order: RankingSortOrder }
@@ -51,9 +51,6 @@ function sortValue(row: RankingItem, key: RankingSortKey): number | null {
   switch (key) {
     case 'rank':
       return -row.rank
-    case 'tier':
-      // A player not placed in a tier yet has no tier to compare.
-      return row.tier === 'UNASSIGNED' ? null : -toTierOrder(row.tier)
     case 'streak':
       return streakValue(row.streak)
     default: {
@@ -65,7 +62,7 @@ function sortValue(row: RankingItem, key: RankingSortKey): number | null {
 
 /**
  * The rows in the order asked for. Rows level on that column keep the ranking's order, and rows
- * with no value there (no MMR yet, no tier) come last either way.
+ * with no value there (no MMR yet) come last either way.
  */
 export function sortRankingRows(rows: readonly RankingItem[], sort: RankingSort): RankingItem[] {
   return [...rows].sort((a, b) => {

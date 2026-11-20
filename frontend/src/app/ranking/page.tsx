@@ -22,7 +22,6 @@ const TEMP_GROUP_ID = 1
 
 const SORT_LABEL_KEYS: Record<RankingSortKey, string> = {
   rank: 'ranking.table.rank',
-  tier: 'ranking.table.tier',
   currentMmr: 'ranking.table.currentMmr',
   peakMmr: 'ranking.table.peakMmr',
   lowestMmr: 'ranking.table.lowestMmr',
@@ -336,7 +335,8 @@ export default function RankingPage() {
               <SortableHeader sortKey="rank" sort={activeSort} onSort={handleSort} />
               <th className="px-4 py-3">{t('ranking.table.nickname')}</th>
               <th className="whitespace-nowrap px-4 py-3">{t('ranking.table.race')}</th>
-              <SortableHeader sortKey="tier" sort={activeSort} onSort={handleSort} />
+              {/* Not a sort: the tier follows the rank. */}
+              <th className="whitespace-nowrap px-4 py-3">{t('ranking.table.tier')}</th>
               {showMmr && <SortableHeader sortKey="currentMmr" sort={activeSort} onSort={handleSort} />}
               {showMmr && <SortableHeader sortKey="peakMmr" sort={activeSort} onSort={handleSort} />}
               {showMmr && <SortableHeader sortKey="lowestMmr" sort={activeSort} onSort={handleSort} />}
