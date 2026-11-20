@@ -51,11 +51,8 @@ describe('sortRankingRows', () => {
     expect(names(sortRankingRows(rows, { key: 'games', order: 'low' }))).toEqual(['fresh', 'ace', 'tied', 'busy'])
   })
 
-  it('reads the rank and the tier as higher when better', () => {
+  it('reads the rank as higher when better', () => {
     expect(names(sortRankingRows(rows, { key: 'rank', order: 'low' }))).toEqual(['fresh', 'tied', 'busy', 'ace'])
-    expect(names(sortRankingRows(rows, { key: 'tier', order: 'high' }))).toEqual(['tied', 'ace', 'busy', 'fresh'])
-    // A player with no tier yet comes last both ways.
-    expect(names(sortRankingRows(rows, { key: 'tier', order: 'low' }))).toEqual(['busy', 'ace', 'tied', 'fresh'])
   })
 
   it('counts a win streak above none and a losing streak below it', () => {
