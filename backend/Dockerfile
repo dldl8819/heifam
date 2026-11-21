@@ -55,4 +55,17 @@ USER 10001:10001
 
 EXPOSE 10000
 
-CMD ["sh", "-c", "java -Dserver.port=${PORT:-10000} -jar /app/app.jar"]
+# Memory, sized so the backend fits Render's 0.5c-512mb plan (half a CPU, 512 MB) with room to spare,
+# and fine on bigger plans. Measured on 2026-11-21 with --memory=512m --cpus=0.5 under up to 120
+# users at once (page cache aside): without these the backend peaked at 435-455 MB, with them (and
+# Tomcat's thread limit in application.yml) at about 360 MB, flat over a 20-minute run.
+# - A serial collector and a 160 MB heap: what is still in use after a full collection is 60-70 MB.
+# - TieredStopAtLevel=1 compiles with C1 only: compiled code takes 32 MB instead of 70, and starting
+#   on half a CPU takes about 20 s instead of 36-42. The backend uses well under 1% of a CPU, so C2's
+#   faster code is not missed (at 18 requests a second the median answer took 0.6 ms longer).
+# - ExitOnOutOfMemoryError: a full heap ends the process, and Render starts it again, instead of
+#   leaving it running half-broken.
+# JAVA_OPTS set on the Render service replaces these.
+ENV JAVA_OPTS="-XX:+UseSerialGC -Xmx160m -XX:TieredStopAtLevel=1 -XX:+ExitOnOutOfMemoryError"
+
+CMD ["sh", "-c", "java $JAVA_OPTS -Dserver.port=${PORT:-10000} -jar /app/app.jar"]
