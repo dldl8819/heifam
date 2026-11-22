@@ -128,6 +128,32 @@ class OperationAuditLogServiceTest {
     }
 
     @Test
+    void recordsAMatchCalledOffForGoingADayWithoutAResult() {
+        OffsetDateTime setUpAt = OffsetDateTime.parse("2026-11-22T14:15:46Z");
+
+        operationAuditLogService.recordAutomaticMatchCancellation(
+            new MatchResultService.DeletedMatchAuditSnapshot(4916L, 1L, setUpAt, false),
+            24
+        );
+
+        ArgumentCaptor<OperationAuditLog> logCaptor = ArgumentCaptor.forClass(OperationAuditLog.class);
+        verify(operationAuditLogRepository).save(logCaptor.capture());
+        OperationAuditLog log = logCaptor.getValue();
+
+        assertThat(log.getAction()).isEqualTo(OperationAuditLogService.ACTION_MATCH_DELETED);
+        assertThat(log.getActorEmail()).isNull();
+        assertThat(log.getActorRole()).isNull();
+        assertThat(log.getActorNickname()).isEqualTo("자동 정리");
+        assertThat(log.getTargetType()).isEqualTo("MATCH");
+        assertThat(log.getTargetId()).isEqualTo(4916L);
+        assertThat(log.getTargetLabel()).isEqualTo("#4916");
+        assertThat(log.getGroupId()).isEqualTo(1L);
+        assertThat(log.getSummary()).isEqualTo("경기 자동 취소 (결과 없이 24시간)");
+        assertThat(log.getDetails())
+            .isEqualTo("matchId=4916, setUpAt=" + setUpAt + ", deletedAt=" + log.getCreatedAt());
+    }
+
+    @Test
     void recordsPrizeEventSteps() {
         operationAuditLogService.recordPrizeEvent(
             OperationAuditLogService.ACTION_PRIZE_EVENT_CONFIRMED, "ops@example.com", "운영진", 5L, 1L, "10월 이벤트", "winners=2, total=15000"

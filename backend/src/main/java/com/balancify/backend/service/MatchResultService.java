@@ -29,6 +29,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.time.OffsetDateTime;
 import org.springframework.beans.factory.annotation.Value;
@@ -1047,6 +1048,11 @@ public class MatchResultService {
             throw new MatchConflictException("시리즈 경기는 시리즈에서 취소해 주세요.");
         }
         return deleteMatch(matchId);
+    }
+
+    @Transactional
+    public Optional<DeletedMatchAuditSnapshot> cancelUnplayedMatchSetUpBefore(Long matchId, OffsetDateTime setUpBefore) {
+        return Optional.empty();
     }
 
     /**

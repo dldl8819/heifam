@@ -480,6 +480,10 @@ public class OperationAuditLogService {
     }
 
     @Transactional
+    public void recordAutomaticMatchCancellation(MatchResultService.DeletedMatchAuditSnapshot snapshot, long afterHours) {
+    }
+
+    @Transactional
     public void recordMatchResultUpdate(
         String actorEmail,
         String actorNickname,

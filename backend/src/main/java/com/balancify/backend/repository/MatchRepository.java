@@ -47,6 +47,23 @@ public interface MatchRepository extends JpaRepository<Match, Long>, JpaSpecific
         @Param("fromInclusive") OffsetDateTime fromInclusive
     );
 
+    // Matches set up before the given time and still waiting for a result, in every group. Series
+    // games are left out: they are called off with their series.
+    @Query("""
+        select m.id
+        from Match m
+        where m.status = com.balancify.backend.domain.MatchStatus.CONFIRMED
+          and m.winningTeam is null
+          and m.seriesId is null
+          and m.balanceSeriesId is null
+          and m.createdAt < :setUpBefore
+        order by m.id asc
+        """)
+    List<Long> findUnplayedMatchIdsSetUpBefore(
+        @Param("setUpBefore") OffsetDateTime setUpBefore,
+        Pageable pageable
+    );
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select m from Match m where m.id = :matchId")
     Optional<Match> findByIdForUpdate(@Param("matchId") Long matchId);

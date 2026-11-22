@@ -1657,6 +1657,63 @@ class MatchResultServiceTest {
     }
 
     @Test
+    void callsOffAMatchLeftWaitingForItsResultSinceBeforeTheCutoff() {
+        OffsetDateTime cutoff = OffsetDateTime.parse("2026-11-22T18:00:00Z");
+        Match match = waitingMatch(91L, cutoff.minusMinutes(1));
+        when(matchRepository.findByIdForUpdate(91L)).thenReturn(Optional.of(match));
+
+        Optional<MatchResultService.DeletedMatchAuditSnapshot> snapshot =
+            matchResultService.cancelUnplayedMatchSetUpBefore(91L, cutoff);
+
+        assertThat(snapshot).isPresent();
+        assertThat(snapshot.get().matchId()).isEqualTo(91L);
+        assertThat(snapshot.get().hadResult()).isFalse();
+        verify(predictionService).revoke(91L);
+        verify(matchParticipantRepository).deleteByMatch_Id(91L);
+        verify(matchRepository).delete(match);
+    }
+
+    @Test
+    void leavesAMatchThatNoLongerQualifiesOnceItIsLocked() {
+        OffsetDateTime cutoff = OffsetDateTime.parse("2026-11-22T18:00:00Z");
+        // Its result went in after the match was picked out.
+        Match played = waitingMatch(90L, cutoff.minusHours(3));
+        played.setStatus(MatchStatus.COMPLETED);
+        played.setWinningTeam("HOME");
+        when(matchRepository.findByIdForUpdate(90L)).thenReturn(Optional.of(played));
+        // Set up right at the cutoff: not a full day yet.
+        when(matchRepository.findByIdForUpdate(89L)).thenReturn(Optional.of(waitingMatch(89L, cutoff)));
+        // Series games are called off with their series.
+        Match tournamentGame = waitingMatch(88L, cutoff.minusHours(3));
+        tournamentGame.setSeriesId(70L);
+        when(matchRepository.findByIdForUpdate(88L)).thenReturn(Optional.of(tournamentGame));
+        Match seriesGame = waitingMatch(87L, cutoff.minusHours(3));
+        seriesGame.setBalanceSeriesId(5L);
+        seriesGame.setSeriesGameNumber(1);
+        when(matchRepository.findByIdForUpdate(87L)).thenReturn(Optional.of(seriesGame));
+        Match cancelled = waitingMatch(86L, cutoff.minusHours(3));
+        cancelled.setStatus(MatchStatus.CANCELLED);
+        when(matchRepository.findByIdForUpdate(86L)).thenReturn(Optional.of(cancelled));
+        // Called off by hand in the meantime.
+        when(matchRepository.findByIdForUpdate(85L)).thenReturn(Optional.empty());
+
+        for (long matchId = 85L; matchId <= 90L; matchId++) {
+            assertThat(matchResultService.cancelUnplayedMatchSetUpBefore(matchId, cutoff)).isEmpty();
+        }
+        verify(matchRepository, never()).delete(any(Match.class));
+        verify(predictionService, never()).revoke(any());
+        verify(matchParticipantRepository, never()).deleteByMatch_Id(any());
+    }
+
+    private static Match waitingMatch(Long id, OffsetDateTime createdAt) {
+        Match match = new Match();
+        match.setId(id);
+        match.setStatus(MatchStatus.CONFIRMED);
+        match.setCreatedAt(createdAt);
+        return match;
+    }
+
+    @Test
     void deletesMatchAndRollsBackPlayerMmr() {
         Match match = new Match();
         match.setId(99L);
