@@ -1050,9 +1050,25 @@ public class MatchResultService {
         return deleteMatch(matchId);
     }
 
+    /**
+     * Calls off a match set up before the given time that nobody entered a result for: the
+     * clean-up of matches left waiting (UnplayedMatchCleanupService). It is checked again under the
+     * lock, so a result that went in meanwhile, a series game or a match already called off is left
+     * alone and nothing is returned.
+     */
     @Transactional
     public Optional<DeletedMatchAuditSnapshot> cancelUnplayedMatchSetUpBefore(Long matchId, OffsetDateTime setUpBefore) {
-        return Optional.empty();
+        Match match = matchRepository.findByIdForUpdate(matchId).orElse(null);
+        if (match == null
+            || match.getStatus() != MatchStatus.CONFIRMED
+            || hasProcessedResult(match.getWinningTeam())
+            || match.getSeriesId() != null
+            || match.getBalanceSeriesId() != null
+            || match.getCreatedAt() == null
+            || !match.getCreatedAt().isBefore(setUpBefore)) {
+            return Optional.empty();
+        }
+        return Optional.of(deleteMatch(matchId));
     }
 
     /**
