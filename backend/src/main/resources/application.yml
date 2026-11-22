@@ -1,6 +1,12 @@
 server:
   port: ${PORT:${SERVER_PORT:8080}}
   forward-headers-strategy: framework
+  tomcat:
+    threads:
+      # Requests worked on at once; more wait their turn. The database pool has 10 connections, so
+      # more threads would mostly wait for one, and each costs memory: Tomcat's default of 200 came
+      # to 145 threads under load, this to 74. SERVER_TOMCAT_THREADS_MAX overrides it.
+      max: 50
 
 spring:
   servlet:

@@ -3,7 +3,9 @@
 # not change the service. When the plan, the runtime or the deploy trigger is changed in the dashboard,
 # change it here too.
 #
-# The backend uses about 470-540 MB of memory, close to the 512 MB of the smaller plans.
+# Before 2026-11-21 the backend used about 470-540 MB of memory, close to the 512 MB of the smaller
+# plans. The JVM settings in backend/Dockerfile (and Tomcat's thread limit in application.yml) were
+# then sized so that it fits 0.5c-512mb; it peaked at about 360 MB under a 512 MB limit.
 services:
   - type: web
     name: heifam
