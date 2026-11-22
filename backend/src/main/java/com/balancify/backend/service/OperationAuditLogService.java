@@ -47,6 +47,8 @@ public class OperationAuditLogService {
     public static final String ACTION_PLAYER_DORMANT = "PLAYER_DORMANT";
     public static final String ACTION_PLAYER_WOKEN = "PLAYER_WOKEN";
     public static final String ACTION_MATCH_DELETED = "MATCH_DELETED";
+    // Shown as the actor of what the server does on its own, such as calling off matches left waiting.
+    static final String AUTOMATIC_ACTOR_NICKNAME = "자동 정리";
     public static final String ACTION_MATCH_RESULT_UPDATED = "MATCH_RESULT_UPDATED";
     public static final String ACTION_NOTICE_POSTED = "NOTICE_POSTED";
     public static final String ACTION_NOTICE_UPDATED = "NOTICE_UPDATED";
@@ -476,6 +478,30 @@ public class OperationAuditLogService {
         // A match that goes before it had a result was called off, not undone.
         log.setSummary(snapshot.hadResult() ? "경기 삭제" : "경기 취소 (결과 입력 전)");
         log.setDetails("matchId=" + snapshot.matchId() + ", deletedAt=" + log.getCreatedAt());
+        operationAuditLogRepository.save(log);
+    }
+
+    /**
+     * A match the clean-up called off after it went the given hours without a result. Nobody asked
+     * for it, so there is no actor email; the audit page shows the actor name instead.
+     */
+    @Transactional
+    public void recordAutomaticMatchCancellation(MatchResultService.DeletedMatchAuditSnapshot snapshot, long afterHours) {
+        if (snapshot == null) {
+            return;
+        }
+
+        OperationAuditLog log = baseLog(
+            null,
+            AUTOMATIC_ACTOR_NICKNAME,
+            ACTION_MATCH_DELETED,
+            "MATCH",
+            snapshot.matchId(),
+            snapshot.matchId() == null ? null : "#" + snapshot.matchId(),
+            snapshot.groupId()
+        );
+        log.setSummary("경기 자동 취소 (결과 없이 " + afterHours + "시간)");
+        log.setDetails("matchId=" + snapshot.matchId() + ", setUpAt=" + snapshot.playedAt() + ", deletedAt=" + log.getCreatedAt());
         operationAuditLogRepository.save(log);
     }
 

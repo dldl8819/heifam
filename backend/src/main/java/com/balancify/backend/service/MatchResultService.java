@@ -29,6 +29,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.time.OffsetDateTime;
 import org.springframework.beans.factory.annotation.Value;
@@ -1047,6 +1048,27 @@ public class MatchResultService {
             throw new MatchConflictException("시리즈 경기는 시리즈에서 취소해 주세요.");
         }
         return deleteMatch(matchId);
+    }
+
+    /**
+     * Calls off a match set up before the given time that nobody entered a result for: the
+     * clean-up of matches left waiting (UnplayedMatchCleanupService). It is checked again under the
+     * lock, so a result that went in meanwhile, a series game or a match already called off is left
+     * alone and nothing is returned.
+     */
+    @Transactional
+    public Optional<DeletedMatchAuditSnapshot> cancelUnplayedMatchSetUpBefore(Long matchId, OffsetDateTime setUpBefore) {
+        Match match = matchRepository.findByIdForUpdate(matchId).orElse(null);
+        if (match == null
+            || match.getStatus() != MatchStatus.CONFIRMED
+            || hasProcessedResult(match.getWinningTeam())
+            || match.getSeriesId() != null
+            || match.getBalanceSeriesId() != null
+            || match.getCreatedAt() == null
+            || !match.getCreatedAt().isBefore(setUpBefore)) {
+            return Optional.empty();
+        }
+        return Optional.of(deleteMatch(matchId));
     }
 
     /**
