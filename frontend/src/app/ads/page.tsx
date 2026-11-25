@@ -59,8 +59,8 @@ const promotions: Promotion[] = [
   {
     title: 'RUNBURST 런버스트',
     description: '달리기와 전투, 무기 성장을 함께 즐기는 러닝 서바이벌 슈팅 게임입니다.',
-    imageSrc: '/promotions/runburst-card.jpg',
-    imageAlt: 'RUNBURST 런버스트 앱 아이콘',
+    imageSrc: '/promotions/runburst-hero.jpg',
+    imageAlt: 'RUNBURST 런버스트 주인공 캐릭터 일러스트',
     highlights: ['드래그 이동 · 탭 점프', '게이트 선택과 무기 조합', '보스전과 버스트 공격'],
     note: '앱 내 구매와 선택형 보상 광고가 있으며, 유료 확률형 아이템이 포함되어 있습니다. 확률 정보는 게임 안 뽑기 화면에서 확인할 수 있습니다.',
     href: 'https://play.google.com/store/apps/details?id=com.surfurspace.runburst',
