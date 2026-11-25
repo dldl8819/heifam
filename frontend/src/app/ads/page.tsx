@@ -51,6 +51,10 @@ const promotions: Promotion[] = [
     ctaLabel: '문피아에서 읽기',
     secondaryHref: 'https://library.munpia.com/heiminsik',
     secondaryCtaLabel: '작가 서재',
+    orderHref: 'https://www.munpia.com/novel/detail/625173',
+    qrImageSrc: '/promotions/gongsosihyo-detective-qr.jpg',
+    qrImageAlt: '공소시효가 보이는 형사 문피아 작품 페이지 QR 코드',
+    qrCtaLabel: 'QR로 작품 페이지 열기',
   },
   {
     title: '장수돼지',
