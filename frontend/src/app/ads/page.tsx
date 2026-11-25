@@ -4,7 +4,6 @@ type Promotion = {
   title: string
   eyebrow?: string
   description: string
-  story?: string[]
   imageSrc: string
   imageAlt: string
   imageHref?: string
@@ -24,25 +23,6 @@ type Promotion = {
 
 const promotions: Promotion[] = [
   {
-    title: '공소시효가 보이는 형사',
-    eyebrow: '서울 민식',
-    description: '렌즈 너머, 남은 날이 보인다. 문피아에 연재하는 현대판타지 미스터리 소설입니다.',
-    story: [
-      '벚꽃이 한창이던 처가 기일, 아내 뒷모습을 찍으려던 형사 윤재석의 핸드폰 화면에 숫자 하나가 떴다.\nD-371.\n회색 옷을 입은 남자는 프레임 한 걸음 앞에서 멈춰 섰다.',
-      '그날부터 렌즈 너머로 사람을 보면, 아직 벌받지 않은 죄의 남은 공소시효가 보인다.\n맨눈으로는 보이지 않는다. 보고서에도 쓸 수 없다. 숫자는 증거가 아니니까.',
-      '14년 전 금은방 강도치사 사건의 수배자.\n공소시효는 1년 남짓 남았다.\n그리고 그 남자가 숨어 지내는 산사의 노승, 그 머리 위 숫자는 줄어들지 않는다.',
-      '남은 날을 세는 형사와, 끝까지 프레임 밖에 남으려는 사람들의 이야기.',
-    ],
-    imageSrc: '/promotions/gongsosihyo-detective-cover.jpg',
-    imageAlt: '공소시효가 보이는 형사 표지',
-    highlights: ['문피아 자유연재', '현대판타지 · 미스터리', '필명 헤이민식'],
-    note: '최신 회차와 연재 일정은 문피아 작품 페이지에서 확인해 주세요.',
-    href: 'https://www.munpia.com/novel/detail/625173',
-    ctaLabel: '문피아에서 읽기',
-    secondaryHref: 'https://library.munpia.com/heiminsik',
-    secondaryCtaLabel: '작가 서재',
-  },
-  {
     title: '가이드런프로젝트',
     eyebrow: '서울 민식',
     description: '시각장애러너와 가이드러너가 함께 달리는 러닝 모임입니다.',
@@ -58,6 +38,19 @@ const promotions: Promotion[] = [
     qrImageSrc: '/promotions/guiderun-project-apply-qr.jpg',
     qrImageAlt: '가이드런프로젝트 참여 신청 QR 코드',
     qrCtaLabel: 'QR로 신청 페이지 열기',
+  },
+  {
+    title: '공소시효가 보이는 형사',
+    eyebrow: '서울 민식',
+    description: '렌즈 너머, 남은 날이 보인다. 문피아에 연재하는 현대판타지 미스터리 소설입니다.',
+    imageSrc: '/promotions/gongsosihyo-detective-cover.jpg',
+    imageAlt: '공소시효가 보이는 형사 표지',
+    highlights: ['문피아 자유연재', '현대판타지 · 미스터리', '필명 헤이민식'],
+    note: '최신 회차와 연재 일정은 문피아 작품 페이지에서 확인해 주세요.',
+    href: 'https://www.munpia.com/novel/detail/625173',
+    ctaLabel: '문피아에서 읽기',
+    secondaryHref: 'https://library.munpia.com/heiminsik',
+    secondaryCtaLabel: '작가 서재',
   },
   {
     title: '장수돼지',
@@ -229,16 +222,6 @@ export default function AdsPage() {
                 )}
                 <p className="text-sm leading-6 break-keep text-slate-600 dark:text-slate-300">{promotion.description}</p>
               </div>
-
-              {promotion.story && (
-                <div className="space-y-3 border-l-2 border-slate-200 pl-3 text-sm leading-6 break-keep text-slate-700 dark:border-slate-600 dark:text-slate-300">
-                  {promotion.story.map((paragraph) => (
-                    <p key={paragraph} className="whitespace-pre-line">
-                      {paragraph}
-                    </p>
-                  ))}
-                </div>
-              )}
 
               <ul className="grid gap-2 text-sm text-slate-700 dark:text-slate-300 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
                 {promotion.highlights.map((highlight) => (
